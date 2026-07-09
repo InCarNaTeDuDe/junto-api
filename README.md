@@ -160,4 +160,11 @@ npm start
 - `npm run dev` - if any backend changes
 - `npx expo start --dev-client --clear` - if UI changes
 
+## Build the APK
+
+- `eas build --profile preview`
+- `eas build --profile production`
+
+Then Install the APK in your mobile
+
 Enjoy building the future of physical social gatherings with **DayMates**! 🌸🤝🎫

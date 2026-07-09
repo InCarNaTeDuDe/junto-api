@@ -51,7 +51,7 @@ try {
 
 const DEV_URL = "http://localhost:8081";
 // Use the shared pre URL which has public access and bypasses Cloud Run cookie/redirect checks.
-const PUBLIC_BACKEND_URL = "http://localhost:3000"; // DEV_URL.replace("ais-dev-", "ais-pre-");
+const PUBLIC_BACKEND_URL = process.env.API_URL || "http://localhost:3000"; // DEV_URL.replace("ais-dev-", "ais-pre-");
 
 export function getApiBaseUrl(): string {
   if (Platform.OS === "web") {

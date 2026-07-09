@@ -1027,16 +1027,11 @@ export default function Login() {
 
       // googleUser.credential -> for web
 
-      const response = await ApiService.post("/api/auth/google", {
+      const data = await ApiService.post("/api/auth/google", {
         idToken:
           Platform.OS === "web" ? googleUser.credential : googleUser.idToken,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to authenticate with backend");
-      }
-
-      const data = await response.json();
       const userObj =
         Platform.OS === "web"
           ? {

@@ -73,9 +73,7 @@ export async function signInWithGoogle() {
     // ============================================================
     // ANDROID / IOS LOGIN
     // ============================================================
-
     await GoogleSignin.hasPlayServices();
-
     const response = await GoogleSignin.signIn();
 
     if (!isSuccessResponse(response)) {
@@ -84,6 +82,7 @@ export async function signInWithGoogle() {
 
     return response.data;
   } catch (error: any) {
+    console.error(`GLogin failed for ${Platform.OS}: `, error);
     if (
       error.code === statusCodes.SIGN_IN_CANCELLED ||
       error.code === statusCodes.IN_PROGRESS

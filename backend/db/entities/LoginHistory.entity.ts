@@ -21,6 +21,7 @@ export class LoginHistory {
   userId!: string;
 
   @ManyToOne(() => User, (user) => user.loginHistory, {
+    nullable: false,
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "userId" })
