@@ -1,0 +1,6 @@
+{
+  "name": "DayMates",
+  "description": "Premium multi-platform platform combining real-world social activities discovery and a secure event ticket swap marketplace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
