@@ -351,7 +351,7 @@ class InMemoryDbStore {
         walletBalance: 0.0,
       },
       {
-        id: "google-sub-alex",
+        id: USER_5,
         name: "Alex Carter",
         email: "alex@daymates.com",
         avatar:
