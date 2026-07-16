@@ -7,6 +7,7 @@ import { auth, OAuth2Client } from "google-auth-library";
 
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./auth/auth.routes";
+import activityRoutes from "./activity/activity.routes";
 import { initializeDatabase } from "./db/data-source";
 
 // Session state variables
@@ -122,12 +123,12 @@ async function startServer() {
     ) {
       return next();
     }
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized. Please sign in via Google.",
-      });
-    }
+    // if (!currentUser) {
+    //   return res.status(401).json({
+    //     success: false,
+    //     error: "Unauthorized. Please sign in via Google.",
+    //   });
+    // }
     next();
   });
 
@@ -176,6 +177,7 @@ async function startServer() {
   // });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/activity", activityRoutes);
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);

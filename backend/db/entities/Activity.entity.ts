@@ -12,6 +12,13 @@ import {
 
 import { User } from "./User.entity";
 
+export enum ActivityCategory {
+  DAY_MATES = "DAY_MATES",
+  MOVIES = "MOVIES",
+  SPORTS = "SPORTS",
+  FOOD = "FOOD",
+}
+
 @Entity("activities")
 export class Activity {
   @PrimaryGeneratedColumn("uuid")
@@ -30,11 +37,11 @@ export class Activity {
   @Column({ type: "varchar" })
   title!: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "text", default: "" })
   description!: string;
 
-  @Column({ type: "varchar" })
-  category!: string;
+  @Column({ type: "enum", enum: ActivityCategory })
+  category!: ActivityCategory;
 
   @Column({ type: "varchar" })
   location!: string;

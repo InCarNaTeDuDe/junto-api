@@ -7,6 +7,7 @@ import { DeviceSession } from "../db/entities/DeviceSession.entity";
 import { LoginHistory } from "../db/entities/LoginHistory.entity";
 import { AuditLog } from "../db/entities/AuditLog.entity";
 import { generateAccessToken } from "./jwt.service";
+import { AppDataSource } from "../db/data-source";
 
 export async function loginWithGoogle(
   request: GoogleLoginSchema,
@@ -109,5 +110,21 @@ export async function loginWithGoogle(
     });
   } catch (error) {
     console.error("Failed to save the user in db", error);
+  }
+}
+
+export async function getCurrentUser(userId: string) {
+  try {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) throw new Error("User not found.");
+    return user;
+  } catch (error) {
+    console.log("auth.service.ts [getCurrentUser] failed:", error);
   }
 }

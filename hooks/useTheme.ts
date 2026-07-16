@@ -1,48 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useColorScheme } from "react-native";
 
-type Theme = 'light' | 'dark';
-
-let globalTheme: Theme = 'light';
-const listeners = new Set<(theme: Theme) => void>();
-
-// Initialize theme from storage (safe for browser iframe & react native environment)
-if (typeof window !== 'undefined' && window.localStorage) {
-  const saved = window.localStorage.getItem('daymates-theme') as Theme;
-  if (saved === 'dark' || saved === 'light') {
-    globalTheme = saved;
-  }
-}
+import { LightTheme, DarkTheme } from "@/theme";
+import { useAuthContext } from "@/context/AuthContext";
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(globalTheme);
+  const { themeMode, setThemeMode } = useAuthContext();
 
-  useEffect(() => {
-    const handleThemeChange = (newTheme: Theme) => {
-      setThemeState(newTheme);
-    };
+  const systemTheme = useColorScheme();
 
-    listeners.add(handleThemeChange);
-    setThemeState(globalTheme);
+  const isDark =
+    themeMode === "system" ? systemTheme === "dark" : themeMode === "dark";
 
-    return () => {
-      listeners.delete(handleThemeChange);
-    };
-  }, []);
+  return {
+    theme: isDark ? DarkTheme : LightTheme,
+    isDark,
 
-  const setTheme = (newTheme: Theme) => {
-    if (newTheme === globalTheme) return;
-    globalTheme = newTheme;
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem('daymates-theme', newTheme);
-    }
-    listeners.forEach((listener) => listener(newTheme));
+    mode: themeMode,
+
+    setTheme: setThemeMode,
+
+    toggleTheme: () => setThemeMode(isDark ? "light" : "dark"),
   };
-
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
-
-  const isDark = theme === 'dark';
-
-  return { theme, isDark, setTheme, toggleTheme };
 }

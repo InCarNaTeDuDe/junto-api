@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { loginWithGoogle } from "./auth.service";
+import { getCurrentUser, loginWithGoogle } from "./auth.service";
 import type { GoogleLoginSchema } from "./auth.schema";
 
 export async function googleLogin(
@@ -21,4 +21,8 @@ export async function googleLogin(
   } catch (err) {
     next(err);
   }
+}
+
+export async function me(req: Request, res: Response) {
+  return res.json({ success: true, user: req.user });
 }

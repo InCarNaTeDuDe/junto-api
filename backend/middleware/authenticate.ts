@@ -1,12 +1,13 @@
 import { NextFunction, Request, Response } from "express";
 
+import { User } from "../db/entities/User.entity";
 import { verifyAccessToken } from "../auth/jwt.service";
-import { db } from "../db"; // <-- Adjust import
+import { AppDataSource } from "../db/data-source";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: User;
     }
   }
 }
@@ -19,17 +20,10 @@ export async function authenticate(
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        error: "Authorization header missing.",
-      });
-    }
-
-    if (!authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid Authorization header.",
+        error: "Authorization token missing.",
       });
     }
 
@@ -37,7 +31,13 @@ export async function authenticate(
 
     const payload = verifyAccessToken(token);
 
-    const user = await db.users.findOne(payload.uid);
+    const userRepository = AppDataSource.getRepository(User);
+
+    const user = await userRepository.findOne({
+      where: {
+        id: payload.uid,
+      },
+    });
 
     if (!user) {
       return res.status(401).json({

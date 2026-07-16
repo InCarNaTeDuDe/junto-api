@@ -1,14 +1,21 @@
+// @ts-nocheck
 import React from "react";
 import { Redirect, Tabs } from "expo-router";
-import { Platform, View, Text } from "react-native";
+import { Platform, View, Text, Pressable } from "react-native";
 import { Home, Compass, Plus, MessageSquare, User } from "lucide-react-native";
 import { useAuthContext } from "@/context/AuthContext";
 import { useStore } from "@/hooks/useStore";
 import { GlobalOverlays } from "@/components/GlobalOverlays";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { createStyles } from ".";
+import { useStyles } from "@/hooks/useStyles";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   const { state } = useStore();
+  const s = useStyles(createStyles);
+
+  const { theme, setThemeMode, themeMode } = useAuthContext();
 
   // Calculate total unread count for Chat Badge
   const totalUnread = state.chats.reduce(
@@ -16,36 +23,38 @@ export default function TabsLayout() {
     0,
   );
 
-  const { isLoggedIn } = useAuthContext();
-
-  if (!isLoggedIn) {
-    return <Redirect href="/login" />;
-  }
-
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: "#030712" }}
-      edges={["top", "left", "right", "bottom"]}
-    >
+    <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
       <View className="flex-1 bg-slate-950">
         <Tabs
           screenOptions={{
             headerShown: false,
+
             tabBarStyle: {
-              backgroundColor: "#030712", // slate-950
-              borderTopColor: "#1e293b", // slate-800
-              borderTopWidth: 1,
-              height:
-                Platform.OS === "web" ? 74 : Platform.OS === "ios" ? 90 : 68,
-              paddingBottom: Platform.OS === "ios" ? 28 : 12,
-              paddingTop: 12,
+              position: "relative",
+
+              bottom: 0,
+
+              height: 64,
+
+              backgroundColor: theme.bg2,
+
+              borderTopWidth: 2,
+
+              elevation: 0,
+              shadowOpacity: 0,
+
+              paddingTop: 0,
+              paddingBottom: 0,
             },
-            tabBarActiveTintColor: "#a855f7", // purple-500
-            tabBarInactiveTintColor: "#64748b", // slate-500
+
+            tabBarActiveTintColor: "#A855F7",
+            tabBarInactiveTintColor: "#8B94A7",
+
             tabBarLabelStyle: {
-              fontSize: 10,
-              fontWeight: "bold",
-              marginTop: 4,
+              fontSize: 11,
+              fontWeight: "600",
+              marginTop: 2,
             },
           }}
         >
@@ -54,10 +63,11 @@ export default function TabsLayout() {
             options={{
               title: "Home",
               tabBarIcon: ({ color, focused }) => (
-                <Home size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+                <Home size={22} color={color} strokeWidth={focused ? 2.6 : 2} />
               ),
             }}
           />
+
           <Tabs.Screen
             name="explore"
             options={{
@@ -66,42 +76,93 @@ export default function TabsLayout() {
                 <Compass
                   size={22}
                   color={color}
-                  strokeWidth={focused ? 2.5 : 2}
+                  strokeWidth={focused ? 2.6 : 2}
                 />
               ),
             }}
           />
+
           <Tabs.Screen
             name="create"
             options={{
-              title: "Create",
-              // tabBarIcon: ({ focused }) => (
-              //   <View className="w-11 h-11 bg-purple-600 rounded-full items-center justify-center -mt-5 border-4 border-slate-950 shadow-md shadow-purple-900/50 active:bg-purple-700">
-              //     <Plus size={20} color="#ffffff" strokeWidth={3} />
-              //   </View>
-              // ),
-              tabBarIcon: ({ color }) => <Plus color={color} size={22} />,
-              tabBarLabelStyle: {
-                fontSize: 10,
-                fontWeight: "bold",
-                marginTop: 4,
-              },
+              title: "",
+
+              tabBarLabel: () => null,
+
+              tabBarIcon: () => (
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+
+                    backgroundColor: "#8B5CF6",
+
+                    alignItems: "center",
+                    justifyContent: "center",
+
+                    marginTop: -40,
+
+                    shadowColor: "#8B5CF6",
+                    shadowOpacity: 0.8,
+                    shadowRadius: 18,
+                    shadowOffset: {
+                      width: 0,
+                      height: 8,
+                    },
+
+                    elevation: 18,
+                  }}
+                >
+                  <Plus size={30} color="#FFFFFF" strokeWidth={2.5} />
+                </View>
+              ),
             }}
           />
+
           <Tabs.Screen
             name="chats"
             options={{
               title: "Chats",
+
               tabBarIcon: ({ color, focused }) => (
-                <View className="relative">
+                <View style={{ position: "relative" }}>
                   <MessageSquare
                     size={22}
                     color={color}
-                    strokeWidth={focused ? 2.5 : 2}
+                    strokeWidth={focused ? 2.6 : 2}
                   />
+
                   {totalUnread > 0 && (
-                    <View className="absolute -top-1.5 -right-1.5 bg-purple-500 min-w-4.5 h-4.5 rounded-full items-center justify-center px-1 border border-slate-950">
-                      <Text className="text-white font-black text-4xs">
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -8,
+
+                        minWidth: 18,
+                        height: 18,
+
+                        borderRadius: 9,
+
+                        backgroundColor: "#A855F7",
+
+                        alignItems: "center",
+                        justifyContent: "center",
+
+                        paddingHorizontal: 4,
+
+                        borderWidth: 2,
+                        borderColor: "#131322",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#FFF",
+                          fontSize: 10,
+                          fontWeight: "700",
+                        }}
+                      >
                         {totalUnread}
                       </Text>
                     </View>
@@ -110,12 +171,14 @@ export default function TabsLayout() {
               ),
             }}
           />
+
           <Tabs.Screen
             name="profile"
             options={{
               title: "Profile",
+
               tabBarIcon: ({ color, focused }) => (
-                <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+                <User size={22} color={color} strokeWidth={focused ? 2.6 : 2} />
               ),
             }}
           />

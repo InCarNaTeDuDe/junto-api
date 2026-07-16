@@ -1,9 +1,8 @@
 import { Router } from "express";
 
-import { googleLogin,me } from "./auth.controller";
-import { GoogleLoginSchema, GoogleWebLoginSchema } from "./auth.schema";
-
 import { validate } from "../middleware/validate";
+import { create } from "./activity.controller";
+import { CreateActivitySchema } from "./activity.schema";
 import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
@@ -18,12 +17,5 @@ const router = Router();
  *   deviceInfo?: {...}
  * }
  */
-router.post(
-  "/google",
-  validate(GoogleWebLoginSchema, GoogleLoginSchema),
-  googleLogin,
-);
-
-router.get("/me", authenticate, me);
-
+router.post("/", authenticate, validate(CreateActivitySchema), create);
 export default router;

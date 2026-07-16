@@ -24,6 +24,7 @@
   "dependencies": {
     "@expo/html-elements": "~0.13.8",
     "@google/genai": "^2.4.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

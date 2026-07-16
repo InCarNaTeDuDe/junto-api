@@ -16,3 +16,4 @@ config.sh
 android/
 ios/
 .vscode/
+*.jks
