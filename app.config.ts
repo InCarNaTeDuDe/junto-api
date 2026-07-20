@@ -30,6 +30,7 @@ const config: ExpoConfig = {
       backgroundColor: "#090212",
     },
     package: IS_DEV ? "com.junto.dev" : "com.junto",
+    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
   },
 
   web: {
@@ -42,6 +43,13 @@ const config: ExpoConfig = {
     "expo-web-browser",
     "expo-secure-store",
     "@react-native-google-signin/google-signin",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Allow Junto to access your location to discover activities near you.",
+      },
+    ],
   ],
 
   scheme: "daymates",

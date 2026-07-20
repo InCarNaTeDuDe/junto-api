@@ -7,6 +7,7 @@ import { Text } from "react-native";
 import "../global.css";
 import { patchFetch } from "../utils/apiHelper";
 import { AuthProvider, useAuthContext } from "@/context/AuthContext";
+import { LocationProvider } from "@/context/LocationContext";
 
 patchFetch();
 
@@ -48,7 +49,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <Suspense fallback={<Text>Loading...</Text>}>
         <AuthProvider>
-          <RootNavigator />
+          <LocationProvider>
+            <RootNavigator />
+          </LocationProvider>
         </AuthProvider>
       </Suspense>
     </SafeAreaProvider>

@@ -43,9 +43,6 @@ export class Activity {
   @Column({ type: "enum", enum: ActivityCategory })
   category!: ActivityCategory;
 
-  @Column({ type: "varchar" })
-  location!: string;
-
   @Column({ type: "timestamp" })
   datetime!: Date;
 
@@ -84,4 +81,38 @@ export class Activity {
     type: "timestamp",
   })
   updatedAt!: Date;
+
+  /* ---------------- Location ---------------- */
+
+  @Column({
+    type: "varchar",
+  })
+  locationName!: string;
+
+  @Column({
+    type: "varchar",
+  })
+  locationState!: string;
+  // for frequent searching index lat,long cols
+  @Index()
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 7,
+  })
+  latitude!: number;
+
+  @Index()
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 7,
+  })
+  longitude!: number;
+
+  @Column({
+    type: "boolean",
+    default: false,
+  })
+  isAutoDetected!: boolean;
 }

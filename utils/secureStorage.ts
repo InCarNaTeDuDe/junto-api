@@ -1,8 +1,10 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import type { SelectedLocation } from "@/context/LocationContext";
 
 const JWT_KEY = "jwtToken";
 const THEME_KEY = "themeMode";
+const LOCATION_KEY = "selectedLocation";
 
 async function saveItem(key: string, value: string) {
   console.log("saving jwt");
@@ -63,4 +65,22 @@ export async function getThemeMode(): Promise<ThemeMode> {
 
 export function removeThemeMode() {
   return removeItem(THEME_KEY);
+}
+
+/* ---------------- Location ---------------- */
+
+export function saveSelectedLocation(location: SelectedLocation) {
+  return saveItem(LOCATION_KEY, JSON.stringify(location));
+}
+
+export async function getSelectedLocation(): Promise<SelectedLocation | null> {
+  const location = await getItem(LOCATION_KEY);
+
+  if (!location) return null;
+
+  return JSON.parse(location);
+}
+
+export function removeSelectedLocation() {
+  return removeItem(LOCATION_KEY);
 }

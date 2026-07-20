@@ -1445,6 +1445,7 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -1517,6 +1518,7 @@ const URGENCY_LEVELS = ["Normal Info", "Urgent Broadcast"];
 
 import { useStyles } from "@/hooks/useStyles"; // adjust path if different
 import { ApiService } from "@/services/api";
+import { useLocation } from "@/context/LocationContext";
 
 const createStyles = (t: any) => {
   // t is your existing theme object. We build a rich token map here so
@@ -1578,7 +1580,6 @@ export default function CreateScreen() {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [matesNeeded, setMatesNeeded] = useState(2);
-  const [location, setLocation] = useState("Bandra, Mumbai");
 
   // Sell Ticket form state
   const [eventName, setEventName] = useState("");
@@ -1600,32 +1601,54 @@ export default function CreateScreen() {
   const close = () => router.back();
   const back = () => setSelected(null);
 
+  const { selectedLocation } = useLocation();
+
   const addDayMate = async (d: any) => {
-    console.log("Day Mate:", d);
+    console.log("DAY MATE added", d);
+    if (!selectedLocation) {
+      Alert.alert("Location required", "Please choose your location first.", [
+        {
+          text: "Choose Location",
+          onPress: () => router.push("/(screens)/location-search"),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]);
+
+      return false;
+    }
+
     try {
       await ApiService.post("/api/activity", d);
-    } catch (error) {
-      console.log("Error creating Day Mate activity", error);
+
+      Alert.alert("Success", "Your Day Mate activity has been created.");
+
+      return true;
+    } catch (e) {
+      Alert.alert("Failed", "Something went wrong.");
+      return false;
     }
   };
   const addTicket = (d: any) => console.log("Ticket:", d);
   const addEvent = (d: any) => console.log("Event:", d);
   const addQuestion = (d: any) => console.log("Question:", d);
 
-  const submit = () => {
+  const submit = async () => {
     if (selected === "day_mates") {
-      addDayMate({
+      await addDayMate({
         activity,
         activityEmoji:
           ACTIVITY_CHOICES.find((a) => a.label === activity)?.emoji ?? "🎉",
         date: meetDate.toISOString(),
         time: meetTime.toISOString(),
         matesNeeded,
-        location,
+        selectedLocation,
       });
     } else if (selected === "sell_ticket") {
       if (!eventName || !sellPrice) return;
-      addTicket({
+      await addTicket({
         eventName,
         origPrice: Number(origPrice) || Number(sellPrice),
         sellPrice: Number(sellPrice),
@@ -1633,7 +1656,7 @@ export default function CreateScreen() {
       });
     } else if (selected === "host_event") {
       if (!hostEventName || !hostLocation) return;
-      addEvent({
+      await addEvent({
         name: hostEventName,
         location: hostLocation,
         type: hostType,
@@ -1641,9 +1664,9 @@ export default function CreateScreen() {
       });
     } else if (selected === "ask_nearby") {
       if (!question) return;
-      addQuestion({ question, topic, urgency });
+      await addQuestion({ question, topic, urgency });
     }
-    router.back();
+    // router.back();
   };
 
   const dateLabel = useMemo(
@@ -1961,8 +1984,8 @@ export default function CreateScreen() {
               >
                 <Ionicons name="location-outline" size={18} color="#94A3B8" />
                 <TextInput
-                  value={location}
-                  onChangeText={setLocation}
+                  value={`${selectedLocation?.name || ""},${selectedLocation?.state || ""}`}
+                  // onChangeText={setLocation}
                   style={styles.locationInput}
                   placeholderTextColor="#64748B"
                 />

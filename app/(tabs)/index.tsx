@@ -529,7 +529,7 @@
 //   });
 
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -541,6 +541,9 @@ import {
   StatusBar,
   Image,
   useWindowDimensions,
+  Alert,
+  ActivityIndicator,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -551,6 +554,9 @@ import { useAuthContext } from "@/context/AuthContext";
 import heroSwap from "@/assets/hero-swap.png";
 import heroMates from "@/assets/hero-mates.png";
 import heroHelp from "@/assets/hero-help.png";
+import { requestCurrentLocation } from "@/services/locationServices";
+import { router } from "expo-router";
+import { useLocation } from "@/context/LocationContext";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -700,27 +706,6 @@ const Chip = ({ icon, label, color, s }) => (
   </Pressable>
 );
 
-// const HeroCard = ({ item, s, width }) => (
-//   <Pressable
-//     style={[
-//       s.hero,
-//       { width, backgroundColor: item.tint2 },
-//       Platform.OS === "web" && {
-//         backgroundImage: `linear-gradient(160deg, ${item.tint} 0%, ${item.tint2} 100%)`,
-//       },
-//       shadow(10),
-//     ]}
-//   >
-//     <View style={s.heroArt}>
-//       <Image source={item.image} style={s.heroImg} resizeMode="contain" />
-//     </View>
-//     <Text style={s.heroTitle}>{item.title}</Text>
-//     <Text style={s.heroSub}>{item.sub}</Text>
-//     <View style={[s.heroArrow, { backgroundColor: item.tint }]}>
-//       <Ionicons name="arrow-forward" size={moderateScale(16)} color="#fff" />
-//     </View>
-//   </Pressable>
-// );
 const HeroCard = ({ item, s, width, artHeight }) => (
   <Pressable
     style={[
@@ -800,6 +785,7 @@ const FeedRow = ({ item, s, C }) => (
 /* ---------- Screen ---------- */
 export default function Home() {
   const s = useStyles(createStyles);
+  const { selectedLocation } = useLocation();
   const { theme, setThemeMode, themeMode, user } = useAuthContext();
   const C = { ...FALLBACK, ...(theme || {}) };
   const { width: winW } = useWindowDimensions();
@@ -833,30 +819,101 @@ export default function Home() {
       >
         <View style={s.header}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.greet}>{getGreeting()} 👋 </Text>
-            <Text style={s.h1}>What brings{"\n"}you here today?</Text>
+            <View style={s.headerRow}>
+              <Text style={s.greet}>{getGreeting()} 👋</Text>
+              <View style={s.headerActions}>
+                <Pressable
+                  onPress={() =>
+                    setThemeMode(themeMode === "dark" ? "light" : "dark")
+                  }
+                  hitSlop={10}
+                  style={s.iconButton}
+                >
+                  <Ionicons
+                    name={
+                      themeMode === "dark" ? "moon-outline" : "sunny-outline"
+                    }
+                    size={20}
+                    color={theme.icon}
+                  />
+                </Pressable>
+                <Pressable style={s.iconButton}>
+                  <Ionicons
+                    name="notifications-outline"
+                    size={20}
+                    color={theme.icon}
+                  />
+                  <View style={s.dot} />
+                </Pressable>
+              </View>
+            </View>
+            <View style={s.locationWrapper}>
+              <Text style={s.h1}>What brings{"\n"}you here today?</Text>
+              {/* ================= LOCATION SELECTOR ================= */}
+              {/* <Pressable
+                onPress={useCurrentLocation}
+                disabled={locationLoading}
+                style={{
+                  opacity: locationLoading ? 0.6 : 1,
+                }}
+              >
+                <View style={{ flexDirection: "row" }}>
+                  <Ionicons name="location" size={20} color={theme.primary} />
+                  <Text style={s.locationTitle}>
+                    {locationLoading
+                      ? "Detecting location..."
+                      : selectedLocation || "Choose your location"}
+                  </Text>
+
+                  {locationLoading ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.primary}
+                      style={{ marginLeft: 6 }}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="chevron-down"
+                      size={18}
+                      color={theme.icon}
+                    />
+                  )}
+                </View>
+              </Pressable> */}
+              <View>
+                <Pressable
+                  // onPress={openLocationMenu}
+                  onPress={() => router.push("/(screens)/location-search")}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    alignSelf: "flex-start",
+                  }}
+                >
+                  <Ionicons name="location" size={20} color={theme.primary} />
+
+                  <Text
+                    style={[
+                      s.locationTitle,
+                      {
+                        marginLeft: 6,
+                        maxWidth: 180,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectedLocation?.name || "Choose your location"}
+                  </Text>
+
+                  <Ionicons
+                    name={"chevron-down"}
+                    size={18}
+                    color={theme.icon}
+                  />
+                </Pressable>
+              </View>
+            </View>
           </View>
-          <Pressable
-            onPress={() =>
-              setThemeMode(themeMode === "dark" ? "light" : "dark")
-            }
-            style={{ marginTop: 10 }}
-            hitSlop={10}
-          >
-            <Ionicons
-              name={themeMode === "dark" ? "moon-outline" : "sunny-outline"}
-              size={24}
-              color={theme.icon}
-            />
-          </Pressable>
-          <Pressable style={s.bell}>
-            <Ionicons
-              name="notifications-outline"
-              size={20}
-              color={theme.icon}
-            />
-            <View style={s.dot} />
-          </Pressable>
         </View>
         {/* Search */}
         <View style={s.searchRow}>
@@ -956,21 +1013,35 @@ export const createStyles = (theme) => {
       gap: scale(6),
       alignItems: "flex-start",
     },
+    locationWrapper: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    locationTitle: { color: C.primary, fontWeight: 700 },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      // marginBottom: verticalScale(14),
+    },
+
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
+
     greet: {
       color: C.primary,
       fontWeight: "700",
       fontSize: moderateScale(13),
-      marginBottom: verticalScale(6),
     },
-    h1: {
-      color: C.text,
-      fontSize: moderateScale(20),
-      fontWeight: "800",
-      lineHeight: moderateScale(24),
-    },
-    bell: {
-      width: scale(42),
-      height: scale(42),
+
+    iconButton: {
+      width: scale(36),
+      height: scale(36),
       borderRadius: scale(21),
       backgroundColor: C.card,
       borderWidth: 1,
@@ -978,20 +1049,29 @@ export const createStyles = (theme) => {
       alignItems: "center",
       justifyContent: "center",
     },
+
     dot: {
       position: "absolute",
-      top: scale(10),
-      right: scale(12),
-      width: scale(8),
-      height: scale(8),
+      top: scale(7),
+      right: scale(8),
+      width: scale(9),
+      height: scale(9),
       borderRadius: scale(4),
       backgroundColor: C.primary,
+      borderWidth: 2,
+      borderColor: C.card,
+    },
+    h1: {
+      color: C.text,
+      fontSize: moderateScale(20),
+      fontWeight: "800",
+      lineHeight: moderateScale(24),
     },
 
     searchRow: {
       flexDirection: "row",
       gap: scale(10),
-      paddingHorizontal: scale(20),
+      paddingHorizontal: scale(10),
       marginTop: verticalScale(20),
     },
     search: {
@@ -1025,9 +1105,9 @@ export const createStyles = (theme) => {
     },
 
     heroScroll: {
-      paddingHorizontal: scale(16),
+      paddingHorizontal: scale(10),
       paddingVertical: verticalScale(12),
-      gap: scale(8),
+      // gap: scale(8),
     },
     hero: {
       borderRadius: scale(22),

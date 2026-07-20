@@ -1,4 +1,4 @@
-import { Activity } from "../db/entities/Activity.entity";
+import { Activity, ActivityCategory } from "../db/entities/Activity.entity";
 import { CreateActivityRequest } from "./activity.schema";
 import { AppDataSource } from "../db/data-source";
 import { User } from "../db/entities/User.entity";
@@ -27,16 +27,19 @@ export async function createActivity(
 
     title: body.activity,
     description: "",
-    category: "DAY_MATES",
+    category: ActivityCategory.DAY_MATES,
 
     activityEmoji: body.activityEmoji,
 
-    location: body.location,
+    locationName: body.locationName,
+    locationState: body.locationState,
+    latitude: body.latitude,
+    longitude: body.longitude,
+    isAutoDetected: body.isAutoDetected ?? false,
 
     datetime: date,
 
     cost: 0,
-
     maxParticipants: body.matesNeeded,
     remainingSeats: body.matesNeeded,
 

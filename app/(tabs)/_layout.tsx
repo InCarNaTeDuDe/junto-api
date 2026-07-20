@@ -10,12 +10,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createStyles } from ".";
 import { useStyles } from "@/hooks/useStyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocation } from "@/context/LocationContext";
 
 export default function TabsLayout() {
   const { state } = useStore();
   const s = useStyles(createStyles);
 
   const { theme, setThemeMode, themeMode } = useAuthContext();
+  const { selectedLocation } = useLocation();
 
   // Calculate total unread count for Chat Badge
   const totalUnread = state.chats.reduce(

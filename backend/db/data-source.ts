@@ -10,7 +10,7 @@ import { Activity } from "./entities/Activity.entity";
 import { Message } from "./entities/Message.entity";
 import { Notification } from "./entities/Notification.entity";
 
-import { inMemoryStore } from "../db"; // <-- adjust path if needed
+// import { inMemoryStore } from "../db"; // <-- adjust path if needed
 
 export let isConnectedToPostgres = false;
 
@@ -21,9 +21,11 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  synchronize: process.env.NODE_ENV !== "production", // Dev Only
-  migrationsRun: process.env.NODE_ENV === "production",
+  synchronize: true,
+  // synchronize: process.env.NODE_ENV !== "production", // Dev Only
+  // migrationsRun: process.env.NODE_ENV === "production",
   logging: false,
+  // dropSchema: true,
   entities: [
     User,
     DeviceSession,
@@ -59,35 +61,35 @@ export async function initializeDatabase() {
 
     console.log("TypeORM: Successfully connected to PostgreSQL.");
 
-    const userRepo = AppDataSource.getRepository(User);
+    // const userRepo = AppDataSource.getRepository(User);
 
-    if ((await userRepo.count()) === 0) {
-      console.log("TypeORM: Seeding initial mock data...");
+    // if ((await userRepo.count()) === 0) {
+    //   console.log("TypeORM: Seeding initial mock data...");
 
-      await userRepo.save(inMemoryStore.users);
+    //   await userRepo.save(inMemoryStore.users);
 
-      await AppDataSource.getRepository(Activity).save(
-        inMemoryStore.activities,
-      );
+    //   await AppDataSource.getRepository(Activity).save(
+    //     inMemoryStore.activities,
+    //   );
 
-      await AppDataSource.getRepository(Ticket).save(inMemoryStore.tickets);
+    //   await AppDataSource.getRepository(Ticket).save(inMemoryStore.tickets);
 
-      await AppDataSource.getRepository(Message).save(inMemoryStore.messages);
+    //   await AppDataSource.getRepository(Message).save(inMemoryStore.messages);
 
-      await AppDataSource.getRepository(Notification).save(
-        inMemoryStore.notifications,
-      );
+    //   await AppDataSource.getRepository(Notification).save(
+    //     inMemoryStore.notifications,
+    //   );
 
-      await AppDataSource.getRepository(DeviceSession).save(
-        inMemoryStore.devices,
-      );
+    //   await AppDataSource.getRepository(DeviceSession).save(
+    //     inMemoryStore.devices,
+    //   );
 
-      await AppDataSource.getRepository(LoginHistory).save(
-        inMemoryStore.loginHistories,
-      );
+    //   await AppDataSource.getRepository(LoginHistory).save(
+    //     inMemoryStore.loginHistories,
+    //   );
 
-      await AppDataSource.getRepository(AuditLog).save(inMemoryStore.auditLogs);
-    }
+    //   await AppDataSource.getRepository(AuditLog).save(inMemoryStore.auditLogs);
+    // }
   } catch (err) {
     console.error(
       "TypeORM: Failed to connect. Falling back to in-memory database.",

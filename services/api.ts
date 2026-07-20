@@ -8,9 +8,13 @@
  */
 
 import { Env } from "@/config/env";
-import { getJwtToken, removeJwtToken } from "@/utils/secureStorage";
+import {
+  getJwtToken,
+  getSelectedLocation,
+  removeJwtToken,
+} from "@/utils/secureStorage";
 
-const BASE_URL = "http://localhost:3000"; /* Env.API_BASE_URL!;*/
+const BASE_URL = /*"http://192.168.29.37:3000"; */ Env.API_BASE_URL!;
 
 const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
 
@@ -45,9 +49,31 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
+  // Add this block
+  let requestBody: any = options.body
+    ? JSON.parse(options.body as string)
+    : undefined;
+
+  if (endpoint.startsWith("/api/activity")) {
+    const location = await getSelectedLocation();
+
+    if (location) {
+      requestBody = {
+        ...requestBody,
+
+        locationName: location.name,
+        locationState: location.state,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        isAutoDetected: false,
+      };
+    }
+  }
+
   const response = await fetch(buildUrl(endpoint), {
     ...options,
     headers,
+    body: requestBody ? JSON.stringify(requestBody) : undefined,
   });
 
   let body: any = null;
