@@ -35,6 +35,12 @@ export class User {
     type: "varchar",
     nullable: true,
   })
+  avatar?: string;
+
+  @Column({
+    type: "varchar",
+    nullable: true,
+  })
   passwordHash?: string;
 
   @CreateDateColumn({

@@ -130,6 +130,7 @@ export default function Login() {
     } catch (e) {
       console.error("Error during Google login", e);
       Alert.alert("Login Failed", String(e));
+      throw e;
     } finally {
       setLoading(false);
     }

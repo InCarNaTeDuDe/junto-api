@@ -17,7 +17,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "prebuildAndroid": "npx expo prebuild --platform android --clean && node scripts/patch-settings-gradle.js",
+    "prebuildAndroid": "APP_VARIANT=prod npx expo prebuild --platform android --clean",
     "android": "npm run prebuildAndroid && npx expo run:android",
     "ios": "expo run:ios",
     "typeorm": "typeorm-ts-node-commonjs",

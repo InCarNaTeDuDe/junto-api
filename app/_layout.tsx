@@ -47,7 +47,7 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Suspense fallback={<Text>Loading...</Text>}>
+      <Suspense fallback={<Text>Loading...!!!!</Text>}>
         <AuthProvider>
           <LocationProvider>
             <RootNavigator />

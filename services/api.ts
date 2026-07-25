@@ -14,7 +14,7 @@ import {
   removeJwtToken,
 } from "@/utils/secureStorage";
 
-const BASE_URL = /*"http://192.168.29.37:3000"; */ Env.API_BASE_URL!;
+const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
 
 const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
 

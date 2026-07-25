@@ -1,533 +1,3 @@
-// // @ts-nocheck
-// import React, { useState } from "react";
-// import {
-//   View,
-//   Text,
-//   ScrollView,
-//   Pressable,
-//   TextInput,
-//   StyleSheet,
-//   Platform,
-//   StatusBar,
-//   SafeAreaView,
-// } from "react-native";
-// import { Ionicons } from "@expo/vector-icons";
-// import { useStyles } from "@/hooks/useStyles";
-// import { useAuthContext } from "@/context/AuthContext";
-
-// /* ---------- Design tokens ---------- */
-// const C = {
-//   bg: "#0B0714",
-//   bg2: "#120A22",
-//   card: "rgba(255,255,255,0.04)",
-//   border: "rgba(255,255,255,0.08)",
-//   text: "#FFFFFF",
-//   sub: "rgba(255,255,255,0.65)",
-//   mute: "rgba(255,255,255,0.45)",
-//   primary: "#A855F7",
-//   primarySoft: "rgba(168,85,247,0.15)",
-//   orange: "#F59E0B",
-//   teal: "#14B8A6",
-//   green: "#22C55E",
-//   blue: "#3B82F6",
-//   pink: "#EC4899",
-// };
-
-// const shadow = (elev = 8, color = "#000") =>
-//   Platform.select({
-//     web: { boxShadow: `0 ${elev}px ${elev * 2}px rgba(0,0,0,0.35)` },
-//     default: {
-//       shadowColor: color,
-//       shadowOffset: { width: 0, height: elev / 2 },
-//       shadowOpacity: 0.35,
-//       shadowRadius: elev,
-//       elevation: elev,
-//     },
-//   });
-
-// /* ---------- Data ---------- */
-// const HERO = [
-//   {
-//     key: "swap",
-//     title: "Swap Tickets",
-//     sub: "Buy or sell movie\ntickets nearby",
-//     tint: "#7C3AED",
-//     tint2: "#4C1D95",
-//     emoji: "🎟️",
-//   },
-//   {
-//     key: "mates",
-//     title: "Day Mates",
-//     sub: "Find buddies for\nactivities & events",
-//     tint: "#EA580C",
-//     tint2: "#7C2D12",
-//     emoji: "🧑‍🤝‍🧑",
-//   },
-//   {
-//     key: "help",
-//     title: "Help Others",
-//     sub: "Lost something?\nFound something?",
-//     tint: "#0D9488",
-//     tint2: "#134E4A",
-//     emoji: "🎒",
-//   },
-// ];
-
-// const ACTIVITIES = [
-//   { key: "walk", label: "Walking", icon: "walk-outline", color: "#A855F7" },
-//   { key: "coffee", label: "Coffee", icon: "cafe-outline", color: "#F59E0B" },
-//   { key: "gym", label: "Gym", icon: "barbell-outline", color: "#3B82F6" },
-//   { key: "movies", label: "Movies", icon: "film-outline", color: "#EC4899" },
-//   { key: "cycle", label: "Cycling", icon: "bicycle-outline", color: "#22C55E" },
-//   { key: "more", label: "More", icon: "apps-outline", color: "#94A3B8" },
-// ];
-
-// const FEED = [
-//   {
-//     type: "MOVIE TICKET",
-//     typeColor: "#A855F7",
-//     title: "Avengers: Endgame",
-//     place: "PVR Phoenix Marketcity, Mumbai",
-//     user: "Rohan",
-//     right: "2 Tickets",
-//     rightSub: "₹500 each",
-//     rightSubColor: "#A855F7",
-//     thumbBg: "#3B1F5E",
-//     thumbEmoji: "🎬",
-//   },
-//   {
-//     type: "MOVIE TICKET",
-//     typeColor: "#A855F7",
-//     title: "Spider-Man: No Way Home",
-//     place: "PVR Icon, Andheri",
-//     user: "Ananya",
-//     right: "2 Tickets",
-//     rightSub: "₹400 each",
-//     rightSubColor: "#A855F7",
-//     thumbBg: "#4B1D1D",
-//     thumbEmoji: "🕷️",
-//   },
-//   {
-//     type: "LOST & FOUND",
-//     typeColor: "#14B8A6",
-//     title: "Black Wallet",
-//     place: "Found near Dadar Station",
-//     user: "Neha",
-//     right: "Found item",
-//     rightColor: "#22C55E",
-//     rightSub: "Daymate Request",
-//     rightSubColor: "#A855F7",
-//     thumbBg: "#1F2937",
-//     thumbEmoji: "👛",
-//   },
-//   {
-//     type: "DAY MATES",
-//     typeColor: "#EA580C",
-//     title: "Morning Walk Buddy",
-//     place: "Bandra Reclamation",
-//     user: "Ananya",
-//     right: "1.1 km away",
-//     rightColor: "#F59E0B",
-//     rightSub: "Daymate Request",
-//     rightSubColor: "#A855F7",
-//     thumbBg: "#1E3A2E",
-//     thumbEmoji: "🌳",
-//   },
-// ];
-
-// /* ---------- Small components ---------- */
-// const Chip = ({ icon, label, color, s }) => (
-//   <Pressable style={s.chip}>
-//     <Ionicons name={icon} size={20} color={color} />
-//     <Text style={s.chipLabel}>{label}</Text>
-//   </Pressable>
-// );
-
-// const HeroCard = ({
-//   item,
-//   s,
-// }: {
-//   item: Hero;
-//   s: ReturnType<typeof createStyles>;
-// }) => (
-//   <Pressable
-//     style={[
-//       s.hero,
-//       { backgroundColor: item.tint2 },
-//       Platform.OS === "web" && {
-//         backgroundImage: `linear-gradient(160deg, ${item.tint} 0%, ${item.tint2} 100%)`,
-//       },
-//       shadow(10),
-//     ]}
-//   >
-//     <View style={s.heroArt}>
-//       <Text style={{ fontSize: 56 }}>{item.emoji}</Text>
-//     </View>
-//     <Text style={s.heroTitle}>{item.title}</Text>
-//     <Text style={s.heroSub}>{item.sub}</Text>
-//     <View style={[s.heroArrow, { backgroundColor: item.tint }]}>
-//       <Ionicons name="arrow-forward" size={16} color="#fff" />
-//     </View>
-//   </Pressable>
-// );
-
-// const FeedRow = ({ item, s }) => (
-//   <Pressable style={s.feedCard}>
-//     <View style={[s.thumb, { backgroundColor: item.thumbBg }]}>
-//       <Text style={{ fontSize: 26 }}>{item.thumbEmoji}</Text>
-//     </View>
-//     <View style={{ flex: 1, minWidth: 0 }}>
-//       <View
-//         style={[
-//           s.badge,
-//           {
-//             backgroundColor: item.typeColor + "22",
-//             borderColor: item.typeColor + "55",
-//           },
-//         ]}
-//       >
-//         <Text style={[s.badgeText, { color: item.typeColor }]}>
-//           {item.type}
-//         </Text>
-//       </View>
-//       <Text style={s.feedTitle} numberOfLines={1}>
-//         {item.title}
-//       </Text>
-//       <Text style={s.feedPlace} numberOfLines={1}>
-//         {item.place}
-//       </Text>
-//       <View style={s.feedUserRow}>
-//         <View style={s.avatar}>
-//           <Text style={{ fontSize: 10, color: "#fff" }}>{item.user[0]}</Text>
-//         </View>
-//         <Text style={s.feedUser}>{item.user}</Text>
-//       </View>
-//     </View>
-//     <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
-//       <Text
-//         style={[s.feedRight, item.rightColor && { color: item.rightColor }]}
-//       >
-//         {item.right}
-//       </Text>
-//       <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
-//         {item.rightSub}
-//       </Text>
-//     </View>
-//     <Ionicons
-//       name="chevron-forward"
-//       size={16}
-//       color={C.mute}
-//       style={{ marginLeft: 4 }}
-//     />
-//   </Pressable>
-// );
-
-// /* ---------- Screen ---------- */
-// export default function Home() {
-//   const s = useStyles(createStyles);
-//   const { theme, setThemeMode, themeMode } = useAuthContext();
-
-//   const [q, setQ] = useState("");
-
-//   return (
-//     <SafeAreaView style={s.safe}>
-//       <StatusBar barStyle="light-content" />
-//       {/* Ambient glows */}
-//       {/* <View pointerEvents="none" style={s.glowTop} />
-//       <View pointerEvents="none" style={s.glowBottom} /> */}
-
-//       <ScrollView
-//         contentContainerStyle={{ paddingBottom: 32 }}
-//         showsVerticalScrollIndicator={false}
-//       >
-//         {/* Header */}
-//         {/* <View style={s.header}>
-//           <View style={{ flex: 1, minWidth: 0 }}>
-//             <Text style={s.greet}>Good morning, Bharath 👋 </Text>
-
-//             <Text style={s.h1}>What brings{"\n"}you here today?</Text>
-//           </View>
-//           <Pressable
-//             onPress={() =>
-//               setThemeMode(themeMode === "dark" ? "light" : "dark")
-//             }
-//             style={{ marginTop: 10 }}
-//             hitSlop={10}
-//           >
-//             <Ionicons
-//               name={themeMode === "dark" ? "moon-outline" : "sunny-outline"}
-//               size={24}
-//               color={theme.icon}
-//             />
-//           </Pressable>
-//           <Pressable style={s.bell}>
-//             <Ionicons name="notifications-outline" size={20} />
-//             <View style={s.dot} />
-//           </Pressable>
-//         </View> */}
-
-//         {/* Search */}
-//         <View style={s.searchRow}>
-//           <View style={s.search}>
-//             <Ionicons name="search" size={18} color={C.mute} />
-//             <TextInput
-//               value={q}
-//               onChangeText={setQ}
-//               placeholder="Search tickets, lost items, day mates…"
-//               placeholderTextColor={C.mute}
-//               style={s.searchInput}
-//             />
-//           </View>
-//           <Pressable style={s.filterBtn}>
-//             <Ionicons name="options-outline" size={18} color="#fff" />
-//           </Pressable>
-//         </View>
-
-//         {/* Hero cards */}
-//         <ScrollView
-//           horizontal
-//           showsHorizontalScrollIndicator={false}
-//           contentContainerStyle={s.heroScroll}
-//         >
-//           {HERO.map((h) => (
-//             <HeroCard key={h.key} item={h} s={s} />
-//           ))}
-//         </ScrollView>
-
-//         {/* Popular activities */}
-//         <View style={s.sectionHead}>
-//           <Text style={s.sectionTitle}>Popular Activities</Text>
-//           <Pressable style={s.viewAll}>
-//             <Text style={s.viewAllText}>View all</Text>
-//             <Ionicons name="chevron-forward" size={14} color={C.primary} />
-//           </Pressable>
-//         </View>
-//         <ScrollView
-//           horizontal
-//           showsHorizontalScrollIndicator={false}
-//           contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
-//         >
-//           {ACTIVITIES.map((item) => {
-//             const { key, ...props } = item;
-//             return <Chip key={key} {...props} s={s} />;
-//           })}
-//         </ScrollView>
-
-//         {/* Popular around you */}
-//         <View style={s.sectionHead}>
-//           <Text style={s.sectionTitle}>Popular around you</Text>
-//           <Pressable style={s.viewAll}>
-//             <Text style={s.viewAllText}>View all</Text>
-//             <Ionicons name="chevron-forward" size={14} color={C.primary} />
-//           </Pressable>
-//         </View>
-//         <View style={{ paddingHorizontal: 20, gap: 10 }}>
-//           {FEED.map((f, i) => (
-//             <FeedRow key={i} item={f} s={s} />
-//           ))}
-//         </View>
-//       </ScrollView>
-//     </SafeAreaView>
-//   );
-// }
-
-// /* ---------- Styles ---------- */
-// export const createStyles = (C: Theme) =>
-//   StyleSheet.create({
-//     safe: { flex: 1, backgroundColor: C.bg },
-//     glowTop: {
-//       position: "absolute",
-//       top: -140,
-//       left: -80,
-//       width: 320,
-//       height: 320,
-//       borderRadius: 160,
-//       backgroundColor: "#4C1D95",
-//       opacity: 0.45,
-//       ...Platform.select({ web: { filter: "blur(80px)" } }),
-//     },
-//     glowBottom: {
-//       position: "absolute",
-//       bottom: 40,
-//       right: -100,
-//       width: 300,
-//       height: 300,
-//       borderRadius: 150,
-//       backgroundColor: "#7C3AED",
-//       opacity: 0.25,
-//       ...Platform.select({ web: { filter: "blur(90px)" } }),
-//     },
-
-//     header: {
-//       flexDirection: "row",
-//       paddingHorizontal: 20,
-//       paddingTop: 16,
-//       gap: 12,
-//       alignItems: "flex-start",
-//     },
-//     greet: {
-//       color: C.primary,
-//       fontWeight: "700",
-//       fontSize: 13,
-//       marginBottom: 6,
-//       textTransform: "capitalize",
-//     },
-//     h1: { color: C.text, fontSize: 30, fontWeight: "800", lineHeight: 36 },
-//     bell: {
-//       width: 44,
-//       height: 44,
-//       borderRadius: 22,
-//       backgroundColor: C.card,
-//       borderWidth: 1,
-//       borderColor: C.border,
-//       alignItems: "center",
-//       justifyContent: "center",
-//     },
-//     dot: {
-//       position: "absolute",
-//       top: 10,
-//       right: 12,
-//       width: 8,
-//       height: 8,
-//       borderRadius: 4,
-//       backgroundColor: C.primary,
-//     },
-
-//     searchRow: {
-//       flexDirection: "row",
-//       gap: 10,
-//       paddingHorizontal: 20,
-//       marginTop: 22,
-//     },
-//     search: {
-//       flex: 1,
-//       flexDirection: "row",
-//       alignItems: "center",
-//       gap: 10,
-//       backgroundColor: C.card,
-//       borderWidth: 1,
-//       borderColor: C.border,
-//       borderRadius: 16,
-//       paddingHorizontal: 14,
-//       height: 48,
-//     },
-//     searchInput: { flex: 1, color: C.text, fontSize: 14, padding: 0 },
-//     filterBtn: {
-//       width: 48,
-//       height: 48,
-//       borderRadius: 14,
-//       backgroundColor: C.card,
-//       borderWidth: 1,
-//       borderColor: C.border,
-//       alignItems: "center",
-//       justifyContent: "center",
-//     },
-
-//     heroScroll: {
-//       paddingHorizontal: 20,
-//       paddingVertical: 20,
-//       gap: 12,
-//       flex: 1,
-//     },
-//     hero: {
-//       flex: 1,
-//       width: 170,
-//       height: 220,
-//       borderRadius: 22,
-//       padding: 14,
-//       marginRight: 12,
-//       overflow: "hidden",
-//     },
-//     heroArt: { height: 100, alignItems: "center", justifyContent: "center" },
-//     heroTitle: { color: "#fff", fontWeight: "800", fontSize: 17, marginTop: 6 },
-//     heroSub: {
-//       color: "rgba(255,255,255,0.8)",
-//       fontSize: 12,
-//       marginTop: 4,
-//       lineHeight: 16,
-//     },
-//     heroArrow: {
-//       marginTop: 10,
-//       width: 30,
-//       height: 30,
-//       borderRadius: 15,
-//       alignItems: "center",
-//       justifyContent: "center",
-//     },
-
-//     sectionHead: {
-//       flexDirection: "row",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       paddingHorizontal: 20,
-//       marginTop: 8,
-//       marginBottom: 12,
-//     },
-//     sectionTitle: { color: C.text, fontSize: 18, fontWeight: "800" },
-//     viewAll: { flexDirection: "row", alignItems: "center", gap: 2 },
-//     viewAllText: { color: C.primary, fontSize: 13, fontWeight: "700" },
-
-//     chip: {
-//       minWidth: 84,
-//       paddingHorizontal: 14,
-//       paddingVertical: 12,
-//       borderRadius: 16,
-//       backgroundColor: C.card,
-//       borderWidth: 1,
-//       borderColor: C.border,
-//       alignItems: "center",
-//       gap: 6,
-//     },
-//     chipLabel: { color: C.text, fontSize: 12, fontWeight: "600" },
-
-//     feedCard: {
-//       flexDirection: "row",
-//       gap: 12,
-//       padding: 12,
-//       backgroundColor: C.card,
-//       borderWidth: 1,
-//       borderColor: C.border,
-//       borderRadius: 18,
-//       alignItems: "center",
-//       marginTop: 12,
-//     },
-//     thumb: {
-//       width: 56,
-//       height: 56,
-//       borderRadius: 12,
-//       alignItems: "center",
-//       justifyContent: "center",
-//     },
-//     badge: {
-//       alignSelf: "flex-start",
-//       paddingHorizontal: 8,
-//       paddingVertical: 3,
-//       borderRadius: 6,
-//       borderWidth: 1,
-//       marginBottom: 4,
-//     },
-//     badgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.6 },
-//     feedTitle: { color: C.text, fontSize: 14, fontWeight: "700" },
-//     feedPlace: { color: C.sub, fontSize: 12, marginTop: 2 },
-//     feedUserRow: {
-//       flexDirection: "row",
-//       alignItems: "center",
-//       gap: 6,
-//       marginTop: 6,
-//     },
-//     avatar: {
-//       width: 18,
-//       height: 18,
-//       borderRadius: 9,
-//       backgroundColor: C.primary,
-//       alignItems: "center",
-//       justifyContent: "center",
-//     },
-//     feedUser: { color: C.primary, fontSize: 11, fontWeight: "700" },
-//     feedRight: { color: C.text, fontSize: 12, fontWeight: "700" },
-//     feedRightSub: { fontSize: 11, fontWeight: "700", marginTop: 20 },
-//   });
-
 // @ts-nocheck
 import React, { useRef, useState } from "react";
 import {
@@ -610,25 +80,25 @@ const HERO = [
     key: "swap",
     title: "Swap Tickets",
     sub: "Buy or sell movie\ntickets nearby",
-    tint: "#7C3AED",
-    tint2: "#3B1670",
-    image: heroSwap,
+    image: require("../../assets/hero-swap.png"),
+    tint: "#7C3AED", // arrow / accent (deeper purple)
+    tint2: "#4C1D95", // card bg (darker purple)
   },
   {
-    key: "mates",
+    key: "daymates",
     title: "Day Mates",
     sub: "Find buddies for\nactivities & events",
-    tint: "#EA580C",
-    tint2: "#7C2D12",
-    image: heroMates,
+    image: require("../../assets/hero-mates.png"),
+    tint: "#F97316", // arrow (orange)
+    tint2: "#7C2D12", // card bg (deep orange/brown)
   },
   {
     key: "help",
     title: "Help Others",
     sub: "Lost something?\nFound something?",
-    tint: "#0D9488",
-    tint2: "#0F3C39",
-    image: heroHelp,
+    image: require("../../assets/hero-help.png"),
+    tint: "#0D9488", // arrow (teal)
+    tint2: "#134E4A", // card bg (deep teal)
   },
 ];
 
@@ -727,6 +197,7 @@ const HeroCard = ({ item, s, width, artHeight }) => (
     </View>
   </Pressable>
 );
+
 const FeedRow = ({ item, s, C }) => (
   <Pressable style={s.feedCard}>
     <View style={[s.thumb, { backgroundColor: item.thumbBg }]}>
@@ -1127,14 +598,16 @@ export const createStyles = (theme) => {
     heroTitle: {
       color: "#fff",
       fontWeight: "800",
-      fontSize: moderateScale(17),
+      fontSize: moderateScale(14),
       marginTop: verticalScale(6),
+      margin: "auto",
     },
     heroSub: {
       color: "rgba(255,255,255,0.8)",
       fontSize: moderateScale(12),
       marginTop: verticalScale(4),
       lineHeight: moderateScale(16),
+      margin: "auto",
     },
     heroArrow: {
       marginTop: verticalScale(10),
@@ -1143,6 +616,7 @@ export const createStyles = (theme) => {
       borderRadius: scale(15),
       alignItems: "center",
       justifyContent: "center",
+      margin: "auto",
     },
 
     sectionHead: {
