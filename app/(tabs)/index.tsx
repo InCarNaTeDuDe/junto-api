@@ -186,6 +186,22 @@ const HeroCard = ({ item, s, width, artHeight }) => (
       },
       shadow(10),
     ]}
+    onPress={() => {
+      console.log("==>", item);
+      switch (item.key) {
+        case "swap":
+          router.push("/(screens)/add-ticket");
+          break;
+        case "daymates":
+          router.push("/(screens)/add-daymate");
+          break;
+        case "help":
+          router.push("/(screens)/ask-nearby");
+          break;
+        default:
+          break;
+      }
+    }}
   >
     <View style={[s.heroArt, { height: artHeight }]}>
       <Image source={item.image} style={s.heroImg} resizeMode="contain" />
@@ -320,37 +336,7 @@ export default function Home() {
             </View>
             <View style={s.locationWrapper}>
               <Text style={s.h1}>What brings{"\n"}you here today?</Text>
-              {/* ================= LOCATION SELECTOR ================= */}
-              {/* <Pressable
-                onPress={useCurrentLocation}
-                disabled={locationLoading}
-                style={{
-                  opacity: locationLoading ? 0.6 : 1,
-                }}
-              >
-                <View style={{ flexDirection: "row" }}>
-                  <Ionicons name="location" size={20} color={theme.primary} />
-                  <Text style={s.locationTitle}>
-                    {locationLoading
-                      ? "Detecting location..."
-                      : selectedLocation || "Choose your location"}
-                  </Text>
 
-                  {locationLoading ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.primary}
-                      style={{ marginLeft: 6 }}
-                    />
-                  ) : (
-                    <Ionicons
-                      name="chevron-down"
-                      size={18}
-                      color={theme.icon}
-                    />
-                  )}
-                </View>
-              </Pressable> */}
               <View>
                 <Pressable
                   // onPress={openLocationMenu}

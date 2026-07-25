@@ -24,7 +24,7 @@ const ASK_CATEGORIES = [
   "Local Advice",
 ];
 
-export const AskNearbyForm: React.FC<AskNearbyFormProps> = ({
+const AskNearbyForm: React.FC<AskNearbyFormProps> = ({
   selectedLocation = "Downtown Area",
   onSubmitSuccess,
 }) => {
@@ -375,3 +375,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+export default AskNearbyForm;

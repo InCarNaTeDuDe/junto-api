@@ -297,7 +297,7 @@ const createStyles = (t: Theme) => {
   };
 };
 
-export const SellTicketForm: React.FC<SellTicketFormProps> = ({
+const SellTicketForm: React.FC<SellTicketFormProps> = ({
   colors: propColors,
   selectedLocation = "Downtown Cinema",
   onSubmitSuccess,
@@ -614,3 +614,5 @@ export const SellTicketForm: React.FC<SellTicketFormProps> = ({
     </ScrollView>
   );
 };
+
+export default SellTicketForm;

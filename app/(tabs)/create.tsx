@@ -30,8 +30,8 @@ import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/theme";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
-import { DayMatesForm } from "../(screens)/add-daymate";
-import { SellTicketForm } from "../(screens)/add-ticket";
+import DayMatesForm from "../(screens)/add-daymate";
+import SellTicketForm from "../(screens)/add-ticket";
 
 /* ---------------- Types & data ---------------- */
 
@@ -586,7 +586,7 @@ const createStyles = (t: Theme) =>
       borderBottomWidth: 1,
       borderBottomColor: t.border,
     },
-    headerLeft: { flexDirection: "row", alignItems: "flex-start", flex: 1 },
+    headerLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
     headerTitle1: { fontWeight: "800", fontSize: 16, flex: 1, color: t.text },
     headerTitle: { fontWeight: "800", fontSize: 16, flex: 1, color: t.text },
     headerSub: { fontSize: 12, fontWeight: "500", marginTop: 2, color: t.sub },

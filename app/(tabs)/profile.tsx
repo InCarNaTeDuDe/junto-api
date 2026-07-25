@@ -470,7 +470,7 @@
 // }
 
 // @ts-nocheck
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
@@ -483,6 +483,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { useAuthContext } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
+import { HeroColors } from "@/theme";
 
 interface ProfileScreenProps {
   onLogout: () => void;
@@ -493,7 +495,10 @@ export default function ProfileScreen({
   onLogout,
   onOpenCreate,
 }: ProfileScreenProps) {
+  const { theme: t, isDark } = useTheme();
+
   const { user, logout } = useAuthContext();
+  const s = useMemo(() => createStyles(t), [t]);
 
   return (
     <View style={s.container}>
@@ -548,11 +553,15 @@ export default function ProfileScreen({
             {/* Quick Stats Grid */}
             <View style={s.statsGrid}>
               <View style={s.statBox}>
-                <Text style={[s.statLabel, { color: "#A78BFA" }]}>Swaps</Text>
+                <Text style={[s.statLabel, { color: HeroColors.swap.tint }]}>
+                  Swaps
+                </Text>
                 <Text style={s.statVal}>14 Deals</Text>
               </View>
               <View style={s.statBox}>
-                <Text style={[s.statLabel, { color: "#FBBF24" }]}>Buddies</Text>
+                <Text style={[s.statLabel, { color: HeroColors.mates.tint }]}>
+                  Buddies
+                </Text>
                 <Text style={s.statVal}>32 Walks</Text>
               </View>
               <View style={s.statBox}>
@@ -685,254 +694,254 @@ const shadow = Platform.select({
   },
   default: {},
 });
-
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#070514",
-  },
-  scrollContent: {
-    paddingBottom: verticalScale(100),
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: scale(20),
-    paddingTop: verticalScale(20),
-    paddingBottom: verticalScale(8),
-  },
-  headerTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  settingsBtn: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.06)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardWrapper: {
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(12),
-  },
-  heroCard: {
-    backgroundColor: "#1E1245",
-    borderRadius: scale(24),
-    borderWidth: 1,
-    borderColor: "rgba(167, 139, 250, 0.08)",
-    padding: scale(16),
-    position: "relative",
-    overflow: "hidden",
-    ...shadow,
-  },
-  spotlight: {
-    position: "absolute",
-    top: "-30%",
-    right: "-15%",
-    width: scale(120),
-    height: scale(120),
-    borderRadius: scale(60),
-    backgroundColor: "rgba(167, 139, 250, 0.15)",
-  },
-  profileHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(12),
-  },
-  avatarWrapper: {
-    position: "relative",
-  },
-  avatar: {
-    width: scale(56),
-    height: scale(56),
-    borderRadius: scale(16),
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  avatarRing: {
-    position: "absolute",
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: scale(18),
-    borderWidth: 1.5,
-    borderColor: "#A78BFA",
-    opacity: 0.8,
-  },
-  profileMeta: {
-    justifyContent: "center",
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(4),
-  },
-  profileName: {
-    fontSize: moderateScale(15),
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  verifiedTag: {
-    fontSize: moderateScale(9),
-    fontWeight: "700",
-    color: "#A78BFA",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: scale(1),
-  },
-  emailText: {
-    fontSize: moderateScale(10),
-    color: "#94A3B8",
-    marginTop: scale(1),
-  },
-  statsGrid: {
-    flexDirection: "row",
-    gap: scale(8),
-    marginTop: verticalScale(16),
-    borderTopWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    paddingTop: verticalScale(12),
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: "rgba(7, 5, 20, 0.6)",
-    borderRadius: scale(10),
-    paddingVertical: scale(8),
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.03)",
-  },
-  statLabel: {
-    fontSize: moderateScale(8),
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  statVal: {
-    fontSize: moderateScale(11.5),
-    fontWeight: "900",
-    color: "#FFFFFF",
-    marginTop: scale(2),
-  },
-  walletWrapper: {
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(12),
-  },
-  walletCard: {
-    backgroundColor: "rgba(18, 14, 44, 0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.03)",
-    borderRadius: scale(18),
-    padding: scale(12),
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  walletLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(10),
-  },
-  walletIconBg: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(10),
-    backgroundColor: "rgba(124, 58, 237, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  walletTexts: {
-    justifyContent: "center",
-  },
-  walletSubtitle: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "700",
-    color: "#94A3B8",
-    textTransform: "uppercase",
-  },
-  walletBalance: {
-    fontSize: moderateScale(12.5),
-    fontWeight: "900",
-    color: "#FFFFFF",
-    marginTop: scale(1),
-  },
-  addCashBtn: {
-    backgroundColor: "#7C3AED",
-    borderRadius: scale(8),
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(6),
-  },
-  addCashBtnText: {
-    fontSize: moderateScale(10.5),
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  optionsSection: {
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(20),
-    gap: scale(8),
-  },
-  optionsSectionTitle: {
-    fontSize: moderateScale(10.5),
-    fontWeight: "900",
-    color: "#94A3B8",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    paddingLeft: scale(2),
-  },
-  optionCard: {
-    backgroundColor: "rgba(18, 14, 44, 0.3)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.02)",
-    borderRadius: scale(16),
-    padding: scale(12),
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  optionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(10),
-  },
-  optionIconBg: {
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(8),
-    backgroundColor: "rgba(124, 58, 237, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  optionLabel: {
-    fontSize: moderateScale(11.5),
-    fontWeight: "700",
-    color: "#E2E8F0",
-  },
-  logoutWrapper: {
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(24),
-  },
-  logoutBtn: {
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    borderRadius: scale(16),
-    paddingVertical: verticalScale(12),
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: scale(6),
-  },
-  logoutBtnText: {
-    fontSize: moderateScale(11),
-    fontWeight: "700",
-    color: "#EF4444",
-  },
-});
+const createStyles = (t: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    scrollContent: {
+      paddingBottom: verticalScale(100),
+    },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: scale(20),
+      paddingTop: verticalScale(20),
+      paddingBottom: verticalScale(8),
+    },
+    headerTitle: {
+      fontSize: moderateScale(18),
+      fontWeight: "900",
+      color: t.text,
+    },
+    settingsBtn: {
+      width: scale(36),
+      height: scale(36),
+      borderRadius: scale(18),
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.06)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cardWrapper: {
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(12),
+    },
+    heroCard: {
+      backgroundColor: t.card,
+      borderRadius: scale(24),
+      borderWidth: 1,
+      borderColor: "rgba(167, 139, 250, 0.08)",
+      padding: scale(16),
+      position: "relative",
+      overflow: "hidden",
+      ...shadow,
+    },
+    spotlight: {
+      position: "absolute",
+      top: "-30%",
+      right: "-15%",
+      width: scale(120),
+      height: scale(120),
+      borderRadius: scale(60),
+      backgroundColor: "rgba(167, 139, 250, 0.15)",
+    },
+    profileHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(12),
+    },
+    avatarWrapper: {
+      position: "relative",
+    },
+    avatar: {
+      width: scale(56),
+      height: scale(56),
+      borderRadius: scale(16),
+      borderWidth: 1.5,
+      borderColor: "rgba(255, 255, 255, 0.2)",
+    },
+    avatarRing: {
+      position: "absolute",
+      top: -2,
+      left: -2,
+      right: -2,
+      bottom: -2,
+      borderRadius: scale(18),
+      borderWidth: 1.5,
+      borderColor: t.primary,
+      opacity: 0.8,
+    },
+    profileMeta: {
+      justifyContent: "center",
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+    },
+    profileName: {
+      fontSize: moderateScale(15),
+      fontWeight: "900",
+      color: t.text,
+    },
+    verifiedTag: {
+      fontSize: moderateScale(9),
+      fontWeight: "700",
+      color: t.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginTop: scale(1),
+    },
+    emailText: {
+      fontSize: moderateScale(10),
+      color: t.sub,
+      marginTop: scale(1),
+    },
+    statsGrid: {
+      flexDirection: "row",
+      gap: scale(8),
+      marginTop: verticalScale(16),
+      borderTopWidth: 0.5,
+      borderColor: "rgba(255, 255, 255, 0.05)",
+      paddingTop: verticalScale(12),
+    },
+    statBox: {
+      flex: 1,
+      backgroundColor: t.bg,
+      borderRadius: scale(10),
+      paddingVertical: scale(8),
+      alignItems: "center",
+      borderWidth: 0.5,
+      borderColor: t.border,
+    },
+    statLabel: {
+      fontSize: moderateScale(8),
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    statVal: {
+      fontSize: moderateScale(11.5),
+      fontWeight: "900",
+      color: t.text,
+      marginTop: scale(2),
+    },
+    walletWrapper: {
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(12),
+    },
+    walletCard: {
+      backgroundColor: t.bg,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: scale(18),
+      padding: scale(12),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    walletLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
+    walletIconBg: {
+      width: scale(36),
+      height: scale(36),
+      borderRadius: scale(10),
+      backgroundColor: "rgba(124, 58, 237, 0.1)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    walletTexts: {
+      justifyContent: "center",
+    },
+    walletSubtitle: {
+      fontSize: moderateScale(8.5),
+      fontWeight: "700",
+      color: t.sub,
+      textTransform: "uppercase",
+    },
+    walletBalance: {
+      fontSize: moderateScale(12.5),
+      fontWeight: "900",
+      color: t.text,
+      marginTop: scale(1),
+    },
+    addCashBtn: {
+      backgroundColor: "#7C3AED",
+      borderRadius: scale(8),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(6),
+    },
+    addCashBtnText: {
+      fontSize: moderateScale(10.5),
+      fontWeight: "900",
+      color: t.text,
+    },
+    optionsSection: {
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(20),
+      gap: scale(8),
+    },
+    optionsSectionTitle: {
+      fontSize: moderateScale(10.5),
+      fontWeight: "900",
+      color: t.sub,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      paddingLeft: scale(2),
+    },
+    optionCard: {
+      backgroundColor: t.bg,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: scale(16),
+      padding: scale(12),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    optionLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
+    optionIconBg: {
+      width: scale(28),
+      height: scale(28),
+      borderRadius: scale(8),
+      backgroundColor: "rgba(124, 58, 237, 0.1)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    optionLabel: {
+      fontSize: moderateScale(11.5),
+      fontWeight: "700",
+      color: t.text,
+    },
+    logoutWrapper: {
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(24),
+    },
+    logoutBtn: {
+      backgroundColor: "rgba(239, 68, 68, 0.15)",
+      borderWidth: 1,
+      borderColor: "rgba(239, 68, 68, 0.2)",
+      borderRadius: scale(16),
+      paddingVertical: verticalScale(12),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(6),
+    },
+    logoutBtnText: {
+      fontSize: moderateScale(11),
+      fontWeight: "700",
+      color: t.error,
+    },
+  });

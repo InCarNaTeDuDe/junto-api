@@ -217,7 +217,7 @@ const createStyles = (t: any) => {
   };
 };
 
-export const DayMatesForm: React.FC<DayMatesFormProps> = ({
+const DayMatesForm: React.FC<DayMatesFormProps> = ({
   colors: propColors,
   selectedLocation = "Bandra, Mumbai",
   onSubmitSuccess,
@@ -452,8 +452,7 @@ export const DayMatesForm: React.FC<DayMatesFormProps> = ({
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.submitButtonText}>
-                Find Mates{" "}
-                <Ionicons name="people" size={22} />
+                Find Mates <Ionicons name="people" size={22} />
               </Text>
             )}
           </TouchableOpacity>
@@ -462,3 +461,5 @@ export const DayMatesForm: React.FC<DayMatesFormProps> = ({
     </ScrollView>
   );
 };
+
+export default DayMatesForm;
