@@ -1,6 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 
-import { createActivity } from "./activity.service";
+import {
+  addTicketForSale,
+  createActivity,
+  exploreByLatLong,
+  fetchUserActivities,
+} from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 
 export async function create(req: Request, res: Response, next: NextFunction) {
@@ -18,4 +23,42 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   } catch (err) {
     next(err);
   }
+}
+
+export async function fetchAllByUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const feed = await fetchUserActivities(req.user!);
+    res.status(200).json({ userActivities: feed });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function exploreByArea(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const activePinsInLocation = await exploreByLatLong(req.body);
+
+    res.status(200).json(activePinsInLocation || []);
+  } catch (error) {}
+}
+
+export async function postTicket(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const d = await addTicketForSale(req.body, req.user!);
+    console.log("-->>>", d);
+
+    res.status(201).json(d || {});
+  } catch (error) {}
 }

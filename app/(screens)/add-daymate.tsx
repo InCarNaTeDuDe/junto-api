@@ -12,6 +12,8 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/hooks/useStyles";
 import { Ionicons } from "@expo/vector-icons";
+import { ApiService } from "@/services/api";
+import { useLocation } from "@/context/LocationContext";
 
 export interface DayMatesFormProps {
   colors?: any;
@@ -225,13 +227,13 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark } = theme;
 
-  const [selectedActivity, setSelectedActivity] = useState("cricket");
+  const [selectedActivity, setSelectedActivity] = useState(ACTIVITIES[0]);
   const [meetingDate, setMeetingDate] = useState(new Date());
   const [meetingTime, setMeetingTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [matesCount, setMatesCount] = useState(2);
-  const [currentLocation] = useState(selectedLocation);
+  const [matesCount, setMatesCount] = useState(1);
+  // const [currentLocation] = useState(selectedLocation);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatDate = (d: Date) =>
@@ -256,20 +258,25 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // const payload = {
+      //   type: "day_mates",
+      //   activity: selectedActivity,
+      //   date: formatDate(meetingDate),
+      //   time: formatTime(meetingTime),
+      //   matesCount,
+      //   location: currentLocation,
+      //   createdAt: new Date().toISOString(),
+      // };
+
       const payload = {
-        type: "day_mates",
-        activity: selectedActivity,
-        date: formatDate(meetingDate),
-        time: formatTime(meetingTime),
-        matesCount,
-        location: currentLocation,
-        createdAt: new Date().toISOString(),
+        activity: selectedActivity.label,
+        activityEmoji: selectedActivity.icon,
+        date: meetingDate.toISOString(),
+        time: meetingTime.toISOString(),
+        matesNeeded: matesCount,
       };
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const activeObj = ACTIVITIES.find((a) => a.id === selectedActivity);
-      const message = `Found ${matesCount} day mates for ${activeObj?.label || selectedActivity} on ${formatDate(meetingDate)} at ${formatTime(meetingTime)} in ${currentLocation}!`;
-
+      const message: string = await ApiService.post("/api/activity", payload);
       if (typeof window !== "undefined" && window.alert) {
         window.alert(message);
       } else {
@@ -278,7 +285,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
 
       onSubmitSuccess?.(payload);
     } catch {
-      Alert.alert("Error", "Failed to submit request.");
+      // Alert.alert("Error", "Failed to submit request.");
     } finally {
       setIsSubmitting(false);
     }
@@ -319,7 +326,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
             showsVerticalScrollIndicator
           >
             {ACTIVITIES.map((act) => {
-              const isSel = selectedActivity === act.id;
+              const isSel = selectedActivity.id === act.id;
               return (
                 <TouchableOpacity
                   key={act.id}
@@ -328,7 +335,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                     isSel ? styles.chipSelected : styles.chipUnselected,
                   ]}
                   activeOpacity={0.8}
-                  onPress={() => setSelectedActivity(act.id)}
+                  onPress={() => setSelectedActivity(act)}
                 >
                   <Text style={styles.chipEmoji}>{act.icon}</Text>
                   <Text
@@ -381,7 +388,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
             </View>
 
             {/* DateTimePicker Components */}
-            {(showDatePicker || Platform.OS === "web") && (
+            {/* {(showDatePicker || Platform.OS === "web") && (
               <View style={styles.pickerWrapper}>
                 <Text style={styles.pickerSubHeader}>Select Date</Text>
                 <DateTimePicker
@@ -405,7 +412,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                   themeVariant={isDark ? "dark" : "light"}
                 />
               </View>
-            )}
+            )} */}
           </View>
 
           {/* Mates Stepper */}
@@ -431,12 +438,12 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
           </View>
 
           {/* Location */}
-          <View style={styles.section}>
+          {/* <View style={styles.section}>
             <Text style={styles.sectionTitle}>Location</Text>
             <View style={styles.locationCard}>
-              <Text style={styles.locationText}>📍 {currentLocation}</Text>
+              <Text style={styles.locationText}>📍 {}</Text>
             </View>
-          </View>
+          </View> */}
 
           {/* Submit */}
           <TouchableOpacity

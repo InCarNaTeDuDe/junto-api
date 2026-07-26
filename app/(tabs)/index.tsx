@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import heroHelp from "@/assets/hero-help.png";
 import { requestCurrentLocation } from "@/services/locationServices";
 import { router } from "expo-router";
 import { useLocation } from "@/context/LocationContext";
+import { ApiService } from "@/services/api";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -269,6 +270,100 @@ const FeedRow = ({ item, s, C }) => (
   </Pressable>
 );
 
+const CATEGORY = {
+  DAY_MATES: {
+    label: "DAY MATES",
+    color: "#EA580C",
+    bg: "#1E3A2E",
+    icon: "people",
+    iconColor: "#4ADE80",
+  },
+  SELL_TICKET: {
+    label: "MOVIE TICKET",
+    color: "#A855F7",
+    bg: "#3B1F5E",
+    icon: "film",
+    iconColor: "#C084FC",
+  },
+  HOST_EVENT: {
+    label: "HOST EVENT",
+    color: "#EF4444",
+    bg: "#4B1D1D",
+    icon: "sparkles",
+    iconColor: "#FCA5A5",
+  },
+  ASK_NEARBY: {
+    label: "ASK NEARBY",
+    color: "#14B8A6",
+    bg: "#1F2937",
+    icon: "help-circle",
+    iconColor: "#94A3B8",
+  },
+};
+
+const UserFeedRow = ({ item, s, C }) => {
+  const meta = CATEGORY[item.category];
+
+  return (
+    <Pressable style={s.feedCard}>
+      <View style={[s.thumb, { backgroundColor: meta.bg }]}>
+        <Ionicons
+          name={meta.icon}
+          size={moderateScale(26)}
+          color={meta.iconColor}
+        />
+      </View>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View
+          style={[
+            s.badge,
+            {
+              backgroundColor: meta.color + "22",
+              borderColor: meta.color + "55",
+            },
+          ]}
+        >
+          <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
+        </View>
+
+        <Text style={s.feedTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+
+        <Text style={s.feedPlace} numberOfLines={1}>
+          {item.locationName}, {item.locationState}
+        </Text>
+
+        <View style={s.feedUserRow}>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>J</Text>
+          </View>
+
+          <Text style={s.feedUser}>{item.organizer?.name ?? "Junto User"}</Text>
+        </View>
+      </View>
+
+      <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
+        <Text style={[s.feedRight, { color: meta.color }]}>
+          {item.remainingSeats}/{item.maxParticipants}
+        </Text>
+
+        <Text style={s.feedRightSub}>
+          {new Date(item.datetime).toLocaleDateString()}
+        </Text>
+      </View>
+
+      <Ionicons
+        name="chevron-forward"
+        size={moderateScale(16)}
+        color={C.mute}
+        style={{ marginLeft: 4 }}
+      />
+    </Pressable>
+  );
+};
+
 /* ---------- Screen ---------- */
 export default function Home() {
   const s = useStyles(createStyles);
@@ -283,6 +378,24 @@ export default function Home() {
   // hero card is ~55% of viewport on phone, capped on wide screens
   // const heroW = Math.min(Math.max(winW * 0.55, 180), 260);
   const { cardW: heroW, artH: heroArtHeight } = useHeroCardSize();
+
+  const [userActs, setUserActs] = useState<[]>([]);
+
+  useEffect(() => {
+    const loadActivities = async () => {
+      try {
+        const { userActivities } = await ApiService.get<{
+          userActivities: any[];
+        }>("/api/activity");
+
+        setUserActs(userActivities);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadActivities();
+  }, []);
 
   const getGreeting = () => {
     const hr = new Date().getHours();
@@ -450,6 +563,9 @@ export default function Home() {
         <View style={{ paddingHorizontal: scale(20), gap: verticalScale(10) }}>
           {FEED.map((f, i) => (
             <FeedRow key={i} item={f} s={s} C={C} />
+          ))}
+          {userActs.map((f, i) => (
+            <UserFeedRow key={i} item={f} s={s} C={C} />
           ))}
         </View>
       </ScrollView>

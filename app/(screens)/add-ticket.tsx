@@ -13,6 +13,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/hooks/useStyles";
 import { Theme } from "@/theme";
+import { ApiService } from "@/services/api";
 
 export interface SellTicketFormProps {
   colors?: any;
@@ -327,6 +328,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
 
   const onDateChange = (_: any, date?: Date) => {
     if (Platform.OS !== "web") setShowDatePicker(false);
+    console.log("DATE CHANEG FROM PICKER --", date);
     if (date) setShowDate(date);
   };
 
@@ -353,21 +355,33 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
     setIsSubmitting(true);
     try {
       const payload = {
-        type: "sell_ticket",
         movieName,
-        showDate: formatDate(showDate),
-        showTime: formatTime(showTime),
+
+        showDate: showDate.toISOString().split("T")[0], // 2026-07-27
+        showTime: showTime.toTimeString().slice(0, 5), // 18:30
+
         originalPrice,
         sellingPrice,
         quantity,
         note,
-        location: selectedLocation,
-        createdAt: new Date().toISOString(),
       };
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      const msg = `Listed ${quantity} ticket(s) for "${movieName}" on ${formatDate(showDate)} at ${formatTime(showTime)} for ₹${sellingPrice}!`;
+      Alert.alert("Payload", JSON.stringify(payload, null, 2));
+      const msg: string = await ApiService.post(
+        "/api/activity/sell-ticket",
+        payload,
+      );
+      // const payload = {
+      //   type: "sell_ticket",
+      //   movieName,
+      //   showDate: formatDate(showDate),
+      //   showTime: formatTime(showTime),
+      //   originalPrice,
+      //   sellingPrice,
+      //   quantity,
+      //   note,
+      //   location: selectedLocation,
+      //   createdAt: new Date().toISOString(),
+      // };
       if (typeof window !== "undefined" && window.alert) window.alert(msg);
       else Alert.alert("Success", msg);
 

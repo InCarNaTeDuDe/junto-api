@@ -34,7 +34,7 @@ const config: ExpoConfig = {
   },
 
   web: {
-    favicon: "./assets/logo.png",
+    favicon: "./assets/icon.png",
     bundler: "metro",
   },
 

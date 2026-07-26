@@ -13,6 +13,7 @@ import {
   getSelectedLocation,
   removeJwtToken,
 } from "@/utils/secureStorage";
+import { Alert } from "react-native";
 
 const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
 
@@ -38,6 +39,11 @@ async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const hasBody = ["POST", "PUT", "PATCH"].includes(method);
+
+  /* ---------------- Authentication ---------------- */
+
   const token = await getJwtToken();
 
   const headers: HeadersInit = {
@@ -49,53 +55,62 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  // Add this block
-  let requestBody: any = options.body
-    ? JSON.parse(options.body as string)
-    : undefined;
+  /* ---------------- Request Body ---------------- */
 
-  if (endpoint.startsWith("/api/activity")) {
+  let requestBody =
+    hasBody && options.body ? JSON.parse(options.body as string) : undefined;
+
+  // Global preprocessing for requests with a body
+  if (hasBody) {
+    // Example:
     const location = await getSelectedLocation();
 
-    if (location) {
-      requestBody = {
-        ...requestBody,
-
-        locationName: location.name,
-        locationState: location.state,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        isAutoDetected: false,
-      };
+    if (!location) {
+      Alert.alert("Error", "Please add location");
+      throw new Error("Location is required");
     }
+
+    requestBody = {
+      ...requestBody,
+      locationName: location.name,
+      locationState: location.state,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      isAutoDetected: location.isAutoDetected,
+    };
   }
 
-  const response = await fetch(buildUrl(endpoint), {
+  /* ---------------- Fetch ---------------- */
+
+  const fetchOptions: RequestInit = {
     ...options,
+    method,
     headers,
-    body: requestBody ? JSON.stringify(requestBody) : undefined,
-  });
+  };
+
+  if (hasBody) {
+    fetchOptions.body = JSON.stringify(requestBody);
+  }
+
+  const response = await fetch(buildUrl(endpoint), fetchOptions);
+
+  /* ---------------- Parse Response ---------------- */
 
   let body: any = null;
 
   try {
     body = await response.json();
   } catch {
-    body = null;
+    // Ignore non-JSON responses
   }
 
-  /**
-   * JWT expired / invalid
-   */
+  /* ---------------- Error Handling ---------------- */
+
   if (response.status === 401) {
     await removeJwtToken();
-
     throw new UnauthorizedError(body?.error ?? "Unauthorized");
   }
 
-  /**
-   * Any other backend error
-   */
   if (!response.ok) {
     throw new ApiError(
       response.status,

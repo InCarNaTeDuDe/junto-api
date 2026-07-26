@@ -16,7 +16,7 @@ function RootNavigator() {
   const segments = useSegments();
 
   if (loading) {
-    return <Text>Loading...</Text>;
+    return <Text>Loading...*********</Text>;
   }
 
   const currentRoute = segments[0];

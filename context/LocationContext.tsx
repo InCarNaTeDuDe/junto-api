@@ -13,6 +13,7 @@ export interface SelectedLocation {
   state?: string;
   latitude?: number;
   longitude?: number;
+  isAutoDetected?: boolean;
 }
 
 interface LocationContextType {

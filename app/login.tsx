@@ -151,7 +151,7 @@ export default function Login() {
               <View style={s.logo}>
                 {/* <Ionicons name="people" size={26} color="#fff" /> */}
                 <Image
-                  source={require("@/assets/logo.png")}
+                  source={require("@/assets/icon.png")}
                   style={{
                     width: 60,
                     height: 54,

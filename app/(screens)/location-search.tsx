@@ -1,11 +1,13 @@
 import { useAuthContext } from "@/context/AuthContext";
 import { useLocation } from "@/context/LocationContext";
 import { CITIES } from "@/data/cities";
+import { useTheme } from "@/hooks/useTheme";
 import { requestCurrentLocation } from "@/services/locationServices";
+import { Theme } from "@/theme";
 import { saveSelectedLocation } from "@/utils/secureStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -14,10 +16,15 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LocationSearch() {
+  const { theme: t, isDark } = useTheme();
+
+  const s = useMemo(() => createStyles(t), [t]);
+
   const { theme } = useAuthContext();
   const [search, setSearch] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
@@ -80,30 +87,15 @@ export default function LocationSearch() {
   };
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={s.wrapper}>
       {/* Header */}
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-        }}
-      >
+      <View style={s.container}>
         <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} />
+          <Ionicons name="arrow-back" color={t.text} size={24} />
         </Pressable>
 
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: "700",
-            marginLeft: 14,
-          }}
-        >
-          Search Location
-        </Text>
+        <Text style={s.heading}>Search Location</Text>
       </View>
 
       {/* Current */}
@@ -185,14 +177,7 @@ export default function LocationSearch() {
           autoFocus
           selectionColor={theme.primary}
           cursorColor={theme.primary}
-          style={{
-            flex: 1,
-            marginLeft: 10,
-
-            color: theme.text,
-            fontSize: 16,
-            fontWeight: "500",
-          }}
+          style={s.input_location}
         />
 
         {search.length > 0 && (
@@ -230,26 +215,17 @@ export default function LocationSearch() {
 
               router.back();
             }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 18,
-              paddingVertical: 16,
-            }}
+            style={s.location_icon}
           >
-            <Ionicons name="location-outline" size={22} />
+            <Ionicons name="location-outline" color={t.text} size={22} />
 
             <View
               style={{
                 marginLeft: 14,
+                borderColor: "red",
               }}
             >
-              <Text
-                style={{
-                  color: "#777",
-                  marginTop: 2,
-                }}
-              >
+              <Text style={s.cityname_result}>
                 {item.name}, {item.state}
               </Text>
             </View>
@@ -259,3 +235,40 @@ export default function LocationSearch() {
     </SafeAreaView>
   );
 }
+
+const createStyles = (t: Theme) =>
+  StyleSheet.create({
+    wrapper: {
+      backgroundColor: t.bg,
+    },
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+    },
+    heading: {
+      color: t.text,
+      fontSize: 22,
+      fontWeight: "700",
+      marginLeft: 14,
+    },
+    input_location: {
+      flex: 1,
+      marginLeft: 10,
+
+      color: t.text,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    location_icon: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+    },
+    cityname_result: {
+      color: t.text,
+      marginTop: 2,
+    },
+  });

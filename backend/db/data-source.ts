@@ -24,7 +24,7 @@ export const AppDataSource = new DataSource({
   // synchronize: true,
   synchronize: process.env.NODE_ENV !== "production", // Dev Only
   // migrationsRun: process.env.NODE_ENV === "production",
-  logging: false,
+  logging: true,
   // dropSchema: true,
   entities: [
     User,
