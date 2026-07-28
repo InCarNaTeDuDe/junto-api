@@ -5,9 +5,9 @@ export const CreateActivitySchema = z.object({
 
   activityEmoji: z.string().trim().min(1).max(10),
 
-  date: z.string().datetime(),
+  date: z.union([z.string(), z.date(), z.number()]),
 
-  time: z.string().datetime(),
+  time: z.union([z.string(), z.date(), z.number()]),
 
   matesNeeded: z
     .number({

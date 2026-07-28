@@ -119,6 +119,8 @@ const FEED = [
     title: "Avengers: Endgame",
     place: "PVR Phoenix Marketcity, Mumbai",
     user: "Rohan",
+    avatar:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     right: "2 Tickets",
     rightSub: "₹500 each",
     rightSubColor: "#A855F7",
@@ -132,6 +134,8 @@ const FEED = [
     title: "Spider-Man: No Way Home",
     place: "PVR Icon, Andheri",
     user: "Ananya",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
     right: "2 Tickets",
     rightSub: "₹400 each",
     rightSubColor: "#A855F7",
@@ -145,6 +149,8 @@ const FEED = [
     title: "Black Wallet",
     place: "Found near Dadar Station",
     user: "Neha",
+    avatar:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
     right: "Found item",
     rightColor: "#22C55E",
     rightSub: "Daymate Request",
@@ -159,6 +165,8 @@ const FEED = [
     title: "Morning Walk Buddy",
     place: "Bandra Reclamation",
     user: "Ananya",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
     right: "1.1 km away",
     rightColor: "#F59E0B",
     rightSub: "Daymate Request",
@@ -214,60 +222,110 @@ const HeroCard = ({ item, s, width, artHeight }) => (
   </Pressable>
 );
 
-const FeedRow = ({ item, s, C }) => (
-  <Pressable style={s.feedCard}>
-    <View style={[s.thumb, { backgroundColor: item.thumbBg }]}>
-      <Ionicons
-        name={item.thumbIcon}
-        size={moderateScale(26)}
-        color={item.thumbIconColor}
-      />
-    </View>
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <View
-        style={[
-          s.badge,
-          {
-            backgroundColor: item.typeColor + "22",
-            borderColor: item.typeColor + "55",
-          },
-        ]}
-      >
-        <Text style={[s.badgeText, { color: item.typeColor }]}>
-          {item.type}
+const FeedRow = ({ item, s, C }) => {
+  const { user } = useAuthContext();
+  const avatarUrl = item.userAvatar || item.avatar;
+
+  const isOwnActivity =
+    (user?.id && item.organizerId === user.id) ||
+    (user?.name &&
+      item.user &&
+      item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
+
+  const handlePress = () => {
+    if (isOwnActivity) {
+      Alert.alert(
+        "Your Activity Post",
+        "You created this activity post! You cannot join or chat with yourself as a partner.",
+      );
+      return;
+    }
+
+    router.push({
+      pathname: "/(screens)/activity-chat",
+      params: {
+        title: item.title,
+        user: item.user,
+        organizerId: item.organizerId,
+        place: item.place,
+        right: item.right,
+        type: item.type,
+        category: item.type,
+        avatar: avatarUrl,
+      },
+    });
+  };
+
+  return (
+    <Pressable style={s.feedCard} onPress={handlePress}>
+      <View style={[s.thumb, { backgroundColor: item.thumbBg }]}>
+        {item.activityEmoji ? (
+          <Text style={{ fontSize: moderateScale(22) }}>
+            {item.activityEmoji}
+          </Text>
+        ) : (
+          <Ionicons
+            name={item.thumbIcon}
+            size={moderateScale(26)}
+            color={item.thumbIconColor}
+          />
+        )}
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View
+          style={[
+            s.badge,
+            {
+              backgroundColor: item.typeColor + "22",
+              borderColor: item.typeColor + "55",
+            },
+          ]}
+        >
+          <Text style={[s.badgeText, { color: item.typeColor }]}>
+            {item.type}
+          </Text>
+        </View>
+        <Text style={s.feedTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={s.feedPlace} numberOfLines={1}>
+          {item.place}
+        </Text>
+        <View style={s.feedUserRow}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={s.userAvatarImg} />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.avatarText}>{item.user?.[0] || "J"}</Text>
+            </View>
+          )}
+          <Text style={s.feedUser}>{item.user}</Text>
+          {isOwnActivity && (
+            <View style={s.youTag}>
+              <Text style={s.youTagText}>YOU</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
+        <Text
+          style={[s.feedRight, item.rightColor && { color: item.rightColor }]}
+        >
+          {item.right}
+        </Text>
+        <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
+          {item.rightSub}
         </Text>
       </View>
-      <Text style={s.feedTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={s.feedPlace} numberOfLines={1}>
-        {item.place}
-      </Text>
-      <View style={s.feedUserRow}>
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>{item.user[0]}</Text>
-        </View>
-        <Text style={s.feedUser}>{item.user}</Text>
-      </View>
-    </View>
-    <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
-      <Text
-        style={[s.feedRight, item.rightColor && { color: item.rightColor }]}
-      >
-        {item.right}
-      </Text>
-      <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
-        {item.rightSub}
-      </Text>
-    </View>
-    <Ionicons
-      name="chevron-forward"
-      size={moderateScale(16)}
-      color={C.mute}
-      style={{ marginLeft: 4 }}
-    />
-  </Pressable>
-);
+      <Ionicons
+        name="chevron-forward"
+        size={moderateScale(16)}
+        color={C.mute}
+        style={{ marginLeft: 4 }}
+      />
+    </Pressable>
+  );
+};
 
 const CATEGORY = {
   DAY_MATES: {
@@ -301,20 +359,54 @@ const CATEGORY = {
 };
 
 const UserFeedRow = ({ item, s, C }) => {
-  const meta = CATEGORY[item.type];
+  const { user } = useAuthContext();
+  const meta = CATEGORY[item.type] || CATEGORY.DAY_MATES;
+  const avatarUrl = item.userAvatar || item.avatar;
 
-  if (!meta.bg) {
-    console.log("--->>>>>", item);
-  }
+  const isOwnActivity =
+    (user?.id && item.organizerId === user.id) ||
+    (user?.name &&
+      item.user &&
+      item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
+
+  const handlePress = () => {
+    if (isOwnActivity) {
+      Alert.alert(
+        "Your Activity Post",
+        "You created this activity post! You cannot join or chat with yourself as a partner.",
+      );
+      return;
+    }
+
+    router.push({
+      pathname: "/(screens)/activity-chat",
+      params: {
+        title: item.title,
+        user: item.user || "Junto User",
+        organizerId: item.organizerId,
+        place: item.place,
+        right: item.right || "Upcoming",
+        type: meta.label,
+        category: meta.label,
+        avatar: avatarUrl,
+      },
+    });
+  };
 
   return (
-    <Pressable style={s.feedCard}>
+    <Pressable style={s.feedCard} onPress={handlePress}>
       <View style={[s.thumb, { backgroundColor: meta.bg }]}>
-        <Ionicons
-          name={meta.icon}
-          size={moderateScale(26)}
-          color={meta.iconColor}
-        />
+        {item.activityEmoji ? (
+          <Text style={{ fontSize: moderateScale(22) }}>
+            {item.activityEmoji}
+          </Text>
+        ) : (
+          <Ionicons
+            name={meta.icon}
+            size={moderateScale(26)}
+            color={meta.iconColor}
+          />
+        )}
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -339,13 +431,22 @@ const UserFeedRow = ({ item, s, C }) => {
         </Text>
 
         <View style={s.feedUserRow}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>
-              {item.user?.charAt(0).toUpperCase() || "J"}
-            </Text>
-          </View>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={s.userAvatarImg} />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.avatarText}>
+                {item.user?.charAt(0).toUpperCase() || "J"}
+              </Text>
+            </View>
+          )}
 
           <Text style={s.feedUser}>{item.user ?? "Junto User"}</Text>
+          {isOwnActivity && (
+            <View style={s.youTag}>
+              <Text style={s.youTagText}>YOU</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -387,7 +488,6 @@ const UserFeedRow = ({ item, s, C }) => {
         </View>
 
         <Text style={[s.feedRight, { color: item.rightColor }]}>
-          {/* {item.remainingSeats}/{item.maxParticipants} */}
           {item.right}
         </Text>
 
@@ -858,6 +958,25 @@ export const createStyles = (theme) => {
       fontSize: moderateScale(10),
       color: "#fff",
       fontWeight: "700",
+    },
+    userAvatarImg: {
+      width: scale(18),
+      height: scale(18),
+      borderRadius: scale(9),
+    },
+    youTag: {
+      backgroundColor: "rgba(168,85,247,0.2)",
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: "rgba(168,85,247,0.4)",
+      marginLeft: 4,
+    },
+    youTagText: {
+      fontSize: moderateScale(8),
+      fontWeight: "800",
+      color: "#C084FC",
     },
     feedRight: {
       color: C.text,

@@ -18,12 +18,14 @@ export async function createActivity(
   const date = new Date(body.date);
   const time = new Date(body.time);
 
-  date.setHours(
-    time.getHours(),
-    time.getMinutes(),
-    time.getSeconds(),
-    time.getMilliseconds(),
-  );
+  if (!isNaN(date.getTime()) && !isNaN(time.getTime())) {
+    date.setHours(
+      time.getHours(),
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+  }
 
   const activity = activityRepository.create({
     organizerId: organizer.id,
@@ -78,7 +80,10 @@ export async function popularActivitiesAround() {
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
 
-            user: activity.organizer.name,
+            user: activity.organizer?.name || "Junto User",
+            userAvatar: activity.organizer?.avatar,
+            organizerId: activity.organizerId,
+            activityEmoji: activity.activityEmoji,
 
             right: `${activity.remainingSeats} Ticket${activity.remainingSeats > 1 ? "s" : ""}`,
             rightSub: `₹${activity.cost} each`,
@@ -101,7 +106,10 @@ export async function popularActivitiesAround() {
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
 
-            user: activity.organizer.name,
+            user: activity.organizer?.name || "Junto User",
+            userAvatar: activity.organizer?.avatar,
+            organizerId: activity.organizerId,
+            activityEmoji: activity.activityEmoji,
 
             // Replace with distance calculation later
             right: `${activity.remainingSeats} Mates`,
@@ -127,7 +135,10 @@ export async function popularActivitiesAround() {
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
 
-            user: activity.organizer.name,
+            user: activity.organizer?.name || "Junto User",
+            userAvatar: activity.organizer?.avatar,
+            organizerId: activity.organizerId,
+            activityEmoji: activity.activityEmoji,
 
             right: `${activity.remainingSeats} Spots`,
             rightColor: "#22C55E",
@@ -152,7 +163,10 @@ export async function popularActivitiesAround() {
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
 
-            user: activity.organizer.name,
+            user: activity.organizer?.name || "Junto User",
+            userAvatar: activity.organizer?.avatar,
+            organizerId: activity.organizerId,
+            activityEmoji: activity.activityEmoji,
 
             right: `${activity.remainingSeats} Seats`,
             rightColor: "#F97316",

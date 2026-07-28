@@ -43,6 +43,9 @@ export class Activity {
   @Column({ type: "enum", enum: ActivityCategory })
   category!: ActivityCategory;
 
+  @Column({ type: "varchar", nullable: true })
+  activityEmoji?: string;
+
   @Column({ type: "timestamp" })
   datetime!: Date;
 

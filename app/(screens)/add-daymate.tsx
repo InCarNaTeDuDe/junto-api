@@ -271,8 +271,8 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
       const payload = {
         activity: selectedActivity.label,
         activityEmoji: selectedActivity.icon,
-        date: meetingDate.toISOString(),
-        time: meetingTime.toISOString(),
+        date: meetingDate,
+        time: meetingTime,
         matesNeeded: matesCount,
       };
 
@@ -285,7 +285,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
 
       onSubmitSuccess?.(payload);
     } catch {
-      // Alert.alert("Error", "Failed to submit request.");
+      Alert.alert("Error", "Failed to submit request.");
     } finally {
       setIsSubmitting(false);
     }
