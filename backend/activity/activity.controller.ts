@@ -31,7 +31,7 @@ export async function fetchActivitiesByLoc(
   next: NextFunction,
 ) {
   try {
-    const feed = await popularActivitiesAround(req.user!);
+    const feed = await popularActivitiesAround();
     res.status(200).json({ userActivities: feed });
   } catch (error) {
     next(error);

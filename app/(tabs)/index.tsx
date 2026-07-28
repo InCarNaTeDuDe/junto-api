@@ -397,7 +397,7 @@ const UserFeedRow = ({ item, s, C }) => {
     <Pressable style={s.feedCard} onPress={handlePress}>
       <View style={[s.thumb, { backgroundColor: meta.bg }]}>
         {item.activityEmoji ? (
-          <Text style={{ fontSize: moderateScale(22) }}>
+          <Text style={{ fontSize: moderateScale(34) }}>
             {item.activityEmoji}
           </Text>
         ) : (
@@ -441,7 +441,9 @@ const UserFeedRow = ({ item, s, C }) => {
             </View>
           )}
 
-          <Text style={s.feedUser}>{item.user ?? "Junto User"}</Text>
+          <Text style={s.feedUser} numberOfLines={1}>
+            {item.user?.split(" ")?.at(0) ?? "Junto User"}
+          </Text>
           {isOwnActivity && (
             <View style={s.youTag}>
               <Text style={s.youTagText}>YOU</Text>
@@ -450,34 +452,50 @@ const UserFeedRow = ({ item, s, C }) => {
         </View>
       </View>
 
-      <View style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <View
-          style={{ gap: verticalScale(3), marginBottom: verticalScale(10) }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <View
+        style={{
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          minWidth: scale(75),
+          paddingLeft: scale(4),
+        }}
+      >
+        <View style={{ gap: verticalScale(2), marginBottom: verticalScale(6) }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+            }}
+          >
             <Ionicons
               name="calendar-outline"
-              size={16}
-              color="#666"
-              style={{ marginRight: 6 }}
+              size={moderateScale(12)}
+              color="#888"
+              style={{ marginRight: 4 }}
             />
-            <Text>
+            <Text style={{ fontSize: moderateScale(10), color: C.sub }}>
               {new Date(item.datetime).toLocaleDateString([], {
                 day: "2-digit",
                 month: "short",
-                year: "numeric",
               })}
             </Text>
           </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+            }}
+          >
             <Ionicons
               name="time-outline"
-              size={16}
-              color="#666"
-              style={{ marginRight: 6 }}
+              size={moderateScale(12)}
+              color="#888"
+              style={{ marginRight: 4 }}
             />
-            <Text>
+            <Text style={{ fontSize: moderateScale(10), color: C.sub }}>
               {new Date(item.datetime).toLocaleTimeString([], {
                 hour: "numeric",
                 minute: "2-digit",
@@ -487,11 +505,18 @@ const UserFeedRow = ({ item, s, C }) => {
           </View>
         </View>
 
-        <Text style={[s.feedRight, { color: item.rightColor }]}>
+        <Text
+          style={[s.feedRight, { color: item.rightColor, textAlign: "right" }]}
+        >
           {item.right}
         </Text>
 
-        <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
+        <Text
+          style={[
+            s.feedRightSub,
+            { color: item.rightSubColor, textAlign: "right" },
+          ]}
+        >
           {item.rightSub}
         </Text>
       </View>
@@ -702,7 +727,7 @@ export default function Home() {
             />
           </Pressable>
         </View>
-        <View style={{ paddingHorizontal: scale(20), gap: verticalScale(10) }}>
+        <View style={{ paddingHorizontal: scale(10), gap: verticalScale(10) }}>
           {FEED.map((f, i) => (
             <FeedRow key={i} item={f} s={s} C={C} />
           ))}
@@ -902,7 +927,7 @@ export const createStyles = (theme) => {
 
     feedCard: {
       flexDirection: "row",
-      gap: scale(12),
+      gap: scale(6),
       padding: scale(12),
       backgroundColor: C.card,
       borderWidth: 1,
@@ -940,6 +965,7 @@ export const createStyles = (theme) => {
       fontSize: moderateScale(12),
       marginTop: 2,
     },
+    feedUser: { color: C.text },
     feedUserRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -956,7 +982,7 @@ export const createStyles = (theme) => {
     },
     avatarText: {
       fontSize: moderateScale(10),
-      color: "#fff",
+      color: C.text,
       fontWeight: "700",
     },
     userAvatarImg: {

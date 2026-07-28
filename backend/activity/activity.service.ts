@@ -5,16 +5,12 @@ import {
 } from "./activity.schema";
 import { AppDataSource } from "../db/data-source";
 import { User } from "../db/entities/User.entity";
+import { activityRepository } from "../db/repository/Activity.repository";
 
 export async function createActivity(
   body: CreateActivityRequest,
   organizer: User,
 ) {
-  const activityRepository = AppDataSource.getRepository(Activity);
-
-  /**
-   * Combine date + time
-   */
   const date = new Date(body.date);
   const time = new Date(body.time);
 
@@ -27,7 +23,7 @@ export async function createActivity(
     );
   }
 
-  const activity = activityRepository.create({
+  return activityRepository.create({
     organizerId: organizer.id,
 
     title: body.activity,
@@ -51,21 +47,10 @@ export async function createActivity(
     participantIds: [],
     tags: [],
   });
-
-  return await activityRepository.save(activity);
 }
 
 export async function popularActivitiesAround() {
-  const activityRepository = AppDataSource.getRepository(Activity);
-
-  const activities = await activityRepository.find({
-    relations: {
-      organizer: true,
-    },
-    order: {
-      createdAt: "DESC",
-    },
-  });
+  const activities = await activityRepository.findAll();
 
   return activities
     .map((activity) => {
@@ -73,112 +58,84 @@ export async function popularActivitiesAround() {
         case ActivityCategory.MOVIES:
           return {
             id: activity.id,
-
             type: ActivityCategory.MOVIES,
             typeColor: "#A855F7",
-
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
-
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
             activityEmoji: activity.activityEmoji,
-
             right: `${activity.remainingSeats} Ticket${activity.remainingSeats > 1 ? "s" : ""}`,
             rightSub: `₹${activity.cost} each`,
             rightSubColor: "#A855F7",
-
             thumbBg: "#3B1F5E",
             thumbIcon: "film",
             thumbIconColor: "#C084FC",
-
-            datetime: activity.createdAt,
+            datetime: activity.datetime,
           };
 
         case ActivityCategory.DAY_MATES:
           return {
             id: activity.id,
-
             type: ActivityCategory.DAY_MATES,
             typeColor: "#EA580C",
-
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
-
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
             activityEmoji: activity.activityEmoji,
-
-            // Replace with distance calculation later
             right: `${activity.remainingSeats} Mates`,
             rightColor: "#F59E0B",
-
             rightSub: `${activity.maxParticipants} Needed`,
             rightSubColor: "#A855F7",
-
             thumbBg: "#1E3A2E",
             thumbIcon: "people",
             thumbIconColor: "#4ADE80",
-
-            datetime: activity.createdAt,
+            datetime: activity.datetime,
           };
 
         case ActivityCategory.SPORTS:
           return {
             id: activity.id,
-
-            type: "SPORTS",
+            type: ActivityCategory.SPORTS,
             typeColor: "#22C55E",
-
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
-
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
             activityEmoji: activity.activityEmoji,
-
             right: `${activity.remainingSeats} Spots`,
             rightColor: "#22C55E",
-
             rightSub: activity.description,
             rightSubColor: "#22C55E",
-
             thumbBg: "#123524",
             thumbIcon: "football",
             thumbIconColor: "#4ADE80",
-
-            datetime: activity.createdAt,
+            datetime: activity.datetime,
           };
 
         case ActivityCategory.FOOD:
           return {
             id: activity.id,
-
-            type: "FOOD",
+            type: ActivityCategory.FOOD,
             typeColor: "#F97316",
-
             title: activity.title,
             place: `${activity.locationName}, ${activity.locationState}`,
-
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
             activityEmoji: activity.activityEmoji,
-
             right: `${activity.remainingSeats} Seats`,
             rightColor: "#F97316",
-
             rightSub: activity.description,
             rightSubColor: "#F97316",
-
             thumbBg: "#3A1F10",
             thumbIcon: "restaurant",
             thumbIconColor: "#FDBA74",
-
-            datetime: activity.createdAt,
+            datetime: activity.datetime,
           };
 
         default:
@@ -187,7 +144,6 @@ export async function popularActivitiesAround() {
     })
     .filter(Boolean);
 }
-
 export async function exploreByLatLong(location: {
   latitude: number;
   longitude: number;

@@ -276,11 +276,11 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
         matesNeeded: matesCount,
       };
 
-      const message: string = await ApiService.post("/api/activity", payload);
+      const res: any = await ApiService.post("/api/activity", payload);
       if (typeof window !== "undefined" && window.alert) {
-        window.alert(message);
+        window.alert(res?.message || "");
       } else {
-        Alert.alert("Success", message);
+        Alert.alert("Success", res?.message || "");
       }
 
       onSubmitSuccess?.(payload);

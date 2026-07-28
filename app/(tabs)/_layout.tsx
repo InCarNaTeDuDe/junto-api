@@ -18,11 +18,35 @@ export default function TabsLayout() {
 
   const { theme, setThemeMode, themeMode } = useAuthContext();
   const { selectedLocation } = useLocation();
+  const [serverUnreadCount, setServerUnreadCount] = React.useState<number>(0);
 
-  // Calculate total unread count for Chat Badge
-  const totalUnread = state.chats.reduce(
-    (acc, chat) => acc + (chat.unreadCount || 0),
-    0,
+  React.useEffect(() => {
+    let isMounted = true;
+    async function checkUnread() {
+      try {
+        const res = await fetch("/api/messages/unread-count");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && typeof data.unreadCount === "number") {
+            setServerUnreadCount(data.unreadCount);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully
+      }
+    }
+    checkUnread();
+    const interval = setInterval(checkUnread, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Calculate total unread count for Chat Badge merging backend and store
+  const totalUnread = Math.max(
+    serverUnreadCount,
+    state.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0),
   );
 
   return (
