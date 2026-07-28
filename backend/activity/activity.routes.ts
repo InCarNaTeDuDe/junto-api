@@ -4,7 +4,7 @@ import { validate } from "../middleware/validate";
 import {
   create,
   exploreByArea,
-  fetchAllByUser,
+  fetchActivitiesByLoc,
   postTicket,
 } from "./activity.controller";
 import { CreateActivitySchema } from "./activity.schema";
@@ -23,7 +23,7 @@ const router = Router();
  * }
  */
 router.post("/", authenticate, validate(CreateActivitySchema), create);
-router.get("/", authenticate, fetchAllByUser);
+router.post("/activities-around", authenticate, fetchActivitiesByLoc);
 
 router.post("/explore", authenticate, exploreByArea);
 

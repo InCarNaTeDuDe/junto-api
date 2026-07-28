@@ -188,7 +188,6 @@ const HeroCard = ({ item, s, width, artHeight }) => (
       shadow(10),
     ]}
     onPress={() => {
-      console.log("==>", item);
       switch (item.key) {
         case "swap":
           router.push("/(screens)/add-ticket");
@@ -278,7 +277,7 @@ const CATEGORY = {
     icon: "people",
     iconColor: "#4ADE80",
   },
-  SELL_TICKET: {
+  MOVIES: {
     label: "MOVIE TICKET",
     color: "#A855F7",
     bg: "#3B1F5E",
@@ -302,7 +301,11 @@ const CATEGORY = {
 };
 
 const UserFeedRow = ({ item, s, C }) => {
-  const meta = CATEGORY[item.category];
+  const meta = CATEGORY[item.type];
+
+  if (!meta.bg) {
+    console.log("--->>>>>", item);
+  }
 
   return (
     <Pressable style={s.feedCard}>
@@ -332,25 +335,64 @@ const UserFeedRow = ({ item, s, C }) => {
         </Text>
 
         <Text style={s.feedPlace} numberOfLines={1}>
-          {item.locationName}, {item.locationState}
+          {item.place}
         </Text>
 
         <View style={s.feedUserRow}>
           <View style={s.avatar}>
-            <Text style={s.avatarText}>J</Text>
+            <Text style={s.avatarText}>
+              {item.user?.charAt(0).toUpperCase() || "J"}
+            </Text>
           </View>
 
-          <Text style={s.feedUser}>{item.organizer?.name ?? "Junto User"}</Text>
+          <Text style={s.feedUser}>{item.user ?? "Junto User"}</Text>
         </View>
       </View>
 
-      <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
-        <Text style={[s.feedRight, { color: meta.color }]}>
-          {item.remainingSeats}/{item.maxParticipants}
+      <View style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <View
+          style={{ gap: verticalScale(3), marginBottom: verticalScale(10) }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color="#666"
+              style={{ marginRight: 6 }}
+            />
+            <Text>
+              {new Date(item.datetime).toLocaleDateString([], {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons
+              name="time-outline"
+              size={16}
+              color="#666"
+              style={{ marginRight: 6 }}
+            />
+            <Text>
+              {new Date(item.datetime).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              })}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[s.feedRight, { color: item.rightColor }]}>
+          {/* {item.remainingSeats}/{item.maxParticipants} */}
+          {item.right}
         </Text>
 
-        <Text style={s.feedRightSub}>
-          {new Date(item.datetime).toLocaleDateString()}
+        <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
+          {item.rightSub}
         </Text>
       </View>
 
@@ -384,9 +426,9 @@ export default function Home() {
   useEffect(() => {
     const loadActivities = async () => {
       try {
-        const { userActivities } = await ApiService.get<{
+        const { userActivities } = await ApiService.post<{
           userActivities: any[];
-        }>("/api/activity");
+        }>("/api/activity/activities-around");
 
         setUserActs(userActivities);
       } catch (error) {
@@ -825,7 +867,7 @@ export const createStyles = (theme) => {
     feedRightSub: {
       fontSize: moderateScale(11),
       fontWeight: "700",
-      marginTop: verticalScale(20),
+      marginTop: verticalScale(10),
     },
   });
 };

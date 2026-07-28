@@ -53,11 +53,125 @@ export async function createActivity(
   return await activityRepository.save(activity);
 }
 
-export async function fetchUserActivities(organizer: User) {
-  try {
-    const activityRepository = AppDataSource.getRepository(Activity);
-    return await activityRepository.findBy({ organizerId: organizer.id });
-  } catch (error) {}
+export async function popularActivitiesAround() {
+  const activityRepository = AppDataSource.getRepository(Activity);
+
+  const activities = await activityRepository.find({
+    relations: {
+      organizer: true,
+    },
+    order: {
+      createdAt: "DESC",
+    },
+  });
+
+  return activities
+    .map((activity) => {
+      switch (activity.category) {
+        case ActivityCategory.MOVIES:
+          return {
+            id: activity.id,
+
+            type: ActivityCategory.MOVIES,
+            typeColor: "#A855F7",
+
+            title: activity.title,
+            place: `${activity.locationName}, ${activity.locationState}`,
+
+            user: activity.organizer.name,
+
+            right: `${activity.remainingSeats} Ticket${activity.remainingSeats > 1 ? "s" : ""}`,
+            rightSub: `₹${activity.cost} each`,
+            rightSubColor: "#A855F7",
+
+            thumbBg: "#3B1F5E",
+            thumbIcon: "film",
+            thumbIconColor: "#C084FC",
+
+            datetime: activity.createdAt,
+          };
+
+        case ActivityCategory.DAY_MATES:
+          return {
+            id: activity.id,
+
+            type: ActivityCategory.DAY_MATES,
+            typeColor: "#EA580C",
+
+            title: activity.title,
+            place: `${activity.locationName}, ${activity.locationState}`,
+
+            user: activity.organizer.name,
+
+            // Replace with distance calculation later
+            right: `${activity.remainingSeats} Mates`,
+            rightColor: "#F59E0B",
+
+            rightSub: `${activity.maxParticipants} Needed`,
+            rightSubColor: "#A855F7",
+
+            thumbBg: "#1E3A2E",
+            thumbIcon: "people",
+            thumbIconColor: "#4ADE80",
+
+            datetime: activity.createdAt,
+          };
+
+        case ActivityCategory.SPORTS:
+          return {
+            id: activity.id,
+
+            type: "SPORTS",
+            typeColor: "#22C55E",
+
+            title: activity.title,
+            place: `${activity.locationName}, ${activity.locationState}`,
+
+            user: activity.organizer.name,
+
+            right: `${activity.remainingSeats} Spots`,
+            rightColor: "#22C55E",
+
+            rightSub: activity.description,
+            rightSubColor: "#22C55E",
+
+            thumbBg: "#123524",
+            thumbIcon: "football",
+            thumbIconColor: "#4ADE80",
+
+            datetime: activity.createdAt,
+          };
+
+        case ActivityCategory.FOOD:
+          return {
+            id: activity.id,
+
+            type: "FOOD",
+            typeColor: "#F97316",
+
+            title: activity.title,
+            place: `${activity.locationName}, ${activity.locationState}`,
+
+            user: activity.organizer.name,
+
+            right: `${activity.remainingSeats} Seats`,
+            rightColor: "#F97316",
+
+            rightSub: activity.description,
+            rightSubColor: "#F97316",
+
+            thumbBg: "#3A1F10",
+            thumbIcon: "restaurant",
+            thumbIconColor: "#FDBA74",
+
+            datetime: activity.createdAt,
+          };
+
+        default:
+          return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 export async function exploreByLatLong(location: {

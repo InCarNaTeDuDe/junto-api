@@ -4,7 +4,7 @@ import {
   addTicketForSale,
   createActivity,
   exploreByLatLong,
-  fetchUserActivities,
+  popularActivitiesAround,
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 
@@ -25,13 +25,13 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export async function fetchAllByUser(
+export async function fetchActivitiesByLoc(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const feed = await fetchUserActivities(req.user!);
+    const feed = await popularActivitiesAround(req.user!);
     res.status(200).json({ userActivities: feed });
   } catch (error) {
     next(error);
