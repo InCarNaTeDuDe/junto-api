@@ -33,13 +33,21 @@ export class ActivityRepository {
   }
 
   async findUserActivities(userId: string) {
-    return this.repo
-      .createQueryBuilder("activity")
-      .leftJoinAndSelect("activity.organizer", "organizer")
-      .where("activity.organizerId = :userId", { userId })
-      .orWhere(":userId = ANY(activity.participantIds)", { userId }) // Postgres array
-      .orderBy("activity.createdAt", "DESC")
-      .getMany();
+    // return this.repo
+    //   .createQueryBuilder("activity")
+    //   .leftJoinAndSelect("activity.organizer", "organizer")
+    //   .where("activity.organizerId = :userId", { userId })
+    //   .orWhere(":userId = ANY(activity.participantIds)", { userId }) // Postgres array
+    //   .orderBy("activity.createdAt", "DESC")
+    //   .getMany();
+
+    const activities = await this.findAll();
+
+    return activities.filter(
+      (activity) =>
+        activity.organizerId === userId ||
+        activity.participantIds?.includes(userId),
+    );
   }
 }
 

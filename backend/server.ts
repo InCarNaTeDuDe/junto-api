@@ -8,6 +8,7 @@ import { auth, OAuth2Client } from "google-auth-library";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./auth/auth.routes";
 import activityRoutes from "./activity/activity.routes";
+import messagesRoutes from "./messages/messages.routes";
 import { initializeDatabase } from "./db/data-source";
 
 // Session state variables
@@ -178,6 +179,7 @@ async function startServer() {
 
   app.use("/api/auth", authRoutes);
   app.use("/api/activity", activityRoutes);
+  app.use("/api/messages", messagesRoutes);
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);

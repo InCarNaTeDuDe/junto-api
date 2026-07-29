@@ -11,6 +11,7 @@ import { createStyles } from ".";
 import { useStyles } from "@/hooks/useStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocation } from "@/context/LocationContext";
+import { ApiService } from "@/services/api";
 
 export default function TabsLayout() {
   const { state } = useStore();
@@ -24,19 +25,19 @@ export default function TabsLayout() {
     let isMounted = true;
     async function checkUnread() {
       try {
-        const res = await fetch("/api/messages/unread-count");
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && typeof data.unreadCount === "number") {
-            setServerUnreadCount(data.unreadCount);
-          }
-        }
+        const res = await ApiService.get("/api/messages/unread-count");
+        // if (res.ok) {
+        //   const data = await res.json();
+        //   if (isMounted && typeof data.unreadCount === "number") {
+        //     setServerUnreadCount(data.unreadCount);
+        //   }
+        // }
       } catch (err) {
         // Fallback gracefully
       }
     }
     checkUnread();
-    const interval = setInterval(checkUnread, 5000);
+    const interval = setInterval(checkUnread, 120000);
     return () => {
       isMounted = false;
       clearInterval(interval);
