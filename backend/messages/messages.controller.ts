@@ -18,12 +18,14 @@ export async function getChannels(req: Request, res: Response) {
 
 export async function getMessages(req: Request, res: Response) {
   try {
-    const chatId = (req.query.chatId || req.body.chatId) as string;
-    if (!chatId) {
-      return res.status(400).json({ error: "chatId parameter is required" });
+    const activityId = (req.query.activityId || req.body.activityId) as string;
+    if (!activityId) {
+      return res
+        .status(400)
+        .json({ error: "activityId parameter is required" });
     }
 
-    const messages = await fetchMessages(chatId);
+    const messages = await fetchMessages(activityId);
     res.json({ status: "success", messages });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to fetch messages" });

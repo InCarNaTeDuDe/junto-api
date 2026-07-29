@@ -1,16 +1,16 @@
 import { z } from "zod";
 
 export const GetMessagesSchema = z.object({
-  chatId: z.string().min(1, "chatId is required"),
+  activityId: z.string().min(1, "activityId is required"),
 });
 
 export const SendMessageSchema = z.object({
-  chatId: z.string().min(1, "chatId is required"),
+  activityId: z.string().min(1, "activityId is required"),
   content: z.string().trim().min(1, "content cannot be empty"),
 });
 
 export const MarkReadSchema = z.object({
-  chatId: z.string().optional(),
+  activityId: z.string().optional(),
 });
 
 export type GetMessagesRequest = z.infer<typeof GetMessagesSchema>;

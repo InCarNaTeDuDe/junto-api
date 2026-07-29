@@ -1266,6 +1266,7 @@ export default function ExploreScreen() {
       params: {
         title: pin.title,
         user: pin.ownerName,
+        userId: pin.id,
         place: pin.venue,
         right: pin.price || "Nearby",
         type:

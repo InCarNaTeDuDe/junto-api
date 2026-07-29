@@ -6,25 +6,31 @@ export class MessageRepository {
     return AppDataSource.getRepository(Message);
   }
 
-  async findByChatId(chatId: string) {
+  async findByActivityId(activityId: string) {
     return this.repo.find({
-      where: { chatId },
-      relations: { sender: true },
-      order: { timestamp: "ASC" },
+      where: {
+        activityId,
+      },
+      relations: {
+        sender: true,
+      },
+      order: {
+        timestamp: "ASC",
+      },
     });
   }
 
   async createMessage(data: {
-    chatId: string;
+    activityId: string;
     senderId: string;
     content: string;
   }) {
     const msg = this.repo.create({
-      chatId: data.chatId,
+      activityId: data.activityId,
       senderId: data.senderId,
       content: data.content,
-      timestamp: new Date(),
     });
+
     return this.repo.save(msg);
   }
 }

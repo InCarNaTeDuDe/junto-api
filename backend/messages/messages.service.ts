@@ -3,30 +3,34 @@ import { UserRepository } from "../db/repository/User.repository";
 import { ActivityRepository } from "../db/repository/Activity.repository";
 import { NotificationRepository } from "../db/repository/Notification.repository";
 import { ActivityCategory } from "../db/entities/Activity.entity";
+import { User } from "../db/entities/User.entity";
 
 const messageRepo = new MessageRepository();
 const userRepo = new UserRepository();
 const activityRepo = new ActivityRepository();
 const notificationRepo = new NotificationRepository();
 
-export async function fetchMessages(chatId: string) {
-  const msgs = await messageRepo.findByChatId(chatId);
+export async function fetchMessages(activityId: string) {
+  const msgs = await messageRepo.findByActivityId(activityId);
 
   const hydrated = [];
+
   for (const msg of msgs) {
-    let sender = msg.sender;
+    let sender: User | null = msg.sender || null;
+
     if (!sender && msg.senderId) {
       try {
-        sender = (await userRepo.findById(msg.senderId)) || undefined;
+        sender = await userRepo.findById(msg.senderId);
       } catch (e) {
-        // Safe fallback if senderId is non-uuid or user lookup fails
+        sender = null;
       }
     }
 
     hydrated.push({
       id: msg.id,
-      chatId: msg.chatId,
+      activityId: msg.activityId,
       senderId: msg.senderId,
+
       sender: sender
         ? {
             id: sender.id,
@@ -35,10 +39,11 @@ export async function fetchMessages(chatId: string) {
           }
         : {
             id: msg.senderId || "unknown",
-            name: "Mates User",
+            name: "Junto User",
             avatar:
               "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
           },
+
       content: msg.content,
       timestamp: msg.timestamp,
     });
@@ -48,43 +53,48 @@ export async function fetchMessages(chatId: string) {
 }
 
 export async function createAndSaveMessage(
-  chatId: string,
+  activityId: string,
   senderId: string,
   content: string,
 ) {
-  let senderUser: any = null;
+  let senderUser = null;
+
   try {
     senderUser = await userRepo.findById(senderId);
   } catch (e) {
-    // Safe fallback if senderId is not a UUID
+    console.log("Sender lookup failed:", e);
   }
 
+  // Save message using repository
   const savedMsg = await messageRepo.createMessage({
-    chatId,
+    activityId,
     senderId,
     content,
   });
 
-  // If chat is an activity room, notify the organizer if someone else dropped a message!
+  // Notify activity organizer
   try {
-    const activity = await activityRepo.findById(chatId);
+    const activity = await activityRepo.findById(activityId);
+
     if (activity && activity.organizerId !== senderId) {
-      const senderName = senderUser?.name || "A participant";
       await notificationRepo.createNotification({
         userId: activity.organizerId,
         title: `New message in ${activity.title}`,
-        message: `${senderName}: "${content.substring(0, 60)}${content.length > 60 ? "..." : ""}"`,
+        message: `${
+          senderUser?.name || "A participant"
+        }: "${content.substring(0, 60)}${content.length > 60 ? "..." : ""}"`,
         type: "activity",
       });
     }
   } catch (e) {
-    // Ignore non-activity chat IDs
+    console.log("Notification failed:", e);
   }
 
   return {
     id: savedMsg.id,
-    chatId: savedMsg.chatId,
+    activityId: savedMsg.activityId,
     senderId: savedMsg.senderId,
+
     sender: senderUser
       ? {
           id: senderUser.id,
@@ -93,10 +103,11 @@ export async function createAndSaveMessage(
         }
       : {
           id: senderId,
-          name: "Mates User",
+          name: "Junto User",
           avatar:
             "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
         },
+
     content: savedMsg.content,
     timestamp: savedMsg.timestamp,
   };
@@ -135,7 +146,7 @@ export async function fetchUserChannels(userId: string) {
       }
 
       // Calculate unread count for messages in this channel not sent by userId
-      const messages = await messageRepo.findByChatId(act.id);
+      const messages = await messageRepo.findByActivityId(act.id);
       const unread = messages.filter((m) => m.senderId !== userId).length;
 
       channelsList.push({

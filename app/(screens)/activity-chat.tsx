@@ -16,12 +16,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAuthContext } from "@/context/AuthContext";
-import { useStore, Chat, Message } from "@/hooks/useStore";
+import { socket, connectSocket } from "@/services/socket";
 import { useStyles } from "@/hooks/useStyles";
 import { ApiService } from "@/services/api";
 
+interface Message {
+  id: string;
+  sender: "me" | "them";
+  text: string;
+  timestamp: string;
+}
+
 export default function ActivityChatScreen() {
   const params = useLocalSearchParams<{
+    activityId?: string;
     id?: string;
     title?: string;
     user?: string;
@@ -37,8 +45,6 @@ export default function ActivityChatScreen() {
   const { theme, themeMode, user } = useAuthContext();
   const isDark = themeMode === "dark" || !theme || theme.bg === "#0B0714";
   const s = useStyles(createStyles);
-
-  const { state, addMessage, startOrOpenChat } = useStore();
 
   const partnerName = params.user || "Ananya R.";
   const contextTitle = params.title || "Morning Walk / Jogging Partner";
@@ -63,184 +69,145 @@ export default function ActivityChatScreen() {
   const [inputMessage, setInputMessage] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const chatId = params.activityId; //|| `activity-${params.userId}-${params.organizerId}`;
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const loadMessages = async () => {
+    try {
+      const res = await ApiService.get<any>(
+        `/api/messages?activityId=${chatId}`,
+      );
+      const mapped = res.messages.map((m: any) => ({
+        id: m.id,
+        sender: m.senderId === user?.id ? "me" : "them",
+        text: m.content,
+        timestamp: new Date(m.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+      setMessages(mapped);
+    } catch (err) {
+      console.log("load messages error", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id || !chatId) return;
+
+    connectSocket(user.id);
+
+    const onConnect = () => {
+      console.log("JOINING CHAT", chatId);
+
+      socket.emit("join_conversation", chatId);
+    };
+
+    socket.on("connect", onConnect);
+
+    socket.on("receive_message", (msg: any) => {
+      const newMessage: Message = {
+        id: msg.id,
+        sender: msg.senderId === user.id ? "me" : "them",
+        text: msg.content,
+        timestamp: new Date(msg.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      setMessages((prev) => {
+        // remove optimistic message if same content exists
+        const filtered = prev.filter(
+          (m) =>
+            !(
+              m.id.startsWith("temp-") &&
+              m.text === msg.content &&
+              m.sender === "me"
+            ),
+        );
+
+        return [...filtered, newMessage];
+      });
+    });
+
+    loadMessages();
+
+    return () => {
+      socket.off("connect", onConnect);
+
+      socket.off("receive_message");
+    };
+  }, [chatId, user?.id]);
+
   // Find or initialize chat in global store
-  const existingChat = state.chats.find(
-    (c) =>
-      c.partner.name.toLowerCase() === partnerName.toLowerCase() ||
-      c.contextTitle
-        .toLowerCase()
-        .includes(contextTitle.toLowerCase().substring(0, 10)),
-  );
 
-  const [chatId, setChatId] = useState<string | null>(
-    existingChat ? existingChat.id : null,
-  );
-
-  const targetChatId =
-    params.id ||
-    chatId ||
-    (existingChat
-      ? existingChat.id
-      : `chat-${partnerName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`);
+  const targetChatId = params.activityId;
 
   const [dbMessages, setDbMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
 
-  useEffect(() => {
-    if (!existingChat) {
-      // Initialize a new chat session in store
-      const categoryMap: Record<
-        string,
-        "Ticket Swap" | "Day Mates" | "Lost & Found"
-      > = {
-        "MOVIE TICKET": "Ticket Swap",
-        "TICKET SWAP": "Ticket Swap",
-        "DAY MATES": "Day Mates",
-        DAYMATES: "Day Mates",
-        "LOST & FOUND": "Lost & Found",
-      };
-      const cat = categoryMap[activityType.toUpperCase()] || "Day Mates";
+  const activeChat = {
+    id: targetChatId,
+    partner: {
+      name: partnerName,
+      avatar: partnerAvatar,
+      rating: 4.9,
+      isOnline: true,
+    },
+    category: "Day Mates",
+    contextTitle,
+    unreadCount: 0,
+  };
 
-      startOrOpenChat(partnerName, partnerAvatar, cat, contextTitle);
-    } else {
-      setChatId(existingChat.id);
-    }
-  }, [partnerName, contextTitle]);
+  const displayedMessages = messages;
 
-  // Fetch messages from DB and poll for real-time updates
-  const fetchChatMessages = useCallback(async () => {
-    if (!targetChatId) return;
-    try {
-      const res = await ApiService.get<{
-        status: string;
-        messages: Array<{
-          id: string;
-          chatId: string;
-          senderId: string;
-          sender?: { id: string; name: string; avatar?: string };
-          content: string;
-          timestamp: string;
-        }>;
-      }>(`/api/messages?chatId=${encodeURIComponent(targetChatId)}`);
+  const handleSend = () => {
+    if (!inputMessage.trim() || !user?.id || !chatId) return;
 
-      if (res && Array.isArray(res.messages)) {
-        const mapped: Message[] = res.messages.map((m) => {
-          const isMe =
-            (user?.id && m.senderId === user.id) ||
-            (user?.name &&
-              m.sender?.name?.toLowerCase().trim() ===
-                user.name.toLowerCase().trim());
+    const text = inputMessage.trim();
 
-          let timeStr = "Just now";
-          if (m.timestamp) {
-            try {
-              const d = new Date(m.timestamp);
-              timeStr = d.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-            } catch (e) {}
-          }
-
-          return {
-            id: m.id,
-            sender: isMe ? "me" : "them",
-            text: m.content,
-            timestamp: timeStr,
-          };
-        });
-
-        setDbMessages(mapped);
-      }
-    } catch (err) {
-      // Ignore transient network errors during poll
-    }
-  }, [targetChatId, user]);
-
-  useEffect(() => {
-    fetchChatMessages();
-
-    // Real-time polling every 2.5 seconds
-    const interval = setInterval(() => {
-      fetchChatMessages();
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [fetchChatMessages]);
-
-  // Sync active chat if store updates
-  const activeChat = state.chats.find((c) => c.id === chatId) ||
-    existingChat || {
-      id: targetChatId,
-      partner: {
-        name: partnerName,
-        avatar: partnerAvatar,
-        rating: 4.9,
-        isOnline: true,
-      },
-      category: "Day Mates",
-      contextTitle,
-      unreadCount: 0,
-      messages: [
-        {
-          id: "m-welcome",
-          sender: "them" as const,
-          text: `Hey! I saw you requested to join as a partner for "${contextTitle}". I'd love to jog/walk together!`,
-          timestamp: "Just now",
-        },
-      ],
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      sender: "me",
+      text,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
-  const displayedMessages =
-    dbMessages.length > 0 ? dbMessages : activeChat.messages;
+    // show immediately
+    setMessages((prev) => [...prev, tempMessage]);
 
-  const handleSend = async () => {
-    if (isOwnActivity || !inputMessage.trim() || isSending) return;
-
-    const textToSend = inputMessage.trim();
     setInputMessage("");
-    setIsSending(true);
 
-    // Optimistic message addition
-    const tempId = `temp-${Date.now()}`;
-    const nowTime = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+    const now = new Date();
+    console.log("📱 UI SEND TIME");
+    console.log("Local String:", now.toString());
+    console.log("ISO UTC:", now.toISOString());
+    console.log("Locale Time:", now.toLocaleString());
+    console.log("Timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+    console.log("EMITTING MESSAGE", {
+      chatId,
+      senderId: user.id,
+      content: text,
+      socketConnected: socket.connected,
+      sentAtLocal: now.toString(),
+      sentAtUTC: now.toISOString(),
     });
 
-    const optimisticMsg: Message = {
-      id: tempId,
-      sender: "me",
-      text: textToSend,
-      timestamp: nowTime,
-    };
-
-    setDbMessages((prev) => [...prev, optimisticMsg]);
-
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 50);
-
-    try {
-      const res = await ApiService.post<{ status: string; message: any }>(
-        "/api/messages/send",
-        {
-          chatId: targetChatId,
-          content: textToSend,
-        },
-      );
-
-      if (res && res.message) {
-        fetchChatMessages();
-      }
-    } catch (err) {
-      console.error("Failed to send message to backend DB:", err);
-    } finally {
-      setIsSending(false);
-      if (targetChatId) {
-        addMessage(targetChatId, textToSend);
-      }
-    }
+    socket.emit(
+      "send_message",
+      {
+        chatId,
+        senderId: user.id,
+        content: text,
+      },
+      (response: any) => {
+        console.log("SEND MESSAGE ACK:", response);
+      },
+    );
   };
 
   const handleQuickReply = (text: string) => {

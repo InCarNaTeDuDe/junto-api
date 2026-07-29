@@ -244,8 +244,10 @@ const FeedRow = ({ item, s, C }) => {
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
+        activityId: item.id, // <-- activity UUID becomes chatId
         title: item.title,
         user: item.user,
+        userId: item.organizerId,
         organizerId: item.organizerId,
         place: item.place,
         right: item.right,
@@ -381,8 +383,10 @@ const UserFeedRow = ({ item, s, C }) => {
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
+        activityId: item.id, // <-- activity UUID becomes chatId
         title: item.title,
         user: item.user || "Junto User",
+        userId: item.organizerId,
         organizerId: item.organizerId,
         place: item.place,
         right: item.right || "Upcoming",
@@ -728,9 +732,9 @@ export default function Home() {
           </Pressable>
         </View>
         <View style={{ paddingHorizontal: scale(10), gap: verticalScale(10) }}>
-          {FEED.map((f, i) => (
+          {/* {FEED.map((f, i) => (
             <FeedRow key={i} item={f} s={s} C={C} />
-          ))}
+          ))} */}
           {userActs.map((f, i) => (
             <UserFeedRow key={i} item={f} s={s} C={C} />
           ))}

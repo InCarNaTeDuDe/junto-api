@@ -8,9 +8,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  OneToMany,
 } from "typeorm";
 
 import { User } from "./User.entity";
+import { Message } from "./Message.entity";
 
 export enum ActivityCategory {
   DAY_MATES = "DAY_MATES",
@@ -118,4 +120,7 @@ export class Activity {
     default: false,
   })
   isAutoDetected!: boolean;
+
+  @OneToMany(() => Message, (message) => message.activity)
+  messages!: Message[];
 }
