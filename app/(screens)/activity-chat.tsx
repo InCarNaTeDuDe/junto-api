@@ -341,34 +341,61 @@ export default function ActivityChatScreen() {
           </View>
 
           {/* Join Match Notice / Self Activity Notice */}
-          {isOwnActivity ? (
-            <View
-              style={[
-                s.matchNotice,
-                {
-                  backgroundColor: "rgba(245,158,11,0.12)",
-                  borderColor: "rgba(245,158,11,0.3)",
-                },
-              ]}
-            >
-              <Ionicons name="information-circle" size={18} color="#F59E0B" />
-              <Text style={[s.matchNoticeText, { color: "#FBBF24" }]}>
-                This is your activity post! You cannot join or chat with
-                yourself as a partner.
-              </Text>
-            </View>
-          ) : (
-            <View style={s.matchNotice}>
-              <Ionicons name="people" size={16} color="#A855F7" />
-              <Text style={s.matchNoticeText}>
-                You and{" "}
-                <Text style={{ fontWeight: "700", color: "#A855F7" }}>
-                  {partnerName}
-                </Text>{" "}
-                are connected for this activity! Coordinate time & spot below.
-              </Text>
-            </View>
-          )}
+          {
+            /*isOwnActivity*/ false ? (
+              <View
+                style={[
+                  s.matchNotice,
+                  {
+                    backgroundColor: "rgba(245,158,11,0.12)",
+                    borderColor: "rgba(245,158,11,0.3)",
+                  },
+                ]}
+              >
+                <Ionicons name="information-circle" size={18} color="#F59E0B" />
+                <Text style={[s.matchNoticeText, { color: "#FBBF24" }]}>
+                  This is your activity post! You cannot join or chat with
+                  yourself as a partner.
+                </Text>
+              </View>
+            ) : (
+              <View style={s.matchNotice}>
+                {isOwnActivity ? (
+                  <View
+                    style={[
+                      s.matchNotice,
+                      {
+                        backgroundColor: "rgba(245,158,11,0.12)",
+                        borderColor: "rgba(245,158,11,0.3)",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="information-circle"
+                      size={18}
+                      color="#F59E0B"
+                    />
+                    <Text style={[s.matchNoticeText, { color: "#FBBF24" }]}>
+                      This is your activity post! You cannot join or chat with
+                      yourself as a partner.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="people" size={16} color="#A855F7" />
+                    <Text style={s.matchNoticeText}>
+                      You and{" "}
+                      <Text style={{ fontWeight: "700", color: "#A855F7" }}>
+                        {partnerName}
+                      </Text>{" "}
+                      are connected for this activity! Coordinate time & spot
+                      below.
+                    </Text>
+                  </>
+                )}
+              </View>
+            )
+          }
         </View>
 
         {/* Chat Messages Stream */}

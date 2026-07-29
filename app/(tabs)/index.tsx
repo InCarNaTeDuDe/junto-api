@@ -372,13 +372,13 @@ const UserFeedRow = ({ item, s, C }) => {
       item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
 
   const handlePress = () => {
-    if (isOwnActivity) {
-      Alert.alert(
-        "Your Activity Post",
-        "You created this activity post! You cannot join or chat with yourself as a partner.",
-      );
-      return;
-    }
+    // if (isOwnActivity) {
+    //   Alert.alert(
+    //     "Your Activity Post",
+    //     "You created this activity post! You cannot join or chat with yourself as a partner.",
+    //   );
+    //   return;
+    // }
 
     router.push({
       pathname: "/(screens)/activity-chat",
