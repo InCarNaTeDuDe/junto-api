@@ -16,7 +16,11 @@ export async function fetchMessages(chatId: string) {
   for (const msg of msgs) {
     let sender = msg.sender;
     if (!sender && msg.senderId) {
-      sender = (await userRepo.findById(msg.senderId)) || undefined;
+      try {
+        sender = (await userRepo.findById(msg.senderId)) || undefined;
+      } catch (e) {
+        // Safe fallback if senderId is non-uuid or user lookup fails
+      }
     }
 
     hydrated.push({
@@ -30,7 +34,7 @@ export async function fetchMessages(chatId: string) {
             avatar: sender.avatar,
           }
         : {
-            id: msg.senderId,
+            id: msg.senderId || "unknown",
             name: "Mates User",
             avatar:
               "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
@@ -48,7 +52,12 @@ export async function createAndSaveMessage(
   senderId: string,
   content: string,
 ) {
-  const senderUser = await userRepo.findById(senderId);
+  let senderUser: any = null;
+  try {
+    senderUser = await userRepo.findById(senderId);
+  } catch (e) {
+    // Safe fallback if senderId is not a UUID
+  }
 
   const savedMsg = await messageRepo.createMessage({
     chatId,
@@ -57,15 +66,19 @@ export async function createAndSaveMessage(
   });
 
   // If chat is an activity room, notify the organizer if someone else dropped a message!
-  const activity = await activityRepo.findById(chatId);
-  if (activity && activity.organizerId !== senderId) {
-    const senderName = senderUser?.name || "A participant";
-    await notificationRepo.createNotification({
-      userId: activity.organizerId,
-      title: `New message in ${activity.title}`,
-      message: `${senderName}: "${content.substring(0, 60)}${content.length > 60 ? "..." : ""}"`,
-      type: "activity",
-    });
+  try {
+    const activity = await activityRepo.findById(chatId);
+    if (activity && activity.organizerId !== senderId) {
+      const senderName = senderUser?.name || "A participant";
+      await notificationRepo.createNotification({
+        userId: activity.organizerId,
+        title: `New message in ${activity.title}`,
+        message: `${senderName}: "${content.substring(0, 60)}${content.length > 60 ? "..." : ""}"`,
+        type: "activity",
+      });
+    }
+  } catch (e) {
+    // Ignore non-activity chat IDs
   }
 
   return {
