@@ -1,15 +1,15 @@
 // @ts-nocheck
 import React from "react";
-import { Redirect, Tabs } from "expo-router";
-import { Platform, View, Text, Pressable } from "react-native";
-import { Home, Compass, Plus, MessageSquare, User } from "lucide-react-native";
+import { Tabs } from "expo-router";
+import { View, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+
 import { useAuthContext } from "@/context/AuthContext";
 import { useStore } from "@/hooks/useStore";
 import { GlobalOverlays } from "@/components/GlobalOverlays";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { createStyles } from ".";
 import { useStyles } from "@/hooks/useStyles";
-import { Ionicons } from "@expo/vector-icons";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
 
@@ -17,15 +17,18 @@ export default function TabsLayout() {
   const { state } = useStore();
   const s = useStyles(createStyles);
 
-  const { theme, setThemeMode, themeMode } = useAuthContext();
+  const { theme } = useAuthContext();
   const { selectedLocation } = useLocation();
+
   const [serverUnreadCount, setServerUnreadCount] = React.useState<number>(0);
 
   React.useEffect(() => {
     let isMounted = true;
+
     async function checkUnread() {
       try {
         const res = await ApiService.get("/api/messages/unread-count");
+
         // if (res.ok) {
         //   const data = await res.json();
         //   if (isMounted && typeof data.unreadCount === "number") {
@@ -33,18 +36,20 @@ export default function TabsLayout() {
         //   }
         // }
       } catch (err) {
-        // Fallback gracefully
+        // Ignore errors gracefully
       }
     }
+
     checkUnread();
+
     const interval = setInterval(checkUnread, 120000);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, []);
 
-  // Calculate total unread count for Chat Badge merging backend and store
   const totalUnread = Math.max(
     serverUnreadCount,
     state.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0),
@@ -59,18 +64,12 @@ export default function TabsLayout() {
 
             tabBarStyle: {
               position: "relative",
-
               bottom: 0,
-
               height: 64,
-
               backgroundColor: theme.bg2,
-
               borderTopWidth: 2,
-
               elevation: 0,
               shadowOpacity: 0,
-
               paddingTop: 0,
               paddingBottom: 0,
             },
@@ -85,35 +84,41 @@ export default function TabsLayout() {
             },
           }}
         >
+          {/* Home */}
           <Tabs.Screen
             name="index"
             options={{
               title: "Home",
               tabBarIcon: ({ color, focused }) => (
-                <Home size={22} color={color} strokeWidth={focused ? 2.6 : 2} />
-              ),
-            }}
-          />
-
-          <Tabs.Screen
-            name="explore"
-            options={{
-              title: "Explore",
-              tabBarIcon: ({ color, focused }) => (
-                <Compass
+                <Ionicons
+                  name={focused ? "home" : "home-outline"}
                   size={22}
                   color={color}
-                  strokeWidth={focused ? 2.6 : 2}
                 />
               ),
             }}
           />
 
+          {/* Explore */}
+          <Tabs.Screen
+            name="explore"
+            options={{
+              title: "Explore",
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons
+                  name={focused ? "compass" : "compass-outline"}
+                  size={22}
+                  color={color}
+                />
+              ),
+            }}
+          />
+
+          {/* Create */}
           <Tabs.Screen
             name="create"
             options={{
               title: "",
-
               tabBarLabel: () => null,
 
               tabBarIcon: () => (
@@ -122,12 +127,9 @@ export default function TabsLayout() {
                     width: 64,
                     height: 64,
                     borderRadius: 32,
-
                     backgroundColor: "#8B5CF6",
-
                     alignItems: "center",
                     justifyContent: "center",
-
                     marginTop: -40,
 
                     shadowColor: "#8B5CF6",
@@ -141,12 +143,13 @@ export default function TabsLayout() {
                     elevation: 18,
                   }}
                 >
-                  <Plus size={30} color="#FFFFFF" strokeWidth={2.5} />
+                  <Ionicons name="add" size={34} color="#FFFFFF" />
                 </View>
               ),
             }}
           />
 
+          {/* Chats */}
           <Tabs.Screen
             name="chats"
             options={{
@@ -154,10 +157,14 @@ export default function TabsLayout() {
 
               tabBarIcon: ({ color, focused }) => (
                 <View style={{ position: "relative" }}>
-                  <MessageSquare
+                  <Ionicons
+                    name={
+                      focused
+                        ? "chatbubble-ellipses"
+                        : "chatbubble-ellipses-outline"
+                    }
                     size={22}
                     color={color}
-                    strokeWidth={focused ? 2.6 : 2}
                   />
 
                   {totalUnread > 0 && (
@@ -169,7 +176,6 @@ export default function TabsLayout() {
 
                         minWidth: 18,
                         height: 18,
-
                         borderRadius: 9,
 
                         backgroundColor: "#A855F7",
@@ -199,13 +205,18 @@ export default function TabsLayout() {
             }}
           />
 
+          {/* Profile */}
           <Tabs.Screen
             name="profile"
             options={{
               title: "Profile",
 
               tabBarIcon: ({ color, focused }) => (
-                <User size={22} color={color} strokeWidth={focused ? 2.6 : 2} />
+                <Ionicons
+                  name={focused ? "person" : "person-outline"}
+                  size={22}
+                  color={color}
+                />
               ),
             }}
           />

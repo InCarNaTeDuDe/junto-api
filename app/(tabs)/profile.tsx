@@ -1,476 +1,4 @@
-// import React, { useState } from "react";
-// import { View, Text, ScrollView, Image, Pressable, Switch } from "react-native";
-// import {
-//   ShieldCheck,
-//   Star,
-//   Wallet,
-//   Calendar,
-//   MapPin,
-//   ChevronRight,
-//   Settings,
-//   Trash2,
-//   CheckCircle2,
-//   Award,
-//   LogOut,
-//   Lock,
-//   MessageSquare,
-//   AlertCircle,
-// } from "lucide-react-native";
-// import { useStore } from "../../hooks/useStore";
-// import { router } from "expo-router";
-// import { useAuthContext } from "@/context/AuthContext";
-
-// export default function ProfileScreen() {
-//   const {
-//     state,
-//     resolvePost,
-//     deletePost,
-//     updateCurrentUserProfile,
-//     setActivePostId,
-//   } = useStore();
-//   const [activeTab, setActiveTab] = useState<"Posts" | "Reviews">("Posts");
-//   const [showSettingsOverlay, setShowSettingsOverlay] = useState(false);
-
-//   // Profile local configuration settings
-//   const [pushNotifs, setPushNotifs] = useState(true);
-//   const [emailNotifs, setEmailNotifs] = useState(false);
-//   const [privateProfile, setPrivateProfile] = useState(false);
-//   const [twoFactor, setTwoFactor] = useState(true);
-
-//   // const user = state.currentUser;
-
-//   const { user } = useAuthContext();
-
-//   // Filter Rohan's posts from global store
-//   const myPosts = state.posts.filter((p) => p.host.name === user.name);
-
-//   // Mock Reviews (Screen 6)
-//   const mockReviews = [
-//     {
-//       id: "r-1",
-//       reviewer: "Ananya R.",
-//       avatar:
-//         "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-//       rating: 5,
-//       comment:
-//         "Super fast ticket swap! Shared the Paytm QR and transferred the Paytm tickets in less than 2 mins. Highly recommended.",
-//       date: "2 days ago",
-//     },
-//     {
-//       id: "r-2",
-//       reviewer: "Karan M.",
-//       avatar:
-//         "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-//       rating: 4.8,
-//       comment:
-//         "Super friendly daymate, had an awesome talk about films and coffee! Will definitely join another session.",
-//       date: "1 week ago",
-//     },
-//   ];
-
-//   return (
-//     <View className="flex-1 bg-slate-950">
-//       {/* SETTINGS MODAL OVERLAY (Old Settings Screen integrated seamlessly!) */}
-//       {showSettingsOverlay && (
-//         <View className="absolute inset-0 z-50 bg-slate-950 flex-1">
-//           <View className="pt-16 pb-4 px-6 bg-slate-900 border-b border-slate-800 flex-row items-center justify-between">
-//             <View className="flex-row items-center gap-3">
-//               <Pressable
-//                 onPress={() => setShowSettingsOverlay(false)}
-//                 className="p-1 active:opacity-75"
-//               >
-//                 <Text className="text-white text-base font-bold">Close</Text>
-//               </Pressable>
-//               <Text className="text-white text-xl font-black tracking-tight">
-//                 App Settings
-//               </Text>
-//             </View>
-//           </View>
-
-//           <ScrollView
-//             className="flex-1 p-6"
-//             showsVerticalScrollIndicator={false}
-//           >
-//             {/* Notification settings */}
-//             <View className="mb-6">
-//               <Text className="text-slate-400 text-3xs font-black uppercase tracking-wider mb-3 px-1">
-//                 Notifications
-//               </Text>
-//               <View className="bg-slate-900 border border-slate-850 rounded-2xl p-4 gap-4">
-//                 <View className="flex-row justify-between items-center">
-//                   <View>
-//                     <Text className="text-white text-xs font-bold">
-//                       Push Notifications
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-semibold mt-0.5">
-//                       Real-time alerts for chats & posts
-//                     </Text>
-//                   </View>
-//                   <Switch
-//                     value={pushNotifs}
-//                     onValueChange={setPushNotifs}
-//                     trackColor={{ false: "#334155", true: "#a855f7" }}
-//                     thumbColor={pushNotifs ? "#ffffff" : "#94a3b8"}
-//                   />
-//                 </View>
-//                 <View className="flex-row justify-between items-center pt-4 border-t border-slate-850">
-//                   <View>
-//                     <Text className="text-white text-xs font-bold">
-//                       Email Notifications
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-semibold mt-0.5">
-//                       Weekly digest of popular activities
-//                     </Text>
-//                   </View>
-//                   <Switch
-//                     value={emailNotifs}
-//                     onValueChange={setEmailNotifs}
-//                     trackColor={{ false: "#334155", true: "#a855f7" }}
-//                     thumbColor={emailNotifs ? "#ffffff" : "#94a3b8"}
-//                   />
-//                 </View>
-//               </View>
-//             </View>
-
-//             {/* Privacy & Security */}
-//             <View className="mb-6">
-//               <Text className="text-slate-400 text-3xs font-black uppercase tracking-wider mb-3 px-1">
-//                 Privacy & Security
-//               </Text>
-//               <View className="bg-slate-900 border border-slate-850 rounded-2xl p-4 gap-4">
-//                 <View className="flex-row justify-between items-center">
-//                   <View>
-//                     <Text className="text-white text-xs font-bold">
-//                       Private Profile
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-semibold mt-0.5">
-//                       Only daymates can view ratings
-//                     </Text>
-//                   </View>
-//                   <Switch
-//                     value={privateProfile}
-//                     onValueChange={setPrivateProfile}
-//                     trackColor={{ false: "#334155", true: "#a855f7" }}
-//                     thumbColor={privateProfile ? "#ffffff" : "#94a3b8"}
-//                   />
-//                 </View>
-//                 <View className="flex-row justify-between items-center pt-4 border-t border-slate-850">
-//                   <View>
-//                     <Text className="text-white text-xs font-bold">
-//                       Two-Factor Authentication
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-semibold mt-0.5">
-//                       Keep ticketing wallet safe
-//                     </Text>
-//                   </View>
-//                   <Switch
-//                     value={twoFactor}
-//                     onValueChange={setTwoFactor}
-//                     trackColor={{ false: "#334155", true: "#a855f7" }}
-//                     thumbColor={twoFactor ? "#ffffff" : "#94a3b8"}
-//                   />
-//                 </View>
-//               </View>
-//             </View>
-
-//             {/* Support section */}
-//             <View className="mb-12">
-//               <Text className="text-slate-400 text-3xs font-black uppercase tracking-wider mb-3 px-1">
-//                 Support
-//               </Text>
-//               <View className="bg-slate-900 border border-slate-850 rounded-2xl overflow-hidden">
-//                 <Pressable className="px-4 py-4 border-b border-slate-850 flex-row justify-between items-center active:bg-slate-850">
-//                   <Text className="text-white text-xs font-bold">
-//                     Help Center & Safety Rules
-//                   </Text>
-//                   <ChevronRight size={14} color="#64748b" />
-//                 </Pressable>
-//                 <Pressable className="px-4 py-4 flex-row justify-between items-center active:bg-slate-850">
-//                   <Text className="text-white text-xs font-bold">
-//                     Contact Support
-//                   </Text>
-//                   <ChevronRight size={14} color="#64748b" />
-//                 </Pressable>
-//               </View>
-//             </View>
-//           </ScrollView>
-//         </View>
-//       )}
-
-//       {/* MAIN SCREEN 6 CONTENT */}
-//       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-//         {/* Top Header details banner */}
-//         <View className="relative pb-6 bg-slate-900 border-b border-slate-800">
-//           <View className="h-32 bg-purple-900/40" />
-
-//           {/* Settings cog floating */}
-//           <Pressable
-//             onPress={() => setShowSettingsOverlay(true)}
-//             className="absolute top-12 right-6 w-10 h-10 rounded-full bg-slate-950/80 items-center justify-center border border-slate-850 active:bg-slate-900"
-//           >
-//             <Settings size={18} color="#ffffff" />
-//           </Pressable>
-
-//           {/* Profile Details Container */}
-//           <View className="px-6 -mt-12 flex-row items-end gap-4">
-//             <View className="w-24 h-24 rounded-2xl border-4 border-slate-950 overflow-hidden bg-slate-800 shadow-xl">
-//               <Image source={{ uri: user.avatar }} className="w-full h-full" />
-//             </View>
-//             <View className="flex-1 pb-2">
-//               <View className="flex-row items-center gap-1.5">
-//                 <Text className="text-white text-xl font-black tracking-tight">
-//                   {user.name}
-//                 </Text>
-//                 <ShieldCheck size={18} color="#c084fc" />
-//               </View>
-//               <Text className="text-slate-400 text-3xs font-semibold">
-//                 {user.email}
-//               </Text>
-//             </View>
-//           </View>
-
-//           {/* Bio Section */}
-//           <View className="px-6 mt-4">
-//             <Text className="text-slate-300 text-xs font-normal leading-relaxed">
-//               {user.bio}
-//             </Text>
-//             <View className="flex-row items-center gap-4 mt-3">
-//               <View className="flex-row items-center gap-1">
-//                 <MapPin size={12} color="#94a3b8" />
-//                 <Text className="text-slate-400 text-2xs font-semibold">
-//                   {user.location}
-//                 </Text>
-//               </View>
-//               <View className="flex-row items-center gap-1">
-//                 <Calendar size={12} color="#94a3b8" />
-//                 <Text className="text-slate-400 text-2xs font-semibold">
-//                   Joined {user.memberSince}
-//                 </Text>
-//               </View>
-//             </View>
-//           </View>
-//         </View>
-
-//         {/* Numerical Stats Bar */}
-//         <View className="flex-row justify-around py-5 px-6 bg-slate-900 border-b border-slate-850">
-//           <View className="items-center">
-//             <Text className="text-white text-xl font-black">
-//               {myPosts.length}
-//             </Text>
-//             <Text className="text-slate-400 text-4xs font-black uppercase tracking-widest mt-1">
-//               Posts
-//             </Text>
-//           </View>
-//           <View className="items-center">
-//             <Text className="text-white text-xl font-black">
-//               {user.connectionsCount}
-//             </Text>
-//             <Text className="text-slate-400 text-4xs font-black uppercase tracking-widest mt-1">
-//               Connections
-//             </Text>
-//           </View>
-//           <View className="items-center">
-//             <Text className="text-white text-xl font-black">
-//               {user.groupsCount}
-//             </Text>
-//             <Text className="text-slate-400 text-4xs font-black uppercase tracking-widest mt-1">
-//               Groups
-//             </Text>
-//           </View>
-//         </View>
-
-//         {/* Bento Cards (Wallet + Star) */}
-//         <View className="p-6 flex-row gap-4">
-//           <View className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl flex-row items-center gap-3">
-//             <View className="w-9 h-9 rounded-xl bg-green-500/10 items-center justify-center">
-//               <Wallet size={16} color="#22c55e" />
-//             </View>
-//             <View>
-//               <Text className="text-slate-500 text-4xs font-black uppercase tracking-wider">
-//                 Wallet Balance
-//               </Text>
-//               <Text className="text-white text-base font-black mt-0.5">
-//                 {user.walletBalance}
-//               </Text>
-//             </View>
-//           </View>
-
-//           <View className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl flex-row items-center gap-3">
-//             <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center">
-//               <Star size={16} color="#f59e0b" fill="#f59e0b" />
-//             </View>
-//             <View>
-//               <Text className="text-slate-500 text-4xs font-black uppercase tracking-wider">
-//                 Avg Rating
-//               </Text>
-//               <Text className="text-white text-base font-black mt-0.5">
-//                 {user.rating}{" "}
-//                 <Text className="text-slate-500 text-4xs font-semibold">
-//                   (23)
-//                 </Text>
-//               </Text>
-//             </View>
-//           </View>
-//         </View>
-
-//         {/* Screen 6 Tabs Segment Selector */}
-//         <View className="mx-6 mb-4 flex-row border-b border-slate-900">
-//           <Pressable
-//             onPress={() => setActiveTab("Posts")}
-//             className={`flex-1 py-3 items-center ${activeTab === "Posts" ? "border-b-2 border-purple-500" : ""}`}
-//           >
-//             <Text
-//               className={`text-xs font-black uppercase tracking-wider ${activeTab === "Posts" ? "text-purple-400" : "text-slate-500"}`}
-//             >
-//               My Posts ({myPosts.length})
-//             </Text>
-//           </Pressable>
-
-//           <Pressable
-//             onPress={() => setActiveTab("Reviews")}
-//             className={`flex-1 py-3 items-center ${activeTab === "Reviews" ? "border-b-2 border-purple-500" : ""}`}
-//           >
-//             <Text
-//               className={`text-xs font-black uppercase tracking-wider ${activeTab === "Reviews" ? "text-purple-400" : "text-slate-500"}`}
-//             >
-//               Reviews ({mockReviews.length})
-//             </Text>
-//           </Pressable>
-//         </View>
-
-//         {/* Tab content */}
-//         <View className="px-6 pb-16">
-//           {activeTab === "Posts" && (
-//             <View className="gap-3">
-//               {myPosts.map((post) => (
-//                 <View
-//                   key={post.id}
-//                   className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"
-//                 >
-//                   <Pressable
-//                     onPress={() => setActivePostId(post.id)}
-//                     className="flex-row gap-3"
-//                   >
-//                     <Image
-//                       source={{ uri: post.image }}
-//                       className="w-16 h-16 rounded-xl"
-//                     />
-//                     <View className="flex-1 justify-center">
-//                       <View className="flex-row justify-between items-center">
-//                         <Text className="text-purple-400 text-5xs font-black uppercase tracking-wider">
-//                           {post.category}
-//                         </Text>
-//                         <View
-//                           className={`px-2 py-0.5 rounded ${post.status === "Active" ? "bg-purple-900/30 border border-purple-800/40" : "bg-slate-950 border border-slate-850"}`}
-//                         >
-//                           <Text
-//                             className={`text-5xs font-black uppercase ${post.status === "Active" ? "text-purple-400" : "text-slate-500"}`}
-//                           >
-//                             {post.status}
-//                           </Text>
-//                         </View>
-//                       </View>
-//                       <Text
-//                         className="text-white text-xs font-black mt-1"
-//                         numberOfLines={1}
-//                       >
-//                         {post.title}
-//                       </Text>
-//                       <Text
-//                         className="text-slate-400 text-4xs font-medium mt-0.5"
-//                         numberOfLines={1}
-//                       >
-//                         {post.location}
-//                       </Text>
-//                     </View>
-//                   </Pressable>
-
-//                   {/* Actions (Resolve & Delete) for screen interactivity */}
-//                   {post.status === "Active" && (
-//                     <View className="flex-row gap-3 mt-4 pt-3 border-t border-slate-850/60">
-//                       <Pressable
-//                         onPress={() => resolvePost(post.id)}
-//                         className="flex-1 py-2 bg-slate-950 border border-slate-800 rounded-lg flex-row justify-center items-center gap-1.5 active:bg-slate-900"
-//                       >
-//                         <CheckCircle2 size={13} color="#22c55e" />
-//                         <Text className="text-green-400 text-5xs font-black uppercase">
-//                           Mark Resolved
-//                         </Text>
-//                       </Pressable>
-//                       <Pressable
-//                         onPress={() => deletePost(post.id)}
-//                         className="py-2 px-3 bg-slate-950 border border-red-950/40 rounded-lg justify-center items-center active:bg-red-950/20"
-//                       >
-//                         <Trash2 size={13} color="#ef4444" />
-//                       </Pressable>
-//                     </View>
-//                   )}
-//                 </View>
-//               ))}
-
-//               {myPosts.length === 0 && (
-//                 <View className="bg-slate-900/30 border border-slate-850 rounded-2xl p-8 items-center">
-//                   <Text className="text-slate-500 text-xs font-semibold">
-//                     You haven't posted any listings yet
-//                   </Text>
-//                   <Pressable
-//                     onPress={() => router.push("/(tabs)/create")}
-//                     className="mt-3 px-4 py-2 bg-purple-600 rounded-xl"
-//                   >
-//                     <Text className="text-white text-4xs font-black uppercase">
-//                       Create Post Now
-//                     </Text>
-//                   </Pressable>
-//                 </View>
-//               )}
-//             </View>
-//           )}
-
-//           {activeTab === "Reviews" && (
-//             <View className="gap-3">
-//               {mockReviews.map((rev) => (
-//                 <View
-//                   key={rev.id}
-//                   className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"
-//                 >
-//                   <View className="flex-row items-center gap-2.5 mb-2.5">
-//                     <Image
-//                       source={{ uri: rev.avatar }}
-//                       className="w-8 h-8 rounded-full border border-slate-800"
-//                     />
-//                     <View className="flex-1">
-//                       <View className="flex-row justify-between items-center">
-//                         <Text className="text-white text-2xs font-extrabold">
-//                           {rev.reviewer}
-//                         </Text>
-//                         <Text className="text-slate-500 text-5xs font-semibold">
-//                           {rev.date}
-//                         </Text>
-//                       </View>
-//                       <View className="flex-row items-center gap-0.5 mt-0.5">
-//                         <Star size={10} color="#f59e0b" fill="#f59e0b" />
-//                         <Star size={10} color="#f59e0b" fill="#f59e0b" />
-//                         <Star size={10} color="#f59e0b" fill="#f59e0b" />
-//                         <Star size={10} color="#f59e0b" fill="#f59e0b" />
-//                         <Star size={10} color="#f59e0b" fill="#f59e0b" />
-//                       </View>
-//                     </View>
-//                   </View>
-//                   <Text className="text-slate-300 text-3xs font-medium leading-relaxed">
-//                     {rev.comment}
-//                   </Text>
-//                 </View>
-//               ))}
-//             </View>
-//           )}
-//         </View>
-//       </ScrollView>
-//     </View>
-//   );
-// }
-
-// @ts-nocheck
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -478,222 +6,1201 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Modal,
+  TextInput,
+  Switch,
+  Alert,
+  Share,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { useAuthContext } from "@/context/AuthContext";
+import { useLocation } from "@/context/LocationContext";
+import { useStore } from "@/hooks/useStore";
 import { useTheme } from "@/hooks/useTheme";
-import { HeroColors } from "@/theme";
+import type { Theme } from "@/theme";
+import { router } from "expo-router";
 
-interface ProfileScreenProps {
-  onLogout: () => void;
-  onOpenCreate: () => void;
+function hexA(hex: string, a: number) {
+  if (!hex) return `rgba(168,85,247,${a})`;
+  if (hex.startsWith("rgba")) return hex;
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return hex;
+  return `rgba(${r},${g},${b},${a})`;
 }
 
-export default function ProfileScreen({
-  onLogout,
-  onOpenCreate,
-}: ProfileScreenProps) {
-  const { theme: t, isDark } = useTheme();
-
-  const { user, logout } = useAuthContext();
+export default function ProfileScreen() {
+  const { theme: t } = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
 
+  const { user, logout } = useAuthContext();
+  const { selectedLocation } = useLocation();
+  const {
+    state,
+    setShowNotifications,
+    updateCurrentUserProfile,
+    deletePost,
+    resolvePost,
+  } = useStore();
+
+  // Modals state
+  const [activeModal, setActiveModal] = useState<
+    | "edit"
+    | "activities"
+    | "tickets"
+    | "saved"
+    | "privacy"
+    | "help"
+    | "invite"
+    | "settings"
+    | "premium"
+    | null
+  >(null);
+
+  // Edit profile form state
+  const [editName, setEditName] = useState(user?.name || "Bharath Maska");
+  const [editBio, setEditBio] = useState(
+    (user as any)?.bio ||
+      "Love meeting new people and exploring new things! ✨",
+  );
+  const [editAvatar, setEditAvatar] = useState(
+    user?.avatar ||
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+  );
+
+  // Settings toggles
+  const [pushNotifs, setPushNotifs] = useState(true);
+  const [emailNotifs, setEmailNotifs] = useState(false);
+  const [privateProfile, setPrivateProfile] = useState(false);
+  const [twoFactor, setTwoFactor] = useState(true);
+
+  // Calculated values
+  const locationText =
+    selectedLocation?.name ||
+    selectedLocation?.city ||
+    state.currentUser?.location ||
+    "Koramangala, Bengaluru";
+
+  const userHandle = `@${(user?.name || "bharath_m")
+    .toLowerCase()
+    .replace(/\s+/g, "_")}`;
+
+  const userBio =
+    (user as any)?.bio ||
+    state.currentUser?.bio ||
+    "Love meeting new people and exploring new things! ✨";
+
+  const userAvatar =
+    user?.avatar ||
+    state.currentUser?.avatar ||
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150";
+
+  // Filter user's posts
+  const myPosts = useMemo(() => {
+    return state.posts.filter(
+      (p) =>
+        p.host.name.toLowerCase() === (user?.name || "").toLowerCase() ||
+        p.host.name === state.currentUser?.name,
+    );
+  }, [state.posts, user]);
+
+  const ticketPosts = useMemo(() => {
+    return state.posts.filter((p) => p.category === "Movie Tickets");
+  }, [state.posts]);
+
+  // Total unread chat count
+  const unreadChatsCount = useMemo(() => {
+    return state.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0);
+  }, [state.chats]);
+
+  const handleShareProfile = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${user?.name || "Bharath Maska"}'s profile on Junto! Connect with verified daymates and ticket sellers.`,
+      });
+    } catch (err) {
+      console.warn("Share error:", err);
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (!editName.trim()) {
+      Alert.alert("Validation Error", "Name cannot be empty");
+      return;
+    }
+    updateCurrentUserProfile({
+      name: editName.trim(),
+      bio: editBio.trim(),
+      avatar: editAvatar.trim(),
+    });
+    setActiveModal(null);
+    Alert.alert("Success", "Profile updated successfully!");
+  };
+
   return (
-    <View style={s.container}>
+    <SafeAreaView style={s.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
       >
-        {/* HEADER ROW */}
-        <View style={s.headerRow}>
-          <Text style={s.headerTitle}>My Profile</Text>
-          <TouchableOpacity style={s.settingsBtn} activeOpacity={0.7}>
-            <Ionicons
-              name="settings-outline"
-              size={moderateScale(18)}
-              color="#94A3B8"
-            />
-          </TouchableOpacity>
-        </View>
+        {/* 1. TOP PROFILE HEADER AREA */}
+        <View style={s.headerSection}>
+          {/* Top Right Action Icons */}
+          <View style={s.topActionsRow}>
+            <TouchableOpacity
+              style={s.topIconButton}
+              onPress={handleShareProfile}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="share-outline" size={scale(17)} color={t.text} />
+            </TouchableOpacity>
 
-        {/* HERO USER PROFILE CARD */}
-        <View style={s.cardWrapper}>
-          <View style={s.heroCard}>
-            {/* Spotlight decoration */}
-            <View style={s.spotlight} />
+            <TouchableOpacity
+              style={s.topIconButton}
+              onPress={() => setActiveModal("settings")}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={scale(17)}
+                color={t.text}
+              />
+            </TouchableOpacity>
+          </View>
 
-            <View style={s.profileHeader}>
-              <View style={s.avatarWrapper}>
-                <Image
-                  source={{
-                    uri: user?.avatar,
-                    // uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150",
-                  }}
-                  style={s.avatar}
-                />
-                <View style={s.avatarRing} />
+          {/* Profile Header Row: Avatar + Info */}
+          <View style={s.profileMainRow}>
+            {/* Avatar with Edit Badge */}
+            <View style={s.avatarContainer}>
+              <View style={s.avatarGlowRing}>
+                <Image source={{ uri: userAvatar }} style={s.avatarImage} />
               </View>
-
-              <View style={s.profileMeta}>
-                <View style={s.nameRow}>
-                  <Text style={s.profileName}>{user?.name}</Text>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={moderateScale(15)}
-                    color="#A78BFA"
-                  />
-                </View>
-                <Text style={s.verifiedTag}>Verified Mumbaikar</Text>
-                <Text style={s.emailText}>{user?.email}</Text>
-              </View>
+              <TouchableOpacity
+                style={s.editAvatarBadge}
+                onPress={() => setActiveModal("edit")}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="pencil" size={scale(11)} color={t.white} />
+              </TouchableOpacity>
             </View>
 
-            {/* Quick Stats Grid */}
-            <View style={s.statsGrid}>
-              <View style={s.statBox}>
-                <Text style={[s.statLabel, { color: HeroColors.swap.tint }]}>
-                  Swaps
+            {/* User Meta Info */}
+            <View style={s.metaContainer}>
+              {/* Name & Verified Badge */}
+              <View style={s.nameBadgeRow}>
+                <Text style={s.nameText} numberOfLines={1}>
+                  {user?.name || "Bharath Maska"}
                 </Text>
-                <Text style={s.statVal}>14 Deals</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={scale(16)}
+                  color={t.primary}
+                />
               </View>
-              <View style={s.statBox}>
-                <Text style={[s.statLabel, { color: HeroColors.mates.tint }]}>
-                  Buddies
+
+              {/* Handle */}
+              <Text style={s.handleText}>{userHandle}</Text>
+
+              {/* Location Row */}
+              <View style={s.locationRow}>
+                <Ionicons
+                  name="location-sharp"
+                  size={scale(12)}
+                  color={t.primary}
+                />
+                <Text style={s.locationText} numberOfLines={1}>
+                  {locationText}
                 </Text>
-                <Text style={s.statVal}>32 Walks</Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(screens)/location-search")}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.changeLocationText}>Change</Text>
+                </TouchableOpacity>
               </View>
-              <View style={s.statBox}>
-                <Text style={[s.statLabel, { color: "#34D399" }]}>Rating</Text>
-                <Text style={[s.statVal, { color: "#34D399" }]}>★ 4.92</Text>
-              </View>
+
+              {/* Bio */}
+              <Text style={s.bioText} numberOfLines={2}>
+                {userBio}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* WALLET BALANCE CARD */}
-        <View style={s.walletWrapper}>
-          <View style={s.walletCard}>
-            <View style={s.walletLeft}>
-              <View style={s.walletIconBg}>
-                <Ionicons
-                  name="wallet-outline"
-                  size={moderateScale(20)}
-                  color="#C084FC"
-                />
+        {/* 2. NUMERICAL STATS CARD */}
+        <View style={s.statsCardWrapper}>
+          <View style={s.statsCard}>
+            {/* Column 1: Connections */}
+            <View style={s.statCol}>
+              <Ionicons name="people" size={scale(18)} color={t.primary} />
+              <Text style={s.statNumber}>
+                {(user as any)?.connectionsCount ||
+                  state.currentUser?.connectionsCount ||
+                  38}
+              </Text>
+              <Text style={s.statLabel}>Connections</Text>
+            </View>
+
+            <View style={s.statDivider} />
+
+            {/* Column 2: Activities */}
+            <TouchableOpacity
+              style={s.statCol}
+              onPress={() => setActiveModal("activities")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="calendar" size={scale(18)} color={t.error} />
+              <Text style={s.statNumber}>
+                {myPosts.length > 0 ? myPosts.length : 12}
+              </Text>
+              <Text style={s.statLabel}>Activities</Text>
+            </TouchableOpacity>
+
+            <View style={s.statDivider} />
+
+            {/* Column 3: Tickets */}
+            <TouchableOpacity
+              style={s.statCol}
+              onPress={() => setActiveModal("tickets")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="ticket" size={scale(18)} color={t.info} />
+              <Text style={s.statNumber}>{ticketPosts.length || 7}</Text>
+              <Text style={s.statLabel}>Tickets</Text>
+            </TouchableOpacity>
+
+            <View style={s.statDivider} />
+
+            {/* Column 4: Trusted */}
+            <View style={s.statCol}>
+              <Ionicons
+                name="shield-checkmark"
+                size={scale(18)}
+                color={t.success}
+              />
+              <Text style={s.statNumber}>
+                {user?.rating
+                  ? `${Math.round((user.rating / 5) * 100)}%`
+                  : "100%"}
+              </Text>
+              <Text style={s.statLabel}>Trusted</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 3. JUNTO PREMIUM BANNER CARD */}
+        <View style={s.premiumCardWrapper}>
+          <TouchableOpacity
+            style={s.premiumCard}
+            onPress={() => setActiveModal("premium")}
+            activeOpacity={0.88}
+          >
+            <View style={s.premiumLeft}>
+              <View style={s.crownIconBg}>
+                <Ionicons name="ribbon" size={scale(20)} color="#FBBF24" />
               </View>
-              <View style={s.walletTexts}>
-                <Text style={s.walletSubtitle}>Junto Escrow Balance</Text>
-                <Text style={s.walletBalance}>₹1,200.00 INR</Text>
+              <View style={s.premiumTextCol}>
+                <Text style={s.premiumTitle}>Junto Premium</Text>
+                <Text style={s.premiumSub}>
+                  Unlock extra features and more visibility.
+                </Text>
               </View>
             </View>
 
             <TouchableOpacity
-              onPress={onOpenCreate}
+              style={s.upgradePillButton}
+              onPress={() => setActiveModal("premium")}
               activeOpacity={0.8}
-              style={s.addCashBtn}
             >
-              <Text style={s.addCashBtnText}>Add Cash</Text>
+              <Text style={s.upgradePillText}>Upgrade</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={scale(13)}
+                color={t.white}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. "MY SPACE" SECTION */}
+        <View style={s.sectionContainer}>
+          <Text style={s.sectionHeaderTitle}>My Space</Text>
+
+          <View style={s.menuListCard}>
+            {/* My Activities */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("activities")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
+                <Ionicons name="person" size={scale(16)} color={t.primary} />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>My Activities</Text>
+                <Text style={s.menuItemSub}>
+                  Manage your day mates, events & more
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* Saved */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("saved")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[s.menuIconBg, { backgroundColor: hexA(t.error, 0.15) }]}
+              >
+                <Ionicons name="heart" size={scale(16)} color={t.error} />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Saved</Text>
+                <Text style={s.menuItemSub}>
+                  Activities, people and places you saved
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* My Tickets */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("tickets")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[s.menuIconBg, { backgroundColor: hexA(t.info, 0.15) }]}
+              >
+                <Ionicons name="ticket" size={scale(16)} color={t.info} />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>My Tickets</Text>
+                <Text style={s.menuItemSub}>
+                  Tickets you're selling or interested in
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* Chats */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => router.push("/(tabs)/chats")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.success, 0.15) },
+                ]}
+              >
+                <Ionicons
+                  name="chatbubble-ellipses"
+                  size={scale(16)}
+                  color={t.success}
+                />
+              </View>
+              <View style={s.menuTextCol}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: scale(6),
+                  }}
+                >
+                  <Text style={s.menuItemTitle}>Chats</Text>
+                  <View style={s.badgePill}>
+                    <Text style={s.badgePillText}>
+                      {unreadChatsCount > 0 ? unreadChatsCount : 2}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={s.menuItemSub}>Your conversations</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* Notifications */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setShowNotifications(true)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.warning, 0.15) },
+                ]}
+              >
+                <Ionicons
+                  name="notifications"
+                  size={scale(16)}
+                  color={t.warning}
+                />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Notifications</Text>
+                <Text style={s.menuItemSub}>Stay updated with activities</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* SETTINGS OPTIONS LIST */}
-        <View style={s.optionsSection}>
-          <Text style={s.optionsSectionTitle}>Security & Settings</Text>
+        {/* 5. "ACCOUNT & MORE" SECTION */}
+        <View style={s.sectionContainer}>
+          <Text style={s.sectionHeaderTitle}>Account & More</Text>
 
-          {/* Option 1 */}
-          <TouchableOpacity style={s.optionCard} activeOpacity={0.8}>
-            <View style={s.optionLeft}>
-              <View style={s.optionIconBg}>
+          <View style={s.menuListCard}>
+            {/* Edit Profile */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("edit")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
                 <Ionicons
-                  name="ribbon-outline"
-                  size={moderateScale(16)}
-                  color="#C084FC"
+                  name="person-circle-outline"
+                  size={scale(17)}
+                  color={t.primary}
                 />
               </View>
-              <Text style={s.optionLabel}>My Active Listings & Drafts</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={moderateScale(15)}
-              color="#475569"
-            />
-          </TouchableOpacity>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Edit Profile</Text>
+                <Text style={s.menuItemSub}>
+                  Update your info and preferences
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
 
-          {/* Option 2 */}
-          <TouchableOpacity style={s.optionCard} activeOpacity={0.8}>
-            <View style={s.optionLeft}>
-              <View style={s.optionIconBg}>
+            <View style={s.menuItemSeparator} />
+
+            {/* Privacy & Safety */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("privacy")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
                 <Ionicons
-                  name="heart-outline"
-                  size={moderateScale(16)}
-                  color="#C084FC"
+                  name="shield-checkmark-outline"
+                  size={scale(17)}
+                  color={t.primary}
                 />
               </View>
-              <Text style={s.optionLabel}>Trust Badges & Vouch Network</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={moderateScale(15)}
-              color="#475569"
-            />
-          </TouchableOpacity>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Privacy & Safety</Text>
+                <Text style={s.menuItemSub}>
+                  Manage privacy and safety settings
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
 
-          {/* Option 3 */}
-          <TouchableOpacity style={s.optionCard} activeOpacity={0.8}>
-            <View style={s.optionLeft}>
-              <View style={s.optionIconBg}>
+            <View style={s.menuItemSeparator} />
+
+            {/* Help & Support */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("help")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
                 <Ionicons
                   name="help-circle-outline"
-                  size={moderateScale(16)}
-                  color="#C084FC"
+                  size={scale(17)}
+                  color={t.primary}
                 />
               </View>
-              <Text style={s.optionLabel}>Help, FAQs & Escrow Support</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={moderateScale(15)}
-              color="#475569"
-            />
-          </TouchableOpacity>
-        </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Help & Support</Text>
+                <Text style={s.menuItemSub}>FAQs, support and feedback</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
 
-        {/* LOGOUT BUTTON CONTAINER */}
-        <View style={s.logoutWrapper}>
-          <TouchableOpacity
-            // onPress={onLogout}
-            onPress={logout}
-            activeOpacity={0.8}
-            style={s.logoutBtn}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={moderateScale(16)}
-              color="#EF4444"
-            />
-            <Text style={s.logoutBtnText}>Sign Out from Junto Account</Text>
-          </TouchableOpacity>
+            <View style={s.menuItemSeparator} />
+
+            {/* Invite Friends */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("invite")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
+                <Ionicons
+                  name="gift-outline"
+                  size={scale(17)}
+                  color={t.primary}
+                />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>Invite Friends</Text>
+                <Text style={s.menuItemSub}>
+                  Invite friends and earn rewards
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: scale(6),
+                }}
+              >
+                <View style={s.rewardTagPill}>
+                  <Text style={s.rewardTagText}>Earn ₹100</Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={scale(16)}
+                  color={t.sub}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
-    </View>
+
+      {/* ==================== INTERACTIVE MODALS ==================== */}
+
+      {/* 1. EDIT PROFILE MODAL */}
+      <Modal
+        visible={activeModal === "edit"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="close" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              onPress={handleSaveProfile}
+              style={s.modalSaveBtn}
+            >
+              <Text style={s.modalSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <View
+              style={{
+                alignItems: "center",
+                marginVertical: verticalScale(16),
+              }}
+            >
+              <Image source={{ uri: editAvatar }} style={s.editAvatarLarge} />
+              <TouchableOpacity
+                style={s.changePhotoBtn}
+                onPress={() =>
+                  Alert.alert(
+                    "Change Photo",
+                    "Choose an image URL or upload from gallery.",
+                  )
+                }
+              >
+                <Text style={s.changePhotoText}>Change Profile Photo</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.inputLabel}>Full Name</Text>
+              <TextInput
+                style={s.textInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter full name"
+                placeholderTextColor={t.placeholder}
+              />
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.inputLabel}>Bio</Text>
+              <TextInput
+                style={[
+                  s.textInput,
+                  { height: verticalScale(80), textAlignVertical: "top" },
+                ]}
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="Tell others about yourself"
+                placeholderTextColor={t.placeholder}
+                multiline
+              />
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.inputLabel}>Avatar Image URL</Text>
+              <TextInput
+                style={s.textInput}
+                value={editAvatar}
+                onChangeText={setEditAvatar}
+                placeholder="https://..."
+                placeholderTextColor={t.placeholder}
+              />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 2. MY ACTIVITIES MODAL */}
+      <Modal
+        visible={activeModal === "activities"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>My Activities</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            {myPosts.length === 0 ? (
+              <View style={s.emptyStateBox}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={scale(48)}
+                  color={t.sub}
+                />
+                <Text style={s.emptyStateTitle}>No Active Activities</Text>
+                <Text style={s.emptyStateSub}>
+                  You haven't posted any daymate or ticket activities yet.
+                </Text>
+                <TouchableOpacity
+                  style={s.primaryActionBtn}
+                  onPress={() => {
+                    setActiveModal(null);
+                    router.push("/(screens)/add-daymate");
+                  }}
+                >
+                  <Text style={s.primaryActionText}>Create New Activity</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              myPosts.map((post) => (
+                <View key={post.id} style={s.postCard}>
+                  <Image source={{ uri: post.image }} style={s.postImage} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.postCategory}>{post.category}</Text>
+                    <Text style={s.postTitle} numberOfLines={1}>
+                      {post.title}
+                    </Text>
+                    <Text style={s.postLocation} numberOfLines={1}>
+                      {post.location}
+                    </Text>
+
+                    <View style={s.postActionRow}>
+                      <TouchableOpacity
+                        style={s.resolveBtn}
+                        onPress={() => resolvePost(post.id)}
+                      >
+                        <Text style={s.resolveBtnText}>
+                          {post.status === "Resolved"
+                            ? "Resolved"
+                            : "Mark Resolved"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.deleteBtn}
+                        onPress={() => deletePost(post.id)}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={scale(16)}
+                          color={t.error}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 3. MY TICKETS MODAL */}
+      <Modal
+        visible={activeModal === "tickets"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>My Tickets</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            {ticketPosts.map((ticket) => (
+              <View key={ticket.id} style={s.postCard}>
+                <Image source={{ uri: ticket.image }} style={s.postImage} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.postCategory}>{ticket.category}</Text>
+                  <Text style={s.postTitle}>{ticket.title}</Text>
+                  <Text style={s.postLocation}>
+                    {ticket.price || "₹500 each"}
+                  </Text>
+                  <TouchableOpacity
+                    style={s.resolveBtn}
+                    onPress={() =>
+                      Alert.alert(
+                        "Ticket Selected",
+                        `Managing ticket listing: ${ticket.title}`,
+                      )
+                    }
+                  >
+                    <Text style={s.resolveBtnText}>View Swap Requests</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 4. SAVED ITEMS MODAL */}
+      <Modal
+        visible={activeModal === "saved"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Saved Activities & People</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <View style={s.emptyStateBox}>
+              <Ionicons name="heart-outline" size={scale(48)} color={t.error} />
+              <Text style={s.emptyStateTitle}>No Saved Items Yet</Text>
+              <Text style={s.emptyStateSub}>
+                Bookmark tickets, events, or daymate profiles from Explore to
+                access them here quickly.
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 5. PRIVACY & SAFETY MODAL */}
+      <Modal
+        visible={activeModal === "privacy"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Privacy & Safety</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <View style={s.switchCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.switchTitle}>Push Notifications</Text>
+                <Text style={s.switchSub}>
+                  Real-time alerts for chats & posts
+                </Text>
+              </View>
+              <Switch
+                value={pushNotifs}
+                onValueChange={setPushNotifs}
+                trackColor={{ false: t.border, true: t.primary }}
+                thumbColor={t.white}
+              />
+            </View>
+
+            <View style={s.switchCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.switchTitle}>Private Profile</Text>
+                <Text style={s.switchSub}>
+                  Only daymates can view ratings & activities
+                </Text>
+              </View>
+              <Switch
+                value={privateProfile}
+                onValueChange={setPrivateProfile}
+                trackColor={{ false: t.border, true: t.primary }}
+                thumbColor={t.white}
+              />
+            </View>
+
+            <View style={s.switchCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.switchTitle}>Two-Factor Authentication</Text>
+                <Text style={s.switchSub}>
+                  Keep ticket escrow & wallet transfers secure
+                </Text>
+              </View>
+              <Switch
+                value={twoFactor}
+                onValueChange={setTwoFactor}
+                trackColor={{ false: t.border, true: t.primary }}
+                thumbColor={t.white}
+              />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 6. HELP & SUPPORT MODAL */}
+      <Modal
+        visible={activeModal === "help"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Help & Support</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() =>
+                Alert.alert(
+                  "Ticket Guarantee",
+                  "All ticket transfers on Junto are escrow protected.",
+                )
+              }
+            >
+              <Text style={s.helpTitle}>How does Ticket Escrow work?</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() =>
+                Alert.alert(
+                  "Safety Rules",
+                  "Always meet daymates in well-lit public places.",
+                )
+              }
+            >
+              <Text style={s.helpTitle}>Day Mates Safety Guidelines</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() =>
+                Alert.alert("Contact Us", "Support email: support@junto.app")
+              }
+            >
+              <Text style={s.helpTitle}>Contact Customer Support</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 7. INVITE FRIENDS MODAL */}
+      <Modal
+        visible={activeModal === "invite"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Invite Friends</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <View style={s.modalBody}>
+            <View style={s.inviteHeroCard}>
+              <Ionicons
+                name="gift-outline"
+                size={scale(54)}
+                color={t.primary}
+              />
+              <Text style={s.inviteHeroTitle}>Earn ₹100 for every friend!</Text>
+              <Text style={s.inviteHeroSub}>
+                Invite your friends to Junto. When they complete their first
+                ticket swap or join an activity, both of you get ₹100 in your
+                wallet.
+              </Text>
+
+              <View style={s.codeBox}>
+                <Text style={s.codeText}>
+                  JUNTO-{user?.name?.slice(0, 4).toUpperCase() || "BHAR"}100
+                </Text>
+                <TouchableOpacity
+                  style={s.copyBtn}
+                  onPress={() =>
+                    Alert.alert("Copied!", "Referral code copied to clipboard.")
+                  }
+                >
+                  <Text style={s.copyBtnText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={s.primaryActionBtn}
+                onPress={handleShareProfile}
+              >
+                <Text style={s.primaryActionText}>Share Invite Link</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 8. SETTINGS & LOGOUT MODAL */}
+      <Modal
+        visible={activeModal === "settings"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="arrow-back" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>App Settings</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() => {
+                setActiveModal(null);
+                setActiveModal("edit");
+              }}
+            >
+              <Text style={s.helpTitle}>Edit Account Information</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() => {
+                setActiveModal(null);
+                setActiveModal("privacy");
+              }}
+            >
+              <Text style={s.helpTitle}>Notification Preferences</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.helpItem}
+              onPress={() => router.push("/(screens)/location-search")}
+            >
+              <Text style={s.helpTitle}>Change Current Location</Text>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={{ marginTop: verticalScale(32) }}>
+              <TouchableOpacity
+                style={s.logoutButton}
+                onPress={() => {
+                  setActiveModal(null);
+                  logout();
+                }}
+              >
+                <Ionicons
+                  name="log-out-outline"
+                  size={scale(18)}
+                  color={t.error}
+                />
+                <Text style={s.logoutText}>Sign Out from Junto Account</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 9. JUNTO PREMIUM MODAL */}
+      <Modal
+        visible={activeModal === "premium"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <SafeAreaView style={s.modalContainer} edges={["top", "bottom"]}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setActiveModal(null)}
+              style={s.modalBackBtn}
+            >
+              <Ionicons name="close" size={scale(20)} color={t.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>Junto Premium</Text>
+            <View style={{ width: scale(36) }} />
+          </View>
+
+          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
+            <View style={s.premiumHeroBox}>
+              <Ionicons name="ribbon" size={scale(60)} color="#FBBF24" />
+              <Text style={s.premiumHeroTitle}>Upgrade to Junto Gold</Text>
+              <Text style={s.premiumHeroSub}>
+                Get priority radar placement, zero service fees on ticket swaps,
+                and instant verified badge.
+              </Text>
+            </View>
+
+            <View
+              style={{ gap: verticalScale(12), marginTop: verticalScale(16) }}
+            >
+              <View style={s.featureRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={scale(20)}
+                  color={t.success}
+                />
+                <Text style={s.featureText}>
+                  Priority placement on nearby Radar
+                </Text>
+              </View>
+              <View style={s.featureRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={scale(20)}
+                  color={t.success}
+                />
+                <Text style={s.featureText}>
+                  0% Escrow fee on concert & movie ticket swaps
+                </Text>
+              </View>
+              <View style={s.featureRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={scale(20)}
+                  color={t.success}
+                />
+                <Text style={s.featureText}>
+                  Gold Verified badge on profile
+                </Text>
+              </View>
+              <View style={s.featureRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={scale(20)}
+                  color={t.success}
+                />
+                <Text style={s.featureText}>
+                  Unlimited direct messages with daymates
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={s.upgradeActionBtn}
+              onPress={() => {
+                Alert.alert(
+                  "Welcome to Premium!",
+                  "Your 7-day free trial has been activated.",
+                );
+                setActiveModal(null);
+              }}
+            >
+              <Text style={s.upgradeActionText}>
+                Start 7-Day Free Trial (₹199/mo)
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
-const shadow = Platform.select({
-  ios: {
-    shadowColor: "#000000",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  android: {
-    elevation: 3,
-  },
-  default: {},
-});
 const createStyles = (t: Theme) =>
   StyleSheet.create({
     container: {
@@ -701,247 +1208,626 @@ const createStyles = (t: Theme) =>
       backgroundColor: t.bg,
     },
     scrollContent: {
-      paddingBottom: verticalScale(100),
+      paddingBottom: verticalScale(30),
     },
-    headerRow: {
+
+    /* 1. TOP HEADER SECTION */
+    headerSection: {
+      paddingHorizontal: scale(18),
+      paddingTop: verticalScale(10),
+      paddingBottom: verticalScale(12),
+    },
+    topActionsRow: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      paddingHorizontal: scale(20),
-      paddingTop: verticalScale(20),
-      paddingBottom: verticalScale(8),
+      justifyContent: "flex-end",
+      gap: scale(10),
+      marginBottom: verticalScale(12),
     },
-    headerTitle: {
-      fontSize: moderateScale(18),
-      fontWeight: "900",
-      color: t.text,
-    },
-    settingsBtn: {
+    topIconButton: {
       width: scale(36),
       height: scale(36),
       borderRadius: scale(18),
-      backgroundColor: "rgba(255, 255, 255, 0.04)",
+      backgroundColor: t.cardSecondary,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.06)",
+      borderColor: t.border,
       alignItems: "center",
       justifyContent: "center",
     },
-    cardWrapper: {
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(12),
+    profileMainRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: scale(14),
     },
-    heroCard: {
-      backgroundColor: t.card,
-      borderRadius: scale(24),
-      borderWidth: 1,
-      borderColor: "rgba(167, 139, 250, 0.08)",
-      padding: scale(16),
+
+    /* Avatar */
+    avatarContainer: {
       position: "relative",
-      overflow: "hidden",
-      ...shadow,
     },
-    spotlight: {
+    avatarGlowRing: {
+      width: scale(72),
+      height: scale(72),
+      borderRadius: scale(36),
+      padding: scale(2.5),
+      backgroundColor: t.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarImage: {
+      width: scale(67),
+      height: scale(67),
+      borderRadius: scale(33.5),
+      borderWidth: scale(2),
+      borderColor: t.bg,
+    },
+    editAvatarBadge: {
       position: "absolute",
-      top: "-30%",
-      right: "-15%",
-      width: scale(120),
-      height: scale(120),
-      borderRadius: scale(60),
-      backgroundColor: "rgba(167, 139, 250, 0.15)",
+      bottom: -1,
+      right: -1,
+      width: scale(22),
+      height: scale(22),
+      borderRadius: scale(11),
+      backgroundColor: t.primary,
+      borderWidth: scale(2),
+      borderColor: t.bg,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    profileHeader: {
+
+    /* Meta Text */
+    metaContainer: {
+      flex: 1,
+      justifyContent: "center",
+    },
+    nameBadgeRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(12),
+      gap: scale(5),
     },
-    avatarWrapper: {
-      position: "relative",
+    nameText: {
+      fontSize: moderateScale(19),
+      fontWeight: "900",
+      color: t.text,
+      letterSpacing: -0.3,
     },
-    avatar: {
-      width: scale(56),
-      height: scale(56),
-      borderRadius: scale(16),
-      borderWidth: 1.5,
-      borderColor: "rgba(255, 255, 255, 0.2)",
+    handleText: {
+      fontSize: moderateScale(12),
+      color: t.sub,
+      fontWeight: "600",
+      marginTop: verticalScale(1),
     },
-    avatarRing: {
-      position: "absolute",
-      top: -2,
-      left: -2,
-      right: -2,
-      bottom: -2,
-      borderRadius: scale(18),
-      borderWidth: 1.5,
-      borderColor: t.primary,
-      opacity: 0.8,
-    },
-    profileMeta: {
-      justifyContent: "center",
-    },
-    nameRow: {
+    locationRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(4),
+      marginTop: verticalScale(5),
     },
-    profileName: {
+    locationText: {
+      fontSize: moderateScale(11.5),
+      color: t.sub,
+      fontWeight: "500",
+      maxWidth: scale(160),
+    },
+    changeLocationText: {
+      fontSize: moderateScale(11.5),
+      color: t.primary,
+      fontWeight: "700",
+      marginLeft: scale(2),
+    },
+    bioText: {
+      fontSize: moderateScale(11.5),
+      color: t.sub,
+      lineHeight: moderateScale(16),
+      marginTop: verticalScale(7),
+    },
+
+    /* 2. NUMERICAL STATS CARD */
+    statsCardWrapper: {
+      marginHorizontal: scale(16),
+      marginTop: verticalScale(12),
+      marginBottom: verticalScale(14),
+    },
+    statsCard: {
+      backgroundColor: t.card,
+      borderRadius: scale(20),
+      borderWidth: 1,
+      borderColor: t.border,
+      paddingVertical: verticalScale(14),
+      paddingHorizontal: scale(8),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      ...Platform.select({
+        ios: {
+          shadowColor: t.shadow,
+          shadowOpacity: t.shadowOpacity,
+          shadowRadius: scale(10),
+          shadowOffset: { width: 0, height: verticalScale(4) },
+        },
+        android: { elevation: 4 },
+        default: {},
+      }),
+    },
+    statCol: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    statNumber: {
       fontSize: moderateScale(15),
       fontWeight: "900",
       color: t.text,
-    },
-    verifiedTag: {
-      fontSize: moderateScale(9),
-      fontWeight: "700",
-      color: t.primary,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginTop: scale(1),
-    },
-    emailText: {
-      fontSize: moderateScale(10),
-      color: t.sub,
-      marginTop: scale(1),
-    },
-    statsGrid: {
-      flexDirection: "row",
-      gap: scale(8),
-      marginTop: verticalScale(16),
-      borderTopWidth: 0.5,
-      borderColor: "rgba(255, 255, 255, 0.05)",
-      paddingTop: verticalScale(12),
-    },
-    statBox: {
-      flex: 1,
-      backgroundColor: t.bg,
-      borderRadius: scale(10),
-      paddingVertical: scale(8),
-      alignItems: "center",
-      borderWidth: 0.5,
-      borderColor: t.border,
+      marginTop: verticalScale(4),
     },
     statLabel: {
-      fontSize: moderateScale(8),
-      fontWeight: "700",
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
+      fontSize: moderateScale(10),
+      fontWeight: "600",
+      color: t.sub,
+      marginTop: verticalScale(2),
     },
-    statVal: {
-      fontSize: moderateScale(11.5),
-      fontWeight: "900",
-      color: t.text,
-      marginTop: scale(2),
+    statDivider: {
+      width: 1,
+      height: verticalScale(28),
+      backgroundColor: t.divider,
     },
-    walletWrapper: {
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(12),
+
+    /* 3. JUNTO PREMIUM BANNER */
+    premiumCardWrapper: {
+      marginHorizontal: scale(16),
+      marginBottom: verticalScale(16),
     },
-    walletCard: {
-      backgroundColor: t.bg,
+    premiumCard: {
+      backgroundColor: t.card,
+      borderRadius: scale(20),
       borderWidth: 1,
       borderColor: t.border,
-      borderRadius: scale(18),
-      padding: scale(12),
+      padding: scale(14),
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
     },
-    walletLeft: {
+    premiumLeft: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
+      flex: 1,
     },
-    walletIconBg: {
+    crownIconBg: {
+      width: scale(38),
+      height: scale(38),
+      borderRadius: scale(19),
+      backgroundColor: hexA(t.primary, 0.18),
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "rgba(251, 191, 36, 0.4)",
+    },
+    premiumTextCol: {
+      flex: 1,
+    },
+    premiumTitle: {
+      fontSize: moderateScale(13.5),
+      fontWeight: "800",
+      color: t.text,
+    },
+    premiumSub: {
+      fontSize: moderateScale(10),
+      color: t.sub,
+      marginTop: verticalScale(2),
+    },
+    upgradePillButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(3),
+      backgroundColor: t.primary,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(7),
+      borderRadius: scale(16),
+    },
+    upgradePillText: {
+      fontSize: moderateScale(11),
+      fontWeight: "800",
+      color: t.white,
+    },
+
+    /* SECTION HEADERS */
+    sectionContainer: {
+      marginHorizontal: scale(16),
+      marginBottom: verticalScale(16),
+    },
+    sectionHeaderTitle: {
+      fontSize: moderateScale(13),
+      fontWeight: "800",
+      color: t.text,
+      marginBottom: verticalScale(8),
+      marginLeft: scale(4),
+    },
+
+    /* MENU CARD CONTAINER */
+    menuListCard: {
+      backgroundColor: t.card,
+      borderRadius: scale(20),
+      borderWidth: 1,
+      borderColor: t.border,
+      overflow: "hidden",
+    },
+    menuItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: scale(14),
+      paddingVertical: verticalScale(12),
+      gap: scale(12),
+    },
+    menuIconBg: {
+      width: scale(32),
+      height: scale(32),
+      borderRadius: scale(16),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    menuTextCol: {
+      flex: 1,
+    },
+    menuItemTitle: {
+      fontSize: moderateScale(13),
+      fontWeight: "800",
+      color: t.text,
+    },
+    menuItemSub: {
+      fontSize: moderateScale(10.5),
+      color: t.sub,
+      marginTop: verticalScale(1),
+    },
+    menuItemSeparator: {
+      height: 1,
+      backgroundColor: t.divider,
+      marginLeft: scale(58),
+    },
+
+    /* BADGES */
+    badgePill: {
+      backgroundColor: t.primary,
+      paddingHorizontal: scale(6),
+      paddingVertical: verticalScale(1),
+      borderRadius: scale(10),
+    },
+    badgePillText: {
+      fontSize: moderateScale(10),
+      fontWeight: "900",
+      color: t.white,
+    },
+    rewardTagPill: {
+      backgroundColor: hexA(t.primary, 0.18),
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(3),
+      borderRadius: scale(12),
+      borderWidth: 1,
+      borderColor: hexA(t.primary, 0.3),
+    },
+    rewardTagText: {
+      fontSize: moderateScale(10),
+      fontWeight: "800",
+      color: t.primary,
+    },
+
+    /* MODALS STYLING */
+    modalContainer: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(12),
+      borderBottomWidth: 1,
+      borderBottomColor: t.border,
+    },
+    modalBackBtn: {
       width: scale(36),
       height: scale(36),
-      borderRadius: scale(10),
-      backgroundColor: "rgba(124, 58, 237, 0.1)",
+      borderRadius: scale(18),
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: t.cardSecondary,
     },
-    walletTexts: {
-      justifyContent: "center",
-    },
-    walletSubtitle: {
-      fontSize: moderateScale(8.5),
-      fontWeight: "700",
-      color: t.sub,
-      textTransform: "uppercase",
-    },
-    walletBalance: {
-      fontSize: moderateScale(12.5),
+    modalTitle: {
+      fontSize: moderateScale(16),
       fontWeight: "900",
       color: t.text,
-      marginTop: scale(1),
     },
-    addCashBtn: {
-      backgroundColor: "#7C3AED",
-      borderRadius: scale(8),
+    modalSaveBtn: {
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(6),
+      backgroundColor: t.primary,
+      borderRadius: scale(12),
     },
-    addCashBtnText: {
-      fontSize: moderateScale(10.5),
-      fontWeight: "900",
-      color: t.text,
+    modalSaveText: {
+      color: t.white,
+      fontWeight: "800",
+      fontSize: moderateScale(12),
     },
-    optionsSection: {
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(20),
-      gap: scale(8),
+    modalBody: {
+      flex: 1,
+      padding: scale(16),
     },
-    optionsSectionTitle: {
-      fontSize: moderateScale(10.5),
-      fontWeight: "900",
+
+    /* EDIT PROFILE MODAL */
+    editAvatarLarge: {
+      width: scale(90),
+      height: scale(90),
+      borderRadius: scale(45),
+      borderWidth: scale(3),
+      borderColor: t.primary,
+    },
+    changePhotoBtn: {
+      marginTop: verticalScale(8),
+    },
+    changePhotoText: {
+      color: t.primary,
+      fontWeight: "700",
+      fontSize: moderateScale(12),
+    },
+    inputGroup: {
+      marginBottom: verticalScale(16),
+    },
+    inputLabel: {
       color: t.sub,
+      fontSize: moderateScale(11),
+      fontWeight: "700",
+      marginBottom: verticalScale(6),
       textTransform: "uppercase",
-      letterSpacing: 0.5,
-      paddingLeft: scale(2),
     },
-    optionCard: {
-      backgroundColor: t.bg,
+    textInput: {
+      backgroundColor: t.inputBg,
       borderWidth: 1,
-      borderColor: t.border,
+      borderColor: t.inputBorder,
+      borderRadius: scale(12),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+      color: t.text,
+      fontSize: moderateScale(13),
+    },
+
+    /* CARDS & LISTS IN MODALS */
+    postCard: {
+      flexDirection: "row",
+      gap: scale(12),
+      backgroundColor: t.card,
       borderRadius: scale(16),
       padding: scale(12),
+      marginBottom: verticalScale(12),
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    postImage: {
+      width: scale(60),
+      height: scale(60),
+      borderRadius: scale(10),
+    },
+    postCategory: {
+      fontSize: moderateScale(9),
+      color: t.primary,
+      fontWeight: "800",
+      textTransform: "uppercase",
+    },
+    postTitle: {
+      fontSize: moderateScale(13),
+      fontWeight: "800",
+      color: t.text,
+      marginTop: 2,
+    },
+    postLocation: {
+      fontSize: moderateScale(10.5),
+      color: t.sub,
+      marginTop: 2,
+    },
+    postActionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      marginTop: verticalScale(8),
+    },
+    resolveBtn: {
+      backgroundColor: hexA(t.primary, 0.18),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+      borderRadius: scale(8),
+    },
+    resolveBtnText: {
+      color: t.primary,
+      fontSize: moderateScale(10),
+      fontWeight: "800",
+    },
+    deleteBtn: {
+      padding: scale(4),
+    },
+
+    /* EMPTY STATE */
+    emptyStateBox: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: verticalScale(40),
+      paddingHorizontal: scale(20),
+    },
+    emptyStateTitle: {
+      fontSize: moderateScale(16),
+      fontWeight: "800",
+      color: t.text,
+      marginTop: verticalScale(12),
+    },
+    emptyStateSub: {
+      fontSize: moderateScale(11.5),
+      color: t.sub,
+      textAlign: "center",
+      marginTop: verticalScale(6),
+      lineHeight: moderateScale(16),
+    },
+    primaryActionBtn: {
+      backgroundColor: t.primary,
+      paddingHorizontal: scale(20),
+      paddingVertical: verticalScale(12),
+      borderRadius: scale(14),
+      marginTop: verticalScale(18),
+    },
+    primaryActionText: {
+      color: t.white,
+      fontSize: moderateScale(12.5),
+      fontWeight: "800",
+    },
+
+    /* SWITCH CARDS */
+    switchCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: t.card,
+      padding: scale(14),
+      borderRadius: scale(16),
+      marginBottom: verticalScale(12),
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    switchTitle: {
+      fontSize: moderateScale(13),
+      fontWeight: "800",
+      color: t.text,
+    },
+    switchSub: {
+      fontSize: moderateScale(10.5),
+      color: t.sub,
+      marginTop: 2,
+    },
+
+    /* HELP ITEMS */
+    helpItem: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      backgroundColor: t.card,
+      padding: scale(14),
+      borderRadius: scale(16),
+      marginBottom: verticalScale(10),
+      borderWidth: 1,
+      borderColor: t.border,
     },
-    optionLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(10),
-    },
-    optionIconBg: {
-      width: scale(28),
-      height: scale(28),
-      borderRadius: scale(8),
-      backgroundColor: "rgba(124, 58, 237, 0.1)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    optionLabel: {
-      fontSize: moderateScale(11.5),
+    helpTitle: {
+      fontSize: moderateScale(12.5),
       fontWeight: "700",
       color: t.text,
     },
-    logoutWrapper: {
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(24),
-    },
-    logoutBtn: {
-      backgroundColor: "rgba(239, 68, 68, 0.15)",
+
+    /* INVITE HERO */
+    inviteHeroCard: {
+      alignItems: "center",
+      backgroundColor: t.card,
+      padding: scale(20),
+      borderRadius: scale(24),
       borderWidth: 1,
-      borderColor: "rgba(239, 68, 68, 0.2)",
-      borderRadius: scale(16),
-      paddingVertical: verticalScale(12),
+      borderColor: t.border,
+    },
+    inviteHeroTitle: {
+      fontSize: moderateScale(17),
+      fontWeight: "900",
+      color: t.text,
+      marginTop: verticalScale(12),
+    },
+    inviteHeroSub: {
+      fontSize: moderateScale(11.5),
+      color: t.sub,
+      textAlign: "center",
+      marginTop: verticalScale(6),
+      lineHeight: moderateScale(16),
+    },
+    codeBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: t.bg,
+      borderWidth: 1,
+      borderColor: hexA(t.primary, 0.4),
+      borderRadius: scale(14),
+      paddingHorizontal: scale(14),
+      paddingVertical: verticalScale(8),
+      marginTop: verticalScale(16),
+      gap: scale(12),
+    },
+    codeText: {
+      fontSize: moderateScale(14),
+      fontWeight: "900",
+      color: t.primary,
+      letterSpacing: 1,
+    },
+    copyBtn: {
+      backgroundColor: t.primary,
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+      borderRadius: scale(8),
+    },
+    copyBtnText: {
+      fontSize: moderateScale(11),
+      fontWeight: "800",
+      color: t.white,
+    },
+
+    /* SETTINGS & LOGOUT */
+    logoutButton: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: scale(6),
+      gap: scale(8),
+      backgroundColor: hexA(t.error, 0.12),
+      borderWidth: 1,
+      borderColor: hexA(t.error, 0.3),
+      paddingVertical: verticalScale(14),
+      borderRadius: scale(16),
     },
-    logoutBtnText: {
-      fontSize: moderateScale(11),
-      fontWeight: "700",
+    logoutText: {
       color: t.error,
+      fontSize: moderateScale(12.5),
+      fontWeight: "800",
+    },
+
+    /* PREMIUM HERO */
+    premiumHeroBox: {
+      alignItems: "center",
+      paddingVertical: verticalScale(20),
+    },
+    premiumHeroTitle: {
+      fontSize: moderateScale(18),
+      fontWeight: "900",
+      color: t.text,
+      marginTop: verticalScale(10),
+    },
+    premiumHeroSub: {
+      fontSize: moderateScale(11.5),
+      color: t.sub,
+      textAlign: "center",
+      marginTop: verticalScale(6),
+      lineHeight: moderateScale(16),
+    },
+    featureRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      backgroundColor: t.card,
+      padding: scale(12),
+      borderRadius: scale(12),
+    },
+    featureText: {
+      fontSize: moderateScale(12),
+      color: t.text,
+      fontWeight: "600",
+    },
+    upgradeActionBtn: {
+      backgroundColor: t.primary,
+      paddingVertical: verticalScale(14),
+      borderRadius: scale(16),
+      alignItems: "center",
+      marginTop: verticalScale(24),
+    },
+    upgradeActionText: {
+      color: t.white,
+      fontSize: moderateScale(13),
+      fontWeight: "900",
     },
   });
