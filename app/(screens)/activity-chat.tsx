@@ -226,7 +226,8 @@ export default function ActivityChatScreen() {
     <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {/* Header Bar */}
         <View style={s.header}>
@@ -406,6 +407,7 @@ export default function ActivityChatScreen() {
           onContentSizeChange={() =>
             scrollViewRef.current?.scrollToEnd({ animated: true })
           }
+          keyboardShouldPersistTaps="handled"
         >
           {displayedMessages.map((msg: Message) => {
             const isMe = msg.sender === "me";

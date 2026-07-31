@@ -32,6 +32,7 @@ import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
 import DayMatesForm from "../(screens)/add-daymate";
 import SellTicketForm from "../(screens)/add-ticket";
+import AskNearbyScreen from "../(screens)/ask-nearby";
 
 /* ---------------- Types & data ---------------- */
 
@@ -353,61 +354,64 @@ export default function CreateScreen() {
           )}
 
           {selected === "ask_nearby" && (
-            <View style={styles.formWrapper}>
-              <Text style={styles.sectionSubtitle}>
-                Broadcast a localized question to active users
-              </Text>
+            // (
+            //   <View style={styles.formWrapper}>
+            //     <Text style={styles.sectionSubtitle}>
+            //       Broadcast a localized question to active users
+            //     </Text>
 
-              <FormLabel t={t} text="Your Question" />
-              <TextInput
-                style={[styles.input, styles.inputMultiline]}
-                multiline
-                numberOfLines={3}
-                placeholder="e.g., Is the entry fee at Toit active tonight?"
-                placeholderTextColor={t.placeholder}
-                value={question}
-                onChangeText={setQuestion}
-              />
+            //     <FormLabel t={t} text="Your Question" />
+            //     <TextInput
+            //       style={[styles.input, styles.inputMultiline]}
+            //       multiline
+            //       numberOfLines={3}
+            //       placeholder="e.g., Is the entry fee at Toit active tonight?"
+            //       placeholderTextColor={t.placeholder}
+            //       value={question}
+            //       onChangeText={setQuestion}
+            //     />
 
-              <FormLabel t={t} text="Select Topic" />
-              <View style={styles.chipRow}>
-                {QUESTION_TOPICS.map((x) => (
-                  <Chip
-                    key={x}
-                    t={t}
-                    label={x}
-                    selected={topic === x}
-                    onPress={() => setTopic(x)}
-                  />
-                ))}
-              </View>
+            //     <FormLabel t={t} text="Select Topic" />
+            //     <View style={styles.chipRow}>
+            //       {QUESTION_TOPICS.map((x) => (
+            //         <Chip
+            //           key={x}
+            //           t={t}
+            //           label={x}
+            //           selected={topic === x}
+            //           onPress={() => setTopic(x)}
+            //         />
+            //       ))}
+            //     </View>
 
-              <FormLabel t={t} text="Urgency Level" />
-              <View style={styles.chipRow}>
-                {URGENCY_LEVELS.map((x) => (
-                  <Chip
-                    key={x}
-                    t={t}
-                    label={x}
-                    selected={urgency === x}
-                    onPress={() => setUrgency(x)}
-                  />
-                ))}
-              </View>
+            //     <FormLabel t={t} text="Urgency Level" />
+            //     <View style={styles.chipRow}>
+            //       {URGENCY_LEVELS.map((x) => (
+            //         <Chip
+            //           key={x}
+            //           t={t}
+            //           label={x}
+            //           selected={urgency === x}
+            //           onPress={() => setUrgency(x)}
+            //         />
+            //       ))}
+            //     </View>
 
-              <TouchableOpacity
-                activeOpacity={0.9}
-                disabled={!question}
-                onPress={submit}
-                style={[
-                  styles.submitBtn,
-                  { backgroundColor: palettes.question.arrow },
-                  !question && { opacity: 0.5 },
-                ]}
-              >
-                <Text style={styles.submitBtnText}>Broadcast Question</Text>
-              </TouchableOpacity>
-            </View>
+            //     <TouchableOpacity
+            //       activeOpacity={0.9}
+            //       disabled={!question}
+            //       onPress={submit}
+            //       style={[
+            //         styles.submitBtn,
+            //         { backgroundColor: palettes.question.arrow },
+            //         !question && { opacity: 0.5 },
+            //       ]}
+            //     >
+            //       <Text style={styles.submitBtnText}>Broadcast Question</Text>
+            //     </TouchableOpacity>
+            //   </View>
+            // )
+            <AskNearbyScreen />
           )}
         </ScrollView>
       )}
