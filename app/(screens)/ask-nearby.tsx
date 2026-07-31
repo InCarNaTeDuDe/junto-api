@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useStyles } from "@/hooks/useStyles";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -477,15 +478,17 @@ const createStyles = (t: any) => {
     /* Modal */
     modalOverlay: {
       flex: 1,
-      backgroundColor: t.overlay || "rgba(0,0,0,0.65)",
+      backgroundColor: isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)",
       justifyContent: "flex-end",
     },
     modalContent: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: isDark ? "#1A152E" : "#FFFFFF",
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       padding: 20,
       maxHeight: "80%",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "transparent",
     },
     modalTitle: {
       color: t.text || (isDark ? "#FFFFFF" : "#111827"),
@@ -497,15 +500,14 @@ const createStyles = (t: any) => {
       alignItems: "center",
       justifyContent: "space-between",
       padding: 13,
-      backgroundColor:
-        t.inputBg || (isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC"),
+      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F8FAFC",
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: t.border || "#E2E8F0",
+      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
     },
     modalItemSelected: {
       backgroundColor: isDark
-        ? "#1E1838"
+        ? "rgba(168, 85, 247, 0.25)"
         : t.primarySoft || "rgba(168, 85, 247, 0.12)",
       borderColor: t.primary || "#A855F7",
     },
@@ -574,7 +576,8 @@ export default function AskNearbyScreen({
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {/* <View style={styles.container}> */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
@@ -951,6 +954,7 @@ export default function AskNearbyScreen({
           </View>
         </View>
       </Modal>
-    </View>
+      {/* </View> */}
+    </SafeAreaView>
   );
 }

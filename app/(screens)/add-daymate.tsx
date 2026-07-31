@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
  * Hero illustration with baked-in headline, subtext and trust pills.
@@ -30,8 +31,6 @@ export interface DayMatesFormProps {
   onSubmitSuccess?: (data: any) => void;
   onBack?: () => void;
   onClose?: () => void;
-  /** Set false when the parent screen already renders its own "Find Day Mates" header */
-  showHeader?: boolean;
 }
 
 interface ActivityItem {
@@ -41,63 +40,88 @@ interface ActivityItem {
   iconName: keyof typeof Ionicons.glyphMap;
   bgLight: string;
   iconColor: string;
+  emoji: string;
 }
 
 const DAYMATE_ACTIVITIES: ActivityItem[] = [
   {
-    id: "gym",
-    label: "Gym Partner",
-    subtext: "Lift together, stay stronger",
-    iconName: "barbell",
-    bgLight: "#F3E8FF",
-    iconColor: "#8B5CF6",
-  },
-  {
     id: "walking",
-    label: "Walking Partner",
+    label: "Walking",
     subtext: "Walk, talk & feel good",
     iconName: "walk",
     bgLight: "#DCFCE7",
     iconColor: "#10B981",
+    emoji: "🚶",
+  },
+  {
+    id: "gym",
+    label: "Gym",
+    subtext: "Lift together, stay stronger",
+    iconName: "barbell",
+    bgLight: "#F3E8FF",
+    iconColor: "#8B5CF6",
+    emoji: "💪",
   },
   {
     id: "movie",
-    label: "Movie Partner",
+    label: "Movie",
     subtext: "Catch movies together",
     iconName: "film",
     bgLight: "#FFE4E6",
     iconColor: "#F43F5E",
+    emoji: "🎬",
   },
   {
     id: "coffee",
-    label: "Coffee Buddy",
+    label: "Coffee",
     subtext: "Coffee, chats & good vibes",
     iconName: "cafe",
     bgLight: "#FFEDD5",
     iconColor: "#F97316",
+    emoji: "☕",
   },
   {
     id: "lunch",
-    label: "Lunch Partner",
+    label: "Lunch",
     subtext: "Share a meal, share a moment",
     iconName: "restaurant",
     bgLight: "#E0F2FE",
     iconColor: "#0284C7",
+    emoji: "🍽️",
   },
   {
     id: "gaming",
-    label: "Game Buddy",
+    label: "Game",
     subtext: "Play games, make friends",
     iconName: "game-controller",
     bgLight: "#F3E8FF",
     iconColor: "#7C3AED",
+    emoji: "🎮",
+  },
+  {
+    id: "drinks",
+    label: "Drinks",
+    subtext: "Chill over cool beverages",
+    iconName: "beer",
+    bgLight: "#FEF3C7",
+    iconColor: "#D97706",
+    emoji: "🍻",
+  },
+  {
+    id: "sports",
+    label: "Sports",
+    subtext: "Cricket, badminton & more",
+    iconName: "trophy",
+    bgLight: "#ECFDF5",
+    iconColor: "#059669",
+    emoji: "🏏",
   },
 ];
 
 const TIME_OPTIONS = [
-  { id: "today", label: "Today", icon: "calendar" },
-  { id: "tomorrow", label: "Tomorrow", icon: "calendar-outline" },
-  { id: "weekend", label: "This Weekend", icon: "calendar-clear-outline" },
+  // { id: "today", label: "Today", icon: "calendar" },
+  // { id: "tomorrow", label: "Tomorrow", icon: "calendar-outline" },
+  // { id: "weekend", label: "This Weekend", icon: "calendar-clear-outline" },
   { id: "pick_date", label: "Pick Date", icon: "calendar-number-outline" },
 ];
 
@@ -112,8 +136,7 @@ const createStyles = (t: any) => {
     scrollContent: {
       paddingHorizontal: 16,
       paddingTop: 12,
-      // extra bottom space so the CTA is never hidden behind the tab bar / FAB
-      paddingBottom: 140,
+      paddingBottom: 40,
       gap: 16,
       maxWidth: 600,
       alignSelf: "center",
@@ -132,7 +155,6 @@ const createStyles = (t: any) => {
       alignItems: "center",
       gap: 12,
       flex: 1,
-      paddingRight: 8,
     },
     backButton: {
       width: 38,
@@ -165,7 +187,7 @@ const createStyles = (t: any) => {
       alignItems: "center",
       gap: 5,
       backgroundColor: isDark ? "rgba(168, 85, 247, 0.16)" : "#F3E8FF",
-      paddingHorizontal: 12,
+      paddingHorizontal: 10,
       paddingVertical: 7,
       borderRadius: 20,
       borderWidth: 1,
@@ -175,7 +197,7 @@ const createStyles = (t: any) => {
     },
     howItWorksText: {
       color: t.primary || "#8B5CF6",
-      fontSize: 12,
+      fontSize: 11.5,
       fontWeight: "700",
     },
 
@@ -193,12 +215,76 @@ const createStyles = (t: any) => {
       height: undefined,
     },
 
-    /* Section Headers */
-    sectionTitle: {
-      fontSize: 15,
+    heroHeading: {
+      fontSize: 21,
       fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-      marginBottom: 10,
+      color: t.text || (isDark ? "#FFFFFF" : "#1E1B4B"),
+      lineHeight: 26,
+    },
+    heroHighlight: {
+      color: t.primary || "#8B5CF6",
+    },
+    heroUnderline: {
+      width: 40,
+      height: 3,
+      backgroundColor: t.primary || "#8B5CF6",
+      borderRadius: 2,
+      marginTop: 2,
+      marginBottom: 6,
+    },
+    heroSubText: {
+      fontSize: 12.5,
+      color: t.sub || (isDark ? "#CBD5E1" : "#475569"),
+      lineHeight: 17,
+      marginBottom: 12,
+    },
+    heroPillBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDark
+        ? "rgba(255, 255, 255, 0.12)"
+        : "rgba(139, 92, 246, 0.2)",
+    },
+    heroPillText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: t.primary || "#7C3AED",
+    },
+
+    /* Right Graphic illustration */
+    heroGraphicRight: {
+      width: 110,
+      height: 90,
+      borderRadius: 20,
+      backgroundColor: isDark
+        ? "rgba(139, 92, 246, 0.2)"
+        : "rgba(139, 92, 246, 0.12)",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    },
+    avatarGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: "#8B5CF6",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: isDark ? "#17122E" : "#FFFFFF",
+      marginHorizontal: -4,
     },
 
     /* Activity Grid Cards */
@@ -208,7 +294,7 @@ const createStyles = (t: any) => {
       gap: 10,
     },
     activityCard: {
-      width: "48.5%",
+      width: "46.5%",
       backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
       borderRadius: 18,
       padding: 12,
@@ -223,8 +309,8 @@ const createStyles = (t: any) => {
       position: "relative",
     },
     activityCardSelected: {
-      borderColor: t.primary || "#8B5CF6",
-      backgroundColor: isDark ? "rgba(139, 92, 246, 0.15)" : "#F5EDFF",
+      borderColor: "#10B981",
+      backgroundColor: isDark ? "rgba(16, 185, 129, 0.12)" : "#F0FDF4",
     },
     cardHeader: {
       flexDirection: "row",
@@ -249,27 +335,6 @@ const createStyles = (t: any) => {
       fontSize: 10.5,
       color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
       lineHeight: 14,
-    },
-
-    /* Paging Dots */
-    paginationDots: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-      gap: 6,
-      marginTop: 10,
-    },
-    dotActive: {
-      width: 14,
-      height: 5,
-      borderRadius: 3,
-      backgroundColor: t.primary || "#8B5CF6",
-    },
-    dotInactive: {
-      width: 5,
-      height: 5,
-      borderRadius: 2.5,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.2)" : "#CBD5E1",
     },
 
     /* Time Options Row */
@@ -303,6 +368,160 @@ const createStyles = (t: any) => {
       color: "#FFFFFF",
     },
 
+    /* Date & Time Pickers 2-Column Controls */
+    dateControlRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    dateTimeHalfCard: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      borderRadius: 16,
+      padding: 12,
+      borderWidth: 1,
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    dateTimeHalfCardActive: {
+      borderColor: t.primary || "#8B5CF6",
+      backgroundColor: isDark ? "rgba(139, 92, 246, 0.15)" : "#F5EDFF",
+    },
+    dateTimeIconCircle: {
+      width: 34,
+      height: 34,
+      borderRadius: 12,
+      backgroundColor: isDark ? "rgba(139, 92, 246, 0.2)" : "#F3E8FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dateTimeLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+    },
+    dateTimeValue: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      marginTop: 1,
+    },
+    pickersRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 10,
+      flexWrap: "wrap",
+    },
+    pickerHalf: {
+      flex: 1,
+      minWidth: 140,
+      padding: 10,
+      backgroundColor: isDark ? "#17122E" : "#F8FAFC",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+    },
+    pickerLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      marginBottom: 6,
+    },
+
+    /* Date & Time Summary Card */
+    dateSummaryCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: isDark ? "rgba(139, 92, 246, 0.12)" : "#F5EDFF",
+      borderRadius: 14,
+      padding: 8,
+      marginTop: 6,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : "#E9D5FF",
+    },
+    dateSummaryText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: t.primary || "#7C3AED",
+    },
+
+    /* How many mates Card */
+    matesCard: {
+      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    matesLeftRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      flex: 1,
+    },
+    matesIconCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? "rgba(16, 185, 129, 0.18)" : "#DCFCE7",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    matesTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+    },
+
+    stepperRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+    },
+    stepBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#FFFFFF",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255, 255, 255, 0.15)" : "#CBD5E1",
+    },
+    stepBtnDisabled: {
+      opacity: 0.4,
+    },
+    stepCountText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      minWidth: 20,
+      textAlign: "center",
+    },
+
     /* Location Section Card */
     locationCard: {
       backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
@@ -314,8 +533,6 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
-      flexWrap: "wrap",
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDark ? 0.15 : 0.03,
@@ -327,7 +544,6 @@ const createStyles = (t: any) => {
       alignItems: "center",
       gap: 12,
       flex: 1,
-      minWidth: 160,
     },
     locIconCircle: {
       width: 40,
@@ -364,34 +580,6 @@ const createStyles = (t: any) => {
       fontSize: 11,
       fontWeight: "700",
       color: t.primary || "#7C3AED",
-    },
-
-    /* Preference Filter Pills */
-    prefsRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    prefPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 13,
-      paddingVertical: 9,
-      borderRadius: 18,
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-    },
-    prefPillActive: {
-      borderColor: t.primary || "#8B5CF6",
-      backgroundColor: isDark ? "rgba(139, 92, 246, 0.18)" : "#F5EDFF",
-    },
-    prefPillText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#334155"),
     },
 
     /* Primary CTA Button */
@@ -470,8 +658,6 @@ const createStyles = (t: any) => {
       fontSize: 18,
       fontWeight: "800",
       color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-      flex: 1,
-      paddingRight: 10,
     },
     stepItem: {
       flexDirection: "row",
@@ -502,34 +688,6 @@ const createStyles = (t: any) => {
       color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
       marginTop: 2,
     },
-    filterOptionRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-      marginBottom: 14,
-    },
-    filterBtn: {
-      flexGrow: 1,
-      flexBasis: "45%",
-      paddingVertical: 10,
-      paddingHorizontal: 8,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
-      alignItems: "center",
-    },
-    filterBtnActive: {
-      backgroundColor: t.primary || "#8B5CF6",
-      borderColor: t.primary || "#8B5CF6",
-    },
-    filterBtnText: {
-      fontSize: 12.5,
-      fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-    },
-    filterBtnTextActive: {
-      color: "#FFFFFF",
-    },
   });
 
   return {
@@ -544,7 +702,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   selectedLocation: propLocation = "Koramangala, Bengaluru",
   onSubmitSuccess,
   onBack,
-  showHeader = true,
+  onClose,
 }) => {
   const router = RouterHook();
   const theme = useStyles((t: any) => createStyles(propColors || t));
@@ -553,23 +711,25 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   const { selectedLocation: contextLocation } = useLocation();
   const currentLocation =
     propLocation || contextLocation || "Koramangala, Bengaluru";
+  const currentLocationName =
+    typeof currentLocation === "string"
+      ? currentLocation
+      : (currentLocation as any)?.name ||
+        (currentLocation as any)?.address ||
+        "Koramangala, Bengaluru";
 
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem>(
     DAYMATE_ACTIVITIES[0],
   );
-  const [selectedTimeId, setSelectedTimeId] = useState("today");
+  const [selectedTimeId, setSelectedTimeId] = useState("pick_date");
   const [meetingDate, setMeetingDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
-  /* Preferences */
-  const [agePref, setAgePref] = useState("Any Age");
-  const [genderPref, setGenderPref] = useState("Any");
-  const [interestPref, setInterestPref] = useState("All");
+  const [matesNeeded, setMatesNeeded] = useState<number>(1);
 
   /* Modals */
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [activePrefModal, setActivePrefModal] = useState<string | null>(null);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function RouterHook() {
@@ -581,7 +741,9 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   }
 
   const handleHeaderBack = () => {
-    if (onBack) {
+    if (onClose) {
+      onClose();
+    } else if (onBack) {
       onBack();
     } else if (router && router.canGoBack()) {
       router.back();
@@ -611,25 +773,62 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
     }
   };
 
-  const onDateChange = (_: any, date?: Date) => {
+  const onDateChange = (_: any, selectedDate?: Date) => {
     if (Platform.OS !== "web") setShowDatePicker(false);
-    if (date) setMeetingDate(date);
+    if (selectedDate) {
+      const updated = new Date(meetingDate);
+      updated.setFullYear(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+      );
+      setMeetingDate(updated);
+    }
+  };
+
+  const onTimeChange = (_: any, selectedTime?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (selectedTime) {
+      const updated = new Date(meetingDate);
+      updated.setHours(selectedTime.getHours(), selectedTime.getMinutes());
+      setMeetingDate(updated);
+    }
+  };
+
+  const formatDate = (d: Date) => {
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (d: Date) => {
+    return d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const formattedShowDate = formatDate(meetingDate);
+      const formattedShowTime = formatTime(meetingDate);
+
       const payload = {
         activity: selectedActivity.label,
         activityId: selectedActivity.id,
-        timeFrame: selectedTimeId,
+        activityEmoji: selectedActivity.emoji,
+        matesNeeded: matesNeeded,
+        showDate: formattedShowDate,
+        showTime: formattedShowTime,
         date: meetingDate.toISOString().split("T")[0],
-        locationName: currentLocation,
-        preferences: {
-          age: agePref,
-          gender: genderPref,
-          interest: interestPref,
-        },
+        time: formattedShowTime,
+        timeFrame: selectedTimeId,
+        selectedLocation: currentLocation,
+        locationName: currentLocationName,
         type: "DAY_MATES",
       };
 
@@ -639,7 +838,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
         console.log("failed to add day mate", e);
       }
 
-      const msg = `🎉 Great! Searching for your ${selectedActivity.label} nearby!`;
+      const msg = `🎉 Great! Searching for ${matesNeeded} ${selectedActivity.label} nearby!`;
       if (typeof window !== "undefined" && window.alert) {
         window.alert(msg);
       } else {
@@ -655,48 +854,15 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {/*  <View style={styles.container}> */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Top Header — hide it when the parent screen already shows one */}
-        {/* {showHeader && (
-          <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity
-                onPress={handleHeaderBack}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="arrow-back"
-                  size={20}
-                  color={text || (isDark ? "#FFFFFF" : "#0F172A")}
-                />
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                  Find Day Mates
-                </Text>
-                <Text style={styles.headerSubTitle} numberOfLines={1}>
-                  Find people to do things with, today!
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.howItWorksPill}
-              onPress={() => setShowHowItWorks(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="bulb" size={15} color={primary || "#8B5CF6"} />
-              <Text style={styles.howItWorksText}>How it works</Text>
-            </TouchableOpacity>
-          </View>
-        )} */}
+        {/* Hero Card Banner */}
 
         {/* Hero Card Banner — single illustration with baked-in headline + pills */}
         <View style={styles.heroCard}>
@@ -704,23 +870,29 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
             source={HERO_IMAGE}
             style={styles.heroImage}
             resizeMode="cover"
+            accessible
+            accessibilityRole="image"
             accessibilityLabel="Find your Day Mates — verified locals, same-day plans, safe and private"
           />
         </View>
 
         {/* 1. What do you want to do? */}
         <View>
-          <Text style={styles.sectionTitle}>What do you want to do?</Text>
-
           <View style={styles.gridContainer}>
             {DAYMATE_ACTIVITIES.map((act) => {
               const isSelected = selectedActivity.id === act.id;
+              const activeBorderColor = act.iconColor;
+              const activeBgColor = isDark ? `${act.iconColor}22` : act.bgLight;
               return (
                 <TouchableOpacity
                   key={act.id}
                   style={[
                     styles.activityCard,
-                    isSelected && styles.activityCardSelected,
+                    isSelected && {
+                      borderColor: activeBorderColor,
+                      backgroundColor: activeBgColor,
+                      borderWidth: 2,
+                    },
                   ]}
                   onPress={() => setSelectedActivity(act)}
                   activeOpacity={0.8}
@@ -730,9 +902,11 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                       style={[
                         styles.activityIconBox,
                         {
-                          backgroundColor: isDark
-                            ? "rgba(139, 92, 246, 0.2)"
-                            : act.bgLight,
+                          backgroundColor: isSelected
+                            ? "#DCFCE7"
+                            : isDark
+                              ? "rgba(139, 92, 246, 0.2)"
+                              : act.bgLight,
                         },
                       ]}
                     >
@@ -743,13 +917,13 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                       />
                     </View>
 
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={
-                        isSelected ? primary || "#8B5CF6" : sub || "#94A3B8"
-                      }
-                    />
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={act.iconColor}
+                      />
+                    )}
                   </View>
 
                   <Text style={styles.activityLabel}>{act.label}</Text>
@@ -758,65 +932,155 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
               );
             })}
           </View>
-
-          {/* Paging dots */}
-          <View style={styles.paginationDots}>
-            <View style={styles.dotActive} />
-            <View style={styles.dotInactive} />
-          </View>
         </View>
 
         {/* 2. When are you free? */}
         <View>
-          <Text style={styles.sectionTitle}>When are you free?</Text>
-
-          <View style={styles.timeRow}>
-            {TIME_OPTIONS.map((opt) => {
-              const isSel = selectedTimeId === opt.id;
-              return (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[styles.timePill, isSel && styles.timePillSelected]}
-                  onPress={() => handleTimeSelect(opt.id)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={opt.icon as any}
-                    size={16}
-                    color={isSel ? "#FFFFFF" : primary || "#8B5CF6"}
-                  />
-                  <Text
-                    style={[
-                      styles.timePillText,
-                      isSel && styles.timePillTextSelected,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* DateTimePicker if Pick Date is active */}
-          {(showDatePicker || Platform.OS === "web") &&
-            selectedTimeId === "pick_date" && (
-              <View style={[styles.pickerContainer, { marginTop: 10 }]}>
-                <DateTimePicker
-                  value={meetingDate}
-                  mode="date"
-                  display="default"
-                  onChange={onDateChange}
-                  themeVariant={isDark ? "dark" : "light"}
+          <View style={styles.dateControlRow}>
+            {/* Date Control */}
+            <TouchableOpacity
+              style={[
+                styles.dateTimeHalfCard,
+                showDatePicker && styles.dateTimeHalfCardActive,
+              ]}
+              onPress={() => {
+                setSelectedTimeId("pick_date");
+                setShowDatePicker((prev) => !prev);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.dateTimeIconCircle}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={18}
+                  color={primary || "#8B5CF6"}
                 />
               </View>
-            )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateTimeLabel}>Pick Date</Text>
+                <Text style={styles.dateTimeValue}>
+                  {formatDate(meetingDate)}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={sub || "#94A3B8"}
+              />
+            </TouchableOpacity>
+
+            {/* Time Control */}
+            <TouchableOpacity
+              style={[
+                styles.dateTimeHalfCard,
+                showTimePicker && styles.dateTimeHalfCardActive,
+              ]}
+              onPress={() => {
+                setSelectedTimeId("pick_date");
+                setShowTimePicker((prev) => !prev);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.dateTimeIconCircle}>
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color={primary || "#8B5CF6"}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateTimeLabel}>Pick Time</Text>
+                <Text style={styles.dateTimeValue}>
+                  {formatTime(meetingDate)}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={sub || "#94A3B8"}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* DateTimePickers side-by-side */}
+          {(showDatePicker || showTimePicker || Platform.OS === "web") && (
+            <View style={styles.pickersRow}>
+              {(showDatePicker || Platform.OS === "web") && (
+                <View style={styles.pickerHalf}>
+                  <Text style={styles.pickerLabel}>Date</Text>
+                  <DateTimePicker
+                    value={meetingDate}
+                    mode="date"
+                    display="default"
+                    onChange={onDateChange}
+                    themeVariant={isDark ? "dark" : "light"}
+                  />
+                </View>
+              )}
+
+              {(showTimePicker || Platform.OS === "web") && (
+                <View style={styles.pickerHalf}>
+                  <Text style={styles.pickerLabel}>Time</Text>
+                  <DateTimePicker
+                    value={meetingDate}
+                    mode="time"
+                    display="default"
+                    onChange={onTimeChange}
+                    themeVariant={isDark ? "dark" : "light"}
+                  />
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
-        {/* 3. Where are you? */}
+        {/* 3. How Many Mates Needed? */}
         <View>
-          <Text style={styles.sectionTitle}>Where are you?</Text>
+          <View style={styles.matesCard}>
+            <View style={styles.matesLeftRow}>
+              <View style={styles.matesIconCircle}>
+                <Ionicons name="people" size={20} color="#10B981" />
+              </View>
+              <View>
+                <Text style={styles.matesTitle}>
+                  {matesNeeded}{" "}
+                  {matesNeeded === 1 ? "Mate Needed" : "Mates Needed"}
+                </Text>
+              </View>
+            </View>
 
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={[
+                  styles.stepBtn,
+                  matesNeeded <= 1 && styles.stepBtnDisabled,
+                ]}
+                disabled={matesNeeded <= 1}
+                onPress={() => setMatesNeeded((prev) => Math.max(1, prev - 1))}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="remove"
+                  size={18}
+                  color={matesNeeded <= 1 ? sub : text || "#0F172A"}
+                />
+              </TouchableOpacity>
+
+              <Text style={styles.stepCountText}>{matesNeeded}</Text>
+
+              <TouchableOpacity
+                style={styles.stepBtn}
+                onPress={() => setMatesNeeded((prev) => Math.min(10, prev + 1))}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={18} color={text || "#0F172A"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* 4. Where are you? */}
+        <View>
           <View style={styles.locationCard}>
             <View style={styles.locLeftRow}>
               <View style={styles.locIconCircle}>
@@ -826,10 +1090,8 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                   color={primary || "#8B5CF6"}
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.locTitle} numberOfLines={1}>
-                  {currentLocation}
-                </Text>
+              <View>
+                <Text style={styles.locTitle}>{currentLocationName}</Text>
                 <Text style={styles.locSubtitle}>Within 5 km radius</Text>
               </View>
             </View>
@@ -838,7 +1100,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
               style={styles.useLocBtn}
               activeOpacity={0.8}
               onPress={() => {
-                Alert.alert("Location Updated", `Using ${currentLocation}`);
+                Alert.alert("Location Updated", `Using ${currentLocationName}`);
               }}
             >
               <Ionicons
@@ -847,74 +1109,6 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                 color={primary || "#7C3AED"}
               />
               <Text style={styles.useLocText}>Use Current Location</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 4. Any preferences? (Optional) */}
-        <View>
-          <Text style={styles.sectionTitle}>Any preferences? (Optional)</Text>
-
-          <View style={styles.prefsRow}>
-            <TouchableOpacity
-              style={[
-                styles.prefPill,
-                agePref !== "Any Age" && styles.prefPillActive,
-              ]}
-              onPress={() => setActivePrefModal("age")}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="person-outline"
-                size={14}
-                color={primary || "#8B5CF6"}
-              />
-              <Text style={styles.prefPillText}>Age: {agePref}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.prefPill,
-                genderPref !== "Any" && styles.prefPillActive,
-              ]}
-              onPress={() => setActivePrefModal("gender")}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="people-outline"
-                size={14}
-                color={primary || "#8B5CF6"}
-              />
-              <Text style={styles.prefPillText}>Gender: {genderPref}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.prefPill,
-                interestPref !== "All" && styles.prefPillActive,
-              ]}
-              onPress={() => setActivePrefModal("interest")}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="heart-outline"
-                size={14}
-                color={primary || "#8B5CF6"}
-              />
-              <Text style={styles.prefPillText}>Interests: {interestPref}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.prefPill}
-              onPress={() => setActivePrefModal("more")}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="options-outline"
-                size={14}
-                color={primary || "#8B5CF6"}
-              />
-              <Text style={styles.prefPillText}>More Filters</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1012,162 +1206,8 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
           </View>
         </View>
       </Modal>
-
-      {/* Preferences Modals */}
-      <Modal
-        visible={activePrefModal === "gender"}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Gender Preference</Text>
-              <TouchableOpacity onPress={() => setActivePrefModal(null)}>
-                <Ionicons name="close" size={20} color={sub} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.filterOptionRow}>
-              {["Any", "Female Only", "Male Only"].map((g) => (
-                <TouchableOpacity
-                  key={g}
-                  style={[
-                    styles.filterBtn,
-                    genderPref === g && styles.filterBtnActive,
-                  ]}
-                  onPress={() => {
-                    setGenderPref(g);
-                    setActivePrefModal(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterBtnText,
-                      genderPref === g && styles.filterBtnTextActive,
-                    ]}
-                  >
-                    {g}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={activePrefModal === "age"}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Age Preference</Text>
-              <TouchableOpacity onPress={() => setActivePrefModal(null)}>
-                <Ionicons name="close" size={20} color={sub} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.filterOptionRow}>
-              {["Any Age", "18-25", "25-35", "35+"].map((a) => (
-                <TouchableOpacity
-                  key={a}
-                  style={[
-                    styles.filterBtn,
-                    agePref === a && styles.filterBtnActive,
-                  ]}
-                  onPress={() => {
-                    setAgePref(a);
-                    setActivePrefModal(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterBtnText,
-                      agePref === a && styles.filterBtnTextActive,
-                    ]}
-                  >
-                    {a}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={activePrefModal === "interest"}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Interest</Text>
-              <TouchableOpacity onPress={() => setActivePrefModal(null)}>
-                <Ionicons name="close" size={20} color={sub} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.filterOptionRow}>
-              {["All", "Fitness", "Movies", "Foodie"].map((i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[
-                    styles.filterBtn,
-                    interestPref === i && styles.filterBtnActive,
-                  ]}
-                  onPress={() => {
-                    setInterestPref(i);
-                    setActivePrefModal(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterBtnText,
-                      interestPref === i && styles.filterBtnTextActive,
-                    ]}
-                  >
-                    {i}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={activePrefModal === "more"}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Additional Filters</Text>
-              <TouchableOpacity onPress={() => setActivePrefModal(null)}>
-                <Ionicons name="close" size={20} color={sub} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 13, color: sub, marginBottom: 16 }}>
-              Filters applied: Distance 5km • Verified Profiles Only
-            </Text>
-
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={() => setActivePrefModal(null)}
-            >
-              <Text style={styles.submitButtonText}>Apply Filters</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      {/* </View> */}
+    </SafeAreaView>
   );
 };
 

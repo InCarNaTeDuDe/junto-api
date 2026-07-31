@@ -1,1262 +1,350 @@
-// // @ts-nocheck
-// import React, { useEffect, useState } from "react";
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   TouchableOpacity,
-//   Image,
-//   Platform,
-//   useWindowDimensions,
-// } from "react-native";
-// import { Ionicons } from "@expo/vector-icons";
-// import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-// import { ApiService } from "@/services/api";
-// import { useLocation } from "@/context/LocationContext";
-
-// interface Pin {
-//   id: string;
-//   lat: number; // percentage from top
-//   lng: number; // percentage from left
-//   title: string;
-//   type: "ticket" | "day_mates" | "lost";
-//   venue: string;
-//   price?: string;
-//   ownerName: string;
-//   ownerAvatar: string;
-// }
-
-// const ACTIVE_PINS: Pin[] = [
-//   {
-//     id: "p1",
-//     lat: 38,
-//     lng: 28,
-//     title: "Avengers: Endgame Ticket",
-//     type: "ticket",
-//     venue: "PVR Phoenix Marketcity",
-//     price: "₹500",
-//     ownerName: "Rohan",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=11",
-//   },
-//   {
-//     id: "p2",
-//     lat: 52,
-//     lng: 68,
-//     title: "Morning Walk Buddy",
-//     // type: "buddy",
-//     type: "day_mates",
-//     venue: "Bandra Reclamation",
-//     ownerName: "Ananya",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=20",
-//   },
-//   {
-//     id: "p3",
-//     lat: 68,
-//     lng: 35,
-//     title: "Black Wallet Lost",
-//     type: "lost",
-//     venue: "Near Dadar Station",
-//     ownerName: "Neha",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=32",
-//   },
-//   {
-//     id: "p4",
-//     lat: 25,
-//     lng: 72,
-//     title: "Coldplay Ticket Sale",
-//     type: "ticket",
-//     venue: "National Gymkhana",
-//     price: "₹4500",
-//     ownerName: "Marcus",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=12",
-//   },
-// ];
-
-// export default function ExploreScreen() {
-//   const { width, height } = useWindowDimensions();
-//   const [filterType, setFilterType] = useState<
-//     "all" | "ticket" | "day_mates" | "lost"
-//   >("all");
-
-//   const { selectedLocation } = useLocation();
-//   const [activePins, setActivePins] = useState<[]>([]);
-//   const [selectedPin, setSelectedPin] = useState<Pin | null>(activePins[0]); // Default to Ananya's walk buddy
-
-//   const filteredPins = activePins.filter((p) =>
-//     filterType === "all" ? true : p.type === filterType,
-//   );
-
-//   useEffect(() => {
-//     const loadActivePins = async () => {
-//       try {
-//         const d = await ApiService.post("/api/activity/explore");
-
-//         setActivePins(d);
-//       } catch (error) {
-//         console.error(error);
-//       }
-//     };
-
-//     loadActivePins();
-//   }, []);
-
-//   return (
-//     <View style={s.container}>
-//       {/* MAP CANVAS GRID */}
-//       <View style={s.mapCanvas}>
-//         {/* Abstract Map Grid Lines */}
-//         <View style={s.gridContainer}>
-//           {[...Array(12)].map((_, i) => (
-//             <View
-//               key={`v-${i}`}
-//               style={[s.gridLineVert, { left: `${(i + 1) * 8}%` }]}
-//             />
-//           ))}
-//           {[...Array(20)].map((_, i) => (
-//             <View
-//               key={`h-${i}`}
-//               style={[s.gridLineHoriz, { top: `${(i + 1) * 5}%` }]}
-//             />
-//           ))}
-//         </View>
-
-//         {/* Ambient Glow Orbs */}
-//         <View style={s.glowOrb1} />
-//         <View style={s.glowOrb2} />
-
-//         {/* Pulsing Interactive Pins */}
-//         {filteredPins.map((pin) => {
-//           const isSelected = selectedPin?.id === pin.id;
-//           return (
-//             <TouchableOpacity
-//               key={pin.id}
-//               onPress={() => setSelectedPin(pin)}
-//               activeOpacity={0.8}
-//               style={[
-//                 s.markerWrapper,
-//                 { top: `${pin.lat}%`, left: `${pin.lng}%` },
-//               ]}
-//             >
-//               <View style={s.markerContainer}>
-//                 {/* Visual Dot Ring */}
-//                 <View
-//                   style={[
-//                     s.pingRing,
-//                     pin.type === "ticket" && s.ringTicket,
-//                     pin.type === "buddy" && s.ringBuddy,
-//                     pin.type === "lost" && s.ringLost,
-//                     isSelected && s.ringActive,
-//                   ]}
-//                 />
-
-//                 {/* Main Marker Dot */}
-//                 <View
-//                   style={[
-//                     s.markerPin,
-//                     pin.type === "ticket" && { backgroundColor: "#7C3AED" },
-//                     pin.type === "buddy" && { backgroundColor: "#D97706" },
-//                     pin.type === "lost" && { backgroundColor: "#059669" },
-//                     isSelected && s.markerSelected,
-//                   ]}
-//                 >
-//                   <Ionicons
-//                     name="location"
-//                     size={moderateScale(12)}
-//                     color="#FFFFFF"
-//                   />
-//                 </View>
-
-//                 {isSelected && (
-//                   <View style={s.markerLabel}>
-//                     <Text style={s.markerLabelText}>{pin.ownerName}</Text>
-//                   </View>
-//                 )}
-//               </View>
-//             </TouchableOpacity>
-//           );
-//         })}
-//       </View>
-
-//       {/* FLOAT MAP SEARCH OVERLAY */}
-//       <View style={s.floatingOverlay}>
-//         <View style={s.infoCard}>
-//           <View style={s.infoIconBg}>
-//             <Ionicons
-//               name="compass-outline"
-//               size={moderateScale(18)}
-//               color="#A78BFA"
-//             />
-//           </View>
-//           <View style={s.infoTexts}>
-//             <Text style={s.infoTitle}>Radar active around Mumbai</Text>
-//             <Text style={s.infoDesc}>
-//               Showing people within 5 km of your location
-//             </Text>
-//           </View>
-//         </View>
-
-//         {/* Horizontal Quick Filter Pills */}
-//         <View style={s.filtersRow}>
-//           {(
-//             [
-//               { id: "all", label: "All Items" },
-//               { id: "ticket", label: "Tickets 🎟️" },
-//               { id: "buddy", label: "Buddies 👥" },
-//               { id: "lost", label: "Lost & Found 📢" },
-//             ] as const
-//           ).map((opt) => (
-//             <TouchableOpacity
-//               key={opt.id}
-//               onPress={() => {
-//                 setFilterType(opt.id);
-//                 const matching = activePins.filter((p) =>
-//                   opt.id === "all" ? true : p.type === opt.id,
-//                 );
-//                 if (matching.length > 0) setSelectedPin(matching[0]);
-//               }}
-//               activeOpacity={0.8}
-//               style={[
-//                 s.filterPill,
-//                 filterType === opt.id && s.filterPillSelected,
-//               ]}
-//             >
-//               <Text
-//                 style={[
-//                   s.filterPillText,
-//                   filterType === opt.id && s.filterPillTextSelected,
-//                 ]}
-//               >
-//                 {opt.label}
-//               </Text>
-//             </TouchableOpacity>
-//           ))}
-//         </View>
-//       </View>
-
-//       {/* FLOATING TARGET CARD DETAILS */}
-//       <View style={s.bottomPanel}>
-//         {selectedPin ? (
-//           <View style={s.detailsCard}>
-//             {/* Status dot */}
-//             <View
-//               style={[
-//                 s.statusDot,
-//                 selectedPin.type === "ticket" && { backgroundColor: "#7C3AED" },
-//                 selectedPin.type === "buddy" && { backgroundColor: "#D97706" },
-//                 selectedPin.type === "lost" && { backgroundColor: "#059669" },
-//               ]}
-//             />
-
-//             <Image
-//               source={{ uri: selectedPin.ownerAvatar }}
-//               style={s.detailsAvatar}
-//             />
-
-//             <View style={s.detailsCol}>
-//               <Text style={s.detailsBadgeText}>
-//                 {selectedPin.type === "ticket"
-//                   ? "MOVIE DEAL"
-//                   : selectedPin.type === "buddy"
-//                     ? "DAY MATE PLAN"
-//                     : "LOST BROADCAST"}
-//               </Text>
-
-//               <Text style={s.detailsTitle} numberOfLines={1}>
-//                 {selectedPin.title}
-//               </Text>
-
-//               <View style={s.detailsLocRow}>
-//                 <Ionicons
-//                   name="location-outline"
-//                   size={moderateScale(11)}
-//                   color="#94A3B8"
-//                 />
-//                 <Text style={s.detailsLocText} numberOfLines={1}>
-//                   {selectedPin.venue}
-//                 </Text>
-//               </View>
-
-//               <View style={s.detailsBottomRow}>
-//                 <Text style={s.detailsByText}>
-//                   Post by{" "}
-//                   <Text style={s.detailsOwnerName}>
-//                     {selectedPin.ownerName}
-//                   </Text>
-//                 </Text>
-
-//                 {selectedPin.price ? (
-//                   <Text style={s.detailsPrice}>{selectedPin.price}</Text>
-//                 ) : (
-//                   <View style={s.connectRow}>
-//                     <Text style={s.connectText}>Connect</Text>
-//                     <Ionicons
-//                       name="arrow-forward-outline"
-//                       size={moderateScale(10)}
-//                       color="#A78BFA"
-//                     />
-//                   </View>
-//                 )}
-//               </View>
-//             </View>
-//           </View>
-//         ) : (
-//           <View style={s.emptyDetailsCard}>
-//             <Text style={s.emptyDetailsText}>
-//               Tap any active radar point to inspect
-//             </Text>
-//           </View>
-//         )}
-//       </View>
-//     </View>
-//   );
-// }
-
-// const shadow = Platform.select({
-//   ios: {
-//     shadowColor: "#000000",
-//     shadowOpacity: 0.35,
-//     shadowRadius: 16,
-//     shadowOffset: { width: 0, height: 8 },
-//   },
-//   android: {
-//     elevation: 8,
-//   },
-//   default: {},
-// });
-
-// const s = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#070514",
-//   },
-//   mapCanvas: {
-//     ...StyleSheet.absoluteFillObject,
-//     backgroundColor: "#0A071D",
-//     overflow: "hidden",
-//   },
-//   gridContainer: {
-//     ...StyleSheet.absoluteFillObject,
-//     opacity: 0.06,
-//   },
-//   gridLineVert: {
-//     position: "absolute",
-//     top: 0,
-//     bottom: 0,
-//     width: 1,
-//     backgroundColor: "#FFFFFF",
-//   },
-//   gridLineHoriz: {
-//     position: "absolute",
-//     left: 0,
-//     right: 0,
-//     height: 1,
-//     backgroundColor: "#FFFFFF",
-//   },
-//   glowOrb1: {
-//     position: "absolute",
-//     top: "15%",
-//     left: "5%",
-//     width: scale(180),
-//     height: scale(180),
-//     borderRadius: scale(90),
-//     backgroundColor: "rgba(124, 58, 237, 0.08)",
-//   },
-//   glowOrb2: {
-//     position: "absolute",
-//     bottom: "25%",
-//     right: "5%",
-//     width: scale(220),
-//     height: scale(220),
-//     borderRadius: scale(110),
-//     backgroundColor: "rgba(59, 130, 246, 0.08)",
-//   },
-//   markerWrapper: {
-//     position: "absolute",
-//     transform: [{ translateX: scale(-16) }, { translateY: scale(-16) }],
-//     zIndex: 10,
-//   },
-//   markerContainer: {
-//     alignItems: "center",
-//     justifyContent: "center",
-//     position: "relative",
-//   },
-//   pingRing: {
-//     position: "absolute",
-//     width: scale(32),
-//     height: scale(32),
-//     borderRadius: scale(16),
-//     opacity: 0.2,
-//   },
-//   ringTicket: { backgroundColor: "#7C3AED" },
-//   ringBuddy: { backgroundColor: "#D97706" },
-//   ringLost: { backgroundColor: "#059669" },
-//   ringActive: {
-//     transform: [{ scale: 1.3 }],
-//     opacity: 0.4,
-//   },
-//   markerPin: {
-//     width: scale(24),
-//     height: scale(24),
-//     borderRadius: scale(12),
-//     alignItems: "center",
-//     justifyContent: "center",
-//     borderWidth: 1.5,
-//     borderColor: "transparent",
-//   },
-//   markerSelected: {
-//     borderColor: "#FFFFFF",
-//     transform: [{ scale: 1.2 }],
-//   },
-//   markerLabel: {
-//     position: "absolute",
-//     bottom: scale(28),
-//     backgroundColor: "#120E2C",
-//     borderRadius: scale(10),
-//     paddingHorizontal: scale(6),
-//     paddingVertical: scale(2),
-//     borderWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.15)",
-//   },
-//   markerLabelText: {
-//     fontSize: moderateScale(8),
-//     color: "#FFFFFF",
-//     fontWeight: "900",
-//   },
-//   floatingOverlay: {
-//     position: "absolute",
-//     top: verticalScale(16),
-//     left: scale(20),
-//     right: scale(20),
-//     zIndex: 20,
-//     gap: verticalScale(10),
-//   },
-//   infoCard: {
-//     flexDirection: "row",
-//     backgroundColor: "rgba(18, 14, 44, 0.85)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     borderRadius: scale(16),
-//     padding: scale(10),
-//     alignItems: "center",
-//     gap: scale(10),
-//   },
-//   infoIconBg: {
-//     width: scale(32),
-//     height: scale(32),
-//     borderRadius: scale(10),
-//     backgroundColor: "rgba(124, 58, 237, 0.15)",
-//     alignItems: "center",
-//     justifyContent: "center",
-//   },
-//   infoTexts: {
-//     flex: 1,
-//   },
-//   infoTitle: {
-//     fontSize: moderateScale(11.5),
-//     fontWeight: "800",
-//     color: "#FFFFFF",
-//   },
-//   infoDesc: {
-//     fontSize: moderateScale(9),
-//     color: "#94A3B8",
-//     marginTop: scale(1),
-//   },
-//   filtersRow: {
-//     flexDirection: "row",
-//     gap: scale(6),
-//   },
-//   filterPill: {
-//     backgroundColor: "rgba(18, 14, 44, 0.75)",
-//     borderRadius: scale(14),
-//     paddingHorizontal: scale(10),
-//     paddingVertical: verticalScale(6),
-//     borderWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//   },
-//   filterPillSelected: {
-//     backgroundColor: "#7C3AED",
-//     borderColor: "#A78BFA",
-//   },
-//   filterPillText: {
-//     fontSize: moderateScale(9.5),
-//     fontWeight: "800",
-//     color: "#D1D5DB",
-//   },
-//   filterPillTextSelected: {
-//     color: "#FFFFFF",
-//   },
-//   bottomPanel: {
-//     position: "absolute",
-//     bottom: verticalScale(20),
-//     left: scale(20),
-//     right: scale(20),
-//     zIndex: 20,
-//   },
-//   detailsCard: {
-//     backgroundColor: "rgba(18, 14, 44, 0.92)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.08)",
-//     borderRadius: scale(24),
-//     padding: scale(14),
-//     flexDirection: "row",
-//     gap: scale(12),
-//     position: "relative",
-//     ...shadow,
-//   },
-//   statusDot: {
-//     position: "absolute",
-//     top: scale(14),
-//     right: scale(14),
-//     width: scale(6),
-//     height: scale(6),
-//     borderRadius: scale(3),
-//   },
-//   detailsAvatar: {
-//     width: scale(56),
-//     height: scale(56),
-//     borderRadius: scale(16),
-//     backgroundColor: "rgba(255, 255, 255, 0.03)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.08)",
-//   },
-//   detailsCol: {
-//     flex: 1,
-//     justifyContent: "space-between",
-//   },
-//   detailsBadgeText: {
-//     fontSize: moderateScale(8.5),
-//     fontWeight: "900",
-//     color: "#A78BFA",
-//     letterSpacing: 0.5,
-//   },
-//   detailsTitle: {
-//     fontSize: moderateScale(13.5),
-//     fontWeight: "800",
-//     color: "#FFFFFF",
-//     marginTop: verticalScale(1),
-//   },
-//   detailsLocRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: scale(4),
-//     marginTop: verticalScale(1),
-//   },
-//   detailsLocText: {
-//     fontSize: moderateScale(9.5),
-//     color: "#94A3B8",
-//     fontWeight: "500",
-//     flex: 1,
-//   },
-//   detailsBottomRow: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     borderTopWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     paddingTop: verticalScale(6),
-//     marginTop: verticalScale(4),
-//   },
-//   detailsByText: {
-//     fontSize: moderateScale(9.5),
-//     color: "#94A3B8",
-//   },
-//   detailsOwnerName: {
-//     fontWeight: "700",
-//     color: "#FFFFFF",
-//   },
-//   detailsPrice: {
-//     fontSize: moderateScale(11),
-//     fontWeight: "900",
-//     color: "#FBBF24",
-//   },
-//   connectRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: scale(2),
-//   },
-//   connectText: {
-//     fontSize: moderateScale(9.5),
-//     fontWeight: "800",
-//     color: "#A78BFA",
-//     textTransform: "uppercase",
-//   },
-//   emptyDetailsCard: {
-//     backgroundColor: "rgba(18, 14, 44, 0.8)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     borderRadius: scale(20),
-//     paddingVertical: scale(16),
-//     alignItems: "center",
-//     justifyContent: "center",
-//     ...shadow,
-//   },
-//   emptyDetailsText: {
-//     fontSize: moderateScale(11.5),
-//     fontWeight: "700",
-//     color: "#94A3B8",
-//   },
-// });
-
-// // @ts-nocheck
-// import React, { useEffect, useState } from "react";
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   TouchableOpacity,
-//   Image,
-//   Platform,
-//   useWindowDimensions,
-// } from "react-native";
-// import { Ionicons } from "@expo/vector-icons";
-// import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-// import { ApiService } from "@/services/api";
-// import { useLocation } from "@/context/LocationContext";
-
-// interface Pin {
-//   id: string;
-//   lat: number; // percentage from top
-//   lng: number; // percentage from left
-//   title: string;
-//   type: "ticket" | "day_mates" | "lost";
-//   venue: string;
-//   price?: string;
-//   ownerName: string;
-//   ownerAvatar: string;
-// }
-
-// const ACTIVE_PINS: Pin[] = [
-//   {
-//     id: "p1",
-//     lat: 38,
-//     lng: 28,
-//     title: "Avengers: Endgame Ticket",
-//     type: "ticket",
-//     venue: "PVR Phoenix Marketcity",
-//     price: "₹500",
-//     ownerName: "Rohan",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=11",
-//   },
-//   {
-//     id: "p2",
-//     lat: 52,
-//     lng: 68,
-//     title: "Morning Walk Buddy",
-//     // type: "buddy",
-//     type: "day_mates",
-//     venue: "Bandra Reclamation",
-//     ownerName: "Ananya",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=20",
-//   },
-//   {
-//     id: "p3",
-//     lat: 68,
-//     lng: 35,
-//     title: "Black Wallet Lost",
-//     type: "lost",
-//     venue: "Near Dadar Station",
-//     ownerName: "Neha",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=32",
-//   },
-//   {
-//     id: "p4",
-//     lat: 25,
-//     lng: 72,
-//     title: "Coldplay Ticket Sale",
-//     type: "ticket",
-//     venue: "National Gymkhana",
-//     price: "₹4500",
-//     ownerName: "Marcus",
-//     ownerAvatar: "https://i.pravatar.cc/80?img=12",
-//   },
-// ];
-
-// export default function ExploreScreen() {
-//   const { width, height } = useWindowDimensions();
-//   const [filterType, setFilterType] = useState<
-//     "all" | "ticket" | "day_mates" | "lost"
-//   >("all");
-
-//   const { selectedLocation } = useLocation();
-//   const [activePins, setActivePins] = useState<[]>([]);
-//   const [selectedPin, setSelectedPin] = useState<Pin | null>(activePins[0]); // Default to Ananya's walk buddy
-
-//   const filteredPins = activePins.filter((p) =>
-//     filterType === "all" ? true : p.type === filterType,
-//   );
-
-//   useEffect(() => {
-//     const loadActivePins = async () => {
-//       try {
-//         const d = await ApiService.post("/api/activity/explore");
-
-//         setActivePins(d);
-//       } catch (error) {
-//         console.error(error);
-//       }
-//     };
-
-//     loadActivePins();
-//   }, []);
-
-//   return (
-//     <View style={s.container}>
-//       {/* MAP CANVAS GRID */}
-//       <View style={s.mapCanvas}>
-//         {/* Abstract Map Grid Lines */}
-//         <View style={s.gridContainer}>
-//           {[...Array(12)].map((_, i) => (
-//             <View
-//               key={`v-${i}`}
-//               style={[s.gridLineVert, { left: `${(i + 1) * 8}%` }]}
-//             />
-//           ))}
-//           {[...Array(20)].map((_, i) => (
-//             <View
-//               key={`h-${i}`}
-//               style={[s.gridLineHoriz, { top: `${(i + 1) * 5}%` }]}
-//             />
-//           ))}
-//         </View>
-
-//         {/* Ambient Glow Orbs */}
-//         <View style={s.glowOrb1} />
-//         <View style={s.glowOrb2} />
-
-//         {/* Pulsing Interactive Pins */}
-//         {filteredPins.map((pin) => {
-//           const isSelected = selectedPin?.id === pin.id;
-//           return (
-//             <TouchableOpacity
-//               key={pin.id}
-//               onPress={() => setSelectedPin(pin)}
-//               activeOpacity={0.8}
-//               style={[
-//                 s.markerWrapper,
-//                 { top: `${pin.lat}%`, left: `${pin.lng}%` },
-//               ]}
-//             >
-//               <View style={s.markerContainer}>
-//                 {/* Visual Dot Ring */}
-//                 <View
-//                   style={[
-//                     s.pingRing,
-//                     pin.type === "ticket" && s.ringTicket,
-//                     pin.type === "buddy" && s.ringBuddy,
-//                     pin.type === "lost" && s.ringLost,
-//                     isSelected && s.ringActive,
-//                   ]}
-//                 />
-
-//                 {/* Main Marker Dot */}
-//                 <View
-//                   style={[
-//                     s.markerPin,
-//                     pin.type === "ticket" && { backgroundColor: "#7C3AED" },
-//                     pin.type === "buddy" && { backgroundColor: "#D97706" },
-//                     pin.type === "lost" && { backgroundColor: "#059669" },
-//                     isSelected && s.markerSelected,
-//                   ]}
-//                 >
-//                   <Ionicons
-//                     name="location"
-//                     size={moderateScale(12)}
-//                     color="#FFFFFF"
-//                   />
-//                 </View>
-
-//                 {isSelected && (
-//                   <View style={s.markerLabel}>
-//                     <Text style={s.markerLabelText}>{pin.ownerName}</Text>
-//                   </View>
-//                 )}
-//               </View>
-//             </TouchableOpacity>
-//           );
-//         })}
-//       </View>
-
-//       {/* FLOAT MAP SEARCH OVERLAY */}
-//       <View style={s.floatingOverlay}>
-//         <View style={s.infoCard}>
-//           <View style={s.infoIconBg}>
-//             <Ionicons
-//               name="compass-outline"
-//               size={moderateScale(18)}
-//               color="#A78BFA"
-//             />
-//           </View>
-//           <View style={s.infoTexts}>
-//             <Text style={s.infoTitle}>Radar active around Mumbai</Text>
-//             <Text style={s.infoDesc}>
-//               Showing people within 5 km of your location
-//             </Text>
-//           </View>
-//         </View>
-
-//         {/* Horizontal Quick Filter Pills */}
-//         <View style={s.filtersRow}>
-//           {(
-//             [
-//               { id: "all", label: "All Items" },
-//               { id: "ticket", label: "Tickets 🎟️" },
-//               { id: "buddy", label: "Buddies 👥" },
-//               { id: "lost", label: "Lost & Found 📢" },
-//             ] as const
-//           ).map((opt) => (
-//             <TouchableOpacity
-//               key={opt.id}
-//               onPress={() => {
-//                 setFilterType(opt.id);
-//                 const matching = activePins.filter((p) =>
-//                   opt.id === "all" ? true : p.type === opt.id,
-//                 );
-//                 if (matching.length > 0) setSelectedPin(matching[0]);
-//               }}
-//               activeOpacity={0.8}
-//               style={[
-//                 s.filterPill,
-//                 filterType === opt.id && s.filterPillSelected,
-//               ]}
-//             >
-//               <Text
-//                 style={[
-//                   s.filterPillText,
-//                   filterType === opt.id && s.filterPillTextSelected,
-//                 ]}
-//               >
-//                 {opt.label}
-//               </Text>
-//             </TouchableOpacity>
-//           ))}
-//         </View>
-//       </View>
-
-//       {/* FLOATING TARGET CARD DETAILS */}
-//       <View style={s.bottomPanel}>
-//         {selectedPin ? (
-//           <View style={s.detailsCard}>
-//             {/* Status dot */}
-//             <View
-//               style={[
-//                 s.statusDot,
-//                 selectedPin.type === "ticket" && { backgroundColor: "#7C3AED" },
-//                 selectedPin.type === "buddy" && { backgroundColor: "#D97706" },
-//                 selectedPin.type === "lost" && { backgroundColor: "#059669" },
-//               ]}
-//             />
-
-//             <Image
-//               source={{ uri: selectedPin.ownerAvatar }}
-//               style={s.detailsAvatar}
-//             />
-
-//             <View style={s.detailsCol}>
-//               <Text style={s.detailsBadgeText}>
-//                 {selectedPin.type === "ticket"
-//                   ? "MOVIE DEAL"
-//                   : selectedPin.type === "buddy"
-//                     ? "DAY MATE PLAN"
-//                     : "LOST BROADCAST"}
-//               </Text>
-
-//               <Text style={s.detailsTitle} numberOfLines={1}>
-//                 {selectedPin.title}
-//               </Text>
-
-//               <View style={s.detailsLocRow}>
-//                 <Ionicons
-//                   name="location-outline"
-//                   size={moderateScale(11)}
-//                   color="#94A3B8"
-//                 />
-//                 <Text style={s.detailsLocText} numberOfLines={1}>
-//                   {selectedPin.venue}
-//                 </Text>
-//               </View>
-
-//               <View style={s.detailsBottomRow}>
-//                 <Text style={s.detailsByText}>
-//                   Post by{" "}
-//                   <Text style={s.detailsOwnerName}>
-//                     {selectedPin.ownerName}
-//                   </Text>
-//                 </Text>
-
-//                 {selectedPin.price ? (
-//                   <Text style={s.detailsPrice}>{selectedPin.price}</Text>
-//                 ) : (
-//                   <View style={s.connectRow}>
-//                     <Text style={s.connectText}>Connect</Text>
-//                     <Ionicons
-//                       name="arrow-forward-outline"
-//                       size={moderateScale(10)}
-//                       color="#A78BFA"
-//                     />
-//                   </View>
-//                 )}
-//               </View>
-//             </View>
-//           </View>
-//         ) : (
-//           <View style={s.emptyDetailsCard}>
-//             <Text style={s.emptyDetailsText}>
-//               Tap any active radar point to inspect
-//             </Text>
-//           </View>
-//         )}
-//       </View>
-//     </View>
-//   );
-// }
-
-// const shadow = Platform.select({
-//   ios: {
-//     shadowColor: "#000000",
-//     shadowOpacity: 0.35,
-//     shadowRadius: 16,
-//     shadowOffset: { width: 0, height: 8 },
-//   },
-//   android: {
-//     elevation: 8,
-//   },
-//   default: {},
-// });
-
-// const s = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#070514",
-//   },
-//   mapCanvas: {
-//     ...StyleSheet.absoluteFillObject,
-//     backgroundColor: "#0A071D",
-//     overflow: "hidden",
-//   },
-//   gridContainer: {
-//     ...StyleSheet.absoluteFillObject,
-//     opacity: 0.06,
-//   },
-//   gridLineVert: {
-//     position: "absolute",
-//     top: 0,
-//     bottom: 0,
-//     width: 1,
-//     backgroundColor: "#FFFFFF",
-//   },
-//   gridLineHoriz: {
-//     position: "absolute",
-//     left: 0,
-//     right: 0,
-//     height: 1,
-//     backgroundColor: "#FFFFFF",
-//   },
-//   glowOrb1: {
-//     position: "absolute",
-//     top: "15%",
-//     left: "5%",
-//     width: scale(180),
-//     height: scale(180),
-//     borderRadius: scale(90),
-//     backgroundColor: "rgba(124, 58, 237, 0.08)",
-//   },
-//   glowOrb2: {
-//     position: "absolute",
-//     bottom: "25%",
-//     right: "5%",
-//     width: scale(220),
-//     height: scale(220),
-//     borderRadius: scale(110),
-//     backgroundColor: "rgba(59, 130, 246, 0.08)",
-//   },
-//   markerWrapper: {
-//     position: "absolute",
-//     transform: [{ translateX: scale(-16) }, { translateY: scale(-16) }],
-//     zIndex: 10,
-//   },
-//   markerContainer: {
-//     alignItems: "center",
-//     justifyContent: "center",
-//     position: "relative",
-//   },
-//   pingRing: {
-//     position: "absolute",
-//     width: scale(32),
-//     height: scale(32),
-//     borderRadius: scale(16),
-//     opacity: 0.2,
-//   },
-//   ringTicket: { backgroundColor: "#7C3AED" },
-//   ringBuddy: { backgroundColor: "#D97706" },
-//   ringLost: { backgroundColor: "#059669" },
-//   ringActive: {
-//     transform: [{ scale: 1.3 }],
-//     opacity: 0.4,
-//   },
-//   markerPin: {
-//     width: scale(24),
-//     height: scale(24),
-//     borderRadius: scale(12),
-//     alignItems: "center",
-//     justifyContent: "center",
-//     borderWidth: 1.5,
-//     borderColor: "transparent",
-//   },
-//   markerSelected: {
-//     borderColor: "#FFFFFF",
-//     transform: [{ scale: 1.2 }],
-//   },
-//   markerLabel: {
-//     position: "absolute",
-//     bottom: scale(28),
-//     backgroundColor: "#120E2C",
-//     borderRadius: scale(10),
-//     paddingHorizontal: scale(6),
-//     paddingVertical: scale(2),
-//     borderWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.15)",
-//   },
-//   markerLabelText: {
-//     fontSize: moderateScale(8),
-//     color: "#FFFFFF",
-//     fontWeight: "900",
-//   },
-//   floatingOverlay: {
-//     position: "absolute",
-//     top: verticalScale(16),
-//     left: scale(20),
-//     right: scale(20),
-//     zIndex: 20,
-//     gap: verticalScale(10),
-//   },
-//   infoCard: {
-//     flexDirection: "row",
-//     backgroundColor: "rgba(18, 14, 44, 0.85)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     borderRadius: scale(16),
-//     padding: scale(10),
-//     alignItems: "center",
-//     gap: scale(10),
-//   },
-//   infoIconBg: {
-//     width: scale(32),
-//     height: scale(32),
-//     borderRadius: scale(10),
-//     backgroundColor: "rgba(124, 58, 237, 0.15)",
-//     alignItems: "center",
-//     justifyContent: "center",
-//   },
-//   infoTexts: {
-//     flex: 1,
-//   },
-//   infoTitle: {
-//     fontSize: moderateScale(11.5),
-//     fontWeight: "800",
-//     color: "#FFFFFF",
-//   },
-//   infoDesc: {
-//     fontSize: moderateScale(9),
-//     color: "#94A3B8",
-//     marginTop: scale(1),
-//   },
-//   filtersRow: {
-//     flexDirection: "row",
-//     gap: scale(6),
-//   },
-//   filterPill: {
-//     backgroundColor: "rgba(18, 14, 44, 0.75)",
-//     borderRadius: scale(14),
-//     paddingHorizontal: scale(10),
-//     paddingVertical: verticalScale(6),
-//     borderWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//   },
-//   filterPillSelected: {
-//     backgroundColor: "#7C3AED",
-//     borderColor: "#A78BFA",
-//   },
-//   filterPillText: {
-//     fontSize: moderateScale(9.5),
-//     fontWeight: "800",
-//     color: "#D1D5DB",
-//   },
-//   filterPillTextSelected: {
-//     color: "#FFFFFF",
-//   },
-//   bottomPanel: {
-//     position: "absolute",
-//     bottom: verticalScale(20),
-//     left: scale(20),
-//     right: scale(20),
-//     zIndex: 20,
-//   },
-//   detailsCard: {
-//     backgroundColor: "rgba(18, 14, 44, 0.92)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.08)",
-//     borderRadius: scale(24),
-//     padding: scale(14),
-//     flexDirection: "row",
-//     gap: scale(12),
-//     position: "relative",
-//     ...shadow,
-//   },
-//   statusDot: {
-//     position: "absolute",
-//     top: scale(14),
-//     right: scale(14),
-//     width: scale(6),
-//     height: scale(6),
-//     borderRadius: scale(3),
-//   },
-//   detailsAvatar: {
-//     width: scale(56),
-//     height: scale(56),
-//     borderRadius: scale(16),
-//     backgroundColor: "rgba(255, 255, 255, 0.03)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.08)",
-//   },
-//   detailsCol: {
-//     flex: 1,
-//     justifyContent: "space-between",
-//   },
-//   detailsBadgeText: {
-//     fontSize: moderateScale(8.5),
-//     fontWeight: "900",
-//     color: "#A78BFA",
-//     letterSpacing: 0.5,
-//   },
-//   detailsTitle: {
-//     fontSize: moderateScale(13.5),
-//     fontWeight: "800",
-//     color: "#FFFFFF",
-//     marginTop: verticalScale(1),
-//   },
-//   detailsLocRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: scale(4),
-//     marginTop: verticalScale(1),
-//   },
-//   detailsLocText: {
-//     fontSize: moderateScale(9.5),
-//     color: "#94A3B8",
-//     fontWeight: "500",
-//     flex: 1,
-//   },
-//   detailsBottomRow: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     borderTopWidth: 0.5,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     paddingTop: verticalScale(6),
-//     marginTop: verticalScale(4),
-//   },
-//   detailsByText: {
-//     fontSize: moderateScale(9.5),
-//     color: "#94A3B8",
-//   },
-//   detailsOwnerName: {
-//     fontWeight: "700",
-//     color: "#FFFFFF",
-//   },
-//   detailsPrice: {
-//     fontSize: moderateScale(11),
-//     fontWeight: "900",
-//     color: "#FBBF24",
-//   },
-//   connectRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: scale(2),
-//   },
-//   connectText: {
-//     fontSize: moderateScale(9.5),
-//     fontWeight: "800",
-//     color: "#A78BFA",
-//     textTransform: "uppercase",
-//   },
-//   emptyDetailsCard: {
-//     backgroundColor: "rgba(18, 14, 44, 0.8)",
-//     borderWidth: 1,
-//     borderColor: "rgba(255, 255, 255, 0.05)",
-//     borderRadius: scale(20),
-//     paddingVertical: scale(16),
-//     alignItems: "center",
-//     justifyContent: "center",
-//     ...shadow,
-//   },
-//   emptyDetailsText: {
-//     fontSize: moderateScale(11.5),
-//     fontWeight: "700",
-//     color: "#94A3B8",
-//   },
-// });
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Image,
-  Platform,
+  ScrollView,
+  Animated,
+  Easing,
   Alert,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
-import { router } from "expo-router";
 import { useAuthContext } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
+import { router } from "expo-router";
 
-type PinType = "ticket" | "day_mates" | "lost";
+type FilterCategory = "all" | "buddies" | "tickets" | "lost" | "events";
 
-interface Pin {
+interface RadarUserNode {
   id: string;
-  lat: number; // percentage from top (0-100)
-  lng: number; // percentage from left (0-100)
-  title: string;
-  type: PinType;
-  venue: string;
-  price?: string;
-  ownerName: string;
-  ownerAvatar: string;
+  name: string;
+  avatar: string;
+  distance: string;
+  activityTag: string;
+  category: "buddies" | "tickets" | "lost" | "events";
+  status: "online" | "away";
+  topPct: string;
+  leftPct: string;
+  rawItem?: any;
 }
 
-// Sizes used to keep pins inside the map bounds
-const PIN_SIZE = 24; // markerPin diameter (pre-scale)
-const RING_SIZE = 32; // pingRing diameter (pre-scale)
-const HALF_PIN = PIN_SIZE / 2;
-const HALF_RING = RING_SIZE / 2;
+interface ActivePostCard {
+  id: string;
+  categoryTag: string;
+  categoryType: "buddies" | "tickets" | "lost" | "events";
+  tagBg: string;
+  tagColor: string;
+  timeAgo: string;
+  title: string;
+  subtitle: string;
+  location: string;
+  avatars: string[];
+  avatarText: string;
+  actionLabel: string;
+  rawItem?: any;
+}
 
-// Reserve safe zones (percent) so pins never sit under the top overlay or bottom card.
-// Tune these if your overlays change height.
-const SAFE_TOP_PCT = 18;
-const SAFE_BOTTOM_PCT = 22;
-const SAFE_SIDE_PCT = 6;
+const DEFAULT_RADAR_NODES: RadarUserNode[] = [
+  {
+    id: "rad-1",
+    name: "Priya",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+    distance: "2.1 km",
+    activityTag: "Coffee Buddy",
+    category: "buddies",
+    status: "online",
+    topPct: "16%",
+    leftPct: "45%",
+  },
+  {
+    id: "rad-2",
+    name: "Rohit",
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+    distance: "1.8 km",
+    activityTag: "Cricket",
+    category: "events",
+    status: "online",
+    topPct: "36%",
+    leftPct: "15%",
+  },
+  {
+    id: "rad-3",
+    name: "Arjun",
+    avatar:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+    distance: "2.5 km",
+    activityTag: "Gym Partner",
+    category: "buddies",
+    status: "online",
+    topPct: "37%",
+    leftPct: "73%",
+  },
+  {
+    id: "rad-4",
+    name: "Sneha",
+    avatar:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    distance: "3.2 km",
+    activityTag: "Movie Partner",
+    category: "tickets",
+    status: "away",
+    topPct: "56%",
+    leftPct: "16%",
+  },
+  {
+    id: "rad-5",
+    name: "Kiran",
+    avatar:
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+    distance: "1.2 km",
+    activityTag: "Walking Partner",
+    category: "buddies",
+    status: "online",
+    topPct: "65%",
+    leftPct: "44%",
+  },
+  {
+    id: "rad-6",
+    name: "Meera",
+    avatar:
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150",
+    distance: "3.6 km",
+    activityTag: "Event Buddy",
+    category: "events",
+    status: "online",
+    topPct: "57%",
+    leftPct: "73%",
+  },
+];
 
-const clampPct = (v: number, min: number, max: number) =>
-  Math.min(Math.max(v, min), max);
+const DEFAULT_ACTIVE_CARDS: ActivePostCard[] = [
+  {
+    id: "card-1",
+    categoryTag: "Day Mate Plan",
+    categoryType: "buddies",
+    tagBg: "rgba(217, 119, 6, 0.25)",
+    tagColor: "#FBBF24",
+    timeAgo: "10m ago",
+    title: "Badminton 🏸",
+    subtitle: "Looking for 1 player",
+    location: "Koramangala Indoor Court",
+    avatars: [
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
+    ],
+    avatarText: "3 joined",
+    actionLabel: "Connect",
+  },
+  {
+    id: "card-2",
+    categoryTag: "Ticket for Sale",
+    categoryType: "tickets",
+    tagBg: "rgba(37, 99, 235, 0.25)",
+    tagColor: "#60A5FA",
+    timeAgo: "25m ago",
+    title: "Coldplay Concert 🎵",
+    subtitle: "2 tickets available",
+    location: "Bengaluru • 25 Jan, 7 PM",
+    avatars: [
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100",
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
+    ],
+    avatarText: "2 interested",
+    actionLabel: "View",
+  },
+  {
+    id: "card-3",
+    categoryTag: "Lost & Found",
+    categoryType: "lost",
+    tagBg: "rgba(16, 185, 129, 0.25)",
+    tagColor: "#34D399",
+    timeAgo: "1h ago",
+    title: "Lost Wallet 👝",
+    subtitle: "Black wallet with cards",
+    location: "Near Koramangala 4th Block",
+    avatars: [
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100",
+    ],
+    avatarText: "1 found",
+    actionLabel: "Details",
+  },
+];
 
 export default function ExploreScreen() {
   const { user } = useAuthContext();
-  const [filterType, setFilterType] = useState<"all" | PinType>("all");
-  const [activePins, setActivePins] = useState<Pin[]>([]);
-  const [selectedPin, setSelectedPin] = useState<Pin | null>(null);
+  const { selectedLocation } = useLocation();
+  const { theme: t, isDark } = useTheme();
 
-  const handleCardPress = (pin: Pin) => {
+  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>("all");
+  const [radarNodes, setRadarNodes] =
+    useState<RadarUserNode[]>(DEFAULT_RADAR_NODES);
+  const [activeCards, setActiveCards] =
+    useState<ActivePostCard[]>(DEFAULT_ACTIVE_CARDS);
+  const [selectedNode, setSelectedNode] = useState<RadarUserNode | null>(null);
+
+  // Radar animation sweep angle
+  const sweepAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(sweepAnim, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [sweepAnim]);
+
+  // Load backend items & merge dynamically
+  useEffect(() => {
+    let isMounted = true;
+    const loadExploreData = async () => {
+      try {
+        const responsePins = (await ApiService.post(
+          "/api/activity/explore",
+        )) as any[];
+        const list = Array.isArray(responsePins) ? responsePins : [];
+
+        if (isMounted && list.length > 0) {
+          // Map backend pins into radar nodes
+          const mappedNodes: RadarUserNode[] = list.map((item, idx) => {
+            const cat: FilterCategory =
+              item.type === "ticket"
+                ? "tickets"
+                : item.type === "lost"
+                  ? "lost"
+                  : "buddies";
+
+            // Positions arranged around radar circle
+            const positions = [
+              { top: "18%", left: "45%" },
+              { top: "36%", left: "15%" },
+              { top: "37%", left: "73%" },
+              { top: "56%", left: "16%" },
+              { top: "65%", left: "44%" },
+              { top: "57%", left: "73%" },
+            ];
+
+            const pos = positions[idx % positions.length];
+
+            return {
+              id: item.id || `api-node-${idx}`,
+              name: item.ownerName || "Junto User",
+              avatar:
+                item.ownerAvatar ||
+                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+              distance: `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
+              activityTag: item.title || "Buddy Plan",
+              category: cat === "all" ? "buddies" : cat,
+              status: idx % 2 === 0 ? "online" : "away",
+              topPct: pos.top,
+              leftPct: pos.left,
+              rawItem: item,
+            };
+          });
+
+          // Also map into cards for bottom horizontal scroll
+          const mappedCards: ActivePostCard[] = list.map((item, idx) => {
+            const isTicket = item.type === "ticket";
+            const isLost = item.type === "lost";
+
+            return {
+              id: item.id || `api-card-${idx}`,
+              categoryTag: isTicket
+                ? "Ticket for Sale"
+                : isLost
+                  ? "Lost & Found"
+                  : "Day Mate Plan",
+              categoryType: isTicket ? "tickets" : isLost ? "lost" : "buddies",
+              tagBg: isTicket
+                ? isDark
+                  ? "rgba(37, 99, 235, 0.25)"
+                  : "#DBEAFE"
+                : isLost
+                  ? isDark
+                    ? "rgba(16, 185, 129, 0.25)"
+                    : "#D1FAE5"
+                  : isDark
+                    ? "rgba(217, 119, 6, 0.25)"
+                    : "#FEF3C7",
+              tagColor: isTicket
+                ? isDark
+                  ? "#60A5FA"
+                  : "#1D4ED8"
+                : isLost
+                  ? isDark
+                    ? "#34D399"
+                    : "#047857"
+                  : isDark
+                    ? "#FBBF24"
+                    : "#B45309",
+              timeAgo: `${(idx + 1) * 12}m ago`,
+              title: item.title,
+              subtitle: item.venue || "Nearby location",
+              location: item.venue || "Koramangala, Bengaluru",
+              avatars: [
+                item.ownerAvatar ||
+                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
+              ],
+              avatarText: item.price ? item.price : "1 connected",
+              actionLabel: isTicket ? "View" : isLost ? "Details" : "Connect",
+              rawItem: item,
+            };
+          });
+
+          setRadarNodes(mappedNodes);
+          setActiveCards(mappedCards);
+        }
+      } catch (err) {
+        console.warn("Could not fetch explore pins:", err);
+      }
+    };
+
+    loadExploreData();
+    return () => {
+      isMounted = false;
+    };
+  }, [isDark]);
+
+  // Filtered radar nodes and cards based on category select
+  const filteredNodes = useMemo(() => {
+    if (selectedFilter === "all") return radarNodes;
+    return radarNodes.filter((node) => node.category === selectedFilter);
+  }, [radarNodes, selectedFilter]);
+
+  const filteredCards = useMemo(() => {
+    if (selectedFilter === "all") return activeCards;
+    return activeCards.filter((card) => card.categoryType === selectedFilter);
+  }, [activeCards, selectedFilter]);
+
+  // Handle card press / chat connection
+  const handleItemPress = (
+    title: string,
+    ownerName: string,
+    id: string,
+    venue: string,
+    avatar: string,
+    price?: string,
+  ) => {
     const isOwnActivity =
       user?.name &&
-      pin.ownerName &&
-      pin.ownerName.toLowerCase().trim() === user.name.toLowerCase().trim();
+      ownerName &&
+      ownerName.toLowerCase().trim() === user.name.toLowerCase().trim();
 
     if (isOwnActivity) {
       Alert.alert(
-        "Your Activity Post",
-        "You created this activity post! You cannot join or chat with yourself as a partner.",
+        "Your Post",
+        "You created this activity post! You cannot join or chat with yourself.",
       );
       return;
     }
@@ -1264,503 +352,972 @@ export default function ExploreScreen() {
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
-        title: pin.title,
-        user: pin.ownerName,
-        userId: pin.id,
-        place: pin.venue,
-        right: pin.price || "Nearby",
-        type:
-          pin.type === "ticket"
-            ? "MOVIE TICKET"
-            : pin.type === "day_mates"
-              ? "DAY MATES"
-              : "LOST & FOUND",
-        avatar: pin.ownerAvatar,
+        title: title || "Activity Plan",
+        user: ownerName || "Junto User",
+        userId: id || "act-1",
+        place: venue || "Nearby",
+        right: price || "Connect",
+        type: "EXPLORE ACTIVITY",
+        avatar:
+          avatar ||
+          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
       },
     });
   };
 
-  const filteredPins = activePins.filter((p) =>
-    filterType === "all" ? true : p.type === filterType,
-  );
+  // Interpolated rotation for radar sweep
+  const sweepSpin = sweepAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
-  useEffect(() => {
-    const loadActivePins = async () => {
-      try {
-        const d = (await ApiService.post("/api/activity/explore")) as Pin[];
-        const list = Array.isArray(d) ? d : [];
-        setActivePins(list);
-        if (list.length > 0) setSelectedPin(list[0]);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    loadActivePins();
-  }, []);
+  const locationNameDisplay =
+    selectedLocation?.name ||
+    selectedLocation?.city ||
+    "Koramangala, Bengaluru";
 
-  const badgeFor = (t: PinType) =>
-    t === "ticket"
-      ? "MOVIE DEAL"
-      : t === "day_mates"
-        ? "DAY MATE PLAN"
-        : "LOST BROADCAST";
+  const userNameDisplay = user?.name ? user.name.split(" ")[0] : "Bharath";
 
-  const colorFor = (t: PinType) =>
-    t === "ticket" ? "#7C3AED" : t === "day_mates" ? "#D97706" : "#059669";
+  // Dynamic Theme Colors
+  const bgColor = isDark ? "#070414" : "#F8FAFC";
+  const headerTextColor = isDark ? "#FFFFFF" : "#0F172A";
+  const subTextColor = isDark ? "#CBD5E1" : "#475569";
+  const iconBtnBg = isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF";
+  const iconBtnBorder = isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0";
+  const iconColor = isDark ? "#FFFFFF" : "#7C3AED";
+
+  const bannerBg = isDark ? "rgba(24, 15, 48, 0.75)" : "#F3E8FF";
+  const bannerBorder = isDark ? "rgba(168, 85, 247, 0.25)" : "#DDD6FE";
+  const bannerTitleColor = isDark ? "#FFFFFF" : "#3B0764";
+  const bannerSubColor = isDark ? "#94A3B8" : "#6B21A8";
+
+  const pillBg = isDark ? "rgba(255, 255, 255, 0.06)" : "#FFFFFF";
+  const pillBorder = isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0";
+  const pillTextInact = isDark ? "#94A3B8" : "#64748B";
+
+  const stageBg = isDark ? "#0B0621" : "#F1F5F9";
+  const stageBorder = isDark ? "rgba(168, 85, 247, 0.18)" : "#E2E8F0";
+  const ringColor = isDark
+    ? "rgba(139, 92, 246, 0.2)"
+    : "rgba(139, 92, 246, 0.25)";
+
+  const overlayBg = isDark
+    ? "rgba(18, 12, 38, 0.85)"
+    : "rgba(255, 255, 255, 0.92)";
+  const overlayBorder = isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0";
+  const overlayText = isDark ? "#FFFFFF" : "#0F172A";
+
+  const nodeNameColor = isDark ? "#FFFFFF" : "#0F172A";
+  const nodeDistColor = isDark ? "#94A3B8" : "#64748B";
+  const nodeTagBg = isDark ? "rgba(49, 27, 94, 0.9)" : "#F3E8FF";
+  const nodeTagText = isDark ? "#C084FC" : "#7C3AED";
+
+  const cardBg = isDark ? "#110B29" : "#FFFFFF";
+  const cardBorder = isDark ? "rgba(255, 255, 255, 0.09)" : "#E2E8F0";
+  const cardTitleColor = isDark ? "#FFFFFF" : "#0F172A";
+  const cardSubColor = isDark ? "#94A3B8" : "#64748B";
+
+  const coneColor = isDark
+    ? "rgba(168, 85, 247, 0.35)"
+    : "rgba(139, 92, 246, 0.32)";
 
   return (
-    <View style={s.container}>
-      {/* MAP CANVAS GRID */}
-      <View style={s.mapCanvas}>
-        <View style={s.gridContainer}>
-          {[...Array(12)].map((_, i) => (
-            <View
-              key={`v-${i}`}
-              style={[s.gridLineVert, { left: `${(i + 1) * 8}%` }]}
-            />
-          ))}
-          {[...Array(20)].map((_, i) => (
-            <View
-              key={`h-${i}`}
-              style={[s.gridLineHoriz, { top: `${(i + 1) * 5}%` }]}
-            />
-          ))}
+    <SafeAreaView
+      style={[s.container, { backgroundColor: bgColor }]}
+      edges={["top"]}
+    >
+      {/* 1. TOP HEADER BAR */}
+      <View style={[s.headerBar, { backgroundColor: bgColor }]}>
+        <View style={s.headerLeft}>
+          <Text style={[s.greetingText, { color: headerTextColor }]}>
+            Good evening, {userNameDisplay} 👋
+          </Text>
+          <TouchableOpacity
+            style={s.locationPickerRow}
+            onPress={() => router.push("/(screens)/location-search")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="location" size={14} color="#A855F7" />
+            <Text
+              style={[s.locationText, { color: subTextColor }]}
+              numberOfLines={1}
+            >
+              {locationNameDisplay}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={subTextColor} />
+          </TouchableOpacity>
         </View>
 
-        <View style={s.glowOrb1} />
-        <View style={s.glowOrb2} />
-
-        {/* Pins — clamped inside safe zone so they never render outside the visible map */}
-        {filteredPins.map((pin) => {
-          const isSelected = selectedPin?.id === pin.id;
-          const top = clampPct(pin.lat, SAFE_TOP_PCT, 100 - SAFE_BOTTOM_PCT);
-          const left = clampPct(pin.lng, SAFE_SIDE_PCT, 100 - SAFE_SIDE_PCT);
-          const color = colorFor(pin.type);
-          const labelBelow = top <= SAFE_TOP_PCT + 6;
-
-          return (
-            <TouchableOpacity
-              key={pin.id}
-              onPress={() => setSelectedPin(pin)}
-              activeOpacity={0.8}
-              style={[s.markerWrapper, { top: `${top}%`, left: `${left}%` }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={s.markerContainer}>
-                <View
-                  style={[
-                    s.pingRing,
-                    { backgroundColor: color },
-                    isSelected && s.ringActive,
-                  ]}
-                />
-                <View
-                  style={[
-                    s.markerPin,
-                    { backgroundColor: color },
-                    isSelected && s.markerSelected,
-                  ]}
-                >
-                  <Ionicons
-                    name="location"
-                    size={moderateScale(12)}
-                    color="#FFFFFF"
-                  />
-                </View>
-
-                {isSelected && (
-                  <View
-                    style={[s.markerLabel, labelBelow && s.markerLabelBelow]}
-                  >
-                    <Text style={s.markerLabelText}>{pin.ownerName}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        <View style={s.headerActions}>
+          <TouchableOpacity
+            style={[
+              s.iconButton,
+              { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
+            ]}
+            onPress={() => router.push("/(screens)/location-search")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="search-outline" size={18} color={iconColor} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              s.iconButton,
+              { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
+            ]}
+            onPress={() => router.push("/(screens)/ask-nearby")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="options-outline" size={18} color={iconColor} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* TOP OVERLAY */}
-      <View style={s.floatingOverlay} pointerEvents="box-none">
-        <View style={s.infoCard}>
-          <View style={s.infoIconBg}>
-            <Ionicons
-              name="compass-outline"
-              size={moderateScale(18)}
-              color="#A78BFA"
-            />
+      <ScrollView
+        style={s.scrollContainer}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 2. RADAR ACTIVE BANNER CARD */}
+        <View
+          style={[
+            s.radarBannerCard,
+            { backgroundColor: bannerBg, borderColor: bannerBorder },
+          ]}
+        >
+          <View style={s.radarIconCircle}>
+            <Ionicons name="compass-outline" size={20} color="#C084FC" />
           </View>
-          <View style={s.infoTexts}>
-            <Text style={s.infoTitle}>Radar active around Mumbai</Text>
-            <Text style={s.infoDesc}>
+
+          <View style={s.radarBannerTexts}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <Text style={[s.radarBannerTitle, { color: bannerTitleColor }]}>
+                Radar active
+              </Text>
+              <View style={s.activeDot} />
+            </View>
+            <Text style={[s.radarBannerSubtext, { color: bannerSubColor }]}>
               Showing people within 5 km of your location
             </Text>
           </View>
+
+          {/* Radar target animated element */}
+          <View style={s.radarBannerGraphic}>
+            <View style={s.miniRadarRing1} />
+            <View style={s.miniRadarRing2} />
+            <View style={s.miniRadarCenterDot} />
+          </View>
         </View>
 
-        <View style={s.filtersRow}>
-          {(
-            [
-              { id: "all", label: "All Items" },
-              { id: "ticket", label: "Tickets 🎟️" },
-              { id: "day_mates", label: "Buddies 👥" },
-              { id: "lost", label: "Lost & Found 📢" },
-            ] as const
-          ).map((opt) => (
-            <TouchableOpacity
-              key={opt.id}
-              onPress={() => {
-                setFilterType(opt.id);
-                const matching = activePins.filter((p) =>
-                  opt.id === "all" ? true : p.type === opt.id,
-                );
-                setSelectedPin(matching[0] ?? null);
-              }}
-              activeOpacity={0.8}
+        {/* 3. CATEGORY FILTER PILLS */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.filterScrollView}
+          contentContainerStyle={s.filterRow}
+        >
+          <TouchableOpacity
+            style={[
+              s.filterPill,
+              { backgroundColor: pillBg, borderColor: pillBorder },
+              selectedFilter === "all" && s.filterPillActive,
+            ]}
+            onPress={() => setSelectedFilter("all")}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="apps"
+              size={14}
+              color={selectedFilter === "all" ? "#FFFFFF" : pillTextInact}
+            />
+            <Text
               style={[
-                s.filterPill,
-                filterType === opt.id && s.filterPillSelected,
+                s.filterPillText,
+                { color: pillTextInact },
+                selectedFilter === "all" && s.filterPillTextActive,
               ]}
             >
-              <Text
-                style={[
-                  s.filterPillText,
-                  filterType === opt.id && s.filterPillTextSelected,
-                ]}
-              >
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* BOTTOM DETAILS */}
-      <View style={s.bottomPanel} pointerEvents="box-none">
-        {selectedPin ? (
-          <TouchableOpacity
-            style={s.detailsCard}
-            onPress={() => handleCardPress(selectedPin)}
-            activeOpacity={0.85}
-          >
-            <View
-              style={[
-                s.statusDot,
-                { backgroundColor: colorFor(selectedPin.type) },
-              ]}
-            />
-            <Image
-              source={{ uri: selectedPin.ownerAvatar }}
-              style={s.detailsAvatar}
-            />
-            <View style={s.detailsCol}>
-              <Text style={s.detailsBadgeText}>
-                {badgeFor(selectedPin.type)}
-              </Text>
-              <Text style={s.detailsTitle} numberOfLines={1}>
-                {selectedPin.title}
-              </Text>
-              <View style={s.detailsLocRow}>
-                <Ionicons
-                  name="location-outline"
-                  size={moderateScale(11)}
-                  color="#94A3B8"
-                />
-                <Text style={s.detailsLocText} numberOfLines={1}>
-                  {selectedPin.venue}
-                </Text>
-              </View>
-              <View style={s.detailsBottomRow}>
-                <Text style={s.detailsByText}>
-                  Post by{" "}
-                  <Text style={s.detailsOwnerName}>
-                    {selectedPin.ownerName}
-                  </Text>
-                </Text>
-                {selectedPin.price ? (
-                  <Text style={s.detailsPrice}>{selectedPin.price}</Text>
-                ) : (
-                  <View style={s.connectRow}>
-                    <Text style={s.connectText}>Connect</Text>
-                    <Ionicons
-                      name="arrow-forward-outline"
-                      size={moderateScale(10)}
-                      color="#A78BFA"
-                    />
-                  </View>
-                )}
-              </View>
-            </View>
+              All
+            </Text>
           </TouchableOpacity>
-        ) : (
-          <View style={s.emptyDetailsCard}>
-            <Text style={s.emptyDetailsText}>
-              Tap any active radar point to inspect
+
+          <TouchableOpacity
+            style={[
+              s.filterPill,
+              { backgroundColor: pillBg, borderColor: pillBorder },
+              selectedFilter === "buddies" && s.filterPillActive,
+            ]}
+            onPress={() => setSelectedFilter("buddies")}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="people"
+              size={14}
+              color={selectedFilter === "buddies" ? "#FFFFFF" : pillTextInact}
+            />
+            <Text
+              style={[
+                s.filterPillText,
+                { color: pillTextInact },
+                selectedFilter === "buddies" && s.filterPillTextActive,
+              ]}
+            >
+              Buddies
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              s.filterPill,
+              { backgroundColor: pillBg, borderColor: pillBorder },
+              selectedFilter === "tickets" && s.filterPillActive,
+            ]}
+            onPress={() => setSelectedFilter("tickets")}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="ticket"
+              size={14}
+              color={selectedFilter === "tickets" ? "#FFFFFF" : pillTextInact}
+            />
+            <Text
+              style={[
+                s.filterPillText,
+                { color: pillTextInact },
+                selectedFilter === "tickets" && s.filterPillTextActive,
+              ]}
+            >
+              Tickets
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              s.filterPill,
+              { backgroundColor: pillBg, borderColor: pillBorder },
+              selectedFilter === "lost" && s.filterPillActive,
+            ]}
+            onPress={() => setSelectedFilter("lost")}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="briefcase"
+              size={14}
+              color={selectedFilter === "lost" ? "#FFFFFF" : pillTextInact}
+            />
+            <Text
+              style={[
+                s.filterPillText,
+                { color: pillTextInact },
+                selectedFilter === "lost" && s.filterPillTextActive,
+              ]}
+            >
+              Lost & Found
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              s.filterPill,
+              { backgroundColor: pillBg, borderColor: pillBorder },
+              selectedFilter === "events" && s.filterPillActive,
+            ]}
+            onPress={() => setSelectedFilter("events")}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="calendar"
+              size={14}
+              color={selectedFilter === "events" ? "#FFFFFF" : pillTextInact}
+            />
+            <Text
+              style={[
+                s.filterPillText,
+                { color: pillTextInact },
+                selectedFilter === "events" && s.filterPillTextActive,
+              ]}
+            >
+              Events
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* 4. CENTRAL RADAR DISPLAY AREA */}
+        <View
+          style={[
+            s.radarStageContainer,
+            { backgroundColor: stageBg, borderColor: stageBorder },
+          ]}
+        >
+          {/* Circular Concentric Rings */}
+          <View style={[s.radarRingOuter, { borderColor: ringColor }]} />
+          <View style={[s.radarRingMiddle, { borderColor: ringColor }]} />
+          <View style={[s.radarRingInner, { borderColor: ringColor }]} />
+
+          {/* Rotating Radar Sweep Beam (THIN CONE SHAPE) */}
+          <Animated.View
+            style={[
+              s.radarSweepContainer,
+              { transform: [{ rotate: sweepSpin }] },
+            ]}
+          >
+            <View style={[s.radarSweepCone, { borderTopColor: coneColor }]} />
+          </Animated.View>
+
+          {/* Glowing Center Pin (User Location) */}
+          <View style={s.centerPinWrapper}>
+            <View style={s.centerPinGlow} />
+            <View style={s.centerPinDot}>
+              <Ionicons name="location" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+
+          {/* Top-Right Around You Overlay Pill */}
+          <View
+            style={[
+              s.aroundYouOverlay,
+              { backgroundColor: overlayBg, borderColor: overlayBorder },
+            ]}
+          >
+            <Ionicons name="people" size={13} color="#C084FC" />
+            <Text style={[s.aroundYouText, { color: overlayText }]}>
+              {filteredNodes.length * 2} around you
             </Text>
           </View>
-        )}
-      </View>
-    </View>
+
+          {/* Bottom-Right Re-center Target Floating Button */}
+          <TouchableOpacity
+            style={[
+              s.recenterButton,
+              { backgroundColor: overlayBg, borderColor: overlayBorder },
+            ]}
+            onPress={() =>
+              Alert.alert(
+                "Radar Updated",
+                "Scanned 5km radius around your location.",
+              )
+            }
+            activeOpacity={0.8}
+          >
+            <Ionicons name="navigate-circle" size={22} color="#C084FC" />
+          </TouchableOpacity>
+
+          {/* Render User Radar Nodes */}
+          {filteredNodes.map((node) => {
+            return (
+              <TouchableOpacity
+                key={node.id}
+                style={[
+                  s.radarNodeItem,
+                  { top: node.topPct as any, left: node.leftPct as any },
+                ]}
+                onPress={() => {
+                  setSelectedNode(node);
+                  handleItemPress(
+                    node.activityTag,
+                    node.name,
+                    node.id,
+                    "Nearby",
+                    node.avatar,
+                  );
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={s.avatarWrapper}>
+                  <Image source={{ uri: node.avatar }} style={s.nodeAvatar} />
+                  <View
+                    style={[
+                      s.statusDotBadge,
+                      { borderColor: stageBg },
+                      node.status === "online" ? s.statusOnline : s.statusAway,
+                    ]}
+                  />
+                </View>
+
+                <Text style={[s.nodeName, { color: nodeNameColor }]}>
+                  {node.name}
+                </Text>
+                <Text style={[s.nodeDistance, { color: nodeDistColor }]}>
+                  {node.distance}
+                </Text>
+
+                <View
+                  style={[s.activityTagPill, { backgroundColor: nodeTagBg }]}
+                >
+                  <Text style={[s.activityTagText, { color: nodeTagText }]}>
+                    {node.activityTag}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* 5. "ACTIVE AROUND YOU" BOTTOM SECTION */}
+        <View style={s.activeSectionHeader}>
+          <Text style={[s.activeSectionTitle, { color: headerTextColor }]}>
+            Active around you
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push("/(screens)/ask-nearby")}
+            activeOpacity={0.7}
+          >
+            <Text style={s.seeAllText}>See all →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Horizontal Cards List */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.cardsScrollView}
+          contentContainerStyle={s.cardsRow}
+        >
+          {filteredCards.map((card) => (
+            <TouchableOpacity
+              key={card.id}
+              style={[
+                s.cardItem,
+                { backgroundColor: cardBg, borderColor: cardBorder },
+              ]}
+              onPress={() =>
+                handleItemPress(
+                  card.title,
+                  "User",
+                  card.id,
+                  card.location,
+                  card.avatars[0],
+                )
+              }
+              activeOpacity={0.88}
+            >
+              {/* Card Header: Tag & Time */}
+              <View style={s.cardTopRow}>
+                <View
+                  style={[s.categoryTagPill, { backgroundColor: card.tagBg }]}
+                >
+                  <Text style={[s.categoryTagText, { color: card.tagColor }]}>
+                    {card.categoryTag}
+                  </Text>
+                </View>
+                <Text style={s.timeAgoText}>{card.timeAgo}</Text>
+              </View>
+
+              {/* Card Title & Subtitle */}
+              <Text
+                style={[s.cardTitle, { color: cardTitleColor }]}
+                numberOfLines={1}
+              >
+                {card.title}
+              </Text>
+              <Text
+                style={[s.cardSubtitle, { color: cardSubColor }]}
+                numberOfLines={1}
+              >
+                {card.subtitle}
+              </Text>
+
+              {/* Card Location */}
+              <View style={s.cardLocationRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={12}
+                  color={cardSubColor}
+                />
+                <Text
+                  style={[s.cardLocationText, { color: cardSubColor }]}
+                  numberOfLines={1}
+                >
+                  {card.location}
+                </Text>
+              </View>
+
+              {/* Card Footer: Joined Avatars & Action Button */}
+              <View
+                style={[
+                  s.cardFooterRow,
+                  {
+                    borderColor: isDark
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "#F1F5F9",
+                  },
+                ]}
+              >
+                <View style={s.avatarsStackRow}>
+                  <View style={s.avatarsContainer}>
+                    {card.avatars.map((av, idx) => (
+                      <Image
+                        key={idx}
+                        source={{ uri: av }}
+                        style={[
+                          s.stackedAvatar,
+                          {
+                            marginLeft: idx > 0 ? -8 : 0,
+                            zIndex: 10 - idx,
+                            borderColor: cardBg,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={s.avatarTextCount}>{card.avatarText}</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={s.cardActionButton}
+                  onPress={() =>
+                    handleItemPress(
+                      card.title,
+                      "User",
+                      card.id,
+                      card.location,
+                      card.avatars[0],
+                    )
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.cardActionText}>{card.actionLabel}</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const shadow = Platform.select({
   ios: {
-    shadowColor: "#000000",
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
-  android: { elevation: 8 },
+  android: { elevation: 4 },
   default: {},
 });
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#070514" },
-  mapCanvas: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0A071D",
-    overflow: "hidden",
+  container: {
+    flex: 1,
   },
-  gridContainer: { ...StyleSheet.absoluteFillObject, opacity: 0.06 },
-  gridLineVert: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: "#FFFFFF",
+  scrollContainer: {
+    flex: 1,
   },
-  gridLineHoriz: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "#FFFFFF",
+  scrollContent: {
+    paddingBottom: verticalScale(30),
   },
-  glowOrb1: {
-    position: "absolute",
-    top: "15%",
-    left: "5%",
-    width: scale(180),
-    height: scale(180),
-    borderRadius: scale(90),
-    backgroundColor: "rgba(124, 58, 237, 0.08)",
-  },
-  glowOrb2: {
-    position: "absolute",
-    bottom: "25%",
-    right: "5%",
-    width: scale(220),
-    height: scale(220),
-    borderRadius: scale(110),
-    backgroundColor: "rgba(59, 130, 246, 0.08)",
-  },
-  // Wrapper size == ring size so we can center via negative margins of half the ring.
-  // This anchors the marker's visual center exactly on (top%, left%).
-  markerWrapper: {
-    position: "absolute",
-    width: scale(RING_SIZE),
-    height: scale(RING_SIZE),
-    marginLeft: -scale(HALF_RING),
-    marginTop: -scale(HALF_RING),
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  markerContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  pingRing: {
-    position: "absolute",
-    width: scale(RING_SIZE),
-    height: scale(RING_SIZE),
-    borderRadius: scale(HALF_RING),
-    opacity: 0.2,
-  },
-  ringActive: { transform: [{ scale: 1.3 }], opacity: 0.4 },
-  markerPin: {
-    width: scale(PIN_SIZE),
-    height: scale(PIN_SIZE),
-    borderRadius: scale(HALF_PIN),
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
-  markerSelected: {
-    borderColor: "#FFFFFF",
-    transform: [{ scale: 1.2 }],
-  },
-  markerLabel: {
-    position: "absolute",
-    bottom: scale(28),
-    backgroundColor: "#120E2C",
-    borderRadius: scale(10),
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(2),
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-  },
-  markerLabelBelow: {
-    bottom: undefined,
-    top: scale(28),
-  },
-  markerLabelText: {
-    fontSize: moderateScale(8),
-    color: "#FFFFFF",
-    fontWeight: "900",
-  },
-  floatingOverlay: {
-    position: "absolute",
-    top: verticalScale(16),
-    left: scale(20),
-    right: scale(20),
-    zIndex: 20,
-    gap: verticalScale(10),
-  },
-  infoCard: {
+
+  /* 1. Header Bar */
+  headerBar: {
     flexDirection: "row",
-    backgroundColor: "rgba(18, 14, 44, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: scale(16),
-    padding: scale(10),
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: scale(18),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(12),
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: moderateScale(17),
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  locationPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: verticalScale(3),
+  },
+  locationText: {
+    fontSize: moderateScale(12),
+    fontWeight: "600",
+    maxWidth: scale(180),
+  },
+  headerActions: {
+    flexDirection: "row",
     alignItems: "center",
     gap: scale(10),
   },
-  infoIconBg: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(10),
+  iconButton: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  /* 2. Radar Banner Card */
+  radarBannerCard: {
+    marginHorizontal: scale(16),
+    marginTop: verticalScale(4),
+    marginBottom: verticalScale(14),
+    padding: scale(14),
+    borderRadius: scale(20),
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(12),
+  },
+  radarIconCircle: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "rgba(124, 58, 237, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.3)",
+  },
+  radarBannerTexts: {
+    flex: 1,
+  },
+  radarBannerTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: "800",
+  },
+  activeDot: {
+    width: scale(7),
+    height: scale(7),
+    borderRadius: scale(3.5),
+    backgroundColor: "#22C55E",
+  },
+  radarBannerSubtext: {
+    fontSize: moderateScale(10.5),
+    marginTop: verticalScale(2),
+  },
+  radarBannerGraphic: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
     backgroundColor: "rgba(124, 58, 237, 0.15)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  infoTexts: { flex: 1 },
-  infoTitle: {
-    fontSize: moderateScale(11.5),
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  infoDesc: {
-    fontSize: moderateScale(9),
-    color: "#94A3B8",
-    marginTop: scale(1),
-  },
-  filtersRow: { flexDirection: "row", gap: scale(6), flexWrap: "wrap" },
-  filterPill: {
-    backgroundColor: "rgba(18, 14, 44, 0.75)",
-    borderRadius: scale(14),
-    paddingHorizontal: scale(10),
-    paddingVertical: verticalScale(6),
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-  },
-  filterPillSelected: { backgroundColor: "#7C3AED", borderColor: "#A78BFA" },
-  filterPillText: {
-    fontSize: moderateScale(9.5),
-    fontWeight: "800",
-    color: "#D1D5DB",
-  },
-  filterPillTextSelected: { color: "#FFFFFF" },
-  bottomPanel: {
-    position: "absolute",
-    bottom: verticalScale(20),
-    left: scale(20),
-    right: scale(20),
-    zIndex: 20,
-  },
-  detailsCard: {
-    backgroundColor: "rgba(18, 14, 44, 0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: scale(24),
-    padding: scale(14),
-    flexDirection: "row",
-    gap: scale(12),
     position: "relative",
-    ...shadow,
   },
-  statusDot: {
+  miniRadarRing1: {
     position: "absolute",
-    top: scale(14),
-    right: scale(14),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.35)",
+  },
+  miniRadarRing2: {
+    position: "absolute",
+    width: scale(22),
+    height: scale(22),
+    borderRadius: scale(11),
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.5)",
+  },
+  miniRadarCenterDot: {
     width: scale(6),
     height: scale(6),
     borderRadius: scale(3),
+    backgroundColor: "#A855F7",
   },
-  detailsAvatar: {
-    width: scale(56),
-    height: scale(56),
-    borderRadius: scale(16),
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+
+  /* 3. Category Filter Pills */
+  filterScrollView: {
+    marginBottom: verticalScale(14),
+  },
+  filterRow: {
+    paddingHorizontal: scale(16),
+    gap: scale(8),
+  },
+  filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(6),
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(8),
+    borderRadius: scale(20),
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  detailsCol: { flex: 1, justifyContent: "space-between" },
-  detailsBadgeText: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "900",
-    color: "#A78BFA",
-    letterSpacing: 0.5,
+  filterPillActive: {
+    backgroundColor: "#7C3AED",
+    borderColor: "#A855F7",
   },
-  detailsTitle: {
-    fontSize: moderateScale(13.5),
-    fontWeight: "800",
+  filterPillText: {
+    fontSize: moderateScale(11.5),
+    fontWeight: "700",
+  },
+  filterPillTextActive: {
     color: "#FFFFFF",
-    marginTop: verticalScale(1),
   },
-  detailsLocRow: {
+
+  /* 4. Radar Stage Canvas Area */
+  radarStageContainer: {
+    marginHorizontal: scale(16),
+    height: verticalScale(320),
+    borderRadius: scale(28),
+    borderWidth: 1,
+    position: "relative",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radarRingOuter: {
+    position: "absolute",
+    width: scale(270),
+    height: scale(270),
+    borderRadius: scale(135),
+    borderWidth: 1,
+  },
+  radarRingMiddle: {
+    position: "absolute",
+    width: scale(180),
+    height: scale(180),
+    borderRadius: scale(90),
+    borderWidth: 1,
+  },
+  radarRingInner: {
+    position: "absolute",
+    width: scale(90),
+    height: scale(90),
+    borderRadius: scale(45),
+    borderWidth: 1,
+  },
+  radarSweepContainer: {
+    position: "absolute",
+    width: scale(270),
+    height: scale(270),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radarSweepCone: {
+    position: "absolute",
+    top: 0,
+    left: scale(135) - scale(20),
+    width: 0,
+    height: 0,
+    borderLeftWidth: scale(20),
+    borderRightWidth: scale(20),
+    borderTopWidth: scale(135),
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+  centerPinWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  centerPinGlow: {
+    position: "absolute",
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
+    backgroundColor: "rgba(139, 92, 246, 0.35)",
+  },
+  centerPinDot: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  aroundYouOverlay: {
+    position: "absolute",
+    top: scale(14),
+    right: scale(14),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(5),
+    borderRadius: scale(16),
+    borderWidth: 1,
+  },
+  aroundYouText: {
+    fontSize: moderateScale(10.5),
+    fontWeight: "700",
+  },
+  recenterButton: {
+    position: "absolute",
+    bottom: scale(14),
+    right: scale(14),
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(19),
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /* Radar Nodes */
+  radarNodeItem: {
+    position: "absolute",
+    alignItems: "center",
+    transform: [{ translateX: scale(-24) }, { translateY: scale(-24) }],
+    zIndex: 20,
+  },
+  avatarWrapper: {
+    position: "relative",
+  },
+  nodeAvatar: {
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(19),
+    borderWidth: 2,
+    borderColor: "#8B5CF6",
+  },
+  statusDotBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: scale(10),
+    height: scale(10),
+    borderRadius: scale(5),
+    borderWidth: 1.5,
+  },
+  statusOnline: {
+    backgroundColor: "#22C55E",
+  },
+  statusAway: {
+    backgroundColor: "#F59E0B",
+  },
+  nodeName: {
+    fontSize: moderateScale(10),
+    fontWeight: "800",
+    marginTop: verticalScale(2),
+  },
+  nodeDistance: {
+    fontSize: moderateScale(8.5),
+    fontWeight: "600",
+  },
+  activityTagPill: {
+    marginTop: verticalScale(2),
+    paddingHorizontal: scale(7),
+    paddingVertical: verticalScale(2),
+    borderRadius: scale(8),
+    borderWidth: 0.5,
+    borderColor: "rgba(168, 85, 247, 0.4)",
+  },
+  activityTagText: {
+    fontSize: moderateScale(8.5),
+    fontWeight: "700",
+  },
+
+  /* 5. Active Around You Section */
+  activeSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: scale(18),
+    marginTop: verticalScale(20),
+    marginBottom: verticalScale(12),
+  },
+  activeSectionTitle: {
+    fontSize: moderateScale(15),
+    fontWeight: "800",
+  },
+  seeAllText: {
+    fontSize: moderateScale(12),
+    fontWeight: "700",
+    color: "#C084FC",
+  },
+  cardsScrollView: {
+    paddingLeft: scale(16),
+  },
+  cardsRow: {
+    paddingRight: scale(32),
+    gap: scale(12),
+  },
+  cardItem: {
+    width: scale(220),
+    borderRadius: scale(20),
+    borderWidth: 1,
+    padding: scale(14),
+    justifyContent: "space-between",
+    ...shadow,
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: verticalScale(8),
+  },
+  categoryTagPill: {
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(3),
+    borderRadius: scale(10),
+  },
+  categoryTagText: {
+    fontSize: moderateScale(9.5),
+    fontWeight: "800",
+  },
+  timeAgoText: {
+    fontSize: moderateScale(9.5),
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  cardTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: "800",
+  },
+  cardSubtitle: {
+    fontSize: moderateScale(10.5),
+    marginTop: verticalScale(2),
+  },
+  cardLocationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: scale(4),
-    marginTop: verticalScale(1),
+    marginTop: verticalScale(8),
+    marginBottom: verticalScale(12),
   },
-  detailsLocText: {
-    fontSize: moderateScale(9.5),
-    color: "#94A3B8",
+  cardLocationText: {
+    fontSize: moderateScale(10),
     fontWeight: "500",
     flex: 1,
   },
-  detailsBottomRow: {
+  cardFooterRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
+    borderTopWidth: 1,
+    paddingTop: verticalScale(10),
+  },
+  avatarsStackRow: {
+    flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    paddingTop: verticalScale(6),
-    marginTop: verticalScale(4),
+    gap: scale(6),
   },
-  detailsByText: { fontSize: moderateScale(9.5), color: "#94A3B8" },
-  detailsOwnerName: { fontWeight: "700", color: "#FFFFFF" },
-  detailsPrice: {
-    fontSize: moderateScale(11),
-    fontWeight: "900",
-    color: "#FBBF24",
+  avatarsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  connectRow: { flexDirection: "row", alignItems: "center", gap: scale(2) },
-  connectText: {
+  stackedAvatar: {
+    width: scale(22),
+    height: scale(22),
+    borderRadius: scale(11),
+    borderWidth: 1.5,
+  },
+  avatarTextCount: {
     fontSize: moderateScale(9.5),
-    fontWeight: "800",
-    color: "#A78BFA",
-    textTransform: "uppercase",
+    color: "#CBD5E1",
+    fontWeight: "600",
   },
-  emptyDetailsCard: {
-    backgroundColor: "rgba(18, 14, 44, 0.8)",
+  cardActionButton: {
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(6),
+    borderRadius: scale(12),
+    backgroundColor: "rgba(124, 58, 237, 0.25)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: scale(20),
-    paddingVertical: scale(16),
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow,
+    borderColor: "rgba(168, 85, 247, 0.4)",
   },
-  emptyDetailsText: {
-    fontSize: moderateScale(11.5),
-    fontWeight: "700",
-    color: "#94A3B8",
+  cardActionText: {
+    fontSize: moderateScale(10.5),
+    fontWeight: "800",
+    color: "#C084FC",
   },
 });

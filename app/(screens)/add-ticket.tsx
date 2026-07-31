@@ -17,6 +17,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/hooks/useStyles";
 import { ApiService } from "@/services/api";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Hero banner (headline, subtext and trust pill are baked into the artwork)
 const HERO_IMAGE = require("@/assets/screens/sell-ticket-hero.png");
@@ -568,7 +569,8 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {/* <View style={styles.container}> */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
@@ -1057,7 +1059,8 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
           </View>
         </View>
       </Modal>
-    </View>
+      {/* </View> */}
+    </SafeAreaView>
   );
 };
 
