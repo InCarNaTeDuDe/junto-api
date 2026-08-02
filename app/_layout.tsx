@@ -8,6 +8,7 @@ import "../global.css";
 import { patchFetch } from "../utils/apiHelper";
 import { AuthProvider, useAuthContext } from "@/context/AuthContext";
 import { LocationProvider } from "@/context/LocationContext";
+import SpinnerLoader from "@/components/SpinnerLoader";
 
 patchFetch();
 
@@ -16,7 +17,7 @@ function RootNavigator() {
   const segments = useSegments();
 
   if (loading) {
-    return <Text>Loading...*********</Text>;
+    return <SpinnerLoader message="Verifying session..." />;
   }
 
   const currentRoute = segments[0];
@@ -47,7 +48,7 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Suspense fallback={<Text>Loading...!!!!</Text>}>
+      <Suspense fallback={<SpinnerLoader message="Loading..." />}>
         <AuthProvider>
           <LocationProvider>
             <RootNavigator />

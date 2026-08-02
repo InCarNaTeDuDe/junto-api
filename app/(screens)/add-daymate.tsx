@@ -31,6 +31,7 @@ export interface DayMatesFormProps {
   onSubmitSuccess?: (data: any) => void;
   onBack?: () => void;
   onClose?: () => void;
+  from?: string;
 }
 
 interface ActivityItem {
@@ -126,7 +127,8 @@ const TIME_OPTIONS = [
 ];
 
 const createStyles = (t: any) => {
-  const isDark = t?.mode === "dark" || t?.bg === "#0B0714";
+  const isDark =
+    t?.mode === "dark" || t?.bg === "#0B0714" || t?.text === "#FFFFFF";
 
   const styles = StyleSheet.create({
     container: {
@@ -135,70 +137,12 @@ const createStyles = (t: any) => {
     },
     scrollContent: {
       paddingHorizontal: 16,
-      paddingTop: 12,
+      paddingTop: 0,
       paddingBottom: 40,
       gap: 16,
       maxWidth: 600,
       alignSelf: "center",
       width: "100%",
-    },
-
-    /* Header Bar */
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 2,
-    },
-    headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      flex: 1,
-    },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.2 : 0.04,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-      letterSpacing: -0.3,
-    },
-    headerSubTitle: {
-      fontSize: 12,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      marginTop: 1,
-    },
-    howItWorksPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 5,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.16)" : "#F3E8FF",
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: isDark
-        ? "rgba(168, 85, 247, 0.3)"
-        : "rgba(168, 85, 247, 0.2)",
-    },
-    howItWorksText: {
-      color: t.primary || "#8B5CF6",
-      fontSize: 11.5,
-      fontWeight: "700",
     },
 
     /* Hero Banner — single illustration with baked-in text */
@@ -214,79 +158,6 @@ const createStyles = (t: any) => {
       aspectRatio: 2.4,
       height: undefined,
     },
-
-    heroHeading: {
-      fontSize: 21,
-      fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#1E1B4B"),
-      lineHeight: 26,
-    },
-    heroHighlight: {
-      color: t.primary || "#8B5CF6",
-    },
-    heroUnderline: {
-      width: 40,
-      height: 3,
-      backgroundColor: t.primary || "#8B5CF6",
-      borderRadius: 2,
-      marginTop: 2,
-      marginBottom: 6,
-    },
-    heroSubText: {
-      fontSize: 12.5,
-      color: t.sub || (isDark ? "#CBD5E1" : "#475569"),
-      lineHeight: 17,
-      marginBottom: 12,
-    },
-    heroPillBadge: {
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: isDark
-        ? "rgba(255, 255, 255, 0.12)"
-        : "rgba(139, 92, 246, 0.2)",
-    },
-    heroPillText: {
-      fontSize: 11,
-      fontWeight: "700",
-      color: t.primary || "#7C3AED",
-    },
-
-    /* Right Graphic illustration */
-    heroGraphicRight: {
-      width: 110,
-      height: 90,
-      borderRadius: 20,
-      backgroundColor: isDark
-        ? "rgba(139, 92, 246, 0.2)"
-        : "rgba(139, 92, 246, 0.12)",
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-    },
-    avatarGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: "#8B5CF6",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: isDark ? "#17122E" : "#FFFFFF",
-      marginHorizontal: -4,
-    },
-
     /* Activity Grid Cards */
     gridContainer: {
       flexDirection: "row",
@@ -301,7 +172,7 @@ const createStyles = (t: any) => {
       borderWidth: 1.5,
       borderColor:
         t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      shadowColor: "#000",
+      shadowColor: t.shadow || "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDark ? 0.15 : 0.03,
       shadowRadius: 6,
@@ -384,7 +255,7 @@ const createStyles = (t: any) => {
       borderWidth: 1,
       borderColor:
         t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      shadowColor: "#000",
+      shadowColor: t.shadow || "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDark ? 0.15 : 0.03,
       shadowRadius: 4,
@@ -392,13 +263,17 @@ const createStyles = (t: any) => {
     },
     dateTimeHalfCardActive: {
       borderColor: t.primary || "#8B5CF6",
-      backgroundColor: isDark ? "rgba(139, 92, 246, 0.15)" : "#F5EDFF",
+      backgroundColor: isDark
+        ? "rgba(139, 92, 246, 0.15)"
+        : t.primarySoft || "#F5EDFF",
     },
     dateTimeIconCircle: {
       width: 34,
       height: 34,
       borderRadius: 12,
-      backgroundColor: isDark ? "rgba(139, 92, 246, 0.2)" : "#F3E8FF",
+      backgroundColor: isDark
+        ? "rgba(139, 92, 246, 0.2)"
+        : t.primarySoft || "#F3E8FF",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -423,10 +298,11 @@ const createStyles = (t: any) => {
       flex: 1,
       minWidth: 140,
       padding: 10,
-      backgroundColor: isDark ? "#17122E" : "#F8FAFC",
+      backgroundColor: t.inputBg || (isDark ? "#17122E" : "#F8FAFC"),
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
     pickerLabel: {
       fontSize: 11,
@@ -440,12 +316,14 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: isDark ? "rgba(139, 92, 246, 0.12)" : "#F5EDFF",
+      backgroundColor: isDark
+        ? "rgba(139, 92, 246, 0.12)"
+        : t.primarySoft || "#F5EDFF",
       borderRadius: 14,
       padding: 8,
       marginTop: 6,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : "#E9D5FF",
+      borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : t.border || "#E9D5FF",
     },
     dateSummaryText: {
       fontSize: 13,
@@ -464,7 +342,7 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      shadowColor: "#000",
+      shadowColor: t.shadow || "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDark ? 0.15 : 0.03,
       shadowRadius: 6,
@@ -494,22 +372,28 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.06)"
+        : t.cardSecondary || "#F1F5F9",
       paddingHorizontal: 8,
       paddingVertical: 5,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
     stepBtn: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#FFFFFF",
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.12)"
+        : t.card || "#FFFFFF",
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.15)" : "#CBD5E1",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.15)" : "#CBD5E1"),
     },
     stepBtnDisabled: {
       opacity: 0.4,
@@ -533,7 +417,7 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      shadowColor: "#000",
+      shadowColor: t.shadow || "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDark ? 0.15 : 0.03,
       shadowRadius: 6,
@@ -549,7 +433,9 @@ const createStyles = (t: any) => {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.18)" : "#F3E8FF",
+      backgroundColor: isDark
+        ? "rgba(168, 85, 247, 0.18)"
+        : t.primarySoft || "#F3E8FF",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -567,7 +453,9 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.16)" : "#F3E8FF",
+      backgroundColor: isDark
+        ? "rgba(168, 85, 247, 0.16)"
+        : t.primarySoft || "#F3E8FF",
       paddingHorizontal: 10,
       paddingVertical: 7,
       borderRadius: 16,
@@ -589,7 +477,7 @@ const createStyles = (t: any) => {
       paddingVertical: 15,
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: "#8B5CF6",
+      shadowColor: t.primary || "#8B5CF6",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 8,
@@ -625,16 +513,18 @@ const createStyles = (t: any) => {
     /* Date Picker Box */
     pickerContainer: {
       padding: 10,
-      backgroundColor: isDark ? "#17122E" : "#F8FAFC",
+      backgroundColor: t.inputBg || (isDark ? "#17122E" : "#F8FAFC"),
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
 
     /* Modals */
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.65)",
+      backgroundColor:
+        t.overlay || (isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)"),
       justifyContent: "center",
       alignItems: "center",
       padding: 20,
@@ -646,7 +536,8 @@ const createStyles = (t: any) => {
       borderRadius: 24,
       padding: 20,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
     modalHeader: {
       flexDirection: "row",
@@ -703,8 +594,9 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   onSubmitSuccess,
   onBack,
   onClose,
+  from,
 }) => {
-  const router = RouterHook();
+  const router = useRouter();
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark, primary, text, sub } = theme;
 
@@ -731,24 +623,6 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   /* Modals */
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  function RouterHook() {
-    try {
-      return useRouter();
-    } catch {
-      return null;
-    }
-  }
-
-  const handleHeaderBack = () => {
-    if (onClose) {
-      onClose();
-    } else if (onBack) {
-      onBack();
-    } else if (router && router.canGoBack()) {
-      router.back();
-    }
-  };
 
   const handleTimeSelect = (id: string) => {
     setSelectedTimeId(id);
@@ -854,16 +728,16 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/*  <View style={styles.container}> */}
+    <SafeAreaView
+      style={styles.container}
+      edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
+    >
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Hero Card Banner */}
-
         {/* Hero Card Banner — single illustration with baked-in headline + pills */}
         <View style={styles.heroCard}>
           <Image
@@ -903,7 +777,9 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
                         styles.activityIconBox,
                         {
                           backgroundColor: isSelected
-                            ? "#DCFCE7"
+                            ? isDark
+                              ? "rgba(16, 185, 129, 0.25)"
+                              : "#DCFCE7"
                             : isDark
                               ? "rgba(139, 92, 246, 0.2)"
                               : act.bgLight,

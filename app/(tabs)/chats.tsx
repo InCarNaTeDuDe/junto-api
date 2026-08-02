@@ -1,407 +1,5 @@
-// import React, { useState } from "react";
-// import {
-//   View,
-//   Text,
-//   ScrollView,
-//   TextInput,
-//   Pressable,
-//   Image,
-// } from "react-native";
-// import {
-//   Search,
-//   Plus,
-//   MessageSquare,
-//   Ticket,
-//   UserCheck,
-//   HelpCircle,
-//   ChevronRight,
-// } from "lucide-react-native";
-// import { useStore, Chat } from "../../hooks/useStore";
-
-// export default function ChatsScreen() {
-//   const { state, setActiveChatId } = useStore();
-//   const [activeSegment, setActiveSegment] = useState<"All" | "Categories">(
-//     "All",
-//   );
-//   const [activeCategoryFilter, setActiveCategoryFilter] = useState<
-//     "All" | "Ticket Swap" | "Lost & Found" | "Day Mates"
-//   >("All");
-//   const [searchQuery, setSearchQuery] = useState("");
-
-//   // Categories filter list
-//   const categoryFilters: (
-//     | "All"
-//     | "Ticket Swap"
-//     | "Lost & Found"
-//     | "Day Mates"
-//   )[] = ["All", "Ticket Swap", "Lost & Found", "Day Mates"];
-
-//   // Conversations filtered list (Screen 8)
-//   const filteredChats = state.chats.filter((chat) => {
-//     const matchesCategory =
-//       activeCategoryFilter === "All" || chat.category === activeCategoryFilter;
-//     const matchesSearch =
-//       chat.partner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-//       chat.contextTitle.toLowerCase().includes(searchQuery.toLowerCase());
-//     return matchesCategory && matchesSearch;
-//   });
-
-//   return (
-//     <View className="flex-1 bg-slate-950">
-//       {/* SCREEN 7 & 8: Top Bar */}
-//       <View className="pt-16 pb-4 px-6 bg-slate-900 border-b border-slate-800">
-//         <View className="flex-row justify-between items-center mb-4">
-//           <Text className="text-white text-2xl font-black tracking-tight">
-//             Chats
-//           </Text>
-//           <Pressable className="w-9 h-9 bg-slate-950 border border-slate-800 rounded-xl items-center justify-center active:bg-slate-900">
-//             <Plus size={18} color="#c084fc" />
-//           </Pressable>
-//         </View>
-
-//         {/* Custom toggle segment (Conversations vs. Categories) */}
-//         <View className="flex-row bg-slate-950 p-1.5 rounded-xl border border-slate-850">
-//           <Pressable
-//             onPress={() => setActiveSegment("All")}
-//             className={`flex-1 py-2.5 rounded-lg items-center ${activeSegment === "All" ? "bg-purple-600 shadow" : ""}`}
-//           >
-//             <Text
-//               className={`text-2xs font-extrabold ${activeSegment === "All" ? "text-white" : "text-slate-400"}`}
-//             >
-//               Conversations
-//             </Text>
-//           </Pressable>
-//           <Pressable
-//             onPress={() => setActiveSegment("Categories")}
-//             className={`flex-1 py-2.5 rounded-lg items-center ${activeSegment === "Categories" ? "bg-purple-600 shadow" : ""}`}
-//           >
-//             <Text
-//               className={`text-2xs font-extrabold ${activeSegment === "Categories" ? "text-white" : "text-slate-400"}`}
-//             >
-//               By Category
-//             </Text>
-//           </Pressable>
-//         </View>
-//       </View>
-
-//       {/* SEGMENT 1: Conversations list (Screen 8) */}
-//       {activeSegment === "All" && (
-//         <View className="flex-1">
-//           {/* Search Box */}
-//           <View className="px-6 py-4 bg-slate-950 border-b border-slate-900">
-//             <View className="flex-row items-center bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5">
-//               <Search size={16} color="#64748b" />
-//               <TextInput
-//                 placeholder="Search chats, items, sellers..."
-//                 placeholderTextColor="#475569"
-//                 value={searchQuery}
-//                 onChangeText={setSearchQuery}
-//                 className="flex-1 ml-2.5 text-white text-xs font-semibold"
-//               />
-//             </View>
-//           </View>
-
-//           {/* Category Filters row */}
-//           <View className="bg-slate-950 py-3 border-b border-slate-900">
-//             <ScrollView
-//               horizontal
-//               showsHorizontalScrollIndicator={false}
-//               contentContainerStyle={{ gap: 8, paddingHorizontal: 24 }}
-//             >
-//               {categoryFilters.map((filter) => (
-//                 <Pressable
-//                   key={filter}
-//                   onPress={() => setActiveCategoryFilter(filter)}
-//                   className={`px-4 py-2 rounded-xl border ${
-//                     activeCategoryFilter === filter
-//                       ? "bg-purple-600 border-purple-500"
-//                       : "bg-slate-900 border-slate-800"
-//                   }`}
-//                 >
-//                   <Text
-//                     className={`text-3xs font-black uppercase tracking-wider ${activeCategoryFilter === filter ? "text-white" : "text-slate-400"}`}
-//                   >
-//                     {filter === "Ticket Swap" ? "Tickets" : filter}
-//                   </Text>
-//                 </Pressable>
-//               ))}
-//             </ScrollView>
-//           </View>
-
-//           {/* Conversations Feed */}
-//           <ScrollView
-//             className="flex-1 px-6 pt-4 pb-12"
-//             showsVerticalScrollIndicator={false}
-//           >
-//             <View className="gap-3">
-//               {filteredChats.map((chat) => {
-//                 const lastMsg = chat.messages[chat.messages.length - 1];
-//                 return (
-//                   <Pressable
-//                     key={chat.id}
-//                     onPress={() => setActiveChatId(chat.id)}
-//                     className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex-row items-center gap-3.5 active:bg-slate-850"
-//                   >
-//                     {/* Avatar with status indicator */}
-//                     <View className="relative">
-//                       <Image
-//                         source={{ uri: chat.partner.avatar }}
-//                         className="w-11 h-11 rounded-full border border-slate-800"
-//                       />
-//                       {chat.partner.isOnline && (
-//                         <View className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900" />
-//                       )}
-//                     </View>
-
-//                     {/* Chat Text Details */}
-//                     <View className="flex-1 justify-center">
-//                       <View className="flex-row justify-between items-center">
-//                         <Text className="text-white text-xs font-black">
-//                           {chat.partner.name}
-//                         </Text>
-//                         <Text className="text-slate-500 text-5xs font-semibold">
-//                           {lastMsg?.timestamp || "Yesterday"}
-//                         </Text>
-//                       </View>
-
-//                       <Text
-//                         className="text-purple-400 text-5xs font-black uppercase tracking-widest mt-0.5"
-//                         numberOfLines={1}
-//                       >
-//                         {chat.category} • {chat.contextTitle}
-//                       </Text>
-
-//                       <Text
-//                         className="text-slate-300 text-3xs font-medium mt-1"
-//                         numberOfLines={1}
-//                       >
-//                         {lastMsg?.text || "No messages yet"}
-//                       </Text>
-//                     </View>
-
-//                     {/* Unread dot count */}
-//                     {chat.unreadCount > 0 && (
-//                       <View className="w-5 h-5 bg-purple-500 rounded-full items-center justify-center border border-slate-950">
-//                         <Text className="text-white text-5xs font-black">
-//                           {chat.unreadCount}
-//                         </Text>
-//                       </View>
-//                     )}
-//                   </Pressable>
-//                 );
-//               })}
-
-//               {filteredChats.length === 0 && (
-//                 <View className="bg-slate-900/30 border border-slate-850 rounded-2xl p-8 items-center justify-center mt-4">
-//                   <Text className="text-slate-500 text-xs font-semibold text-center">
-//                     No conversations found
-//                   </Text>
-//                 </View>
-//               )}
-//             </View>
-//           </ScrollView>
-//         </View>
-//       )}
-
-//       {/* SEGMENT 2: Chats by Category (Screen 7) */}
-//       {activeSegment === "Categories" && (
-//         <ScrollView
-//           className="flex-1 px-6 py-6"
-//           showsVerticalScrollIndicator={false}
-//         >
-//           <Text className="text-slate-400 text-3xs font-black uppercase tracking-wider mb-4 px-1">
-//             Chats by Category
-//           </Text>
-
-//           <View className="gap-4">
-//             {/* Category Card 1: Ticket Swap */}
-//             <Pressable
-//               onPress={() => {
-//                 setActiveCategoryFilter("Ticket Swap");
-//                 setActiveSegment("All");
-//               }}
-//               className="bg-slate-900 border border-slate-800 p-5 rounded-2xl active:bg-slate-850"
-//             >
-//               <View className="flex-row justify-between items-center mb-3">
-//                 <View className="flex-row items-center gap-3">
-//                   <View className="w-8 h-8 rounded-lg bg-purple-500/10 items-center justify-center">
-//                     <Ticket size={16} color="#c084fc" />
-//                   </View>
-//                   <View>
-//                     <Text className="text-white text-sm font-black">
-//                       Ticket Swap
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-bold uppercase mt-0.5">
-//                       12 conversations
-//                     </Text>
-//                   </View>
-//                 </View>
-//                 <ChevronRight size={16} color="#475569" />
-//               </View>
-
-//               {/* Horizontal user avatars stack */}
-//               <View className="flex-row items-center pt-2 border-t border-slate-850">
-//                 <View className="flex-row -space-x-3 mr-3">
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                 </View>
-//                 <Text className="text-purple-400 text-4xs font-bold">
-//                   +7 more
-//                 </Text>
-//               </View>
-//             </Pressable>
-
-//             {/* Category Card 2: Day Mates */}
-//             <Pressable
-//               onPress={() => {
-//                 setActiveCategoryFilter("Day Mates");
-//                 setActiveSegment("All");
-//               }}
-//               className="bg-slate-900 border border-slate-800 p-5 rounded-2xl active:bg-slate-850"
-//             >
-//               <View className="flex-row justify-between items-center mb-3">
-//                 <View className="flex-row items-center gap-3">
-//                   <View className="w-8 h-8 rounded-lg bg-amber-500/10 items-center justify-center">
-//                     <UserCheck size={16} color="#fbbf24" />
-//                   </View>
-//                   <View>
-//                     <Text className="text-white text-sm font-black">
-//                       Day Mates
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-bold uppercase mt-0.5">
-//                       18 conversations
-//                     </Text>
-//                   </View>
-//                 </View>
-//                 <ChevronRight size={16} color="#475569" />
-//               </View>
-
-//               {/* Avatars */}
-//               <View className="flex-row items-center pt-2 border-t border-slate-850">
-//                 <View className="flex-row -space-x-3 mr-3">
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                 </View>
-//                 <Text className="text-purple-400 text-4xs font-bold">
-//                   +13 more
-//                 </Text>
-//               </View>
-//             </Pressable>
-
-//             {/* Category Card 3: Lost & Found */}
-//             <Pressable
-//               onPress={() => {
-//                 setActiveCategoryFilter("Lost & Found");
-//                 setActiveSegment("All");
-//               }}
-//               className="bg-slate-900 border border-slate-800 p-5 rounded-2xl active:bg-slate-850"
-//             >
-//               <View className="flex-row justify-between items-center mb-3">
-//                 <View className="flex-row items-center gap-3">
-//                   <View className="w-8 h-8 rounded-lg bg-teal-500/10 items-center justify-center">
-//                     <HelpCircle size={16} color="#2dd4bf" />
-//                   </View>
-//                   <View>
-//                     <Text className="text-white text-sm font-black">
-//                       Lost & Found
-//                     </Text>
-//                     <Text className="text-slate-500 text-4xs font-bold uppercase mt-0.5">
-//                       5 conversations
-//                     </Text>
-//                   </View>
-//                 </View>
-//                 <ChevronRight size={16} color="#475569" />
-//               </View>
-
-//               {/* Avatars */}
-//               <View className="flex-row items-center pt-2 border-t border-slate-850">
-//                 <View className="flex-row -space-x-3 mr-3">
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                   <Image
-//                     source={{
-//                       uri: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100",
-//                     }}
-//                     className="w-7 h-7 rounded-full border-2 border-slate-900"
-//                   />
-//                 </View>
-//                 <Text className="text-purple-400 text-4xs font-bold">
-//                   +2 more
-//                 </Text>
-//               </View>
-//             </Pressable>
-//           </View>
-
-//           {/* Core Info Footnote */}
-//           <View className="mt-8 bg-purple-950/10 border border-purple-900/20 rounded-2xl p-4 flex-row items-start gap-3">
-//             <View className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5" />
-//             <Text className="text-slate-400 text-3xs font-semibold leading-relaxed flex-1">
-//               These are people you've chatted with across different categories.
-//               Tap any card to view detailed conversations.
-//             </Text>
-//           </View>
-//         </ScrollView>
-//       )}
-//     </View>
-//   );
-// }
-
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -412,9 +10,16 @@ import {
   Image,
   Platform,
   KeyboardAvoidingView,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
+
+import { ApiService } from "@/services/api";
+import { useStore } from "@/hooks/useStore";
+import { useTabRefresh } from "@/context/TabRefreshContext";
+import { SpinnerLoader } from "@/components/SpinnerLoader";
 
 interface Message {
   id: string;
@@ -428,19 +33,22 @@ interface Thread {
   name: string;
   avatar: string;
   role: string;
+  category?: "Ticket Swap" | "Day Mates" | "Lost & Found" | "Global";
   lastMessage: string;
   lastTime: string;
   unreadCount: number;
   initialMessages: Message[];
-  autoReplyTemplate: string[];
+  autoReplyTemplate?: string[];
 }
 
-const INITIAL_THREADS: Thread[] = [
+const FALLBACK_THREADS: Thread[] = [
   {
     id: "rohan",
-    name: "Rohan",
-    avatar: "https://i.pravatar.cc/80?img=11",
+    name: "Rohan S.",
+    avatar:
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
     role: "Movie Ticket Seller",
+    category: "Ticket Swap",
     lastMessage: "Is 500 each okay with you?",
     lastTime: "Just Now",
     unreadCount: 1,
@@ -448,7 +56,7 @@ const INITIAL_THREADS: Thread[] = [
       {
         id: "m1",
         sender: "them",
-        text: "Hey! Saw your click. Are you interested in the Avengers tickets?",
+        text: "Hey! Saw your interest in the Avengers tickets.",
         time: "5:20 PM",
       },
       {
@@ -478,9 +86,11 @@ const INITIAL_THREADS: Thread[] = [
   },
   {
     id: "ananya",
-    name: "Ananya",
-    avatar: "https://i.pravatar.cc/80?img=20",
+    name: "Ananya R.",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
     role: "Morning Walk Buddy",
+    category: "Day Mates",
     lastMessage: "Awesome! Let's meet at 6:30 AM tomorrow.",
     lastTime: "10m ago",
     unreadCount: 0,
@@ -518,9 +128,11 @@ const INITIAL_THREADS: Thread[] = [
   },
   {
     id: "neha",
-    name: "Neha",
-    avatar: "https://i.pravatar.cc/80?img=32",
+    name: "Neha P.",
+    avatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
     role: "Lost & Found Owner",
+    category: "Lost & Found",
     lastMessage: "I found your wallet near the stairs!",
     lastTime: "1h ago",
     unreadCount: 0,
@@ -553,41 +165,212 @@ const INITIAL_THREADS: Thread[] = [
 ];
 
 export default function ChatsScreen() {
-  const [threads, setThreads] = useState<Thread[]>(INITIAL_THREADS);
+  const { state: storeState, setActiveChatId, addMessage } = useStore();
+  const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
+
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategoryFilter, setActiveCategoryFilter] =
+    useState<string>("All");
   const [inputText, setInputText] = useState("");
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const activeThread = threads.find((t) => t.id === selectedThreadId);
 
-  // Auto scroll to bottom when messages list updates
+  // Categories list
+  const categoryFilters = ["All", "Ticket Swap", "Day Mates", "Lost & Found"];
+
+  /* ---------------- Fetch Dynamic Channels ---------------- */
+  const fetchChannels = useCallback(async () => {
+    try {
+      const res = await ApiService.get<{ status?: string; channels?: any[] }>(
+        "/api/messages/channels",
+      );
+      const serverChannels = res?.channels || [];
+
+      // Map server channels
+      const mappedServerThreads: Thread[] = serverChannels.map((ch: any) => ({
+        id: ch.id,
+        name: ch.name || "Group Chat",
+        avatar:
+          ch.avatar ||
+          "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=100",
+        role: ch.subtitle || ch.type || "Community Chat",
+        category: ch.category || "Day Mates",
+        lastMessage: ch.subtitle || "Tap to open channel",
+        lastTime: "Active",
+        unreadCount: ch.unreadCount || 0,
+        initialMessages: [],
+        autoReplyTemplate: [
+          "Hey everyone! Welcome to the channel.",
+          "Glad to have you here in DayMates!",
+        ],
+      }));
+
+      // Combine with local store chats
+      const storeThreads: Thread[] = storeState.chats.map((c) => ({
+        id: c.id,
+        name: c.partner.name,
+        avatar: c.partner.avatar,
+        role: `${c.category} • ${c.contextTitle}`,
+        category: c.category,
+        lastMessage:
+          c.messages[c.messages.length - 1]?.text || "No messages yet",
+        lastTime: c.messages[c.messages.length - 1]?.timestamp || "Just Now",
+        unreadCount: c.unreadCount || 0,
+        initialMessages: c.messages.map((m) => ({
+          id: m.id,
+          sender: m.sender,
+          text: m.text,
+          time: m.timestamp,
+        })),
+        autoReplyTemplate: [
+          "Thanks for reaching out! Let's coordinate here.",
+          "Sounds great! What time works best for you?",
+        ],
+      }));
+
+      // Merge avoiding duplicates
+      const mergedMap = new Map<string, Thread>();
+
+      // Add fallbacks first
+      // FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
+      // Add server channels
+      mappedServerThreads.forEach((t) => mergedMap.set(t.id, t));
+      // Add store threads (highest priority for local interactivity)
+      storeThreads.forEach((t) => mergedMap.set(t.id, t));
+
+      setThreads(Array.from(mergedMap.values()));
+    } catch (err) {
+      console.warn(
+        "Failed to load server channels, using store & fallbacks:",
+        err,
+      );
+      // Fallback to store chats + fallback threads
+      const storeThreads: Thread[] = storeState.chats.map((c) => ({
+        id: c.id,
+        name: c.partner.name,
+        avatar: c.partner.avatar,
+        role: `${c.category} • ${c.contextTitle}`,
+        category: c.category,
+        lastMessage:
+          c.messages[c.messages.length - 1]?.text || "No messages yet",
+        lastTime: c.messages[c.messages.length - 1]?.timestamp || "Just Now",
+        unreadCount: c.unreadCount || 0,
+        initialMessages: c.messages.map((m) => ({
+          id: m.id,
+          sender: m.sender,
+          text: m.text,
+          time: m.timestamp,
+        })),
+      }));
+
+      const mergedMap = new Map<string, Thread>();
+      FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
+      storeThreads.forEach((t) => mergedMap.set(t.id, t));
+
+      setThreads(Array.from(mergedMap.values()));
+    } finally {
+      setLoading(false);
+    }
+  }, [storeState.chats]);
+
   useEffect(() => {
-    if (scrollRef.current) {
+    fetchChannels();
+  }, [fetchChannels]);
+
+  // Register with tab refresh
+  useEffect(() => {
+    return registerRefreshHandler(fetchChannels);
+  }, [registerRefreshHandler, fetchChannels]);
+
+  /* ---------------- Fetch Thread Messages ---------------- */
+  const fetchMessagesForThread = useCallback(
+    async (threadId: string) => {
+      setLoadingMessages(true);
+      try {
+        const res = await ApiService.get<{ status?: string; messages?: any[] }>(
+          `/api/messages?activityId=${threadId}`,
+        );
+
+        if (
+          res?.messages &&
+          Array.isArray(res.messages) &&
+          res.messages.length > 0
+        ) {
+          const formatted: Message[] = res.messages.map((m) => ({
+            id: m.id,
+            sender:
+              m.senderId === "me" ||
+              m.sender?.name === storeState.currentUser.name
+                ? "me"
+                : "them",
+            text: m.content || m.text,
+            time: new Date(m.timestamp || Date.now()).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          }));
+
+          setThreads((prev) =>
+            prev.map((t) =>
+              t.id === threadId ? { ...t, initialMessages: formatted } : t,
+            ),
+          );
+        }
+      } catch (err) {
+        // Keep existing initialMessages or store messages
+      } finally {
+        setLoadingMessages(false);
+      }
+    },
+    [storeState.currentUser.name],
+  );
+
+  const selectConversation = (id: string) => {
+    setSelectedThreadId(id);
+    setActiveChatId(id);
+    setThreads((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, unreadCount: 0 } : t)),
+    );
+    fetchMessagesForThread(id);
+  };
+
+  // Auto scroll to bottom when active thread's messages update
+  useEffect(() => {
+    if (scrollRef.current && activeThread) {
       setTimeout(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
   }, [activeThread?.initialMessages]);
 
-  const handleSend = () => {
+  /* ---------------- Send Message ---------------- */
+  const handleSend = async () => {
     if (!inputText.trim() || !selectedThreadId) return;
 
     const messageText = inputText.trim();
     setInputText("");
 
-    // Add user's message
-    setThreads((prevThreads) => {
-      return prevThreads.map((thread) => {
+    const nowTime = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const newMsg: Message = {
+      id: `m-user-${Date.now()}`,
+      sender: "me",
+      text: messageText,
+      time: nowTime,
+    };
+
+    // Optimistic UI update
+    setThreads((prevThreads) =>
+      prevThreads.map((thread) => {
         if (thread.id === selectedThreadId) {
-          const newMsg: Message = {
-            id: `m-user-${Date.now()}`,
-            sender: "me",
-            text: messageText,
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          };
           return {
             ...thread,
             initialMessages: [...thread.initialMessages, newMsg],
@@ -597,19 +380,42 @@ export default function ChatsScreen() {
           };
         }
         return thread;
-      });
-    });
+      }),
+    );
 
-    // Simulate active typing indicators and delay a context-aware mock answer
+    // Call store addMessage for global sync
+    try {
+      addMessage(selectedThreadId, messageText);
+    } catch (e) {
+      // Ignore
+    }
+
+    // Call Backend API
+    try {
+      await ApiService.post("/api/messages/send", {
+        chatId: selectedThreadId,
+        content: messageText,
+      });
+    } catch (err) {
+      console.log(
+        "Backend message send fallback to local simulated response:",
+        err,
+      );
+    }
+
+    // Contextual auto-reply simulation for instant user feedback
     setTimeout(() => {
-      setThreads((prevThreads) => {
-        return prevThreads.map((thread) => {
+      setThreads((prevThreads) =>
+        prevThreads.map((thread) => {
           if (thread.id === selectedThreadId) {
-            const replyText =
-              thread.autoReplyTemplate[0] || "Got it, sounds perfect!";
+            const replyTemplates = thread.autoReplyTemplate || [
+              "Got it! Let's connect soon.",
+              "Sounds great!",
+            ];
+            const replyText = replyTemplates[0];
             const updatedTemplate = [
-              ...thread.autoReplyTemplate.slice(1),
-              thread.autoReplyTemplate[0],
+              ...replyTemplates.slice(1),
+              replyTemplates[0],
             ];
 
             const replyMsg: Message = {
@@ -631,21 +437,36 @@ export default function ChatsScreen() {
             };
           }
           return thread;
-        });
-      });
+        }),
+      );
     }, 1200);
   };
 
   const handleBack = () => {
     setSelectedThreadId(null);
+    setActiveChatId(null);
   };
 
-  const selectConversation = (id: string) => {
-    setSelectedThreadId(id);
-    setThreads((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, unreadCount: 0 } : t)),
-    );
-  };
+  /* ---------------- Filtering ---------------- */
+  const filteredThreads = threads.filter((t) => {
+    const matchesCategory =
+      activeCategoryFilter === "All" ||
+      t.category === activeCategoryFilter ||
+      (t.role &&
+        t.role.toLowerCase().includes(activeCategoryFilter.toLowerCase()));
+
+    const matchesSearch =
+      searchQuery === "" ||
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  if (loading) {
+    return <SpinnerLoader message="Loading conversations..." />;
+  }
 
   return (
     <KeyboardAvoidingView
@@ -659,7 +480,20 @@ export default function ChatsScreen() {
         <View style={s.content}>
           {/* Header */}
           <View style={s.header}>
-            <Text style={s.headerTitle}>Conversations</Text>
+            <View style={s.headerTopRow}>
+              <Text style={s.headerTitle}>Conversations</Text>
+              <TouchableOpacity
+                style={s.refreshBtn}
+                onPress={onRefresh}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={refreshing ? "sync" : "refresh-outline"}
+                  size={moderateScale(16)}
+                  color="#A78BFA"
+                />
+              </TouchableOpacity>
+            </View>
             <Text style={s.headerSubtitle}>
               Coordinate exchange spots or meetup times securely
             </Text>
@@ -674,20 +508,64 @@ export default function ChatsScreen() {
                 color="#64748B"
               />
               <TextInput
-                placeholder="Search buddies or tickets..."
+                placeholder="Search chats, buddies or items..."
                 placeholderTextColor="#475569"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
                 style={s.searchInput}
-                editable={false}
               />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={16} color="#64748B" />
+                </TouchableOpacity>
+              )}
             </View>
+          </View>
+
+          {/* Category Filter Pills */}
+          <View style={s.categoryRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.categoryScrollContent}
+            >
+              {categoryFilters.map((cat) => {
+                const isActive = activeCategoryFilter === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setActiveCategoryFilter(cat)}
+                    style={[s.categoryChip, isActive && s.categoryChipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        s.categoryChipText,
+                        isActive && s.categoryChipTextActive,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* Threads list */}
           <ScrollView
             style={s.threadsScroll}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#A78BFA"
+                colors={["#A78BFA", "#7C3AED"]}
+              />
+            }
           >
-            {threads.map((thread) => (
+            {filteredThreads.map((thread) => (
               <TouchableOpacity
                 key={thread.id}
                 onPress={() => selectConversation(thread.id)}
@@ -708,7 +586,9 @@ export default function ChatsScreen() {
                         {thread.name}
                       </Text>
                       <View style={s.roleTag}>
-                        <Text style={s.roleText}>{thread.role}</Text>
+                        <Text style={s.roleText} numberOfLines={1}>
+                          {thread.role}
+                        </Text>
                       </View>
                     </View>
                     <Text style={s.threadTime}>{thread.lastTime}</Text>
@@ -726,6 +606,22 @@ export default function ChatsScreen() {
                 </View>
               </TouchableOpacity>
             ))}
+
+            {filteredThreads.length === 0 && (
+              <View style={s.emptyState}>
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={42}
+                  color="#475569"
+                />
+                <Text style={s.emptyTitle}>No conversations found</Text>
+                <Text style={s.emptySub}>
+                  {searchQuery
+                    ? `No chats matching "${searchQuery}"`
+                    : "Connect with Day Mates or sell tickets to get started!"}
+                </Text>
+              </View>
+            )}
           </ScrollView>
 
           {/* Warning banner */}
@@ -760,7 +656,9 @@ export default function ChatsScreen() {
 
               <View style={s.dmMeta}>
                 <Text style={s.dmName}>{activeThread.name}</Text>
-                <Text style={s.dmRole}>{activeThread.role}</Text>
+                <Text style={s.dmRole} numberOfLines={1}>
+                  {activeThread.role}
+                </Text>
               </View>
             </View>
 
@@ -769,7 +667,6 @@ export default function ChatsScreen() {
                 name="sparkles"
                 size={moderateScale(10)}
                 color="#A78BFA"
-                style={s.sparkleIcon}
               />
               <Text style={s.liveBadgeText}>Live Buddy</Text>
             </View>
@@ -781,30 +678,44 @@ export default function ChatsScreen() {
             style={s.chatScroll}
             contentContainerStyle={s.chatScrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#A78BFA"
+              />
+            }
           >
-            {activeThread.initialMessages.map((msg) => {
-              const isMe = msg.sender === "me";
-              return (
-                <View
-                  key={msg.id}
-                  style={[s.bubbleWrapper, isMe ? s.bubbleMe : s.bubbleThem]}
-                >
+            {loadingMessages ? (
+              <ActivityIndicator
+                color="#A78BFA"
+                style={{ marginVertical: 20 }}
+              />
+            ) : (
+              activeThread.initialMessages.map((msg) => {
+                const isMe = msg.sender === "me";
+                return (
                   <View
-                    style={[s.bubble, isMe ? s.bubbleMeBg : s.bubbleThemBg]}
+                    key={msg.id}
+                    style={[s.bubbleWrapper, isMe ? s.bubbleMe : s.bubbleThem]}
                   >
-                    <Text style={s.bubbleText}>{msg.text}</Text>
-                    <Text
-                      style={[
-                        s.bubbleTime,
-                        isMe ? { color: "#E0E7FF" } : { color: "#64748B" },
-                      ]}
+                    <View
+                      style={[s.bubble, isMe ? s.bubbleMeBg : s.bubbleThemBg]}
                     >
-                      {msg.time}
-                    </Text>
+                      <Text style={s.bubbleText}>{msg.text}</Text>
+                      <Text
+                        style={[
+                          s.bubbleTime,
+                          isMe ? { color: "#E0E7FF" } : { color: "#64748B" },
+                        ]}
+                      >
+                        {msg.time}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Floating DM Input Box */}
@@ -815,6 +726,7 @@ export default function ChatsScreen() {
               value={inputText}
               onChangeText={setInputText}
               style={s.chatInput}
+              onSubmitEditing={handleSend}
             />
             <TouchableOpacity
               onPress={handleSend}
@@ -840,12 +752,27 @@ const s = StyleSheet.create({
   },
   header: {
     paddingHorizontal: scale(20),
-    paddingTop: verticalScale(20),
+    paddingTop: verticalScale(16),
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: moderateScale(22),
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  refreshBtn: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(10),
+    backgroundColor: "#131127",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
   headerSubtitle: {
     fontSize: moderateScale(11),
@@ -873,10 +800,37 @@ const s = StyleSheet.create({
     fontSize: moderateScale(11.5),
     color: "#FFFFFF",
   },
+  categoryRow: {
+    marginTop: verticalScale(10),
+  },
+  categoryScrollContent: {
+    paddingHorizontal: scale(20),
+    gap: scale(8),
+  },
+  categoryChip: {
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(6),
+    borderRadius: scale(10),
+    backgroundColor: "#131127",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+  },
+  categoryChipActive: {
+    backgroundColor: "#7C3AED",
+    borderColor: "#A78BFA",
+  },
+  categoryChipText: {
+    fontSize: moderateScale(10.5),
+    fontWeight: "700",
+    color: "#94A3B8",
+  },
+  categoryChipTextActive: {
+    color: "#FFFFFF",
+  },
   threadsScroll: {
     flex: 1,
     paddingHorizontal: scale(20),
-    marginTop: verticalScale(16),
+    marginTop: verticalScale(12),
   },
   threadCard: {
     backgroundColor: "rgba(18, 14, 44, 0.5)",
@@ -929,13 +883,14 @@ const s = StyleSheet.create({
     fontSize: moderateScale(12.5),
     fontWeight: "900",
     color: "#FFFFFF",
-    maxWidth: "55%",
+    maxWidth: "45%",
   },
   roleTag: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: scale(4),
     paddingHorizontal: scale(5),
     paddingVertical: scale(2),
+    maxWidth: "50%",
   },
   roleText: {
     fontSize: moderateScale(8.5),
@@ -954,6 +909,24 @@ const s = StyleSheet.create({
   lastMsgUnread: {
     color: "#A78BFA",
     fontWeight: "700",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: verticalScale(40),
+    gap: verticalScale(8),
+  },
+  emptyTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  emptySub: {
+    fontSize: moderateScale(11),
+    fontWeight: "600",
+    color: "#64748B",
+    textAlign: "center",
+    paddingHorizontal: scale(20),
   },
   warningBanner: {
     flexDirection: "row",
@@ -1036,7 +1009,6 @@ const s = StyleSheet.create({
     paddingVertical: scale(2.5),
     gap: scale(3),
   },
-  sparkleIcon: {},
   liveBadgeText: {
     fontSize: moderateScale(8.5),
     fontWeight: "900",

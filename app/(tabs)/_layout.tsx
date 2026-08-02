@@ -12,6 +12,7 @@ import { createStyles } from ".";
 import { useStyles } from "@/hooks/useStyles";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
+import { TabRefreshProvider } from "@/context/TabRefreshContext";
 
 export default function TabsLayout() {
   const { state } = useStore();
@@ -22,33 +23,22 @@ export default function TabsLayout() {
 
   const [serverUnreadCount, setServerUnreadCount] = React.useState<number>(0);
 
-  React.useEffect(() => {
-    let isMounted = true;
-
-    async function checkUnread() {
-      try {
-        const res = await ApiService.get("/api/messages/unread-count");
-
-        // if (res.ok) {
-        //   const data = await res.json();
-        //   if (isMounted && typeof data.unreadCount === "number") {
-        //     setServerUnreadCount(data.unreadCount);
-        //   }
-        // }
-      } catch (err) {
-        // Ignore errors gracefully
+  const checkUnread = React.useCallback(async () => {
+    try {
+      const res = await ApiService.get<{ status?: string; unreadCount?: number }>("/api/messages/unread-count");
+      if (res && typeof res.unreadCount === "number") {
+        setServerUnreadCount(res.unreadCount);
       }
+    } catch (err) {
+      // Ignore errors gracefully
     }
-
-    checkUnread();
-
-    const interval = setInterval(checkUnread, 120000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
   }, []);
+
+  React.useEffect(() => {
+    checkUnread();
+    const interval = setInterval(checkUnread, 120000);
+    return () => clearInterval(interval);
+  }, [checkUnread]);
 
   const totalUnread = Math.max(
     serverUnreadCount,
@@ -56,9 +46,10 @@ export default function TabsLayout() {
   );
 
   return (
-    <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
-      <View className="flex-1 bg-slate-950">
-        <Tabs
+    <TabRefreshProvider onGlobalRefresh={checkUnread}>
+      <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
+        <View className="flex-1 bg-slate-950">
+          <Tabs
           screenOptions={{
             headerShown: false,
 
@@ -226,5 +217,6 @@ export default function TabsLayout() {
         <GlobalOverlays />
       </View>
     </SafeAreaView>
+    </TabRefreshProvider>
   );
 }

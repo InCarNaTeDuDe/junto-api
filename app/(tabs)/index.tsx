@@ -28,6 +28,9 @@ import { requestCurrentLocation } from "@/services/locationServices";
 import { router } from "expo-router";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
+import { useTabRefresh } from "@/context/TabRefreshContext";
+import { RefreshControl } from "react-native";
+import { SpinnerLoader } from "@/components/SpinnerLoader";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -543,30 +546,40 @@ export default function Home() {
   const C = { ...FALLBACK, ...(theme || {}) };
   const { width: winW } = useWindowDimensions();
   const isWide = winW >= 900;
+  const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
 
   const [q, setQ] = useState("");
 
   // hero card is ~55% of viewport on phone, capped on wide screens
-  // const heroW = Math.min(Math.max(winW * 0.55, 180), 260);
   const { cardW: heroW, artH: heroArtHeight } = useHeroCardSize();
 
   const [userActs, setUserActs] = useState<[]>([]);
+  const [loadingActs, setLoadingActs] = useState(true);
+
+  const loadActivities = React.useCallback(async () => {
+    setLoadingActs(true);
+    try {
+      const { userActivities } = await ApiService.post<{
+        userActivities: any[];
+      }>("/api/activity/activities-around");
+
+      if (userActivities) {
+        setUserActs(userActivities);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingActs(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadActivities = async () => {
-      try {
-        const { userActivities } = await ApiService.post<{
-          userActivities: any[];
-        }>("/api/activity/activities-around");
-
-        setUserActs(userActivities);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
     loadActivities();
-  }, []);
+  }, [loadActivities]);
+
+  useEffect(() => {
+    return registerRefreshHandler(loadActivities);
+  }, [registerRefreshHandler, loadActivities]);
 
   const getGreeting = () => {
     const hr = new Date().getHours();
@@ -587,6 +600,14 @@ export default function Home() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: verticalScale(32) }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#A78BFA"
+            colors={["#A78BFA", "#7C3AED"]}
+          />
+        }
       >
         <View style={s.header}>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -732,12 +753,29 @@ export default function Home() {
           </Pressable>
         </View>
         <View style={{ paddingHorizontal: scale(10), gap: verticalScale(10) }}>
-          {/* {FEED.map((f, i) => (
-            <FeedRow key={i} item={f} s={s} C={C} />
-          ))} */}
-          {userActs.map((f, i) => (
-            <UserFeedRow key={i} item={f} s={s} C={C} />
-          ))}
+          {loadingActs ? (
+            <View style={{ paddingVertical: scale(20), alignItems: "center" }}>
+              <SpinnerLoader
+                fullScreen={false}
+                message="Finding activities near you..."
+                size={38}
+              />
+            </View>
+          ) : userActs.length > 0 ? (
+            userActs.map((f, i) => <UserFeedRow key={i} item={f} s={s} C={C} />)
+          ) : (
+            <View style={{ paddingVertical: scale(16), alignItems: "center" }}>
+              <Text
+                style={{
+                  color: C.mute || "#94A3B8",
+                  fontSize: moderateScale(12),
+                  fontWeight: "600",
+                }}
+              >
+                No activities found nearby. Tap '+' to host one!
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

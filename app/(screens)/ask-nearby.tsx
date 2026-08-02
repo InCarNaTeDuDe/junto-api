@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const { width } = Dimensions.get("window");
 
 export interface AskNearbyFormProps {
+  from?: "create" | "activity-chat" | "activity-details";
   colors?: any;
   selectedLocation?: any;
   onSubmitSuccess?: (data: any) => void;
@@ -142,7 +143,8 @@ const URGENCY_OPTIONS: UrgencyOption[] = [
 ];
 
 const createStyles = (t: any) => {
-  const isDark = t?.mode === "dark" || t?.bg === "#0B0714";
+  const isDark =
+    t?.mode === "dark" || t?.bg === "#0B0714" || t?.text === "#FFFFFF";
 
   const styles = StyleSheet.create({
     container: {
@@ -151,8 +153,8 @@ const createStyles = (t: any) => {
     },
     scrollContent: {
       paddingHorizontal: 14,
-      paddingTop: 10,
-      paddingBottom: 110,
+      paddingTop: 0,
+      paddingBottom: 20,
       gap: 18,
       maxWidth: 780,
       alignSelf: "center",
@@ -161,7 +163,9 @@ const createStyles = (t: any) => {
 
     /* Hero Banner */
     heroCard: {
-      backgroundColor: isDark ? "#12152B" : t.cardSecondary || "#F1F5F9",
+      backgroundColor: isDark
+        ? "rgba(255,255,255,0.04)"
+        : t.cardSecondary || "#F1F5F9",
       borderRadius: 20,
       padding: 18,
       borderWidth: 1,
@@ -202,9 +206,7 @@ const createStyles = (t: any) => {
       width: 72,
       height: 72,
       borderRadius: 36,
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.15)"
-        : "rgba(168, 85, 247, 0.1)",
+      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
       borderWidth: 1,
       borderColor: "rgba(168, 85, 247, 0.25)",
     },
@@ -278,7 +280,7 @@ const createStyles = (t: any) => {
     },
     categoryCardSelected: {
       backgroundColor: isDark
-        ? "#1E1838"
+        ? "rgba(168, 85, 247, 0.2)"
         : t.primarySoft || "rgba(168, 85, 247, 0.12)",
       borderColor: t.primary || "#A855F7",
     },
@@ -336,7 +338,7 @@ const createStyles = (t: any) => {
     },
     urgencyCardSelected: {
       backgroundColor: isDark
-        ? "#1E1838"
+        ? "rgba(168, 85, 247, 0.2)"
         : t.primarySoft || "rgba(168, 85, 247, 0.12)",
       borderColor: t.primary || "#A855F7",
     },
@@ -344,7 +346,7 @@ const createStyles = (t: any) => {
       width: 30,
       height: 30,
       borderRadius: 10,
-      backgroundColor: "rgba(168, 85, 247, 0.15)",
+      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -361,12 +363,14 @@ const createStyles = (t: any) => {
 
     /* Description Input */
     inputCard: {
-      backgroundColor: t.inputBg || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.inputBg || t.card || (isDark ? "#121528" : "#FFFFFF"),
       borderRadius: 16,
       padding: 14,
       borderWidth: 1,
       borderColor:
-        t.inputBorder || (isDark ? "rgba(255, 255, 255, 0.08)" : "#CBD5E1"),
+        t.inputBorder ||
+        t.border ||
+        (isDark ? "rgba(255, 255, 255, 0.08)" : "#CBD5E1"),
     },
     inputLabel: {
       color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
@@ -425,16 +429,15 @@ const createStyles = (t: any) => {
 
     /* Bottom Post Request Bar */
     bottomBar: {
-      position: "absolute",
-      bottom: 16,
-      left: 14,
-      right: 14,
       backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
       borderRadius: 20,
       padding: 12,
+      marginHorizontal: 14,
+      marginBottom: 10,
+      marginTop: 6,
       borderWidth: 1,
       borderColor: isDark ? "rgba(168, 85, 247, 0.3)" : t.border || "#E2E8F0",
-      shadowColor: "#000",
+      shadowColor: t.shadow || "#000",
       shadowOpacity: 0.15,
       shadowRadius: 10,
       elevation: 8,
@@ -478,17 +481,19 @@ const createStyles = (t: any) => {
     /* Modal */
     modalOverlay: {
       flex: 1,
-      backgroundColor: isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)",
+      backgroundColor:
+        t.overlay || (isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)"),
       justifyContent: "flex-end",
     },
     modalContent: {
-      backgroundColor: isDark ? "#1A152E" : "#FFFFFF",
+      backgroundColor: t.card || (isDark ? "#1A152E" : "#FFFFFF"),
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       padding: 20,
       maxHeight: "80%",
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "transparent",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.12)" : "transparent"),
     },
     modalTitle: {
       color: t.text || (isDark ? "#FFFFFF" : "#111827"),
@@ -500,10 +505,13 @@ const createStyles = (t: any) => {
       alignItems: "center",
       justifyContent: "space-between",
       padding: 13,
-      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F8FAFC",
+      backgroundColor: isDark
+        ? "rgba(255,255,255,0.06)"
+        : t.cardSecondary || "#F8FAFC",
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
     modalItemSelected: {
       backgroundColor: isDark
@@ -521,9 +529,12 @@ const createStyles = (t: any) => {
 };
 
 export default function AskNearbyScreen({
+  from,
   colors: propColors,
   selectedLocation: propLocation,
   onSubmitSuccess,
+  onBack,
+  onClose,
 }: AskNearbyFormProps) {
   const router = useRouter();
   const theme = useStyles((t: any) => createStyles(propColors || t));
@@ -543,6 +554,22 @@ export default function AskNearbyScreen({
     CATEGORIES.find((c) => c.id === selectedCategory) || CATEGORIES[0];
   const activeUrgencyObj =
     URGENCY_OPTIONS.find((u) => u.id === selectedUrgency) || URGENCY_OPTIONS[0];
+
+  const handleHeaderBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (router) {
+      router.replace("/(tabs)/create");
+    }
+  };
+
+  const handleHeaderClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (router) {
+      router.replace("/(tabs)");
+    }
+  };
 
   const handlePostRequest = async () => {
     setIsSubmitting(true);
@@ -576,13 +603,17 @@ export default function AskNearbyScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* <View style={styles.container}> */}
+    <SafeAreaView
+      style={styles.container}
+      edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
+    >
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Top Header if back action exists */}
+
         {/* Hero Section */}
         <View style={styles.heroCard}>
           <View style={styles.heroTextContainer}>

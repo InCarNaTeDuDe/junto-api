@@ -27,6 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import { useTheme } from "@/hooks/useTheme";
+import { ActivityHeader } from "@/components/ActivityHeader";
 import type { Theme } from "@/theme";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
@@ -180,43 +181,22 @@ export default function CreateScreen() {
       <View style={styles.handle} />
 
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {selected && (
-            <Pressable onPress={back} style={styles.roundBtn} hitSlop={10}>
-              <Ionicons name="arrow-back" size={19} color={t.text} />
-            </Pressable>
-          )}
-          <View style={{ flex: 1 }}>
-            {!selected ? (
-              <>
-                <Text
-                  // style={styles.headerTitle1} //-- not working so kept inline
-                  style={{
-                    color: t.text,
-                    fontSize: 16,
-                    fontWeight: "900",
-                    // backgroundColor: "yellow",
-                    lineHeight: 24,
-                  }}
-                >
-                  What would you like to do today? 🎉
-                </Text>
-                <Text style={styles.headerSub}>
-                  Choose an option to get started
-                </Text>
-              </>
-            ) : (
-              <Text style={[styles.headerTitle, { marginLeft: 6 }]}>
-                {OPTIONS.find((o) => o.id === selected)?.title}
-              </Text>
-            )}
-          </View>
-        </View>
-        <Pressable onPress={close} style={styles.roundBtn} hitSlop={10}>
-          <Ionicons name="close" size={19} color={t.sub} />
-        </Pressable>
-      </View>
+      {!selected ? (
+        <ActivityHeader
+          title="What would you like to do today? 🎉"
+          description="Choose an option to get started"
+          onClose={close}
+        />
+      ) : (
+        <ActivityHeader
+          title={OPTIONS.find((o) => o.id === selected)?.title || ""}
+          description={
+            OPTIONS.find((o) => o.id === selected)?.description || ""
+          }
+          onBack={back}
+          onClose={close}
+        />
+      )}
 
       {/* Body */}
       {!selected ? (
@@ -285,133 +265,14 @@ export default function CreateScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {selected === "day_mates" && <DayMatesForm />}
-          {selected === "sell_ticket" && <SellTicketForm />}
-
-          {selected === "host_event" && (
-            <View style={styles.formWrapper}>
-              <Text style={styles.sectionSubtitle}>
-                Host social mixers, games or community events
-              </Text>
-
-              <FormLabel t={t} text="Event Title" />
-              <FormInput
-                t={t}
-                placeholder="e.g., Koramangala Friday Pub Crawl"
-                value={hostEventName}
-                onChangeText={setHostEventName}
-              />
-
-              <FormLabel t={t} text="Venue / Spot Location" />
-              <FormInput
-                t={t}
-                placeholder="e.g., Astro Arena Turf, Toit"
-                value={hostLocation}
-                onChangeText={setHostLocation}
-              />
-
-              <FormLabel t={t} text="Event Category" />
-              <View style={styles.chipRow}>
-                {EVENT_TYPES.map((x) => (
-                  <Chip
-                    key={x}
-                    t={t}
-                    label={x}
-                    selected={hostType === x}
-                    onPress={() => setHostType(x)}
-                  />
-                ))}
-              </View>
-
-              <FormLabel t={t} text="Max Attendees" />
-              <View style={styles.counterRow}>
-                <Text style={styles.counterLabel}>
-                  Maximum attendees invited?
-                </Text>
-                <Stepper
-                  t={t}
-                  value={maxPeople}
-                  onChange={setMaxPeople}
-                  min={5}
-                  max={100}
-                  step={5}
-                />
-              </View>
-
-              <TouchableOpacity
-                activeOpacity={0.9}
-                disabled={!hostEventName || !hostLocation}
-                onPress={submit}
-                style={[
-                  styles.submitBtn,
-                  { backgroundColor: palettes.event.arrow },
-                  (!hostEventName || !hostLocation) && { opacity: 0.5 },
-                ]}
-              >
-                <Text style={styles.submitBtnText}>Launch Community Event</Text>
-              </TouchableOpacity>
-            </View>
+          {selected === "day_mates" && (
+            <DayMatesForm from="create" onBack={back} onClose={close} />
           )}
-
+          {selected === "sell_ticket" && (
+            <SellTicketForm from="create" onBack={back} onClose={close} />
+          )}
           {selected === "ask_nearby" && (
-            // (
-            //   <View style={styles.formWrapper}>
-            //     <Text style={styles.sectionSubtitle}>
-            //       Broadcast a localized question to active users
-            //     </Text>
-
-            //     <FormLabel t={t} text="Your Question" />
-            //     <TextInput
-            //       style={[styles.input, styles.inputMultiline]}
-            //       multiline
-            //       numberOfLines={3}
-            //       placeholder="e.g., Is the entry fee at Toit active tonight?"
-            //       placeholderTextColor={t.placeholder}
-            //       value={question}
-            //       onChangeText={setQuestion}
-            //     />
-
-            //     <FormLabel t={t} text="Select Topic" />
-            //     <View style={styles.chipRow}>
-            //       {QUESTION_TOPICS.map((x) => (
-            //         <Chip
-            //           key={x}
-            //           t={t}
-            //           label={x}
-            //           selected={topic === x}
-            //           onPress={() => setTopic(x)}
-            //         />
-            //       ))}
-            //     </View>
-
-            //     <FormLabel t={t} text="Urgency Level" />
-            //     <View style={styles.chipRow}>
-            //       {URGENCY_LEVELS.map((x) => (
-            //         <Chip
-            //           key={x}
-            //           t={t}
-            //           label={x}
-            //           selected={urgency === x}
-            //           onPress={() => setUrgency(x)}
-            //         />
-            //       ))}
-            //     </View>
-
-            //     <TouchableOpacity
-            //       activeOpacity={0.9}
-            //       disabled={!question}
-            //       onPress={submit}
-            //       style={[
-            //         styles.submitBtn,
-            //         { backgroundColor: palettes.question.arrow },
-            //         !question && { opacity: 0.5 },
-            //       ]}
-            //     >
-            //       <Text style={styles.submitBtnText}>Broadcast Question</Text>
-            //     </TouchableOpacity>
-            //   </View>
-            // )
-            <AskNearbyScreen />
+            <AskNearbyScreen from="create" onBack={back} onClose={close} />
           )}
         </ScrollView>
       )}

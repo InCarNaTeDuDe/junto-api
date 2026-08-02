@@ -23,10 +23,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const HERO_IMAGE = require("@/assets/screens/sell-ticket-hero.png");
 
 export interface SellTicketFormProps {
+  from?: "create" | "activity-chat" | "activity-details";
   colors?: any;
   selectedLocation?: string;
   onSubmitSuccess?: (data: any) => void;
   onBack?: () => void;
+  onClose?: () => void;
 }
 
 const createStyles = (t: any) => {
@@ -45,64 +47,6 @@ const createStyles = (t: any) => {
       maxWidth: 600,
       alignSelf: "center",
       width: "100%",
-    },
-
-    /* Header Bar */
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 2,
-    },
-    headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      flex: 1,
-    },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.2 : 0.04,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-      letterSpacing: -0.3,
-    },
-    headerSubTitle: {
-      fontSize: 12,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      marginTop: 1,
-    },
-    howItWorksPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 5,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.16)" : "#F3E8FF",
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: isDark
-        ? "rgba(168, 85, 247, 0.3)"
-        : "rgba(168, 85, 247, 0.2)",
-    },
-    howItWorksText: {
-      color: t.primary || "#8B5CF6",
-      fontSize: 12,
-      fontWeight: "700",
     },
 
     /* Hero Banner — single illustration with baked-in text */
@@ -229,9 +173,11 @@ const createStyles = (t: any) => {
     /* Fair Deal Banner */
     fairDealBanner: {
       marginTop: 12,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.12)" : "#FAF5FF",
+      backgroundColor: isDark
+        ? "rgba(168, 85, 247, 0.12)"
+        : t.primarySoft || "#FAF5FF",
       borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderColor: isDark ? "rgba(168, 85, 247, 0.2)" : t.border || "#F3E8FF",
       borderRadius: 12,
       paddingVertical: 8,
       paddingHorizontal: 12,
@@ -259,18 +205,23 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.04)" : "#F8FAFC",
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.04)"
+        : t.cardSecondary || "#F8FAFC",
       borderRadius: 20,
       paddingHorizontal: 6,
       paddingVertical: 4,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
     },
     stepBtn: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.1)"
+        : t.cardSecondary || "#E2E8F0",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -303,12 +254,14 @@ const createStyles = (t: any) => {
     /* Trust Badges Row */
     trustRow: {
       flexDirection: "row",
-      backgroundColor: isDark ? "#17122E" : "#FAF5FF",
+      backgroundColor: isDark
+        ? "rgba(255,255,255,0.04)"
+        : t.cardSecondary || "#FAF5FF",
       borderRadius: 18,
       paddingVertical: 14,
       paddingHorizontal: 8,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderColor: isDark ? "rgba(168, 85, 247, 0.2)" : t.border || "#F3E8FF",
     },
     trustCol: {
       flex: 1,
@@ -317,7 +270,8 @@ const createStyles = (t: any) => {
     },
     trustDivider: {
       width: 1,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E9D5FF",
+      backgroundColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E9D5FF"),
       height: "80%",
       alignSelf: "center",
     },
@@ -325,7 +279,9 @@ const createStyles = (t: any) => {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      backgroundColor: isDark
+        ? "rgba(168, 85, 247, 0.2)"
+        : t.primarySoft || "#F3E8FF",
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 6,
@@ -353,7 +309,7 @@ const createStyles = (t: any) => {
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
-      shadowColor: "#8B5CF6",
+      shadowColor: t.primary || "#8B5CF6",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 8,
@@ -379,16 +335,18 @@ const createStyles = (t: any) => {
     pickerContainer: {
       marginTop: 10,
       padding: 10,
-      backgroundColor: isDark ? "#17122E" : "#F8FAFC",
+      backgroundColor: t.inputBg || (isDark ? "#17122E" : "#F8FAFC"),
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
 
     /* How It Works Modal */
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.65)",
+      backgroundColor:
+        t.overlay || (isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)"),
       justifyContent: "center",
       alignItems: "center",
       padding: 20,
@@ -400,7 +358,8 @@ const createStyles = (t: any) => {
       borderRadius: 24,
       padding: 20,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+      borderColor:
+        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     },
     modalHeader: {
       flexDirection: "row",
@@ -456,8 +415,10 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   selectedLocation = "Downtown Cinema",
   onSubmitSuccess,
   onBack,
+  onClose,
+  from,
 }) => {
-  const router = RouterHook();
+  const router = useRouter();
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark, primary, text, sub, placeholder } = theme;
 
@@ -472,14 +433,6 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-
-  function RouterHook() {
-    try {
-      return useRouter();
-    } catch {
-      return null;
-    }
-  }
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString("en-US", {
@@ -563,50 +516,30 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   const handleHeaderBack = () => {
     if (onBack) {
       onBack();
-    } else if (router && router.canGoBack()) {
-      router.back();
+    } else if (router) {
+      router.replace("/(tabs)/create");
+    }
+  };
+
+  const handleHeaderClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (router) {
+      router.replace("/(tabs)");
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* <View style={styles.container}> */}
+    <SafeAreaView
+      style={styles.container}
+      edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
+    >
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Top Header */}
-        {/* <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity
-              onPress={handleHeaderBack}
-              style={styles.backButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="arrow-back"
-                size={20}
-                color={text || (isDark ? "#FFFFFF" : "#0F172A")}
-              />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>Sell Ticket</Text>
-              <Text style={styles.headerSubTitle}>
-                List your ticket and let someone enjoy!
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.howItWorksPill}
-            onPress={() => setShowHowItWorks(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="bulb" size={15} color={primary || "#8B5CF6"} />
-            <Text style={styles.howItWorksText}>How it works</Text>
-          </TouchableOpacity>
-        </View> */}
 
         {/* Hero Header Banner — artwork already contains the headline,
             subtext and the "Safe • Simple • Trusted" pill */}
