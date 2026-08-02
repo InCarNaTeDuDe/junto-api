@@ -17,7 +17,7 @@ function RootNavigator() {
   const segments = useSegments();
 
   if (loading) {
-    return <SpinnerLoader message="Verifying session..." />;
+    return <SpinnerLoader message="Junto never makes you alone" />;
   }
 
   const currentRoute = segments[0];
@@ -48,7 +48,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Suspense fallback={<SpinnerLoader message="Loading..." />}>
+      <Suspense
+        fallback={<SpinnerLoader message="Junto never makes you alone" />}
+      >
         <AuthProvider>
           <LocationProvider>
             <RootNavigator />

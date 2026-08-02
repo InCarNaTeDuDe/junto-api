@@ -269,7 +269,7 @@ export default function ChatsScreen() {
       }));
 
       const mergedMap = new Map<string, Thread>();
-      FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
+      // FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
       storeThreads.forEach((t) => mergedMap.set(t.id, t));
 
       setThreads(Array.from(mergedMap.values()));

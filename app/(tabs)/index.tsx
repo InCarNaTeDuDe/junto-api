@@ -583,9 +583,12 @@ export default function Home() {
 
   const getGreeting = () => {
     const hr = new Date().getHours();
+
     const name = user ? user.name.split(" ")[0] : "Guest";
     // Use lowercased name style like the screenshot: ""
     const displayName = name.toLowerCase();
+    console.log("----%%%%%%%%------", displayName);
+
     if (hr < 12) return `Good Morning, ${displayName}`;
     if (hr < 17) return `Good Afternoon, ${displayName}`;
     return `Good Evening, ${displayName}`;
