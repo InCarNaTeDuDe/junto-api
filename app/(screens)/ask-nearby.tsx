@@ -151,39 +151,12 @@ const createStyles = (t: any) => {
     },
     scrollContent: {
       paddingHorizontal: 14,
-      paddingTop: 0,
-      paddingBottom: 20,
+      paddingTop: 10,
+      paddingBottom: 110,
       gap: 18,
       maxWidth: 780,
       alignSelf: "center",
       width: "100%",
-    },
-
-    /* Header Row */
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      marginBottom: 2,
-    },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0",
-    },
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
-    },
-    headerSubTitle: {
-      fontSize: 12,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
     },
 
     /* Hero Banner */
@@ -452,12 +425,13 @@ const createStyles = (t: any) => {
 
     /* Bottom Post Request Bar */
     bottomBar: {
+      position: "absolute",
+      bottom: 16,
+      left: 14,
+      right: 14,
       backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
       borderRadius: 20,
       padding: 12,
-      marginHorizontal: 14,
-      marginBottom: 10,
-      marginTop: 6,
       borderWidth: 1,
       borderColor: isDark ? "rgba(168, 85, 247, 0.3)" : t.border || "#E2E8F0",
       shadowColor: "#000",
@@ -550,8 +524,6 @@ export default function AskNearbyScreen({
   colors: propColors,
   selectedLocation: propLocation,
   onSubmitSuccess,
-  onBack,
-  onClose,
 }: AskNearbyFormProps) {
   const router = useRouter();
   const theme = useStyles((t: any) => createStyles(propColors || t));
@@ -571,16 +543,6 @@ export default function AskNearbyScreen({
     CATEGORIES.find((c) => c.id === selectedCategory) || CATEGORIES[0];
   const activeUrgencyObj =
     URGENCY_OPTIONS.find((u) => u.id === selectedUrgency) || URGENCY_OPTIONS[0];
-
-  const handleHeaderBack = () => {
-    if (onBack) {
-      onBack();
-    } else if (onClose) {
-      onClose();
-    } else if (router && router.canGoBack()) {
-      router.back();
-    }
-  };
 
   const handlePostRequest = async () => {
     setIsSubmitting(true);
@@ -621,8 +583,6 @@ export default function AskNearbyScreen({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Header if back action exists */}
-
         {/* Hero Section */}
         <View style={styles.heroCard}>
           <View style={styles.heroTextContainer}>

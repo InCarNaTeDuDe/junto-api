@@ -27,7 +27,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import { useTheme } from "@/hooks/useTheme";
-import { ActivityHeader } from "@/components/ActivityHeader";
 import type { Theme } from "@/theme";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
@@ -181,22 +180,43 @@ export default function CreateScreen() {
       <View style={styles.handle} />
 
       {/* Header */}
-      {!selected ? (
-        <ActivityHeader
-          title="What would you like to do today? 🎉"
-          description="Choose an option to get started"
-          onClose={close}
-        />
-      ) : (
-        <ActivityHeader
-          title={OPTIONS.find((o) => o.id === selected)?.title || ""}
-          description={
-            OPTIONS.find((o) => o.id === selected)?.description || ""
-          }
-          onBack={back}
-          onClose={close}
-        />
-      )}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {selected && (
+            <Pressable onPress={back} style={styles.roundBtn} hitSlop={10}>
+              <Ionicons name="arrow-back" size={19} color={t.text} />
+            </Pressable>
+          )}
+          <View style={{ flex: 1 }}>
+            {!selected ? (
+              <>
+                <Text
+                  // style={styles.headerTitle1} //-- not working so kept inline
+                  style={{
+                    color: t.text,
+                    fontSize: 16,
+                    fontWeight: "900",
+                    // backgroundColor: "yellow",
+                    lineHeight: 24,
+                  }}
+                >
+                  What would you like to do today? 🎉
+                </Text>
+                <Text style={styles.headerSub}>
+                  Choose an option to get started
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.headerTitle, { marginLeft: 6 }]}>
+                {OPTIONS.find((o) => o.id === selected)?.title}
+              </Text>
+            )}
+          </View>
+        </View>
+        <Pressable onPress={close} style={styles.roundBtn} hitSlop={10}>
+          <Ionicons name="close" size={19} color={t.sub} />
+        </Pressable>
+      </View>
 
       {/* Body */}
       {!selected ? (
@@ -391,7 +411,7 @@ export default function CreateScreen() {
             //     </TouchableOpacity>
             //   </View>
             // )
-            <AskNearbyScreen onBack={back} onClose={close} />
+            <AskNearbyScreen />
           )}
         </ScrollView>
       )}

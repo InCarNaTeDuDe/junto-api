@@ -18,7 +18,6 @@ import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import ActivityHeader from "@/components/ActivityHeader";
 
 /**
  * Hero illustration with baked-in headline, subtext and trust pills.
@@ -136,7 +135,7 @@ const createStyles = (t: any) => {
     },
     scrollContent: {
       paddingHorizontal: 16,
-      paddingTop: 0,
+      paddingTop: 12,
       paddingBottom: 40,
       gap: 16,
       maxWidth: 600,
@@ -863,6 +862,8 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Hero Card Banner */}
+
         {/* Hero Card Banner — single illustration with baked-in headline + pills */}
         <View style={styles.heroCard}>
           <Image

@@ -577,6 +577,36 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
         showsVerticalScrollIndicator={false}
       >
         {/* Top Header */}
+        {/* <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              onPress={handleHeaderBack}
+              style={styles.backButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="arrow-back"
+                size={20}
+                color={text || (isDark ? "#FFFFFF" : "#0F172A")}
+              />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.headerTitle}>Sell Ticket</Text>
+              <Text style={styles.headerSubTitle}>
+                List your ticket and let someone enjoy!
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.howItWorksPill}
+            onPress={() => setShowHowItWorks(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bulb" size={15} color={primary || "#8B5CF6"} />
+            <Text style={styles.howItWorksText}>How it works</Text>
+          </TouchableOpacity>
+        </View> */}
 
         {/* Hero Header Banner — artwork already contains the headline,
             subtext and the "Safe • Simple • Trusted" pill */}

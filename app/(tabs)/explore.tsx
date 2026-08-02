@@ -10,7 +10,6 @@ import {
   Easing,
   Alert,
   Platform,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -191,7 +190,6 @@ export default function ExploreScreen() {
   const [activeCards, setActiveCards] =
     useState<ActivePostCard[]>(DEFAULT_ACTIVE_CARDS);
   const [selectedNode, setSelectedNode] = useState<RadarUserNode | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
 
   // Radar animation sweep angle
   const sweepAnim = useRef(new Animated.Value(0)).current;
@@ -207,167 +205,116 @@ export default function ExploreScreen() {
     ).start();
   }, [sweepAnim]);
 
-  // Fetch explore data from DB
-  const fetchExploreDataFromDb = async () => {
-    try {
-      let list: any[] = [];
+  // Load backend items & merge dynamically
+  useEffect(() => {
+    let isMounted = true;
+    const loadExploreData = async () => {
       try {
         const responsePins = (await ApiService.post(
           "/api/activity/explore",
         )) as any[];
-        if (Array.isArray(responsePins)) {
-          list = responsePins;
+        const list = Array.isArray(responsePins) ? responsePins : [];
+
+        if (isMounted && list.length > 0) {
+          // Map backend pins into radar nodes
+          const mappedNodes: RadarUserNode[] = list.map((item, idx) => {
+            const cat: FilterCategory =
+              item.type === "ticket"
+                ? "tickets"
+                : item.type === "lost"
+                  ? "lost"
+                  : "buddies";
+
+            // Positions arranged around radar circle
+            const positions = [
+              { top: "18%", left: "45%" },
+              { top: "36%", left: "15%" },
+              { top: "37%", left: "73%" },
+              { top: "56%", left: "16%" },
+              { top: "65%", left: "44%" },
+              { top: "57%", left: "73%" },
+            ];
+
+            const pos = positions[idx % positions.length];
+
+            return {
+              id: item.id || `api-node-${idx}`,
+              name: item.ownerName || "Junto User",
+              avatar:
+                item.ownerAvatar ||
+                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+              distance: `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
+              activityTag: item.title || "Buddy Plan",
+              category: cat === "all" ? "buddies" : cat,
+              status: idx % 2 === 0 ? "online" : "away",
+              topPct: pos.top,
+              leftPct: pos.left,
+              rawItem: item,
+            };
+          });
+
+          // Also map into cards for bottom horizontal scroll
+          const mappedCards: ActivePostCard[] = list.map((item, idx) => {
+            const isTicket = item.type === "ticket";
+            const isLost = item.type === "lost";
+
+            return {
+              id: item.id || `api-card-${idx}`,
+              categoryTag: isTicket
+                ? "Ticket for Sale"
+                : isLost
+                  ? "Lost & Found"
+                  : "Day Mate Plan",
+              categoryType: isTicket ? "tickets" : isLost ? "lost" : "buddies",
+              tagBg: isTicket
+                ? isDark
+                  ? "rgba(37, 99, 235, 0.25)"
+                  : "#DBEAFE"
+                : isLost
+                  ? isDark
+                    ? "rgba(16, 185, 129, 0.25)"
+                    : "#D1FAE5"
+                  : isDark
+                    ? "rgba(217, 119, 6, 0.25)"
+                    : "#FEF3C7",
+              tagColor: isTicket
+                ? isDark
+                  ? "#60A5FA"
+                  : "#1D4ED8"
+                : isLost
+                  ? isDark
+                    ? "#34D399"
+                    : "#047857"
+                  : isDark
+                    ? "#FBBF24"
+                    : "#B45309",
+              timeAgo: `${(idx + 1) * 12}m ago`,
+              title: item.title,
+              subtitle: item.venue || "Nearby location",
+              location: item.venue || "Koramangala, Bengaluru",
+              avatars: [
+                item.ownerAvatar ||
+                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
+              ],
+              avatarText: item.price ? item.price : "1 connected",
+              actionLabel: isTicket ? "View" : isLost ? "Details" : "Connect",
+              rawItem: item,
+            };
+          });
+
+          setRadarNodes(mappedNodes);
+          setActiveCards(mappedCards);
         }
       } catch (err) {
-        console.warn("Explore API post error:", err);
+        console.warn("Could not fetch explore pins:", err);
       }
+    };
 
-      // Fallback or blend with /api/activities feed
-      if (!list || list.length === 0) {
-        try {
-          const activitiesRes = (await ApiService.get(
-            "/api/activities",
-          )) as any;
-          if (
-            activitiesRes?.userActivities &&
-            Array.isArray(activitiesRes.userActivities)
-          ) {
-            list = activitiesRes.userActivities.map((act: any) => ({
-              id: act.id,
-              title: act.title,
-              type: act.type === "MOVIES" ? "ticket" : "buddies",
-              venue: act.place,
-              ownerName: act.user,
-              ownerAvatar: act.userAvatar,
-              price: act.rightSub,
-            }));
-          }
-        } catch (err) {
-          console.warn("Activities API get error:", err);
-        }
-      }
-
-      if (list && list.length > 0) {
-        const mappedNodes: RadarUserNode[] = list.map((item, idx) => {
-          const cat: FilterCategory =
-            item.type === "ticket"
-              ? "tickets"
-              : item.type === "lost"
-                ? "lost"
-                : "buddies";
-
-          const positions = [
-            { top: "18%", left: "45%" },
-            { top: "36%", left: "15%" },
-            { top: "37%", left: "73%" },
-            { top: "56%", left: "16%" },
-            { top: "65%", left: "44%" },
-            { top: "57%", left: "73%" },
-          ];
-
-          const pos = positions[idx % positions.length];
-
-          return {
-            id: item.id || `api-node-${idx}`,
-            name: item.ownerName || "Junto User",
-            avatar:
-              item.ownerAvatar ||
-              "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-            distance: `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
-            activityTag: item.title || "Buddy Plan",
-            category: cat === "all" ? "buddies" : cat,
-            status: idx % 2 === 0 ? "online" : "away",
-            topPct: pos.top,
-            leftPct: pos.left,
-            rawItem: item,
-          };
-        });
-
-        const mappedCards: ActivePostCard[] = list.map((item, idx) => {
-          const isTicket = item.type === "ticket";
-          const isLost = item.type === "lost";
-
-          return {
-            id: item.id || `api-card-${idx}`,
-            categoryTag: isTicket
-              ? "Ticket for Sale"
-              : isLost
-                ? "Lost & Found"
-                : "Day Mate Plan",
-            categoryType: isTicket ? "tickets" : isLost ? "lost" : "buddies",
-            tagBg: isTicket
-              ? isDark
-                ? "rgba(37, 99, 235, 0.25)"
-                : "#DBEAFE"
-              : isLost
-                ? isDark
-                  ? "rgba(16, 185, 129, 0.25)"
-                  : "#D1FAE5"
-                : isDark
-                  ? "rgba(217, 119, 6, 0.25)"
-                  : "#FEF3C7",
-            tagColor: isTicket
-              ? isDark
-                ? "#60A5FA"
-                : "#1D4ED8"
-              : isLost
-                ? isDark
-                  ? "#34D399"
-                  : "#047857"
-                : isDark
-                  ? "#FBBF24"
-                  : "#B45309",
-            timeAgo: `${(idx + 1) * 12}m ago`,
-            title: item.title,
-            subtitle: item.venue || "Nearby location",
-            location: item.venue || "Koramangala, Bengaluru",
-            avatars: [
-              item.ownerAvatar ||
-                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
-            ],
-            avatarText: item.price ? item.price : "1 connected",
-            actionLabel: isTicket ? "View" : isLost ? "Details" : "Connect",
-            rawItem: item,
-          };
-        });
-
-        setRadarNodes(mappedNodes);
-        setActiveCards(mappedCards);
-        return list;
-      }
-    } catch (err) {
-      console.warn("Could not fetch explore pins:", err);
-    }
-    return [];
-  };
-
-  // Load backend items & merge dynamically on mount
-  useEffect(() => {
-    fetchExploreDataFromDb();
+    loadExploreData();
+    return () => {
+      isMounted = false;
+    };
   }, [isDark]);
-
-  // Click pointer icon to trigger database scan
-  const handleScanPointerClick = async () => {
-    setIsScanning(true);
-    try {
-      const list = await fetchExploreDataFromDb();
-      const count = list ? list.length : 0;
-      const msg =
-        count > 0
-          ? `DB Scan complete! Loaded ${count} active records around your location.`
-          : `DB Scan complete! No new activities found in your area.`;
-
-      if (typeof window !== "undefined" && window.alert) {
-        window.alert(msg);
-      } else {
-        Alert.alert("Database Scan Complete", msg);
-      }
-    } catch (err) {
-      console.error("Failed to refresh DB data:", err);
-    } finally {
-      setIsScanning(false);
-    }
-  };
 
   // Filtered radar nodes and cards based on category select
   const filteredNodes = useMemo(() => {
@@ -745,15 +692,15 @@ export default function ExploreScreen() {
               s.recenterButton,
               { backgroundColor: overlayBg, borderColor: overlayBorder },
             ]}
-            onPress={handleScanPointerClick}
-            disabled={isScanning}
+            onPress={() =>
+              Alert.alert(
+                "Radar Updated",
+                "Scanned 5km radius around your location.",
+              )
+            }
             activeOpacity={0.8}
           >
-            {isScanning ? (
-              <ActivityIndicator size="small" color="#C084FC" />
-            ) : (
-              <Ionicons name="navigate-circle" size={22} color="#C084FC" />
-            )}
+            <Ionicons name="navigate-circle" size={22} color="#C084FC" />
           </TouchableOpacity>
 
           {/* Render User Radar Nodes */}
@@ -778,10 +725,7 @@ export default function ExploreScreen() {
                 activeOpacity={0.85}
               >
                 <View style={s.avatarWrapper}>
-                  <Image
-                    source={{ uri: node.avatar }}
-                    style={s.nodeAvatar as any}
-                  />
+                  <Image source={{ uri: node.avatar }} style={s.nodeAvatar} />
                   <View
                     style={[
                       s.statusDotBadge,
@@ -907,7 +851,7 @@ export default function ExploreScreen() {
                         key={idx}
                         source={{ uri: av }}
                         style={[
-                          s.stackedAvatar as any,
+                          s.stackedAvatar,
                           {
                             marginLeft: idx > 0 ? -8 : 0,
                             zIndex: 10 - idx,
