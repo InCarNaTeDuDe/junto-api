@@ -42,6 +42,19 @@ export class Message {
   })
   sender!: User;
 
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  participantId?: string | null;
+
+  @ManyToOne(() => User, {
+    onDelete: "SET NULL",
+    nullable: true,
+  })
+  @JoinColumn({
+    name: "participantId",
+  })
+  participant?: User | null;
+
   @Column({ type: "text" })
   content!: string;
 

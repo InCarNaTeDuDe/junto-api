@@ -34,14 +34,22 @@ export async function getMessages(req: Request, res: Response) {
 
 export async function sendMessage(req: Request, res: Response) {
   try {
-    const { chatId, content } = req.body;
-    const senderId = req.user?.id || "guest-user";
+    const { chatId, activityId, content, participantId } = req.body;
+    const targetChatId = chatId || activityId;
+    const senderId = req.user?.id || req.body.senderId || "guest-user";
 
-    if (!chatId || !content) {
-      return res.status(400).json({ error: "chatId and content are required" });
+    if (!targetChatId || !content) {
+      return res
+        .status(400)
+        .json({ error: "chatId or activityId and content are required" });
     }
 
-    const savedMessage = await createAndSaveMessage(chatId, senderId, content);
+    const savedMessage = await createAndSaveMessage(
+      targetChatId,
+      senderId,
+      content,
+      participantId,
+    );
     res.json({ status: "success", message: savedMessage });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to send message" });

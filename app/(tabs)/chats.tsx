@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,973 +8,968 @@ import {
   ScrollView,
   Image,
   Platform,
-  KeyboardAvoidingView,
   RefreshControl,
+  SafeAreaView,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
+import { useRouter } from "expo-router";
 
 import { ApiService } from "@/services/api";
+import { socket, connectSocket } from "@/services/socket";
 import { useStore } from "@/hooks/useStore";
 import { useTabRefresh } from "@/context/TabRefreshContext";
-import { SpinnerLoader } from "@/components/SpinnerLoader";
+import { useAuthContext } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
-
-interface Message {
-  id: string;
-  sender: "me" | "them";
-  text: string;
-  time: string;
-}
 
 interface Thread {
   id: string;
   name: string;
-  avatar: string;
-  role: string;
-  category?: "Ticket Swap" | "Day Mates" | "Lost & Found" | "Global";
+  avatar?: string | null;
+  category: "DAY MATES" | "TICKET SWAP" | "LOST & FOUND" | "GROUP" | string;
+  contextTitle: string;
   lastMessage: string;
   lastTime: string;
   unreadCount: number;
-  initialMessages: Message[];
-  autoReplyTemplate?: string[];
+  isOnline?: boolean;
+  isGroup?: boolean;
+  activityEmoji?: string;
+  place?: string;
+  participantId?: string | null;
 }
 
-const FALLBACK_THREADS: Thread[] = [];
+const DEFAULT_THREADS: Thread[] = [
+  {
+    id: "thread-1",
+    name: "Ananya R.",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+    category: "DAY MATES",
+    contextTitle: "Morning Walk",
+    lastMessage: "Hey! Are we still on for the walk tomorrow?",
+    lastTime: "8:45 PM",
+    unreadCount: 2,
+    isOnline: true,
+    activityEmoji: "🏃‍♀️",
+    place: "Bandstand, Bandra",
+  },
+  {
+    id: "thread-2",
+    name: "Rohan S.",
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+    category: "TICKET SWAP",
+    contextTitle: "PVR Forum Mall",
+    lastMessage: "Thanks! Ticket confirmed ✅",
+    lastTime: "7:32 PM",
+    unreadCount: 1,
+    isOnline: true,
+    activityEmoji: "🎟️",
+    place: "Koramangala, Bengaluru",
+  },
+  {
+    id: "thread-3",
+    name: "Neha P.",
+    avatar:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    category: "DAY MATES",
+    contextTitle: "Coffee Buddy",
+    lastMessage: "That café looks perfect, see you there! ☕",
+    lastTime: "6:15 PM",
+    unreadCount: 1,
+    isOnline: true,
+    activityEmoji: "☕",
+    place: "Third Wave Coffee, Indiranagar",
+  },
+  {
+    id: "thread-4",
+    name: "Hyderabad Movie Lovers 🎬",
+    avatar:
+      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150",
+    category: "GROUP",
+    contextTitle: "12 members",
+    lastMessage: "Karan: Anyone up for a late night show?",
+    lastTime: "5:40 PM",
+    unreadCount: 3,
+    isOnline: false,
+    isGroup: true,
+    activityEmoji: "🎬",
+    place: "AMB Cinemas, Gachibowli",
+  },
+  {
+    id: "thread-5",
+    name: "Amit P.",
+    avatar:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+    category: "LOST & FOUND",
+    contextTitle: "Lost Wallet",
+    lastMessage: "Really appreciate your help! 🙏",
+    lastTime: "4:12 PM",
+    unreadCount: 1,
+    isOnline: true,
+    activityEmoji: "👛",
+    place: "Metro Station, HSR Layout",
+  },
+  {
+    id: "thread-6",
+    name: "Karan M.",
+    avatar:
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+    category: "TICKET SWAP",
+    contextTitle: "Diljit Concert",
+    lastMessage: "Let me know if you get another ticket",
+    lastTime: "Yesterday",
+    unreadCount: 0,
+    isOnline: false,
+    activityEmoji: "🎟️",
+    place: "JLN Stadium",
+  },
+  {
+    id: "thread-7",
+    name: "Priya K.",
+    avatar:
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150",
+    category: "DAY MATES",
+    contextTitle: "Badminton",
+    lastMessage: "Cool! Will bring my racket.",
+    lastTime: "Yesterday",
+    unreadCount: 0,
+    isOnline: false,
+    activityEmoji: "🏸",
+    place: "Playo Arena, Bellandur",
+  },
+];
 
 export default function ChatsScreen() {
+  const router = useRouter();
   const { theme: t, isDark } = useTheme();
-  const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
-
-  const { state: storeState, setActiveChatId, addMessage } = useStore();
+  const { user } = useAuthContext();
+  const { state: storeState, setActiveChatId } = useStore();
   const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
 
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>(DEFAULT_THREADS);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategoryFilter, setActiveCategoryFilter] =
-    useState<string>("All");
-  const [inputText, setInputText] = useState("");
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [showBanner, setShowBanner] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const activeThread = threads.find((t) => t.id === selectedThreadId);
+  const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
-  // Categories list
-  const categoryFilters = ["All", "Ticket Swap", "Day Mates", "Lost & Found"];
+  /* ---------------- Dynamic Greeting ---------------- */
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    let timeStr = "Good Evening";
+    if (hr < 12) timeStr = "Good Morning";
+    else if (hr < 17) timeStr = "Good Afternoon";
 
-  /* ---------------- Fetch Dynamic Channels ---------------- */
+    const name = user?.name ? user.name.split(" ")[0].toLowerCase() : "bharath";
+    return `${timeStr}, ${name} 👋`;
+  };
+
+  /* ---------------- Fetch Dynamic Channels (API Channels Only) ---------------- */
   const fetchChannels = useCallback(async () => {
     try {
+      setLoading(true);
+
       const res = await ApiService.get<{ status?: string; channels?: any[] }>(
         "/api/messages/channels",
       );
       const serverChannels = res?.channels || [];
 
-      // Map server channels
-      const mappedServerThreads: Thread[] = serverChannels.map((ch: any) => ({
-        id: ch.id,
-        name: ch.name || "Group Chat",
-        avatar:
-          ch.avatar ||
-          "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=100",
-        role: ch.subtitle || ch.type || "Community Chat",
-        category: ch.category || "Day Mates",
-        lastMessage: ch.subtitle || "Tap to open channel",
-        lastTime: "Active",
-        unreadCount: ch.unreadCount || 0,
-        initialMessages: [],
-        autoReplyTemplate: [
-          "Hey everyone! Welcome to the channel.",
-          "Glad to have you here in DayMates!",
-        ],
-      }));
+      if (serverChannels.length > 0) {
+        // Map server channels from /api/messages/channels response
+        const mappedServerThreads: Thread[] = serverChannels.map((ch: any) => ({
+          id: ch.id,
+          name: ch.name || "Community Channel",
+          avatar:
+            ch.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(ch.name || "Chat")}&background=8B5CF6&color=fff`,
+          category: (ch.category || ch.type || "DAY MATES").toUpperCase(),
+          contextTitle: ch.subtitle || ch.type || "Channel",
+          lastMessage: ch.lastMessage || "Tap to open channel",
+          lastTime: ch.lastTime || "Active",
+          unreadCount: typeof ch.unreadCount === "number" ? ch.unreadCount : 0,
+          isOnline: typeof ch.isOnline === "boolean" ? ch.isOnline : true,
+          isGroup: true,
+          activityEmoji: ch.activityEmoji || "💬",
+          place: ch.locationName || "Nearby",
+          participantId: ch.participantId || ch.organizerId || null,
+        }));
 
-      // Combine with local store chats
-      const storeThreads: Thread[] = storeState.chats.map((c) => ({
-        id: c.id,
-        name: c.partner.name,
-        avatar: c.partner.avatar,
-        role: `${c.category} • ${c.contextTitle}`,
-        category: c.category,
-        lastMessage:
-          c.messages[c.messages.length - 1]?.text || "No messages yet",
-        lastTime: c.messages[c.messages.length - 1]?.timestamp || "Just Now",
-        unreadCount: c.unreadCount || 0,
-        initialMessages: c.messages.map((m) => ({
-          id: m.id,
-          sender: m.sender,
-          text: m.text,
-          time: m.timestamp,
-        })),
-        autoReplyTemplate: [
-          "Thanks for reaching out! Let's coordinate here.",
-          "Sounds great! What time works best for you?",
-        ],
-      }));
-
-      // Merge avoiding duplicates
-      const mergedMap = new Map<string, Thread>();
-
-      // Add fallbacks first
-      // FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
-      // Add server channels
-      mappedServerThreads.forEach((t) => mergedMap.set(t.id, t));
-      // Add store threads (highest priority for local interactivity)
-      storeThreads.forEach((t) => mergedMap.set(t.id, t));
-
-      setThreads(Array.from(mergedMap.values()));
+        setThreads(mappedServerThreads);
+      }
     } catch (err) {
-      console.warn(
-        "Failed to load server channels, using store & fallbacks:",
-        err,
-      );
-      // Fallback to store chats + fallback threads
-      const storeThreads: Thread[] = storeState.chats.map((c) => ({
-        id: c.id,
-        name: c.partner.name,
-        avatar: c.partner.avatar,
-        role: `${c.category} • ${c.contextTitle}`,
-        category: c.category,
-        lastMessage:
-          c.messages[c.messages.length - 1]?.text || "No messages yet",
-        lastTime: c.messages[c.messages.length - 1]?.timestamp || "Just Now",
-        unreadCount: c.unreadCount || 0,
-        initialMessages: c.messages.map((m) => ({
-          id: m.id,
-          sender: m.sender,
-          text: m.text,
-          time: m.timestamp,
-        })),
-      }));
-
-      const mergedMap = new Map<string, Thread>();
-      // FALLBACK_THREADS.forEach((t) => mergedMap.set(t.id, t));
-      storeThreads.forEach((t) => mergedMap.set(t.id, t));
-
-      setThreads(Array.from(mergedMap.values()));
+      console.log("Error fetching API channels:", err);
     } finally {
       setLoading(false);
     }
-  }, [storeState.chats]);
+  }, []);
 
   useEffect(() => {
     fetchChannels();
   }, [fetchChannels]);
 
-  // Register with tab refresh
+  // Connect socket and listen to live incoming message events
+  useEffect(() => {
+    if (user?.id) {
+      connectSocket(user.id);
+    }
+
+    const handleMessageReceived = (msg: any) => {
+      if (!msg) return;
+      const targetId = msg.activityId || msg.chatId;
+
+      setThreads((prevThreads) => {
+        return prevThreads.map((t) => {
+          if (t.id === targetId) {
+            return {
+              ...t,
+              lastMessage: msg.content || msg.text || t.lastMessage,
+              lastTime: msg.timestamp
+                ? new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Just now",
+              unreadCount: t.unreadCount + 1,
+            };
+          }
+          return t;
+        });
+      });
+    };
+
+    socket.on("receive_message", handleMessageReceived);
+    socket.on("chat_message", handleMessageReceived);
+    socket.on("message_sent", handleMessageReceived);
+
+    return () => {
+      socket.off("receive_message", handleMessageReceived);
+      socket.off("chat_message", handleMessageReceived);
+      socket.off("message_sent", handleMessageReceived);
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     return registerRefreshHandler(fetchChannels);
   }, [registerRefreshHandler, fetchChannels]);
 
-  /* ---------------- Fetch Thread Messages ---------------- */
-  const fetchMessagesForThread = useCallback(
-    async (threadId: string) => {
-      setLoadingMessages(true);
-      try {
-        const res = await ApiService.get<{ status?: string; messages?: any[] }>(
-          `/api/messages?activityId=${threadId}`,
-        );
-
-        if (
-          res?.messages &&
-          Array.isArray(res.messages) &&
-          res.messages.length > 0
-        ) {
-          const formatted: Message[] = res.messages.map((m) => ({
-            id: m.id,
-            sender:
-              m.senderId === "me" ||
-              m.sender?.name === storeState.currentUser.name
-                ? "me"
-                : "them",
-            text: m.content || m.text,
-            time: new Date(m.timestamp || Date.now()).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          }));
-
-          setThreads((prev) =>
-            prev.map((t) =>
-              t.id === threadId ? { ...t, initialMessages: formatted } : t,
-            ),
-          );
-        }
-      } catch (err) {
-        // Keep existing initialMessages or store messages
-      } finally {
-        setLoadingMessages(false);
-      }
-    },
-    [storeState.currentUser.name],
+  /* ---------------- Compute Unread Totals ---------------- */
+  const totalUnreadCount = threads.reduce(
+    (acc, item) => acc + (item.unreadCount || 0),
+    0,
   );
 
-  const selectConversation = (id: string) => {
-    setSelectedThreadId(id);
-    setActiveChatId(id);
-    setThreads((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, unreadCount: 0 } : t)),
-    );
-    fetchMessagesForThread(id);
-  };
+  /* ---------------- Filtering Logic ---------------- */
+  const filterCategories = [
+    "All",
+    `Unread`,
+    "Day Mates",
+    "Tickets",
+    "Lost & Found",
+    "Groups",
+  ];
 
-  // Auto scroll to bottom when active thread's messages update
-  useEffect(() => {
-    if (scrollRef.current && activeThread) {
-      setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [activeThread?.initialMessages]);
-
-  /* ---------------- Send Message ---------------- */
-  const handleSend = async () => {
-    if (!inputText.trim() || !selectedThreadId) return;
-
-    const messageText = inputText.trim();
-    setInputText("");
-
-    const nowTime = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const newMsg: Message = {
-      id: `m-user-${Date.now()}`,
-      sender: "me",
-      text: messageText,
-      time: nowTime,
-    };
-
-    // Optimistic UI update
-    setThreads((prevThreads) =>
-      prevThreads.map((thread) => {
-        if (thread.id === selectedThreadId) {
-          return {
-            ...thread,
-            initialMessages: [...thread.initialMessages, newMsg],
-            lastMessage: messageText,
-            lastTime: "Just Now",
-            unreadCount: 0,
-          };
-        }
-        return thread;
-      }),
-    );
-
-    // Call store addMessage for global sync
-    try {
-      addMessage(selectedThreadId, messageText);
-    } catch (e) {
-      // Ignore
+  const filteredThreads = threads.filter((item) => {
+    // Category match
+    let matchesCategory = true;
+    if (activeFilter === "Unread") {
+      matchesCategory = item.unreadCount > 0;
+    } else if (activeFilter === "Day Mates") {
+      matchesCategory =
+        item.category.includes("DAY") || item.category.includes("MATE");
+    } else if (activeFilter === "Tickets") {
+      matchesCategory =
+        item.category.includes("TICKET") || item.category.includes("SWAP");
+    } else if (activeFilter === "Lost & Found") {
+      matchesCategory =
+        item.category.includes("LOST") || item.category.includes("FOUND");
+    } else if (activeFilter === "Groups") {
+      matchesCategory = item.isGroup || item.category.includes("GROUP");
     }
 
-    // Call Backend API
-    try {
-      await ApiService.post("/api/messages/send", {
-        chatId: selectedThreadId,
-        content: messageText,
-      });
-    } catch (err) {
-      console.log(
-        "Backend message send fallback to local simulated response:",
-        err,
-      );
-    }
-
-    // Contextual auto-reply simulation for instant user feedback
-    setTimeout(() => {
-      setThreads((prevThreads) =>
-        prevThreads.map((thread) => {
-          if (thread.id === selectedThreadId) {
-            const replyTemplates = thread.autoReplyTemplate || [
-              "Got it! Let's connect soon.",
-              "Sounds great!",
-            ];
-            const replyText = replyTemplates[0];
-            const updatedTemplate = [
-              ...replyTemplates.slice(1),
-              replyTemplates[0],
-            ];
-
-            const replyMsg: Message = {
-              id: `m-reply-${Date.now()}`,
-              sender: "them",
-              text: replyText,
-              time: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-            };
-
-            return {
-              ...thread,
-              initialMessages: [...thread.initialMessages, replyMsg],
-              lastMessage: replyText,
-              lastTime: "Just Now",
-              autoReplyTemplate: updatedTemplate,
-            };
-          }
-          return thread;
-        }),
-      );
-    }, 1200);
-  };
-
-  const handleBack = () => {
-    setSelectedThreadId(null);
-    setActiveChatId(null);
-  };
-
-  /* ---------------- Filtering ---------------- */
-  const filteredThreads = threads.filter((t) => {
-    const matchesCategory =
-      activeCategoryFilter === "All" ||
-      t.category === activeCategoryFilter ||
-      (t.role &&
-        t.role.toLowerCase().includes(activeCategoryFilter.toLowerCase()));
-
+    // Search query match
     const matchesSearch =
-      searchQuery === "" ||
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery.trim() ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.contextTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesCategory && matchesSearch;
   });
 
-  if (loading) {
-    return <SpinnerLoader message="Loading conversations..." />;
-  }
+  /* ---------------- Open Direct Chat ---------------- */
+  const openChat = (thread: Thread) => {
+    // Clear unread count locally
+    setThreads((prev) =>
+      prev.map((t) => (t.id === thread.id ? { ...t, unreadCount: 0 } : t)),
+    );
+    setActiveChatId(thread.id);
+
+    router.push({
+      pathname: "/(screens)/activity-chat",
+      params: {
+        id: thread.id,
+        name: thread.name,
+        partner: thread.name,
+        title: thread.contextTitle,
+        contextTitle: thread.contextTitle,
+        type: thread.category,
+        category: thread.category,
+        place: thread.place || "Nearby",
+        right: thread.lastTime,
+        avatar: thread.avatar || "",
+        activityEmoji: thread.activityEmoji || "💬",
+      },
+    });
+  };
+
+  /* ---------------- Get Badge Styling ---------------- */
+  const getBadgeStyle = (category: string) => {
+    const catUpper = category.toUpperCase();
+    if (catUpper.includes("DAY") || catUpper.includes("MATE")) {
+      return {
+        bg: isDark ? "rgba(168, 85, 247, 0.18)" : "#F3E8FF",
+        text: isDark ? "#C084FC" : "#8B5CF6",
+      };
+    }
+    if (catUpper.includes("TICKET") || catUpper.includes("SWAP")) {
+      return {
+        bg: isDark ? "rgba(249, 115, 22, 0.18)" : "#FFEDD5",
+        text: isDark ? "#FB923C" : "#F97316",
+      };
+    }
+    if (catUpper.includes("GROUP")) {
+      return {
+        bg: isDark ? "rgba(245, 158, 11, 0.18)" : "#FEF3C7",
+        text: isDark ? "#FBBF24" : "#D97706",
+      };
+    }
+    if (catUpper.includes("LOST") || catUpper.includes("FOUND")) {
+      return {
+        bg: isDark ? "rgba(20, 184, 166, 0.18)" : "#CCFBF1",
+        text: isDark ? "#2DD4BF" : "#0D9488",
+      };
+    }
+    return {
+      bg: isDark ? "rgba(124, 58, 237, 0.18)" : "#F3E8FF",
+      text: isDark ? "#C084FC" : "#7C3AED",
+    };
+  };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={s.container}
-    >
-      {!selectedThreadId ? (
-        /* ==================================== */
-        /* THREADS LISTING SCREEN              */
-        /* ==================================== */
-        <View style={s.content}>
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.headerTopRow}>
-              <Text style={s.headerTitle}>Conversations</Text>
+    <SafeAreaView style={s.safeArea}>
+      <View style={s.container}>
+        {/* ================= HEADER ================= */}
+        <View style={s.header}>
+          <View style={s.headerRow}>
+            <View style={s.headerTitleCol}>
+              <Text style={s.greetingText}>{getGreeting()}</Text>
+              <Text style={s.headerTitle}>Chats</Text>
+              <Text style={s.headerSubtitle}>
+                Your conversations, all in one place
+              </Text>
+            </View>
+
+            {/* Top Right Action Buttons */}
+            <View style={s.headerActions}>
               <TouchableOpacity
-                style={s.refreshBtn}
-                onPress={onRefresh}
+                style={s.iconBtnLight}
                 activeOpacity={0.7}
+                onPress={() => setActiveFilter("All")}
               >
                 <Ionicons
-                  name={refreshing ? "sync" : "refresh-outline"}
-                  size={moderateScale(16)}
-                  color={t.primary}
-                />
-              </TouchableOpacity>
-            </View>
-            <Text style={s.headerSubtitle}>
-              Coordinate exchange spots or meetup times securely
-            </Text>
-          </View>
-
-          {/* Quick search */}
-          <View style={s.searchContainer}>
-            <View style={s.searchBar}>
-              <Ionicons
-                name="search-outline"
-                size={moderateScale(15)}
-                color={t.icon}
-              />
-              <TextInput
-                placeholder="Search chats, buddies or items..."
-                placeholderTextColor={t.placeholder}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={s.searchInput}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={16} color={t.mute} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Category Filter Pills */}
-          <View style={s.categoryRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.categoryScrollContent}
-            >
-              {categoryFilters.map((cat) => {
-                const isActive = activeCategoryFilter === cat;
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    onPress={() => setActiveCategoryFilter(cat)}
-                    style={[s.categoryChip, isActive && s.categoryChipActive]}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        s.categoryChipText,
-                        isActive && s.categoryChipTextActive,
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Threads list */}
-          <ScrollView
-            style={s.threadsScroll}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={t.primary}
-                colors={[t.primary]}
-              />
-            }
-          >
-            {filteredThreads.map((thread) => (
-              <TouchableOpacity
-                key={thread.id}
-                onPress={() => selectConversation(thread.id)}
-                activeOpacity={0.8}
-                style={s.threadCard}
-              >
-                {/* Avatar with badge */}
-                <View style={s.avatarContainer}>
-                  <Image source={{ uri: thread.avatar }} style={s.avatar} />
-                  {thread.unreadCount > 0 && <View style={s.unreadDot} />}
-                </View>
-
-                {/* Meta details */}
-                <View style={s.threadBody}>
-                  <View style={s.threadMetaRow}>
-                    <View style={s.threadNameRow}>
-                      <Text style={s.threadName} numberOfLines={1}>
-                        {thread.name}
-                      </Text>
-                      <View style={s.roleTag}>
-                        <Text style={s.roleText} numberOfLines={1}>
-                          {thread.role}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={s.threadTime}>{thread.lastTime}</Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      s.lastMsg,
-                      thread.unreadCount > 0 ? s.lastMsgUnread : null,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {thread.lastMessage}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-
-            {filteredThreads.length === 0 && (
-              <View style={s.emptyState}>
-                <Ionicons name="chatbubbles-outline" size={42} color={t.mute} />
-                <Text style={s.emptyTitle}>No conversations found</Text>
-                <Text style={s.emptySub}>
-                  {searchQuery
-                    ? `No chats matching "${searchQuery}"`
-                    : "Connect with Day Mates or sell tickets to get started!"}
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Warning banner */}
-          <View style={s.warningBanner}>
-            <View style={s.warningDot} />
-            <Text style={s.warningText}>
-              All chats are encrypted and self-destruct after 48h.
-            </Text>
-          </View>
-        </View>
-      ) : (
-        /* ==================================== */
-        /* DIRECT MESSAGE THREAD DIALOG        */
-        /* ==================================== */
-        <View style={s.chatWrapper}>
-          {/* DM Header */}
-          <View style={s.dmHeader}>
-            <View style={s.dmHeaderLeft}>
-              <TouchableOpacity
-                onPress={handleBack}
-                style={s.backBtn}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={moderateScale(20)}
+                  name="options-outline"
+                  size={moderateScale(18)}
                   color={t.text}
                 />
               </TouchableOpacity>
 
-              <Image source={{ uri: activeThread.avatar }} style={s.dmAvatar} />
-
-              <View style={s.dmMeta}>
-                <Text style={s.dmName}>{activeThread.name}</Text>
-                <Text style={s.dmRole} numberOfLines={1}>
-                  {activeThread.role}
-                </Text>
-              </View>
-            </View>
-
-            <View style={s.liveBadge}>
-              <Ionicons
-                name="sparkles"
-                size={moderateScale(10)}
-                color={t.primary}
-              />
-              <Text style={s.liveBadgeText}>Live Buddy</Text>
+              <TouchableOpacity
+                style={s.iconBtnPurple}
+                activeOpacity={0.8}
+                onPress={() => router.push("/(screens)/add-daymate")}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={moderateScale(18)}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Message Bubbles Scroll */}
+          {/* ================= SEARCH BAR ================= */}
+          <View style={s.searchContainer}>
+            <Ionicons
+              name="search-outline"
+              size={moderateScale(17)}
+              color={t.placeholder || "#94A3B8"}
+              style={s.searchIcon}
+            />
+            <TextInput
+              placeholder="Search conversations..."
+              placeholderTextColor={t.placeholder || "#94A3B8"}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={s.searchInput}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={moderateScale(16)}
+                  color={t.sub}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ================= FILTER CHIPS ROW ================= */}
           <ScrollView
-            ref={scrollRef}
-            style={s.chatScroll}
-            contentContainerStyle={s.chatScrollContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={t.primary}
-              />
-            }
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.chipsScroll}
+            style={s.chipsContainer}
           >
-            {loadingMessages ? (
-              <ActivityIndicator
-                color={t.primary}
-                style={{ marginVertical: 20 }}
-              />
-            ) : (
-              activeThread.initialMessages.map((msg) => {
-                const isMe = msg.sender === "me";
-                return (
-                  <View
-                    key={msg.id}
-                    style={[s.bubbleWrapper, isMe ? s.bubbleMe : s.bubbleThem]}
-                  >
+            {filterCategories.map((cat) => {
+              const isActive = activeFilter === cat;
+              const isUnreadChip = cat === "Unread";
+
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setActiveFilter(cat)}
+                  style={[s.chip, isActive && s.chipActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.chipText, isActive && s.chipTextActive]}>
+                    {cat}
+                  </Text>
+                  {isUnreadChip && totalUnreadCount > 0 && (
                     <View
-                      style={[s.bubble, isMe ? s.bubbleMeBg : s.bubbleThemBg]}
+                      style={[
+                        s.unreadChipBadge,
+                        isActive && s.unreadChipBadgeActive,
+                      ]}
                     >
                       <Text
                         style={[
-                          s.bubbleText,
-                          isMe ? { color: "#FFFFFF" } : { color: t.text },
+                          s.unreadChipBadgeText,
+                          isActive && s.unreadChipBadgeTextActive,
                         ]}
                       >
-                        {msg.text}
-                      </Text>
-                      <Text
-                        style={[
-                          s.bubbleTime,
-                          isMe
-                            ? { color: "rgba(255,255,255,0.8)" }
-                            : { color: t.sub },
-                        ]}
-                      >
-                        {msg.time}
+                        {totalUnreadCount}
                       </Text>
                     </View>
-                  </View>
-                );
-              })
-            )}
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-
-          {/* Floating DM Input Box */}
-          <View style={s.inputContainer}>
-            <TextInput
-              placeholder={`Send message to ${activeThread.name}...`}
-              placeholderTextColor={t.placeholder}
-              value={inputText}
-              onChangeText={setInputText}
-              style={s.chatInput}
-              onSubmitEditing={handleSend}
-            />
-            <TouchableOpacity
-              onPress={handleSend}
-              activeOpacity={0.8}
-              style={s.sendBtn}
-            >
-              <Ionicons name="send" size={moderateScale(14)} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
         </View>
-      )}
-    </KeyboardAvoidingView>
+
+        {/* ================= CHATS LIST ================= */}
+        <ScrollView
+          style={s.listScroll}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={t.primary}
+            />
+          }
+        >
+          {filteredThreads.map((thread) => {
+            const badge = getBadgeStyle(thread.category);
+
+            return (
+              <TouchableOpacity
+                key={thread.id}
+                style={s.chatCard}
+                activeOpacity={0.7}
+                onPress={() => openChat(thread)}
+              >
+                {/* Left Avatar */}
+                <View style={s.avatarWrapper}>
+                  {thread.avatar ? (
+                    <Image
+                      source={{ uri: thread.avatar }}
+                      style={s.avatarImage}
+                    />
+                  ) : (
+                    <View style={s.avatarEmojiBox}>
+                      <Text style={s.avatarEmojiText}>
+                        {thread.activityEmoji || "👥"}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Online / Status indicator */}
+                  <View
+                    style={[
+                      s.statusDot,
+                      {
+                        backgroundColor: thread.isOnline
+                          ? "#22C55E"
+                          : "#CBD5E1",
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* Center Content */}
+                <View style={s.chatMainCol}>
+                  {/* Row 1: Name and Timestamp */}
+                  <View style={s.cardTopRow}>
+                    <Text style={s.partnerName} numberOfLines={1}>
+                      {thread.name}
+                    </Text>
+                    <Text style={s.timestampText}>{thread.lastTime}</Text>
+                  </View>
+
+                  {/* Row 2: Category Badge + Dot + Activity Context */}
+                  <View style={s.cardMiddleRow}>
+                    <View
+                      style={[s.categoryBadge, { backgroundColor: badge.bg }]}
+                    >
+                      <Text
+                        style={[s.categoryBadgeText, { color: badge.text }]}
+                      >
+                        {thread.category}
+                      </Text>
+                    </View>
+                    <Text style={s.dotSeparator}>•</Text>
+                    <Text style={s.contextText} numberOfLines={1}>
+                      {thread.contextTitle}
+                    </Text>
+                  </View>
+
+                  {/* Row 3: Last Message + Unread Counter */}
+                  <View style={s.cardBottomRow}>
+                    <Text
+                      style={[
+                        s.lastMessageText,
+                        thread.unreadCount > 0 && s.lastMessageUnread,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {thread.lastMessage}
+                    </Text>
+
+                    {thread.unreadCount > 0 && (
+                      <View style={s.unreadBadge}>
+                        <Text style={s.unreadBadgeText}>
+                          {thread.unreadCount}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {filteredThreads.length === 0 && (
+            <View style={s.emptyState}>
+              <View style={s.emptyIconCircle}>
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={moderateScale(32)}
+                  color={t.primary}
+                />
+              </View>
+              <Text style={s.emptyTitle}>No conversations found</Text>
+              <Text style={s.emptySub}>
+                {searchQuery
+                  ? `No results matching "${searchQuery}"`
+                  : "Connect with Day Mates or swap tickets to start chatting!"}
+              </Text>
+            </View>
+          )}
+
+          {/* ================= SECURITY BANNER AT BOTTOM ================= */}
+          {showBanner && (
+            <View style={s.securityBanner}>
+              <View style={s.shieldIconBox}>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={moderateScale(16)}
+                  color="#FFFFFF"
+                />
+              </View>
+              <View style={s.bannerTextCol}>
+                <Text style={s.bannerTitle}>Chat with confidence</Text>
+                <Text style={s.bannerSub}>
+                  Junto keeps your conversations safe & secure.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowBanner(false)}
+                style={s.closeBannerBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close"
+                  size={moderateScale(16)}
+                  color={isDark ? "#A78BFA" : "#94A3B8"}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const createStyles = (t: any, isDark: boolean) =>
   StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
     container: {
       flex: 1,
       backgroundColor: t.bg,
     },
-    content: {
-      flex: 1,
-    },
     header: {
-      paddingHorizontal: scale(20),
-      paddingTop: verticalScale(16),
+      paddingHorizontal: scale(18),
+      paddingTop: verticalScale(12),
+      paddingBottom: verticalScale(8),
+      backgroundColor: t.bg,
     },
-    headerTopRow: {
+    headerRow: {
       flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: "center",
+      alignItems: "flex-start",
+      marginBottom: verticalScale(12),
+    },
+    headerTitleCol: {
+      flex: 1,
+    },
+    greetingText: {
+      fontSize: moderateScale(12.5),
+      fontWeight: "700",
+      color: isDark ? "#A78BFA" : "#7C3AED",
+      marginBottom: verticalScale(2),
     },
     headerTitle: {
-      fontSize: moderateScale(22),
+      fontSize: moderateScale(26),
       fontWeight: "900",
       color: t.text,
+      letterSpacing: -0.5,
     },
-    refreshBtn: {
-      width: scale(32),
-      height: scale(32),
-      borderRadius: scale(10),
-      backgroundColor: t.cardSecondary,
+    headerSubtitle: {
+      fontSize: moderateScale(11.5),
+      color: t.sub || "#64748B",
+      marginTop: verticalScale(2),
+      fontWeight: "500",
+    },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      marginTop: verticalScale(4),
+    },
+    iconBtnLight: {
+      width: scale(38),
+      height: scale(38),
+      borderRadius: scale(19),
+      backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#FFFFFF",
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: t.border,
+      borderColor: isDark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 4,
+      elevation: 2,
     },
-    headerSubtitle: {
-      fontSize: moderateScale(11),
-      fontWeight: "600",
-      color: t.sub,
-      marginTop: verticalScale(2),
+    iconBtnPurple: {
+      width: scale(38),
+      height: scale(38),
+      borderRadius: scale(19),
+      backgroundColor: "#7C3AED",
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#7C3AED",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 4,
     },
     searchContainer: {
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(12),
-    },
-    searchBar: {
-      height: verticalScale(38),
-      backgroundColor: t.inputBg,
-      borderRadius: scale(10),
+      height: verticalScale(40),
+      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+      borderRadius: scale(18),
       borderWidth: 1,
-      borderColor: t.inputBorder,
-      paddingHorizontal: scale(12),
+      borderColor: isDark ? "rgba(255,255,255,0.1)" : "#F1F5F9",
+      paddingHorizontal: scale(14),
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      marginBottom: verticalScale(12),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.03,
+      shadowRadius: 6,
+      elevation: 1,
+    },
+    searchIcon: {
+      marginRight: scale(8),
     },
     searchInput: {
       flex: 1,
-      fontSize: moderateScale(11.5),
+      fontSize: moderateScale(12.5),
       color: t.text,
+      paddingVertical: 0,
     },
-    categoryRow: {
-      marginTop: verticalScale(10),
+    chipsContainer: {
+      marginHorizontal: scale(-18),
     },
-    categoryScrollContent: {
-      paddingHorizontal: scale(20),
+    chipsScroll: {
+      paddingHorizontal: scale(18),
       gap: scale(8),
+      alignItems: "center",
     },
-    categoryChip: {
-      paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(6),
-      borderRadius: scale(10),
-      backgroundColor: t.cardSecondary,
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: scale(14),
+      paddingVertical: verticalScale(7),
+      borderRadius: scale(20),
+      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
       borderWidth: 1,
-      borderColor: t.border,
+      borderColor: isDark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
+      gap: scale(6),
     },
-    categoryChipActive: {
-      backgroundColor: t.primary,
-      borderColor: t.primary,
+    chipActive: {
+      backgroundColor: "#7C3AED",
+      borderColor: "#7C3AED",
     },
-    categoryChipText: {
-      fontSize: moderateScale(10.5),
+    chipText: {
+      fontSize: moderateScale(11.5),
+      fontWeight: "600",
+      color: isDark ? "#E2E8F0" : "#475569",
+    },
+    chipTextActive: {
+      color: "#FFFFFF",
       fontWeight: "700",
-      color: t.sub,
     },
-    categoryChipTextActive: {
+    unreadChipBadge: {
+      width: scale(18),
+      height: scale(18),
+      borderRadius: scale(9),
+      backgroundColor: "#7C3AED",
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: scale(2),
+    },
+    unreadChipBadgeActive: {
+      backgroundColor: "#FFFFFF",
+    },
+    unreadChipBadgeText: {
+      fontSize: moderateScale(9.5),
+      fontWeight: "800",
       color: "#FFFFFF",
     },
-    threadsScroll: {
-      flex: 1,
-      paddingHorizontal: scale(20),
-      marginTop: verticalScale(12),
+    unreadChipBadgeTextActive: {
+      color: "#7C3AED",
     },
-    threadCard: {
-      backgroundColor: t.card,
-      borderWidth: 1,
-      borderColor: t.border,
+    listScroll: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: scale(18),
+      paddingTop: verticalScale(6),
+      paddingBottom: verticalScale(32),
+    },
+    chatCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
       borderRadius: scale(18),
       padding: scale(12),
-      flexDirection: "row",
-      gap: scale(12),
       marginBottom: verticalScale(10),
-      alignItems: "center",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255,255,255,0.07)" : "#F8FAFC",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.02,
+      shadowRadius: 8,
+      elevation: 1,
     },
-    avatarContainer: {
+    avatarWrapper: {
       position: "relative",
+      marginRight: scale(12),
     },
-    avatar: {
-      width: scale(44),
-      height: scale(44),
-      borderRadius: scale(14),
+    avatarImage: {
+      width: scale(50),
+      height: scale(50),
+      borderRadius: scale(25),
       backgroundColor: t.bg2,
     },
-    unreadDot: {
+    avatarEmojiBox: {
+      width: scale(50),
+      height: scale(50),
+      borderRadius: scale(25),
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.15)" : "#F3E8FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarEmojiText: {
+      fontSize: moderateScale(24),
+    },
+    statusDot: {
       position: "absolute",
-      top: scale(-2),
-      right: scale(-2),
-      width: scale(8),
-      height: scale(8),
-      borderRadius: scale(4),
-      backgroundColor: t.primary,
-      borderWidth: 1.5,
-      borderColor: t.bg,
+      bottom: scale(1),
+      right: scale(1),
+      width: scale(12),
+      height: scale(12),
+      borderRadius: scale(6),
+      borderWidth: 2,
+      borderColor: isDark ? "#111827" : "#FFFFFF",
     },
-    threadBody: {
+    chatMainCol: {
       flex: 1,
-      justifyContent: "space-between",
-      height: scale(40),
+      justifyContent: "center",
     },
-    threadMetaRow: {
+    cardTopRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      marginBottom: verticalScale(3),
     },
-    threadNameRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(6),
-      flex: 1,
-    },
-    threadName: {
-      fontSize: moderateScale(12.5),
-      fontWeight: "900",
+    partnerName: {
+      fontSize: moderateScale(13.5),
+      fontWeight: "800",
       color: t.text,
-      maxWidth: "45%",
+      maxWidth: "70%",
     },
-    roleTag: {
-      backgroundColor: t.cardSecondary,
-      borderRadius: scale(4),
-      paddingHorizontal: scale(5),
-      paddingVertical: scale(2),
-      maxWidth: "50%",
+    timestampText: {
+      fontSize: moderateScale(10.5),
+      fontWeight: "600",
+      color: t.sub || "#94A3B8",
     },
-    roleText: {
+    cardMiddleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: verticalScale(4),
+    },
+    categoryBadge: {
+      paddingHorizontal: scale(6),
+      paddingVertical: verticalScale(2),
+      borderRadius: scale(5),
+    },
+    categoryBadgeText: {
       fontSize: moderateScale(8.5),
-      fontWeight: "700",
-      color: t.sub,
+      fontWeight: "900",
+      textTransform: "uppercase",
+      letterSpacing: 0.2,
     },
-    threadTime: {
-      fontSize: moderateScale(9.5),
-      fontWeight: "700",
-      color: t.mute,
+    dotSeparator: {
+      fontSize: moderateScale(10),
+      color: "#94A3B8",
+      marginHorizontal: scale(5),
     },
-    lastMsg: {
+    contextText: {
       fontSize: moderateScale(11),
-      color: t.sub,
+      color: t.sub || "#64748B",
+      fontWeight: "500",
+      flex: 1,
     },
-    lastMsgUnread: {
-      color: t.primary,
+    cardBottomRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    lastMessageText: {
+      fontSize: moderateScale(11.5),
+      color: t.sub || "#64748B",
+      flex: 1,
+      marginRight: scale(8),
+    },
+    lastMessageUnread: {
       fontWeight: "700",
+      color: t.text,
+    },
+    unreadBadge: {
+      minWidth: scale(20),
+      height: scale(20),
+      borderRadius: scale(10),
+      backgroundColor: "#7C3AED",
+      paddingHorizontal: scale(5),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    unreadBadgeText: {
+      fontSize: moderateScale(10),
+      fontWeight: "900",
+      color: "#FFFFFF",
+    },
+    securityBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "rgba(124, 58, 237, 0.12)" : "#FAF5FF",
+      borderRadius: scale(16),
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(124, 58, 237, 0.25)" : "#F3E8FF",
+      padding: scale(12),
+      marginTop: verticalScale(14),
+      gap: scale(10),
+    },
+    shieldIconBox: {
+      width: scale(32),
+      height: scale(32),
+      borderRadius: scale(16),
+      backgroundColor: "#8B5CF6",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    bannerTextCol: {
+      flex: 1,
+    },
+    bannerTitle: {
+      fontSize: moderateScale(12),
+      fontWeight: "800",
+      color: isDark ? "#D8B4FE" : "#6D28D9",
+    },
+    bannerSub: {
+      fontSize: moderateScale(10.5),
+      color: isDark ? "#C084FC" : "#7C3AED",
+      marginTop: verticalScale(1),
+    },
+    closeBannerBtn: {
+      padding: scale(4),
     },
     emptyState: {
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: verticalScale(40),
-      gap: verticalScale(8),
+      paddingHorizontal: scale(20),
+    },
+    emptyIconCircle: {
+      width: scale(56),
+      height: scale(56),
+      borderRadius: scale(28),
+      backgroundColor: isDark ? "rgba(124, 58, 237, 0.15)" : "#F3E8FF",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: verticalScale(10),
     },
     emptyTitle: {
       fontSize: moderateScale(14),
       fontWeight: "800",
       color: t.text,
+      marginBottom: verticalScale(4),
     },
     emptySub: {
-      fontSize: moderateScale(11),
-      fontWeight: "600",
-      color: t.sub,
+      fontSize: moderateScale(11.5),
+      color: t.sub || "#64748B",
       textAlign: "center",
-      paddingHorizontal: scale(20),
-    },
-    warningBanner: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(6),
-      backgroundColor: t.cardSecondary,
-      borderTopWidth: 1,
-      borderColor: t.border,
-      paddingVertical: verticalScale(10),
-      paddingHorizontal: scale(20),
-      marginTop: "auto",
-    },
-    warningDot: {
-      width: scale(5),
-      height: scale(5),
-      borderRadius: scale(2.5),
-      backgroundColor: t.primary,
-    },
-    warningText: {
-      fontSize: moderateScale(9.5),
-      color: t.sub,
-      fontWeight: "600",
-    },
-    chatWrapper: {
-      flex: 1,
-      backgroundColor: t.bg,
-    },
-    dmHeader: {
-      height: verticalScale(50),
-      backgroundColor: t.bg2,
-      borderBottomWidth: 1,
-      borderColor: t.border,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: scale(12),
-    },
-    dmHeaderLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(8),
-      flex: 1,
-    },
-    backBtn: {
-      width: scale(28),
-      height: scale(28),
-      borderRadius: scale(14),
-      backgroundColor: t.cardSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    dmAvatar: {
-      width: scale(32),
-      height: scale(32),
-      borderRadius: scale(10),
-    },
-    dmMeta: {
-      justifyContent: "center",
-      flex: 1,
-    },
-    dmName: {
-      fontSize: moderateScale(12.5),
-      fontWeight: "900",
-      color: t.text,
-    },
-    dmRole: {
-      fontSize: moderateScale(9.5),
-      fontWeight: "700",
-      color: t.primary,
-      marginTop: scale(1),
-    },
-    liveBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: isDark ? "rgba(124, 58, 237, 0.15)" : "#F3E8FF",
-      borderWidth: 0.5,
-      borderColor: isDark ? "rgba(124, 58, 237, 0.25)" : "#E9D5FF",
-      borderRadius: scale(10),
-      paddingHorizontal: scale(6),
-      paddingVertical: scale(2.5),
-      gap: scale(3),
-    },
-    liveBadgeText: {
-      fontSize: moderateScale(8.5),
-      fontWeight: "900",
-      color: t.primary,
-      textTransform: "uppercase",
-    },
-    chatScroll: {
-      flex: 1,
-    },
-    chatScrollContent: {
-      padding: scale(16),
-      paddingBottom: verticalScale(80),
-    },
-    bubbleWrapper: {
-      flexDirection: "row",
-      marginBottom: verticalScale(12),
-      width: "100%",
-    },
-    bubbleMe: {
-      justifyContent: "flex-end",
-    },
-    bubbleThem: {
-      justifyContent: "flex-start",
-    },
-    bubble: {
-      maxWidth: "80%",
-      borderRadius: scale(16),
-      paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(8),
-    },
-    bubbleMeBg: {
-      backgroundColor: t.primary,
-      borderTopRightRadius: 0,
-    },
-    bubbleThemBg: {
-      backgroundColor: t.cardSecondary,
-      borderWidth: 1,
-      borderColor: t.border,
-      borderTopLeftRadius: 0,
-    },
-    bubbleText: {
-      fontSize: moderateScale(11.5),
-      color: t.text,
-      lineHeight: moderateScale(15),
-      fontWeight: "600",
-    },
-    bubbleTime: {
-      fontSize: moderateScale(8.5),
-      fontWeight: "700",
-      textAlign: "right",
-      marginTop: verticalScale(4),
-    },
-    inputContainer: {
-      position: "absolute",
-      bottom: scale(14),
-      left: scale(14),
-      right: scale(14),
-      backgroundColor: t.bg2,
-      borderWidth: 1,
-      borderColor: t.border,
-      borderRadius: scale(16),
-      padding: scale(6),
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    chatInput: {
-      flex: 1,
-      fontSize: moderateScale(11.5),
-      color: t.text,
-      paddingHorizontal: scale(10),
-      paddingVertical: scale(4),
-    },
-    sendBtn: {
-      width: scale(32),
-      height: scale(32),
-      borderRadius: scale(10),
-      backgroundColor: t.primary,
-      alignItems: "center",
-      justifyContent: "center",
     },
   });

@@ -2,6 +2,7 @@ import { MessageRepository } from "../db/repository/Message.repository";
 import { UserRepository } from "../db/repository/User.repository";
 import { ActivityRepository } from "../db/repository/Activity.repository";
 import { NotificationRepository } from "../db/repository/Notification.repository";
+import { DeviceRepository } from "../db/repository/Device.repository";
 import { ActivityCategory } from "../db/entities/Activity.entity";
 import { User } from "../db/entities/User.entity";
 
@@ -9,6 +10,7 @@ const messageRepo = new MessageRepository();
 const userRepo = new UserRepository();
 const activityRepo = new ActivityRepository();
 const notificationRepo = new NotificationRepository();
+const deviceRepo = new DeviceRepository();
 
 export async function fetchMessages(activityId: string) {
   const msgs = await messageRepo.findByActivityId(activityId);
@@ -30,6 +32,7 @@ export async function fetchMessages(activityId: string) {
       id: msg.id,
       activityId: msg.activityId,
       senderId: msg.senderId,
+      participantId: msg.participantId || null,
 
       sender: sender
         ? {
@@ -56,6 +59,7 @@ export async function createAndSaveMessage(
   activityId: string,
   senderId: string,
   content: string,
+  participantIdInput?: string | null,
 ) {
   let senderUser = null;
 
@@ -65,10 +69,45 @@ export async function createAndSaveMessage(
     console.log("Sender lookup failed:", e);
   }
 
+  let computedParticipantId = participantIdInput || null;
+  let activity = null;
+  try {
+    activity = await activityRepo.findById(activityId);
+    if (activity) {
+      if (senderId !== activity.organizerId) {
+        const currentParts = activity.participantIds || [];
+        if (!currentParts.includes(senderId)) {
+          const updatedParts = [...currentParts, senderId];
+          await activityRepo.update(activity.id, {
+            participantIds: updatedParts,
+          });
+          activity.participantIds = updatedParts;
+        }
+      }
+
+      if (!computedParticipantId) {
+        if (activity.organizerId && activity.organizerId !== senderId) {
+          computedParticipantId = activity.organizerId;
+        } else if (
+          activity.organizerId === senderId &&
+          activity.participantIds?.length
+        ) {
+          computedParticipantId =
+            activity.participantIds.find((id) => id !== senderId) || null;
+        }
+      }
+    }
+  } catch (e) {
+    console.log("Error processing activity participants:", e);
+  }
+
+  console.log("Computed participantId:", computedParticipantId);
+
   // Save message using repository
   const savedMsg = await messageRepo.createMessage({
     activityId,
     senderId,
+    participantId: computedParticipantId,
     content,
   });
 
@@ -94,6 +133,7 @@ export async function createAndSaveMessage(
     id: savedMsg.id,
     activityId: savedMsg.activityId,
     senderId: savedMsg.senderId,
+    participantId: savedMsg.participantId || null,
 
     sender: senderUser
       ? {
@@ -113,50 +153,151 @@ export async function createAndSaveMessage(
   };
 }
 
+function getDefaultEmojiForCategory(
+  category: string,
+  title: string = "",
+): string {
+  const lowerTitle = title.toLowerCase();
+  if (lowerTitle.includes("phone")) return "📱";
+  if (lowerTitle.includes("wallet") || lowerTitle.includes("purse"))
+    return "👛";
+  if (
+    lowerTitle.includes("movie") ||
+    lowerTitle.includes("ticket") ||
+    lowerTitle.includes("pushpa")
+  )
+    return "🎟️";
+  if (lowerTitle.includes("coffee") || lowerTitle.includes("tea")) return "☕";
+  if (
+    lowerTitle.includes("walk") ||
+    lowerTitle.includes("jog") ||
+    lowerTitle.includes("gym")
+  )
+    return "🏃‍♂️";
+  if (lowerTitle.includes("bag")) return "🎒";
+
+  switch (category) {
+    case ActivityCategory.MOVIES:
+      return "🎟️";
+    case ActivityCategory.ASK_NEARBY:
+      return "📱";
+    case ActivityCategory.FOOD:
+      return "☕";
+    case ActivityCategory.SPORTS:
+      return "🏃‍♂️";
+    case ActivityCategory.DAY_MATES:
+    default:
+      return "👥";
+  }
+}
+
+function formatCategoryLabel(
+  cat: string,
+): "Ticket Swap" | "Day Mates" | "Lost & Found" {
+  if (cat === ActivityCategory.MOVIES) return "Ticket Swap";
+  if (cat === ActivityCategory.ASK_NEARBY) return "Lost & Found";
+  return "Day Mates";
+}
+
 export async function fetchUserChannels(userId: string) {
   const channelsList: any[] = [];
 
-  // 1. Global Lounge
-  channelsList.push({
-    id: "chat-general",
-    name: "DayMates Global Lounge 🌐",
-    avatar:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=100",
-    type: "activity",
-    subtitle: "Connect with all DayMates online",
-    unreadCount: 0,
-  });
-
-  // 2. User Activities
+  // Fetch activities linked with Messages & User
   try {
-    const userActivities = await activityRepo.findUserActivities(userId);
+    const allActivities = await activityRepo.findAll();
 
-    for (const act of userActivities) {
-      let avatar =
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100";
-      if (act.category === ActivityCategory.FOOD) {
-        avatar =
-          "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100";
-      } else if (act.category === ActivityCategory.SPORTS) {
-        avatar =
-          "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=100";
-      } else if (act.category === ActivityCategory.MOVIES) {
-        avatar =
-          "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=100";
+    for (const act of allActivities) {
+      // Find all messages linked via activityId in messages table
+      const messages = await messageRepo.findByActivityId(act.id);
+
+      // Determine partner / organizer user we chatted with
+      let partnerUser: User | null = null;
+      try {
+        if (act.organizerId && act.organizerId !== userId) {
+          partnerUser = await userRepo.findById(act.organizerId);
+        } else if (act.organizerId === userId) {
+          const otherParticipantId = act.participantIds?.find(
+            (id) => id !== userId,
+          );
+          if (otherParticipantId) {
+            partnerUser = await userRepo.findById(otherParticipantId);
+          }
+        }
+      } catch (e) {}
+
+      if (!partnerUser && messages.length > 0) {
+        const otherMsg = [...messages]
+          .reverse()
+          .find((m) => m.senderId !== userId);
+        if (otherMsg) {
+          try {
+            const sender = await userRepo.findById(otherMsg.senderId);
+            if (sender) partnerUser = sender;
+          } catch (e) {}
+        }
       }
 
-      // Calculate unread count for messages in this channel not sent by userId
-      const messages = await messageRepo.findByActivityId(act.id);
-      const unread = messages.filter((m) => m.senderId !== userId).length;
+      const participantId =
+        partnerUser?.id ||
+        (act.organizerId !== userId ? act.organizerId : null) ||
+        act.participantIds?.find((id) => id !== userId) ||
+        null;
 
-      channelsList.push({
-        id: act.id,
-        name: act.title,
-        avatar,
-        type: "activity",
-        subtitle: `${(act.participantIds?.length || 0) + 1} mates registered`,
-        unreadCount: unread,
-      });
+      const isUserInvolved =
+        act.organizerId === userId ||
+        act.participantIds?.includes(userId) ||
+        messages.some((m) => m.senderId === userId);
+
+      // ONLY return channels where the user is involved AND there is a participant that the user chatted/connected with
+      if (isUserInvolved && participantId) {
+        const lastMsg =
+          messages.length > 0 ? messages[messages.length - 1] : null;
+        const unread = messages.filter((m) => m.senderId !== userId).length;
+
+        const emoji =
+          act.activityEmoji ||
+          getDefaultEmojiForCategory(act.category, act.title);
+
+        const lastTimeFormatted = lastMsg
+          ? new Date(lastMsg.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Active";
+
+        const subtitleText = lastMsg
+          ? lastMsg.content
+          : `${(act.participantIds?.length || 0) + 1} mates registered`;
+
+        // Generate logo avatar URL for chatted partner / user
+        const logoAvatar =
+          partnerUser?.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerUser?.name || act.title)}&background=8B5CF6&color=fff`;
+
+        // Determine active status from device_session
+        let isOnline = true;
+        if (partnerUser?.id) {
+          // isOnline = await deviceRepo.isUserActive(partnerUser.id);
+        }
+
+        channelsList.push({
+          id: act.id,
+          name: act.title,
+          activityEmoji: emoji,
+          avatar: logoAvatar,
+          type: formatCategoryLabel(act.category),
+          category: formatCategoryLabel(act.category),
+          subtitle: subtitleText,
+          lastMessage: lastMsg ? lastMsg.content : "Tap to open channel",
+          lastTime: lastTimeFormatted,
+          organizerId: act.organizerId,
+          participantId: participantId,
+          participantIds: act.participantIds || [],
+          locationName: act.locationName,
+          unreadCount: unread,
+          isOnline,
+        });
+      }
     }
   } catch (err) {
     console.error("Error building user activity channels:", err);

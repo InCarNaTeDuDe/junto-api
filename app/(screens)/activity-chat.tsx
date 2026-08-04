@@ -35,11 +35,14 @@ export default function ActivityChatScreen() {
     user?: string;
     userId?: string;
     organizerId?: string;
+    participantId?: string;
     place?: string;
     right?: string;
     type?: string;
     category?: string;
     avatar?: string;
+    activityEmoji?: string;
+    emoji?: string;
   }>();
 
   const { user } = useAuthContext();
@@ -51,6 +54,23 @@ export default function ActivityChatScreen() {
   const activityType = params.type || params.category || "DAY MATES";
   const activityPlace = params.place || "Bandra Reclamation, Mumbai";
   const rightDetail = params.right || "1.1 km away";
+
+  const activityEmoji =
+    params.activityEmoji ||
+    params.emoji ||
+    (contextTitle.toLowerCase().includes("phone")
+      ? "📱"
+      : contextTitle.toLowerCase().includes("wallet")
+        ? "👛"
+        : contextTitle.toLowerCase().includes("pushpa") ||
+            activityType.includes("TICKET")
+          ? "🎟️"
+          : contextTitle.toLowerCase().includes("coffee")
+            ? "☕"
+            : contextTitle.toLowerCase().includes("walk") ||
+                contextTitle.toLowerCase().includes("jog")
+              ? "🏃‍♂️"
+              : "🙋‍♂️");
   const partnerAvatar =
     params.avatar ||
     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150";
@@ -71,7 +91,7 @@ export default function ActivityChatScreen() {
   const typingTimeoutRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const chatId = params.activityId; //|| `activity-${params.userId}-${params.organizerId}`;
+  const chatId = params.activityId || params.id;
   const [messages, setMessages] = useState<Message[]>([]);
 
   const loadMessages = async () => {
@@ -233,17 +253,27 @@ export default function ActivityChatScreen() {
       sentAtUTC: now.toISOString(),
     });
 
-    socket.emit(
-      "send_message",
-      {
+    const targetParticipantId =
+      params.participantId ||
+      (organizerId && organizerId !== user.id ? organizerId : null);
+
+    if (socket.connected) {
+      socket.emit("send_message", {
         chatId,
         senderId: user.id,
+        participantId: targetParticipantId,
         content: text,
-      },
-      (response: any) => {
-        console.log("SEND MESSAGE ACK:", response);
-      },
-    );
+      });
+    } else {
+      ApiService.post("/api/messages/send", {
+        chatId,
+        activityId: chatId,
+        content: text,
+        participantId: targetParticipantId,
+      }).catch((err) => {
+        console.log("REST API message send fallback error:", err);
+      });
+    }
   };
 
   const handleQuickReply = (text: string) => {
@@ -277,10 +307,17 @@ export default function ActivityChatScreen() {
 
           <View style={s.headerUser}>
             <View style={{ position: "relative" }}>
-              <Image
-                source={{ uri: activeChat.partner.avatar || partnerAvatar }}
-                style={s.avatar}
-              />
+              {activeChat.partner.avatar &&
+              !activeChat.partner.avatar.includes("unsplash.com") ? (
+                <Image
+                  source={{ uri: activeChat.partner.avatar }}
+                  style={s.avatar}
+                />
+              ) : (
+                <View style={s.headerEmojiBox}>
+                  <Text style={{ fontSize: 20 }}>{activityEmoji}</Text>
+                </View>
+              )}
               <View style={s.onlineDot} />
             </View>
 
@@ -311,53 +348,61 @@ export default function ActivityChatScreen() {
 
         {/* Activity Banner Context */}
         <View style={s.activityCard}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 6,
-            }}
-          >
-            <View
-              style={[
-                s.badge,
-                {
-                  backgroundColor: categoryColor + "22",
-                  borderColor: categoryColor + "55",
-                },
-              ]}
-            >
-              <Text style={[s.badgeText, { color: categoryColor }]}>
-                {activityType}
-              </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={s.bannerEmojiBox}>
+              <Text style={{ fontSize: 26 }}>{activityEmoji}</Text>
             </View>
 
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-            >
-              <Ionicons name="location-outline" size={14} color="#A855F7" />
-              <Text style={s.distanceText}>{rightDetail}</Text>
-            </View>
-          </View>
+            <View style={{ flex: 1 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <View
+                  style={[
+                    s.badge,
+                    {
+                      backgroundColor: categoryColor + "22",
+                      borderColor: categoryColor + "55",
+                    },
+                  ]}
+                >
+                  <Text style={[s.badgeText, { color: categoryColor }]}>
+                    {activityType}
+                  </Text>
+                </View>
 
-          <Text style={s.activityTitle}>{contextTitle}</Text>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
+                  <Ionicons name="location-outline" size={14} color="#A855F7" />
+                  <Text style={s.distanceText}>{rightDetail}</Text>
+                </View>
+              </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 4,
-              gap: 12,
-            }}
-          >
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-            >
-              <Ionicons name="navigate-outline" size={14} color={t.sub} />
-              <Text style={s.placeText} numberOfLines={1}>
-                {activityPlace}
-              </Text>
+              <Text style={s.activityTitle}>{contextTitle}</Text>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 2,
+                  gap: 12,
+                }}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
+                  <Ionicons name="navigate-outline" size={14} color={t.sub} />
+                  <Text style={s.placeText} numberOfLines={1}>
+                    {activityPlace}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -461,10 +506,9 @@ export default function ActivityChatScreen() {
           {isPartnerTyping && (
             <View style={[s.messageWrapper, { alignSelf: "flex-start" }]}>
               <View style={[s.bubble, s.bubbleThem, s.typingBubble]}>
-                <Image
-                  source={{ uri: activeChat.partner.avatar || partnerAvatar }}
-                  style={s.typingAvatar}
-                />
+                <View style={s.typingEmojiBox}>
+                  <Text style={{ fontSize: 12 }}>{activityEmoji}</Text>
+                </View>
                 <Text style={[s.messageText, s.messageTextThem, s.typingText]}>
                   {partnerName.split(" ")[0]} is typing...
                 </Text>
@@ -610,6 +654,35 @@ const createStyles = (t: any, isDark: boolean) => {
       borderRadius: 20,
       borderWidth: 1.5,
       borderColor: t.primary,
+    },
+    headerEmojiBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderWidth: 1.5,
+      borderColor: t.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    bannerEmojiBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(168, 85, 247, 0.35)" : "#E9D5FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    typingEmojiBox: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 6,
     },
     onlineDot: {
       position: "absolute",

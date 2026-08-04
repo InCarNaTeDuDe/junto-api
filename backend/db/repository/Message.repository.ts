@@ -23,11 +23,13 @@ export class MessageRepository {
   async createMessage(data: {
     activityId: string;
     senderId: string;
+    participantId?: string | null;
     content: string;
   }) {
     const msg = this.repo.create({
       activityId: data.activityId,
       senderId: data.senderId,
+      participantId: data.participantId,
       content: data.content,
     });
 

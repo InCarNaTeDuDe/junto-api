@@ -81,30 +81,38 @@ const shadow = (elev = 8) =>
   });
 
 /* ---------- Data ---------- */
+/* colors sampled directly from the reference mockup so the card
+   background blends into the artwork edges */
 const HERO = [
   {
     key: "swap",
     title: "Swap Tickets",
     sub: "Buy or sell movie\ntickets nearby",
-    image: require("../../assets/hero-swap.png"),
-    tint: "#7C3AED", // arrow / accent (deeper purple)
-    tint2: "#4C1D95", // card bg (darker purple)
+    image: heroSwap,
+    tintTop: "#6F3BDC", // gradient top (matches art top edge)
+    tintMid: "#5B2EB8",
+    tint2: "#4C249B", // gradient bottom / solid fallback
+    tint: "#7B46D8", // arrow bubble
   },
   {
     key: "daymates",
     title: "Day Mates",
     sub: "Find buddies for\nactivities & events",
-    image: require("../../assets/hero-mates.png"),
-    tint: "#F97316", // arrow (orange)
-    tint2: "#7C2D12", // card bg (deep orange/brown)
+    image: heroMates,
+    tintTop: "#DB7233",
+    tintMid: "#A95326",
+    tint2: "#813C1E",
+    tint: "#E97B2E",
   },
   {
     key: "help",
     title: "Help Others",
     sub: "Lost something?\nFound something?",
-    image: require("../../assets/hero-help.png"),
-    tint: "#0D9488", // arrow (teal)
-    tint2: "#134E4A", // card bg (deep teal)
+    image: heroHelp,
+    tintTop: "#3F8981",
+    tintMid: "#326D66",
+    tint2: "#295651",
+    tint: "#2F7E74",
   },
 ];
 
@@ -194,9 +202,9 @@ const HeroCard = ({ item, s, width, artHeight }) => (
   <Pressable
     style={[
       s.hero,
-      { width, backgroundColor: item.tint2 },
+      { width, backgroundColor: item.tintMid },
       Platform.OS === "web" && {
-        backgroundImage: `linear-gradient(160deg, ${item.tint} 0%, ${item.tint2} 100%)`,
+        backgroundImage: `linear-gradient(180deg, ${item.tintTop} 0%, ${item.tintMid} 55%, ${item.tint2} 100%)`,
       },
       shadow(10),
     ]}
@@ -216,8 +224,10 @@ const HeroCard = ({ item, s, width, artHeight }) => (
       }
     }}
   >
-    <View style={[s.heroArt, { height: artHeight }]}>
-      <Image source={item.image} style={s.heroImg} resizeMode="contain" />
+    <View
+      style={[s.heroArt, { height: artHeight, backgroundColor: item.tintTop }]}
+    >
+      <Image source={item.image} style={s.heroImg} resizeMode="cover" />
     </View>
     <Text style={s.heroTitle}>{item.title}</Text>
     <Text style={s.heroSub}>{item.sub}</Text>
@@ -381,14 +391,6 @@ const UserFeedRow = ({ item, s, C }) => {
       item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
 
   const handlePress = () => {
-    // if (isOwnActivity) {
-    //   Alert.alert(
-    //     "Your Activity Post",
-    //     "You created this activity post! You cannot join or chat with yourself as a partner.",
-    //   );
-    //   return;
-    // }
-
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
@@ -598,9 +600,7 @@ export default function Home() {
     const hr = new Date().getHours();
 
     const name = user ? user.name.split(" ")[0] : "Guest";
-    // Use lowercased name style like the screenshot: ""
     const displayName = name.toLowerCase();
-    console.log("----%%%%%%%%------", displayName);
 
     if (hr < 12) return `Good Morning, ${displayName}`;
     if (hr < 17) return `Good Afternoon, ${displayName}`;
@@ -663,7 +663,6 @@ export default function Home() {
 
               <View>
                 <Pressable
-                  // onPress={openLocationMenu}
                   onPress={() => router.push("/(screens)/location-search")}
                   style={{
                     flexDirection: "row",
@@ -696,6 +695,7 @@ export default function Home() {
             </View>
           </View>
         </View>
+
         {/* Search */}
         <View style={s.searchRow}>
           <View style={s.search}>
@@ -716,6 +716,7 @@ export default function Home() {
             />
           </Pressable>
         </View>
+
         {/* Hero cards */}
         <ScrollView
           horizontal
@@ -734,6 +735,7 @@ export default function Home() {
             />
           ))}
         </ScrollView>
+
         {/* Popular activities */}
         <View style={s.sectionHead}>
           <Text style={s.sectionTitle}>Popular Activities</Text>
@@ -759,6 +761,7 @@ export default function Home() {
             return <Chip key={key} {...props} s={s} />;
           })}
         </ScrollView>
+
         {/* Popular around you */}
         <View style={s.sectionHead}>
           <Text style={s.sectionTitle}>Popular around you</Text>
@@ -826,12 +829,11 @@ export const createStyles = (theme) => {
       alignItems: "center",
       justifyContent: "space-between",
     },
-    locationTitle: { color: C.primary, fontWeight: 700 },
+    locationTitle: { color: C.primary, fontWeight: "700" },
     headerRow: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      // marginBottom: verticalScale(14),
     },
 
     headerActions: {
@@ -914,7 +916,6 @@ export const createStyles = (theme) => {
     heroScroll: {
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(12),
-      // gap: scale(8),
     },
     hero: {
       borderRadius: scale(22),
@@ -926,6 +927,8 @@ export const createStyles = (theme) => {
       height: verticalScale(110),
       alignItems: "center",
       justifyContent: "center",
+      borderRadius: scale(14),
+      overflow: "hidden",
     },
     heroImg: {
       width: "100%",
@@ -939,7 +942,7 @@ export const createStyles = (theme) => {
       margin: "auto",
     },
     heroSub: {
-      color: "rgba(255,255,255,0.8)",
+      color: "rgba(255,255,255,0.85)",
       fontSize: moderateScale(12),
       marginTop: verticalScale(4),
       lineHeight: moderateScale(16),
