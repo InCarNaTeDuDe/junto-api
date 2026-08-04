@@ -20,6 +20,8 @@ import { useAuthContext } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { router } from "expo-router";
 
+import { SpinnerLoader } from "@/components/SpinnerLoader";
+
 type FilterCategory = "all" | "buddies" | "tickets" | "lost" | "events";
 
 interface RadarUserNode {
@@ -51,133 +53,8 @@ interface ActivePostCard {
   rawItem?: any;
 }
 
-const DEFAULT_RADAR_NODES: RadarUserNode[] = [
-  {
-    id: "rad-1",
-    name: "Priya",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-    distance: "2.1 km",
-    activityTag: "Coffee Buddy",
-    category: "buddies",
-    status: "online",
-    topPct: "16%",
-    leftPct: "45%",
-  },
-  {
-    id: "rad-2",
-    name: "Rohit",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-    distance: "1.8 km",
-    activityTag: "Cricket",
-    category: "events",
-    status: "online",
-    topPct: "36%",
-    leftPct: "15%",
-  },
-  {
-    id: "rad-3",
-    name: "Arjun",
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
-    distance: "2.5 km",
-    activityTag: "Gym Partner",
-    category: "buddies",
-    status: "online",
-    topPct: "37%",
-    leftPct: "73%",
-  },
-  {
-    id: "rad-4",
-    name: "Sneha",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
-    distance: "3.2 km",
-    activityTag: "Movie Partner",
-    category: "tickets",
-    status: "away",
-    topPct: "56%",
-    leftPct: "16%",
-  },
-  {
-    id: "rad-5",
-    name: "Kiran",
-    avatar:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-    distance: "1.2 km",
-    activityTag: "Walking Partner",
-    category: "buddies",
-    status: "online",
-    topPct: "65%",
-    leftPct: "44%",
-  },
-  {
-    id: "rad-6",
-    name: "Meera",
-    avatar:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150",
-    distance: "3.6 km",
-    activityTag: "Event Buddy",
-    category: "events",
-    status: "online",
-    topPct: "57%",
-    leftPct: "73%",
-  },
-];
-
-const DEFAULT_ACTIVE_CARDS: ActivePostCard[] = [
-  {
-    id: "card-1",
-    categoryTag: "Day Mate Plan",
-    categoryType: "buddies",
-    tagBg: "rgba(217, 119, 6, 0.25)",
-    tagColor: "#FBBF24",
-    timeAgo: "10m ago",
-    title: "Badminton 🏸",
-    subtitle: "Looking for 1 player",
-    location: "Koramangala Indoor Court",
-    avatars: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-    ],
-    avatarText: "3 joined",
-    actionLabel: "Connect",
-  },
-  {
-    id: "card-2",
-    categoryTag: "Ticket for Sale",
-    categoryType: "tickets",
-    tagBg: "rgba(37, 99, 235, 0.25)",
-    tagColor: "#60A5FA",
-    timeAgo: "25m ago",
-    title: "Coldplay Concert 🎵",
-    subtitle: "2 tickets available",
-    location: "Bengaluru • 25 Jan, 7 PM",
-    avatars: [
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-    ],
-    avatarText: "2 interested",
-    actionLabel: "View",
-  },
-  {
-    id: "card-3",
-    categoryTag: "Lost & Found",
-    categoryType: "lost",
-    tagBg: "rgba(16, 185, 129, 0.25)",
-    tagColor: "#34D399",
-    timeAgo: "1h ago",
-    title: "Lost Wallet 👝",
-    subtitle: "Black wallet with cards",
-    location: "Near Koramangala 4th Block",
-    avatars: [
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100",
-    ],
-    avatarText: "1 found",
-    actionLabel: "Details",
-  },
-];
+const DEFAULT_RADAR_NODES: RadarUserNode[] = [];
+const DEFAULT_ACTIVE_CARDS: ActivePostCard[] = [];
 
 export default function ExploreScreen() {
   const { user } = useAuthContext();
@@ -185,11 +62,10 @@ export default function ExploreScreen() {
   const { theme: t, isDark } = useTheme();
 
   const [selectedFilter, setSelectedFilter] = useState<FilterCategory>("all");
-  const [radarNodes, setRadarNodes] =
-    useState<RadarUserNode[]>(DEFAULT_RADAR_NODES);
-  const [activeCards, setActiveCards] =
-    useState<ActivePostCard[]>(DEFAULT_ACTIVE_CARDS);
+  const [radarNodes, setRadarNodes] = useState<RadarUserNode[]>([]);
+  const [activeCards, setActiveCards] = useState<ActivePostCard[]>([]);
   const [selectedNode, setSelectedNode] = useState<RadarUserNode | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Radar animation sweep angle
   const sweepAnim = useRef(new Animated.Value(0)).current;
@@ -209,13 +85,14 @@ export default function ExploreScreen() {
   useEffect(() => {
     let isMounted = true;
     const loadExploreData = async () => {
+      setIsLoading(true);
       try {
         const responsePins = (await ApiService.post(
           "/api/activity/explore",
         )) as any[];
         const list = Array.isArray(responsePins) ? responsePins : [];
 
-        if (isMounted && list.length > 0) {
+        if (isMounted) {
           // Map backend pins into radar nodes
           const mappedNodes: RadarUserNode[] = list.map((item, idx) => {
             const cat: FilterCategory =
@@ -243,9 +120,10 @@ export default function ExploreScreen() {
               avatar:
                 item.ownerAvatar ||
                 "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-              distance: `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
+              distance:
+                item.distance || `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
               activityTag: item.title || "Buddy Plan",
-              category: cat === "all" ? "buddies" : cat,
+              category: cat,
               status: idx % 2 === 0 ? "online" : "away",
               topPct: pos.top,
               leftPct: pos.left,
@@ -307,6 +185,10 @@ export default function ExploreScreen() {
         }
       } catch (err) {
         console.warn("Could not fetch explore pins:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -336,22 +218,10 @@ export default function ExploreScreen() {
     avatar: string,
     price?: string,
   ) => {
-    const isOwnActivity =
-      user?.name &&
-      ownerName &&
-      ownerName.toLowerCase().trim() === user.name.toLowerCase().trim();
-
-    if (isOwnActivity) {
-      Alert.alert(
-        "Your Post",
-        "You created this activity post! You cannot join or chat with yourself.",
-      );
-      return;
-    }
-
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
+        activityId: id,
         title: title || "Activity Plan",
         user: ownerName || "Junto User",
         userId: id || "act-1",
@@ -725,7 +595,10 @@ export default function ExploreScreen() {
                 activeOpacity={0.85}
               >
                 <View style={s.avatarWrapper}>
-                  <Image source={{ uri: node.avatar }} style={s.nodeAvatar} />
+                  <Image
+                    source={{ uri: node.avatar }}
+                    style={s.nodeAvatar as any}
+                  />
                   <View
                     style={[
                       s.statusDotBadge,
@@ -851,7 +724,7 @@ export default function ExploreScreen() {
                         key={idx}
                         source={{ uri: av }}
                         style={[
-                          s.stackedAvatar,
+                          s.stackedAvatar as any,
                           {
                             marginLeft: idx > 0 ? -8 : 0,
                             zIndex: 10 - idx,

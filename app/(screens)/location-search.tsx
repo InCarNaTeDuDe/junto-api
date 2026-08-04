@@ -222,7 +222,7 @@ export default function LocationSearch() {
             <View
               style={{
                 marginLeft: 14,
-                borderColor: "red",
+                flex: 1,
               }}
             >
               <Text style={s.cityname_result}>
@@ -239,6 +239,7 @@ export default function LocationSearch() {
 const createStyles = (t: Theme) =>
   StyleSheet.create({
     wrapper: {
+      flex: 1,
       backgroundColor: t.bg,
     },
     container: {

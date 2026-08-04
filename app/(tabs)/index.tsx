@@ -32,6 +32,8 @@ import { useTabRefresh } from "@/context/TabRefreshContext";
 import { RefreshControl } from "react-native";
 import { SpinnerLoader } from "@/components/SpinnerLoader";
 
+import { useStore } from "@/hooks/useStore";
+
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
 const GAP = 4;
@@ -236,14 +238,6 @@ const FeedRow = ({ item, s, C }) => {
       item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
 
   const handlePress = () => {
-    if (isOwnActivity) {
-      Alert.alert(
-        "Your Activity Post",
-        "You created this activity post! You cannot join or chat with yourself as a partner.",
-      );
-      return;
-    }
-
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
@@ -543,6 +537,8 @@ export default function Home() {
   const s = useStyles(createStyles);
   const { selectedLocation } = useLocation();
   const { theme, setThemeMode, themeMode, user } = useAuthContext();
+  const { state, setShowNotifications } = useStore();
+  const unreadNotifCount = state.notifications.filter((n) => !n.read).length;
   const C = { ...FALLBACK, ...(theme || {}) };
   const { width: winW } = useWindowDimensions();
   const isWide = winW >= 900;
@@ -632,13 +628,16 @@ export default function Home() {
                     color={theme.icon}
                   />
                 </Pressable>
-                <Pressable style={s.iconButton}>
+                <Pressable
+                  style={s.iconButton}
+                  onPress={() => setShowNotifications(true)}
+                >
                   <Ionicons
                     name="notifications-outline"
                     size={20}
                     color={theme.icon}
                   />
-                  <View style={s.dot} />
+                  {unreadNotifCount > 0 && <View style={s.dot} />}
                 </Pressable>
               </View>
             </View>
@@ -758,11 +757,17 @@ export default function Home() {
         <View style={{ paddingHorizontal: scale(10), gap: verticalScale(10) }}>
           {loadingActs ? (
             <View style={{ paddingVertical: scale(20), alignItems: "center" }}>
-              <SpinnerLoader
-                fullScreen={false}
-                message="Finding activities near you..."
-                size={38}
-              />
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text
+                style={{
+                  color: "#8B5CF6",
+                  fontSize: moderateScale(13),
+                  fontWeight: "700",
+                  letterSpacing: 0.3,
+                }}
+              >
+                Finding activities near you...
+              </Text>
             </View>
           ) : userActs.length > 0 ? (
             userActs.map((f, i) => <UserFeedRow key={i} item={f} s={s} C={C} />)

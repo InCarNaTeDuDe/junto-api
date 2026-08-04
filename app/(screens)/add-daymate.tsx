@@ -133,7 +133,7 @@ const createStyles = (t: any) => {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: t.bg || (isDark ? "#0B0714" : "#F8FAFC"),
+      backgroundColor: t.bg,
     },
     scrollContent: {
       paddingHorizontal: 16,
@@ -149,8 +149,8 @@ const createStyles = (t: any) => {
     heroCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 85, 247, 0.25)" : "#E9D5FF",
-      backgroundColor: isDark ? "#17122E" : "#F5EDFF",
+      borderColor: t.border,
+      backgroundColor: t.primarySoft || t.card,
       overflow: "hidden",
     },
     heroImage: {
@@ -166,22 +166,21 @@ const createStyles = (t: any) => {
     },
     activityCard: {
       width: "46.5%",
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderRadius: 18,
       padding: 12,
       borderWidth: 1.5,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      shadowColor: t.shadow || "#000",
+      borderColor: t.border,
+      shadowColor: t.shadow,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowOpacity: t.shadowOpacity || 0.05,
       shadowRadius: 6,
       elevation: 2,
       position: "relative",
     },
     activityCardSelected: {
-      borderColor: "#10B981",
-      backgroundColor: isDark ? "rgba(16, 185, 129, 0.12)" : "#F0FDF4",
+      borderColor: t.primary,
+      backgroundColor: t.primarySoft,
     },
     cardHeader: {
       flexDirection: "row",
@@ -199,12 +198,12 @@ const createStyles = (t: any) => {
     activityLabel: {
       fontSize: 13.5,
       fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
       marginBottom: 2,
     },
     activitySubtext: {
       fontSize: 10.5,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
       lineHeight: 14,
     },
 
@@ -221,22 +220,21 @@ const createStyles = (t: any) => {
       paddingHorizontal: 14,
       paddingVertical: 10,
       borderRadius: 20,
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
+      borderColor: t.border,
     },
     timePillSelected: {
-      backgroundColor: t.primary || "#8B5CF6",
-      borderColor: t.primary || "#8B5CF6",
+      backgroundColor: t.primary,
+      borderColor: t.primary,
     },
     timePillText: {
       fontSize: 12.5,
       fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#334155"),
+      color: t.text,
     },
     timePillTextSelected: {
-      color: "#FFFFFF",
+      color: t.white,
     },
 
     /* Date & Time Pickers 2-Column Controls */
@@ -249,43 +247,38 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderRadius: 16,
       padding: 12,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      shadowColor: t.shadow || "#000",
+      borderColor: t.border,
+      shadowColor: t.shadow,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowOpacity: t.shadowOpacity || 0.05,
       shadowRadius: 4,
       elevation: 2,
     },
     dateTimeHalfCardActive: {
-      borderColor: t.primary || "#8B5CF6",
-      backgroundColor: isDark
-        ? "rgba(139, 92, 246, 0.15)"
-        : t.primarySoft || "#F5EDFF",
+      borderColor: t.primary,
+      backgroundColor: t.primarySoft,
     },
     dateTimeIconCircle: {
       width: 34,
       height: 34,
       borderRadius: 12,
-      backgroundColor: isDark
-        ? "rgba(139, 92, 246, 0.2)"
-        : t.primarySoft || "#F3E8FF",
+      backgroundColor: t.primarySoft,
       alignItems: "center",
       justifyContent: "center",
     },
     dateTimeLabel: {
       fontSize: 11,
       fontWeight: "600",
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
     },
     dateTimeValue: {
       fontSize: 13,
       fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
       marginTop: 1,
     },
     pickersRow: {
@@ -298,16 +291,15 @@ const createStyles = (t: any) => {
       flex: 1,
       minWidth: 140,
       padding: 10,
-      backgroundColor: t.inputBg || (isDark ? "#17122E" : "#F8FAFC"),
+      backgroundColor: t.inputBg,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
+      borderColor: t.inputBorder || t.border,
     },
     pickerLabel: {
       fontSize: 11,
       fontWeight: "700",
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
       marginBottom: 6,
     },
 
@@ -316,35 +308,32 @@ const createStyles = (t: any) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: isDark
-        ? "rgba(139, 92, 246, 0.12)"
-        : t.primarySoft || "#F5EDFF",
+      backgroundColor: t.primarySoft,
       borderRadius: 14,
       padding: 8,
       marginTop: 6,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : t.border || "#E9D5FF",
+      borderColor: t.border,
     },
     dateSummaryText: {
       fontSize: 13,
       fontWeight: "700",
-      color: t.primary || "#7C3AED",
+      color: t.primary,
     },
 
     /* How many mates Card */
     matesCard: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderRadius: 18,
       padding: 14,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
+      borderColor: t.border,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      shadowColor: t.shadow || "#000",
+      shadowColor: t.shadow,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowOpacity: t.shadowOpacity || 0.05,
       shadowRadius: 6,
       elevation: 2,
     },
@@ -358,42 +347,36 @@ const createStyles = (t: any) => {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: isDark ? "rgba(16, 185, 129, 0.18)" : "#DCFCE7",
+      backgroundColor: t.primarySoft,
       alignItems: "center",
       justifyContent: "center",
     },
     matesTitle: {
       fontSize: 14,
       fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
     },
 
     stepperRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      backgroundColor: isDark
-        ? "rgba(255, 255, 255, 0.06)"
-        : t.cardSecondary || "#F1F5F9",
+      backgroundColor: t.cardSecondary,
       paddingHorizontal: 8,
       paddingVertical: 5,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
+      borderColor: t.border,
     },
     stepBtn: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: isDark
-        ? "rgba(255, 255, 255, 0.12)"
-        : t.card || "#FFFFFF",
+      backgroundColor: t.card,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.15)" : "#CBD5E1"),
+      borderColor: t.border,
     },
     stepBtnDisabled: {
       opacity: 0.4,
@@ -401,25 +384,24 @@ const createStyles = (t: any) => {
     stepCountText: {
       fontSize: 15,
       fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
       minWidth: 20,
       textAlign: "center",
     },
 
     /* Location Section Card */
     locationCard: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderRadius: 18,
       padding: 14,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
+      borderColor: t.border,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      shadowColor: t.shadow || "#000",
+      shadowColor: t.shadow,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.15 : 0.03,
+      shadowOpacity: t.shadowOpacity || 0.05,
       shadowRadius: 6,
       elevation: 2,
     },
@@ -433,51 +415,45 @@ const createStyles = (t: any) => {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.18)"
-        : t.primarySoft || "#F3E8FF",
+      backgroundColor: t.primarySoft,
       alignItems: "center",
       justifyContent: "center",
     },
     locTitle: {
       fontSize: 13.5,
       fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
     },
     locSubtitle: {
       fontSize: 11,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
       marginTop: 2,
     },
     useLocBtn: {
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.16)"
-        : t.primarySoft || "#F3E8FF",
+      backgroundColor: t.primarySoft,
       paddingHorizontal: 10,
       paddingVertical: 7,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: isDark
-        ? "rgba(168, 85, 247, 0.3)"
-        : "rgba(168, 85, 247, 0.2)",
+      borderColor: t.border,
     },
     useLocText: {
       fontSize: 11,
       fontWeight: "700",
-      color: t.primary || "#7C3AED",
+      color: t.primary,
     },
 
     /* Primary CTA Button */
     submitButton: {
-      backgroundColor: t.primary || "#8B5CF6",
+      backgroundColor: t.primary,
       borderRadius: 20,
       paddingVertical: 15,
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: t.primary || "#8B5CF6",
+      shadowColor: t.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 8,
@@ -493,19 +469,20 @@ const createStyles = (t: any) => {
       gap: 8,
     },
     submitButtonText: {
-      color: "#FFFFFF",
+      color: t.white,
       fontSize: 16,
       fontWeight: "800",
     },
     ctaSubText: {
-      color: "rgba(255, 255, 255, 0.85)",
+      color: t.white,
       fontSize: 11,
       fontWeight: "600",
       marginTop: 2,
+      opacity: 0.85,
     },
     safeFooterText: {
       fontSize: 11.5,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
       textAlign: "center",
       marginTop: -4,
     },
@@ -513,18 +490,16 @@ const createStyles = (t: any) => {
     /* Date Picker Box */
     pickerContainer: {
       padding: 10,
-      backgroundColor: t.inputBg || (isDark ? "#17122E" : "#F8FAFC"),
+      backgroundColor: t.inputBg,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
+      borderColor: t.border,
     },
 
     /* Modals */
     modalOverlay: {
       flex: 1,
-      backgroundColor:
-        t.overlay || (isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)"),
+      backgroundColor: t.overlay,
       justifyContent: "center",
       alignItems: "center",
       padding: 20,
@@ -532,12 +507,11 @@ const createStyles = (t: any) => {
     modalCard: {
       width: "100%",
       maxWidth: 400,
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
+      backgroundColor: t.card,
       borderRadius: 24,
       padding: 20,
       borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
+      borderColor: t.border,
     },
     modalHeader: {
       flexDirection: "row",
@@ -548,7 +522,7 @@ const createStyles = (t: any) => {
     modalTitle: {
       fontSize: 18,
       fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
     },
     stepItem: {
       flexDirection: "row",
@@ -560,23 +534,23 @@ const createStyles = (t: any) => {
       width: 26,
       height: 26,
       borderRadius: 13,
-      backgroundColor: t.primary || "#8B5CF6",
+      backgroundColor: t.primary,
       alignItems: "center",
       justifyContent: "center",
     },
     stepNumberText: {
-      color: "#FFFFFF",
+      color: t.white,
       fontWeight: "800",
       fontSize: 12,
     },
     stepTitle: {
       fontSize: 13.5,
       fontWeight: "700",
-      color: t.text || (isDark ? "#FFFFFF" : "#0F172A"),
+      color: t.text,
     },
     stepDesc: {
       fontSize: 11.5,
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
+      color: t.sub,
       marginTop: 2,
     },
   });
@@ -587,6 +561,7 @@ const createStyles = (t: any) => {
     styles,
   };
 };
+
 
 const DayMatesForm: React.FC<DayMatesFormProps> = ({
   colors: propColors,

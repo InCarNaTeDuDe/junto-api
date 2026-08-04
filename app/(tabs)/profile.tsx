@@ -110,8 +110,34 @@ export default function ProfileScreen() {
   }, [state.posts, user]);
 
   const ticketPosts = useMemo(() => {
-    return state.posts.filter((p) => p.category === "Movie Tickets");
+    return state.posts.filter(
+      (p) =>
+        p.category === "Movie Tickets" ||
+        (p.category as string) === "MOVIE TICKET" ||
+        (p.category as string) === "TICKETS",
+    );
   }, [state.posts]);
+
+  // Real Connections count calculated from chats and current user
+  const realConnectionsCount = useMemo(() => {
+    if (
+      (user as any)?.connectionsCount !== undefined &&
+      (user as any)?.connectionsCount !== null
+    ) {
+      return (user as any).connectionsCount;
+    }
+    if (
+      state.currentUser?.connectionsCount !== undefined &&
+      state.currentUser?.connectionsCount !== null
+    ) {
+      return state.currentUser.connectionsCount;
+    }
+    const partners = new Set<string>();
+    state.chats.forEach((c) => {
+      if (c.partner?.name) partners.add(c.partner.name);
+    });
+    return partners.size;
+  }, [state.chats, state.currentUser, user]);
 
   // Total unread chat count
   const unreadChatsCount = useMemo(() => {
@@ -238,11 +264,7 @@ export default function ProfileScreen() {
             {/* Column 1: Connections */}
             <View style={s.statCol}>
               <Ionicons name="people" size={scale(18)} color={t.primary} />
-              <Text style={s.statNumber}>
-                {(user as any)?.connectionsCount ||
-                  state.currentUser?.connectionsCount ||
-                  38}
-              </Text>
+              <Text style={s.statNumber}>{realConnectionsCount}</Text>
               <Text style={s.statLabel}>Connections</Text>
             </View>
 
@@ -255,9 +277,7 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Ionicons name="calendar" size={scale(18)} color={t.error} />
-              <Text style={s.statNumber}>
-                {myPosts.length > 0 ? myPosts.length : 12}
-              </Text>
+              <Text style={s.statNumber}>{myPosts.length}</Text>
               <Text style={s.statLabel}>Activities</Text>
             </TouchableOpacity>
 
@@ -270,7 +290,7 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Ionicons name="ticket" size={scale(18)} color={t.info} />
-              <Text style={s.statNumber}>{ticketPosts.length || 7}</Text>
+              <Text style={s.statNumber}>{ticketPosts.length}</Text>
               <Text style={s.statLabel}>Tickets</Text>
             </TouchableOpacity>
 
@@ -428,11 +448,11 @@ export default function ProfileScreen() {
                   }}
                 >
                   <Text style={s.menuItemTitle}>Chats</Text>
-                  <View style={s.badgePill}>
-                    <Text style={s.badgePillText}>
-                      {unreadChatsCount > 0 ? unreadChatsCount : 2}
-                    </Text>
-                  </View>
+                  {unreadChatsCount > 0 && (
+                    <View style={s.badgePill}>
+                      <Text style={s.badgePillText}>{unreadChatsCount}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={s.menuItemSub}>Your conversations</Text>
               </View>

@@ -16,8 +16,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAuthContext } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
 import { socket, connectSocket } from "@/services/socket";
-import { useStyles } from "@/hooks/useStyles";
 import { ApiService } from "@/services/api";
 
 interface Message {
@@ -42,9 +42,9 @@ export default function ActivityChatScreen() {
     avatar?: string;
   }>();
 
-  const { theme, themeMode, user } = useAuthContext();
-  const isDark = themeMode === "dark" || !theme || theme.bg === "#0B0714";
-  const s = useStyles(createStyles);
+  const { user } = useAuthContext();
+  const { theme: t, isDark } = useTheme();
+  const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
   const partnerName = params.user || "Ananya R.";
   const contextTitle = params.title || "Morning Walk / Jogging Partner";
@@ -67,6 +67,8 @@ export default function ActivityChatScreen() {
         user.name.toLowerCase().trim()) as boolean);
 
   const [inputMessage, setInputMessage] = useState("");
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const typingTimeoutRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const chatId = params.activityId; //|| `activity-${params.userId}-${params.organizerId}`;
@@ -105,7 +107,17 @@ export default function ActivityChatScreen() {
 
     socket.on("connect", onConnect);
 
+    socket.on(
+      "user_typing",
+      (data: { userId: string; userName?: string; isTyping: boolean }) => {
+        if (data.userId !== user?.id) {
+          setIsPartnerTyping(data.isTyping);
+        }
+      },
+    );
+
     socket.on("receive_message", (msg: any) => {
+      setIsPartnerTyping(false);
       const newMessage: Message = {
         id: msg.id,
         sender: msg.senderId === user.id ? "me" : "them",
@@ -135,8 +147,8 @@ export default function ActivityChatScreen() {
 
     return () => {
       socket.off("connect", onConnect);
-
       socket.off("receive_message");
+      socket.off("user_typing");
     };
   }, [chatId, user?.id]);
 
@@ -162,8 +174,32 @@ export default function ActivityChatScreen() {
 
   const displayedMessages = messages;
 
+  const handleInputChange = (text: string) => {
+    setInputMessage(text);
+    if (!user?.id || !chatId) return;
+
+    if (text.trim().length > 0) {
+      socket.emit("typing", { chatId, userId: user.id, userName: user.name });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("stop_typing", { chatId, userId: user.id });
+      }, 2500);
+    } else {
+      socket.emit("stop_typing", { chatId, userId: user.id });
+    }
+  };
+
   const handleSend = () => {
     if (!inputMessage.trim() || !user?.id || !chatId) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    socket.emit("stop_typing", { chatId, userId: user.id });
 
     const text = inputMessage.trim();
 
@@ -236,11 +272,7 @@ export default function ActivityChatScreen() {
             style={s.backBtn}
             hitSlop={12}
           >
-            <Ionicons
-              name="arrow-back"
-              size={22}
-              color={theme?.text || "#FFF"}
-            />
+            <Ionicons name="arrow-back" size={22} color={t.text} />
           </TouchableOpacity>
 
           <View style={s.headerUser}>
@@ -268,19 +300,11 @@ export default function ActivityChatScreen() {
 
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity style={s.actionBtn}>
-              <Ionicons
-                name="call-outline"
-                size={18}
-                color={theme?.text || "#FFF"}
-              />
+              <Ionicons name="call-outline" size={18} color={t.text} />
             </TouchableOpacity>
 
             <TouchableOpacity style={s.actionBtn}>
-              <Ionicons
-                name="ellipsis-vertical"
-                size={18}
-                color={theme?.text || "#FFF"}
-              />
+              <Ionicons name="ellipsis-vertical" size={18} color={t.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -330,11 +354,7 @@ export default function ActivityChatScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
-              <Ionicons
-                name="navigate-outline"
-                size={14}
-                color={theme?.sub || "#94A3B8"}
-              />
+              <Ionicons name="navigate-outline" size={14} color={t.sub} />
               <Text style={s.placeText} numberOfLines={1}>
                 {activityPlace}
               </Text>
@@ -421,13 +441,6 @@ export default function ActivityChatScreen() {
                     : { alignSelf: "flex-start" },
                 ]}
               >
-                {!isMe && (
-                  <Image
-                    source={{ uri: activeChat.partner.avatar || partnerAvatar }}
-                    style={s.smallAvatar}
-                  />
-                )}
-
                 <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
                   <Text
                     style={[
@@ -441,13 +454,23 @@ export default function ActivityChatScreen() {
                     {msg.timestamp}
                   </Text>
                 </View>
-
-                {isMe && (
-                  <Image source={{ uri: myAvatar }} style={s.smallAvatar} />
-                )}
               </View>
             );
           })}
+
+          {isPartnerTyping && (
+            <View style={[s.messageWrapper, { alignSelf: "flex-start" }]}>
+              <View style={[s.bubble, s.bubbleThem, s.typingBubble]}>
+                <Image
+                  source={{ uri: activeChat.partner.avatar || partnerAvatar }}
+                  style={s.typingAvatar}
+                />
+                <Text style={[s.messageText, s.messageTextThem, s.typingText]}>
+                  {partnerName.split(" ")[0]} is typing...
+                </Text>
+              </View>
+            </View>
+          )}
         </ScrollView>
 
         {/* Quick Suggestion Chips */}
@@ -457,63 +480,97 @@ export default function ActivityChatScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 12 }}
           >
-            <TouchableOpacity
-              style={s.chip}
-              onPress={() =>
-                handleQuickReply("Count me in! What time works best? 🏃‍♂️")
-              }
-            >
-              <Text style={s.chipText}>Count me in! 🏃‍♂️</Text>
-            </TouchableOpacity>
+            {isOwnActivity ? (
+              <>
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Welcome everyone! Excited to meet up 👋")
+                  }
+                >
+                  <Text style={s.chipText}>Welcome everyone! 👋</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={s.chip}
-              onPress={() => handleQuickReply("See you at the location! 👋")}
-            >
-              <Text style={s.chipText}>See you there! 👋</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply(
+                      "I'm at the location, see you all soon! 📍",
+                    )
+                  }
+                >
+                  <Text style={s.chipText}>I'm at location 📍</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={s.chip}
-              onPress={() => handleQuickReply("Is this still open to join? ☕")}
-            >
-              <Text style={s.chipText}>Still open to join? ☕</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply(
+                      "Let me know if anyone needs directions! 🗺️",
+                    )
+                  }
+                >
+                  <Text style={s.chipText}>Need directions? 🗺️</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Count me in! What time works best? 🏃‍♂️")
+                  }
+                >
+                  <Text style={s.chipText}>Count me in! 🏃‍♂️</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("See you at the location! 👋")
+                  }
+                >
+                  <Text style={s.chipText}>See you there! 👋</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Is this still open to join? ☕")
+                  }
+                >
+                  <Text style={s.chipText}>Still open to join? ☕</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </ScrollView>
         </View>
 
         {/* Input Bar */}
         <View style={s.inputContainer}>
-          <TouchableOpacity style={s.iconInputBtn} disabled={isOwnActivity}>
-            <Ionicons
-              name="add-circle-outline"
-              size={24}
-              color={theme?.sub || "#94A3B8"}
-            />
+          <TouchableOpacity style={s.iconInputBtn}>
+            <Ionicons name="add-circle-outline" size={24} color={t.sub} />
           </TouchableOpacity>
 
           <TextInput
-            style={[s.textInput, isOwnActivity && { opacity: 0.6 }]}
+            style={s.textInput}
             placeholder={
               isOwnActivity
-                ? "Self-joining disabled for your own post"
+                ? "Send a message as host..."
                 : `Message ${partnerName.split(" ")[0]}...`
             }
-            placeholderTextColor={theme?.sub || "#64748B"}
+            placeholderTextColor={t.placeholder}
             value={inputMessage}
-            onChangeText={setInputMessage}
+            onChangeText={handleInputChange}
             onSubmitEditing={handleSend}
             returnKeyType="send"
-            editable={!isOwnActivity}
+            editable={true}
           />
 
           <TouchableOpacity
-            style={[
-              s.sendBtn,
-              (isOwnActivity || !inputMessage.trim()) && { opacity: 0.5 },
-            ]}
+            style={[s.sendBtn, !inputMessage.trim() && { opacity: 0.5 }]}
             onPress={handleSend}
-            disabled={isOwnActivity || !inputMessage.trim()}
+            disabled={!inputMessage.trim()}
           >
             <Ionicons name="send" size={18} color="#FFF" />
           </TouchableOpacity>
@@ -523,13 +580,11 @@ export default function ActivityChatScreen() {
   );
 }
 
-const createStyles = (t: any) => {
-  const isDark = t?.mode === "dark" || !t || t.bg === "#0B0714";
-
+const createStyles = (t: any, isDark: boolean) => {
   return StyleSheet.create({
     safe: {
       flex: 1,
-      backgroundColor: t?.bg || "#0B0714",
+      backgroundColor: t.bg,
     },
     header: {
       flexDirection: "row",
@@ -537,8 +592,8 @@ const createStyles = (t: any) => {
       paddingHorizontal: 14,
       paddingVertical: 10,
       borderBottomWidth: 1,
-      borderBottomColor: t?.border || "rgba(255,255,255,0.08)",
-      backgroundColor: t?.bg2 || "#120A22",
+      borderBottomColor: t.border,
+      backgroundColor: t.bg2,
     },
     backBtn: {
       padding: 6,
@@ -554,7 +609,7 @@ const createStyles = (t: any) => {
       height: 40,
       borderRadius: 20,
       borderWidth: 1.5,
-      borderColor: t?.primary || "#A855F7",
+      borderColor: t.primary,
     },
     onlineDot: {
       position: "absolute",
@@ -565,12 +620,12 @@ const createStyles = (t: any) => {
       borderRadius: 6,
       backgroundColor: "#22C55E",
       borderWidth: 2,
-      borderColor: t?.bg2 || "#120A22",
+      borderColor: t.bg2,
     },
     partnerName: {
       fontSize: 15,
       fontWeight: "700",
-      color: t?.text || "#FFFFFF",
+      color: t.text,
     },
     onlineText: {
       fontSize: 11,
@@ -581,11 +636,11 @@ const createStyles = (t: any) => {
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: t?.card || "rgba(255,255,255,0.05)",
+      backgroundColor: t.cardSecondary,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: t?.border || "rgba(255,255,255,0.08)",
+      borderColor: t.border,
     },
     activityCard: {
       marginHorizontal: 12,
@@ -611,17 +666,17 @@ const createStyles = (t: any) => {
     distanceText: {
       fontSize: 12,
       fontWeight: "700",
-      color: t?.primary || "#A855F7",
+      color: t.primary,
     },
     activityTitle: {
       fontSize: 15,
       fontWeight: "800",
-      color: t?.text || "#FFFFFF",
+      color: t.text,
       marginBottom: 2,
     },
     placeText: {
       fontSize: 12,
-      color: t?.sub || "rgba(255,255,255,0.65)",
+      color: t.sub,
     },
     matchNotice: {
       flexDirection: "row",
@@ -630,12 +685,12 @@ const createStyles = (t: any) => {
       marginTop: 10,
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: "rgba(168,85,247,0.15)",
+      borderTopColor: isDark ? "rgba(168,85,247,0.15)" : "#E2E8F0",
     },
     matchNoticeText: {
       flex: 1,
       fontSize: 12,
-      color: t?.sub || "rgba(255,255,255,0.8)",
+      color: t.sub,
       lineHeight: 16,
     },
     messageWrapper: {
@@ -656,7 +711,7 @@ const createStyles = (t: any) => {
       paddingVertical: 10,
     },
     bubbleMe: {
-      backgroundColor: t?.primary || "#A855F7",
+      backgroundColor: t.primary,
       borderBottomRightRadius: 4,
     },
     bubbleThem: {
@@ -672,7 +727,7 @@ const createStyles = (t: any) => {
       fontWeight: "500",
     },
     messageTextThem: {
-      color: t?.text || "#FFFFFF",
+      color: t.text,
       fontWeight: "500",
     },
     timestampText: {
@@ -681,15 +736,15 @@ const createStyles = (t: any) => {
       alignSelf: "flex-end",
     },
     timeMe: {
-      color: "rgba(255,255,255,0.7)",
+      color: "rgba(255,255,255,0.8)",
     },
     timeThem: {
-      color: t?.sub || "rgba(255,255,255,0.5)",
+      color: t.sub,
     },
     quickRepliesContainer: {
       paddingVertical: 6,
       borderTopWidth: 1,
-      borderTopColor: t?.border || "rgba(255,255,255,0.05)",
+      borderTopColor: t.border,
     },
     chip: {
       backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0",
@@ -697,12 +752,12 @@ const createStyles = (t: any) => {
       paddingVertical: 7,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: t?.border || "rgba(255,255,255,0.08)",
+      borderColor: t.border,
     },
     chipText: {
       fontSize: 12,
       fontWeight: "600",
-      color: t?.text || "#FFFFFF",
+      color: t.text,
     },
     inputContainer: {
       flexDirection: "row",
@@ -710,9 +765,9 @@ const createStyles = (t: any) => {
       gap: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor: t?.bg2 || "#120A22",
+      backgroundColor: t.bg2,
       borderTopWidth: 1,
-      borderTopColor: t?.border || "rgba(255,255,255,0.08)",
+      borderTopColor: t.border,
     },
     iconInputBtn: {
       padding: 4,
@@ -723,18 +778,38 @@ const createStyles = (t: any) => {
       borderRadius: 20,
       paddingHorizontal: 16,
       paddingVertical: Platform.OS === "ios" ? 10 : 8,
-      color: t?.text || "#FFFFFF",
+      color: t.text,
       fontSize: 14,
       borderWidth: 1,
-      borderColor: t?.border || "rgba(255,255,255,0.08)",
+      borderColor: t.border,
     },
     sendBtn: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: t?.primary || "#A855F7",
+      backgroundColor: t.primary,
       alignItems: "center",
       justifyContent: "center",
+    },
+    typingBubble: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: isDark ? "rgba(168,85,247,0.15)" : "#E2E8F0",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(168,85,247,0.25)" : "#CBD5E1",
+    },
+    typingAvatar: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+    },
+    typingText: {
+      fontSize: 12,
+      fontStyle: "italic",
+      color: t.sub,
     },
   });
 };

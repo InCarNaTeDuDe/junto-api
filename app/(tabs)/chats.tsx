@@ -20,6 +20,7 @@ import { ApiService } from "@/services/api";
 import { useStore } from "@/hooks/useStore";
 import { useTabRefresh } from "@/context/TabRefreshContext";
 import { SpinnerLoader } from "@/components/SpinnerLoader";
+import { useTheme } from "@/hooks/useTheme";
 
 interface Message {
   id: string;
@@ -41,130 +42,12 @@ interface Thread {
   autoReplyTemplate?: string[];
 }
 
-const FALLBACK_THREADS: Thread[] = [
-  {
-    id: "rohan",
-    name: "Rohan S.",
-    avatar:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-    role: "Movie Ticket Seller",
-    category: "Ticket Swap",
-    lastMessage: "Is 500 each okay with you?",
-    lastTime: "Just Now",
-    unreadCount: 1,
-    initialMessages: [
-      {
-        id: "m1",
-        sender: "them",
-        text: "Hey! Saw your interest in the Avengers tickets.",
-        time: "5:20 PM",
-      },
-      {
-        id: "m2",
-        sender: "me",
-        text: "Yes! Are they still available?",
-        time: "5:21 PM",
-      },
-      {
-        id: "m3",
-        sender: "them",
-        text: "Yeah, got 2 tickets in Row E, Center.",
-        time: "5:22 PM",
-      },
-      {
-        id: "m4",
-        sender: "them",
-        text: "Is 500 each okay with you?",
-        time: "5:23 PM",
-      },
-    ],
-    autoReplyTemplate: [
-      "Awesome! Let me send you the payment barcode.",
-      "Just received it! Sending the PDF tickets right away 🎟️",
-      "Perfect! Enjoy the movie, let me know if you need anything else!",
-    ],
-  },
-  {
-    id: "ananya",
-    name: "Ananya R.",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-    role: "Morning Walk Buddy",
-    category: "Day Mates",
-    lastMessage: "Awesome! Let's meet at 6:30 AM tomorrow.",
-    lastTime: "10m ago",
-    unreadCount: 0,
-    initialMessages: [
-      {
-        id: "a1",
-        sender: "me",
-        text: "Hi! Are you still doing the morning walk at Bandra?",
-        time: "5:10 PM",
-      },
-      {
-        id: "a2",
-        sender: "them",
-        text: "Yes! Usually cover 5km near the promenade.",
-        time: "5:12 PM",
-      },
-      {
-        id: "a3",
-        sender: "me",
-        text: "Can I join tomorrow morning?",
-        time: "5:13 PM",
-      },
-      {
-        id: "a4",
-        sender: "them",
-        text: "Awesome! Let's meet at 6:30 AM tomorrow.",
-        time: "5:14 PM",
-      },
-    ],
-    autoReplyTemplate: [
-      "I'll wear a purple hoodie so you can spot me easily!",
-      "See you in the morning! Sleep early 🏃‍♀️",
-      "Yes, the weather is perfect for a walk!",
-    ],
-  },
-  {
-    id: "neha",
-    name: "Neha P.",
-    avatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
-    role: "Lost & Found Owner",
-    category: "Lost & Found",
-    lastMessage: "I found your wallet near the stairs!",
-    lastTime: "1h ago",
-    unreadCount: 0,
-    initialMessages: [
-      {
-        id: "n1",
-        sender: "them",
-        text: "Hey, saw your post. I found a black wallet near Dadar Station stairs!",
-        time: "4:00 PM",
-      },
-      {
-        id: "n2",
-        sender: "me",
-        text: "Oh my god, really? Does it have a blue ID card?",
-        time: "4:02 PM",
-      },
-      {
-        id: "n3",
-        sender: "them",
-        text: "Yes, it says Bharath on the card. I kept it safe with me.",
-        time: "4:05 PM",
-      },
-    ],
-    autoReplyTemplate: [
-      "I'll be near the Starbucks at Dadar until 8 PM today.",
-      "No reward needed at all! Just happy to help a buddy out 💜",
-      "Awesome, see you soon!",
-    ],
-  },
-];
+const FALLBACK_THREADS: Thread[] = [];
 
 export default function ChatsScreen() {
+  const { theme: t, isDark } = useTheme();
+  const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
+
   const { state: storeState, setActiveChatId, addMessage } = useStore();
   const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
 
@@ -490,7 +373,7 @@ export default function ChatsScreen() {
                 <Ionicons
                   name={refreshing ? "sync" : "refresh-outline"}
                   size={moderateScale(16)}
-                  color="#A78BFA"
+                  color={t.primary}
                 />
               </TouchableOpacity>
             </View>
@@ -505,18 +388,18 @@ export default function ChatsScreen() {
               <Ionicons
                 name="search-outline"
                 size={moderateScale(15)}
-                color="#64748B"
+                color={t.icon}
               />
               <TextInput
                 placeholder="Search chats, buddies or items..."
-                placeholderTextColor="#475569"
+                placeholderTextColor={t.placeholder}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 style={s.searchInput}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={16} color="#64748B" />
+                  <Ionicons name="close-circle" size={16} color={t.mute} />
                 </TouchableOpacity>
               )}
             </View>
@@ -560,8 +443,8 @@ export default function ChatsScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#A78BFA"
-                colors={["#A78BFA", "#7C3AED"]}
+                tintColor={t.primary}
+                colors={[t.primary]}
               />
             }
           >
@@ -609,11 +492,7 @@ export default function ChatsScreen() {
 
             {filteredThreads.length === 0 && (
               <View style={s.emptyState}>
-                <Ionicons
-                  name="chatbubbles-outline"
-                  size={42}
-                  color="#475569"
-                />
+                <Ionicons name="chatbubbles-outline" size={42} color={t.mute} />
                 <Text style={s.emptyTitle}>No conversations found</Text>
                 <Text style={s.emptySub}>
                   {searchQuery
@@ -648,7 +527,7 @@ export default function ChatsScreen() {
                 <Ionicons
                   name="chevron-back"
                   size={moderateScale(20)}
-                  color="#D1D5DB"
+                  color={t.text}
                 />
               </TouchableOpacity>
 
@@ -666,7 +545,7 @@ export default function ChatsScreen() {
               <Ionicons
                 name="sparkles"
                 size={moderateScale(10)}
-                color="#A78BFA"
+                color={t.primary}
               />
               <Text style={s.liveBadgeText}>Live Buddy</Text>
             </View>
@@ -682,13 +561,13 @@ export default function ChatsScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#A78BFA"
+                tintColor={t.primary}
               />
             }
           >
             {loadingMessages ? (
               <ActivityIndicator
-                color="#A78BFA"
+                color={t.primary}
                 style={{ marginVertical: 20 }}
               />
             ) : (
@@ -702,11 +581,20 @@ export default function ChatsScreen() {
                     <View
                       style={[s.bubble, isMe ? s.bubbleMeBg : s.bubbleThemBg]}
                     >
-                      <Text style={s.bubbleText}>{msg.text}</Text>
+                      <Text
+                        style={[
+                          s.bubbleText,
+                          isMe ? { color: "#FFFFFF" } : { color: t.text },
+                        ]}
+                      >
+                        {msg.text}
+                      </Text>
                       <Text
                         style={[
                           s.bubbleTime,
-                          isMe ? { color: "#E0E7FF" } : { color: "#64748B" },
+                          isMe
+                            ? { color: "rgba(255,255,255,0.8)" }
+                            : { color: t.sub },
                         ]}
                       >
                         {msg.time}
@@ -722,7 +610,7 @@ export default function ChatsScreen() {
           <View style={s.inputContainer}>
             <TextInput
               placeholder={`Send message to ${activeThread.name}...`}
-              placeholderTextColor="#64748B"
+              placeholderTextColor={t.placeholder}
               value={inputText}
               onChangeText={setInputText}
               style={s.chatInput}
@@ -742,351 +630,352 @@ export default function ChatsScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#070514",
-  },
-  content: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: scale(20),
-    paddingTop: verticalScale(16),
-  },
-  headerTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: moderateScale(22),
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  refreshBtn: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(10),
-    backgroundColor: "#131127",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.06)",
-  },
-  headerSubtitle: {
-    fontSize: moderateScale(11),
-    fontWeight: "600",
-    color: "#94A3B8",
-    marginTop: verticalScale(2),
-  },
-  searchContainer: {
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(12),
-  },
-  searchBar: {
-    height: verticalScale(38),
-    backgroundColor: "#131127",
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.04)",
-    paddingHorizontal: scale(12),
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(8),
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: moderateScale(11.5),
-    color: "#FFFFFF",
-  },
-  categoryRow: {
-    marginTop: verticalScale(10),
-  },
-  categoryScrollContent: {
-    paddingHorizontal: scale(20),
-    gap: scale(8),
-  },
-  categoryChip: {
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(6),
-    borderRadius: scale(10),
-    backgroundColor: "#131127",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.06)",
-  },
-  categoryChipActive: {
-    backgroundColor: "#7C3AED",
-    borderColor: "#A78BFA",
-  },
-  categoryChipText: {
-    fontSize: moderateScale(10.5),
-    fontWeight: "700",
-    color: "#94A3B8",
-  },
-  categoryChipTextActive: {
-    color: "#FFFFFF",
-  },
-  threadsScroll: {
-    flex: 1,
-    paddingHorizontal: scale(20),
-    marginTop: verticalScale(12),
-  },
-  threadCard: {
-    backgroundColor: "rgba(18, 14, 44, 0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.03)",
-    borderRadius: scale(18),
-    padding: scale(12),
-    flexDirection: "row",
-    gap: scale(12),
-    marginBottom: verticalScale(10),
-    alignItems: "center",
-  },
-  avatarContainer: {
-    position: "relative",
-  },
-  avatar: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(14),
-    backgroundColor: "#0B081B",
-  },
-  unreadDot: {
-    position: "absolute",
-    top: scale(-2),
-    right: scale(-2),
-    width: scale(8),
-    height: scale(8),
-    borderRadius: scale(4),
-    backgroundColor: "#8B5CF6",
-    borderWidth: 1.5,
-    borderColor: "#070514",
-  },
-  threadBody: {
-    flex: 1,
-    justifyContent: "space-between",
-    height: scale(40),
-  },
-  threadMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  threadNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(6),
-    flex: 1,
-  },
-  threadName: {
-    fontSize: moderateScale(12.5),
-    fontWeight: "900",
-    color: "#FFFFFF",
-    maxWidth: "45%",
-  },
-  roleTag: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: scale(4),
-    paddingHorizontal: scale(5),
-    paddingVertical: scale(2),
-    maxWidth: "50%",
-  },
-  roleText: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "700",
-    color: "#94A3B8",
-  },
-  threadTime: {
-    fontSize: moderateScale(9.5),
-    fontWeight: "700",
-    color: "#64748B",
-  },
-  lastMsg: {
-    fontSize: moderateScale(11),
-    color: "#94A3B8",
-  },
-  lastMsgUnread: {
-    color: "#A78BFA",
-    fontWeight: "700",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: verticalScale(40),
-    gap: verticalScale(8),
-  },
-  emptyTitle: {
-    fontSize: moderateScale(14),
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  emptySub: {
-    fontSize: moderateScale(11),
-    fontWeight: "600",
-    color: "#64748B",
-    textAlign: "center",
-    paddingHorizontal: scale(20),
-  },
-  warningBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(6),
-    backgroundColor: "rgba(18, 14, 44, 0.2)",
-    borderTopWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.03)",
-    paddingVertical: verticalScale(10),
-    paddingHorizontal: scale(20),
-    marginTop: "auto",
-  },
-  warningDot: {
-    width: scale(5),
-    height: scale(5),
-    borderRadius: scale(2.5),
-    backgroundColor: "#7C3AED",
-  },
-  warningText: {
-    fontSize: moderateScale(9.5),
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  chatWrapper: {
-    flex: 1,
-    backgroundColor: "#0A071D",
-  },
-  dmHeader: {
-    height: verticalScale(50),
-    backgroundColor: "rgba(18, 14, 44, 0.9)",
-    borderBottomWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.04)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: scale(12),
-  },
-  dmHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(8),
-    flex: 1,
-  },
-  backBtn: {
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dmAvatar: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(10),
-  },
-  dmMeta: {
-    justifyContent: "center",
-    flex: 1,
-  },
-  dmName: {
-    fontSize: moderateScale(12.5),
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  dmRole: {
-    fontSize: moderateScale(9.5),
-    fontWeight: "700",
-    color: "#A78BFA",
-    marginTop: scale(1),
-  },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(124, 58, 237, 0.15)",
-    borderWidth: 0.5,
-    borderColor: "rgba(124, 58, 237, 0.25)",
-    borderRadius: scale(10),
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(2.5),
-    gap: scale(3),
-  },
-  liveBadgeText: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "900",
-    color: "#C084FC",
-    textTransform: "uppercase",
-  },
-  chatScroll: {
-    flex: 1,
-  },
-  chatScrollContent: {
-    padding: scale(16),
-    paddingBottom: verticalScale(80),
-  },
-  bubbleWrapper: {
-    flexDirection: "row",
-    marginBottom: verticalScale(12),
-    width: "100%",
-  },
-  bubbleMe: {
-    justifyContent: "flex-end",
-  },
-  bubbleThem: {
-    justifyContent: "flex-start",
-  },
-  bubble: {
-    maxWidth: "80%",
-    borderRadius: scale(16),
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(8),
-  },
-  bubbleMeBg: {
-    backgroundColor: "#7C3AED",
-    borderTopRightRadius: 0,
-  },
-  bubbleThemBg: {
-    backgroundColor: "#120E2C",
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.03)",
-    borderTopLeftRadius: 0,
-  },
-  bubbleText: {
-    fontSize: moderateScale(11.5),
-    color: "#FFFFFF",
-    lineHeight: moderateScale(15),
-    fontWeight: "600",
-  },
-  bubbleTime: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "700",
-    textAlign: "right",
-    marginTop: verticalScale(4),
-  },
-  inputContainer: {
-    position: "absolute",
-    bottom: scale(14),
-    left: scale(14),
-    right: scale(14),
-    backgroundColor: "#120E2C",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: scale(16),
-    padding: scale(6),
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  chatInput: {
-    flex: 1,
-    fontSize: moderateScale(11.5),
-    color: "#FFFFFF",
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(4),
-  },
-  sendBtn: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(10),
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+const createStyles = (t: any, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    content: {
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: scale(20),
+      paddingTop: verticalScale(16),
+    },
+    headerTopRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: moderateScale(22),
+      fontWeight: "900",
+      color: t.text,
+    },
+    refreshBtn: {
+      width: scale(32),
+      height: scale(32),
+      borderRadius: scale(10),
+      backgroundColor: t.cardSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    headerSubtitle: {
+      fontSize: moderateScale(11),
+      fontWeight: "600",
+      color: t.sub,
+      marginTop: verticalScale(2),
+    },
+    searchContainer: {
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(12),
+    },
+    searchBar: {
+      height: verticalScale(38),
+      backgroundColor: t.inputBg,
+      borderRadius: scale(10),
+      borderWidth: 1,
+      borderColor: t.inputBorder,
+      paddingHorizontal: scale(12),
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: moderateScale(11.5),
+      color: t.text,
+    },
+    categoryRow: {
+      marginTop: verticalScale(10),
+    },
+    categoryScrollContent: {
+      paddingHorizontal: scale(20),
+      gap: scale(8),
+    },
+    categoryChip: {
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(6),
+      borderRadius: scale(10),
+      backgroundColor: t.cardSecondary,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    categoryChipActive: {
+      backgroundColor: t.primary,
+      borderColor: t.primary,
+    },
+    categoryChipText: {
+      fontSize: moderateScale(10.5),
+      fontWeight: "700",
+      color: t.sub,
+    },
+    categoryChipTextActive: {
+      color: "#FFFFFF",
+    },
+    threadsScroll: {
+      flex: 1,
+      paddingHorizontal: scale(20),
+      marginTop: verticalScale(12),
+    },
+    threadCard: {
+      backgroundColor: t.card,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: scale(18),
+      padding: scale(12),
+      flexDirection: "row",
+      gap: scale(12),
+      marginBottom: verticalScale(10),
+      alignItems: "center",
+    },
+    avatarContainer: {
+      position: "relative",
+    },
+    avatar: {
+      width: scale(44),
+      height: scale(44),
+      borderRadius: scale(14),
+      backgroundColor: t.bg2,
+    },
+    unreadDot: {
+      position: "absolute",
+      top: scale(-2),
+      right: scale(-2),
+      width: scale(8),
+      height: scale(8),
+      borderRadius: scale(4),
+      backgroundColor: t.primary,
+      borderWidth: 1.5,
+      borderColor: t.bg,
+    },
+    threadBody: {
+      flex: 1,
+      justifyContent: "space-between",
+      height: scale(40),
+    },
+    threadMetaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    threadNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      flex: 1,
+    },
+    threadName: {
+      fontSize: moderateScale(12.5),
+      fontWeight: "900",
+      color: t.text,
+      maxWidth: "45%",
+    },
+    roleTag: {
+      backgroundColor: t.cardSecondary,
+      borderRadius: scale(4),
+      paddingHorizontal: scale(5),
+      paddingVertical: scale(2),
+      maxWidth: "50%",
+    },
+    roleText: {
+      fontSize: moderateScale(8.5),
+      fontWeight: "700",
+      color: t.sub,
+    },
+    threadTime: {
+      fontSize: moderateScale(9.5),
+      fontWeight: "700",
+      color: t.mute,
+    },
+    lastMsg: {
+      fontSize: moderateScale(11),
+      color: t.sub,
+    },
+    lastMsgUnread: {
+      color: t.primary,
+      fontWeight: "700",
+    },
+    emptyState: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: verticalScale(40),
+      gap: verticalScale(8),
+    },
+    emptyTitle: {
+      fontSize: moderateScale(14),
+      fontWeight: "800",
+      color: t.text,
+    },
+    emptySub: {
+      fontSize: moderateScale(11),
+      fontWeight: "600",
+      color: t.sub,
+      textAlign: "center",
+      paddingHorizontal: scale(20),
+    },
+    warningBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      backgroundColor: t.cardSecondary,
+      borderTopWidth: 1,
+      borderColor: t.border,
+      paddingVertical: verticalScale(10),
+      paddingHorizontal: scale(20),
+      marginTop: "auto",
+    },
+    warningDot: {
+      width: scale(5),
+      height: scale(5),
+      borderRadius: scale(2.5),
+      backgroundColor: t.primary,
+    },
+    warningText: {
+      fontSize: moderateScale(9.5),
+      color: t.sub,
+      fontWeight: "600",
+    },
+    chatWrapper: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    dmHeader: {
+      height: verticalScale(50),
+      backgroundColor: t.bg2,
+      borderBottomWidth: 1,
+      borderColor: t.border,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: scale(12),
+    },
+    dmHeaderLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      flex: 1,
+    },
+    backBtn: {
+      width: scale(28),
+      height: scale(28),
+      borderRadius: scale(14),
+      backgroundColor: t.cardSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dmAvatar: {
+      width: scale(32),
+      height: scale(32),
+      borderRadius: scale(10),
+    },
+    dmMeta: {
+      justifyContent: "center",
+      flex: 1,
+    },
+    dmName: {
+      fontSize: moderateScale(12.5),
+      fontWeight: "900",
+      color: t.text,
+    },
+    dmRole: {
+      fontSize: moderateScale(9.5),
+      fontWeight: "700",
+      color: t.primary,
+      marginTop: scale(1),
+    },
+    liveBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "rgba(124, 58, 237, 0.15)" : "#F3E8FF",
+      borderWidth: 0.5,
+      borderColor: isDark ? "rgba(124, 58, 237, 0.25)" : "#E9D5FF",
+      borderRadius: scale(10),
+      paddingHorizontal: scale(6),
+      paddingVertical: scale(2.5),
+      gap: scale(3),
+    },
+    liveBadgeText: {
+      fontSize: moderateScale(8.5),
+      fontWeight: "900",
+      color: t.primary,
+      textTransform: "uppercase",
+    },
+    chatScroll: {
+      flex: 1,
+    },
+    chatScrollContent: {
+      padding: scale(16),
+      paddingBottom: verticalScale(80),
+    },
+    bubbleWrapper: {
+      flexDirection: "row",
+      marginBottom: verticalScale(12),
+      width: "100%",
+    },
+    bubbleMe: {
+      justifyContent: "flex-end",
+    },
+    bubbleThem: {
+      justifyContent: "flex-start",
+    },
+    bubble: {
+      maxWidth: "80%",
+      borderRadius: scale(16),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(8),
+    },
+    bubbleMeBg: {
+      backgroundColor: t.primary,
+      borderTopRightRadius: 0,
+    },
+    bubbleThemBg: {
+      backgroundColor: t.cardSecondary,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderTopLeftRadius: 0,
+    },
+    bubbleText: {
+      fontSize: moderateScale(11.5),
+      color: t.text,
+      lineHeight: moderateScale(15),
+      fontWeight: "600",
+    },
+    bubbleTime: {
+      fontSize: moderateScale(8.5),
+      fontWeight: "700",
+      textAlign: "right",
+      marginTop: verticalScale(4),
+    },
+    inputContainer: {
+      position: "absolute",
+      bottom: scale(14),
+      left: scale(14),
+      right: scale(14),
+      backgroundColor: t.bg2,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: scale(16),
+      padding: scale(6),
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    chatInput: {
+      flex: 1,
+      fontSize: moderateScale(11.5),
+      color: t.text,
+      paddingHorizontal: scale(10),
+      paddingVertical: scale(4),
+    },
+    sendBtn: {
+      width: scale(32),
+      height: scale(32),
+      borderRadius: scale(10),
+      backgroundColor: t.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });

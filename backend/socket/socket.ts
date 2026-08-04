@@ -44,6 +44,23 @@ export function initializeSocket(server: HttpServer) {
 
       io.to(data.chatId).emit("receive_message", savedMessage);
     });
+
+    socket.on("typing", (data: { chatId: string; userId: string; userName?: string }) => {
+      console.log("TYPING EVENT:", data);
+      socket.to(data.chatId).emit("user_typing", {
+        userId: data.userId,
+        userName: data.userName,
+        isTyping: true,
+      });
+    });
+
+    socket.on("stop_typing", (data: { chatId: string; userId: string }) => {
+      console.log("STOP TYPING EVENT:", data);
+      socket.to(data.chatId).emit("user_typing", {
+        userId: data.userId,
+        isTyping: false,
+      });
+    });
   });
 
   return io;

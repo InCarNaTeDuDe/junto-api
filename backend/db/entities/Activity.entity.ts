@@ -19,6 +19,7 @@ export enum ActivityCategory {
   MOVIES = "MOVIES",
   SPORTS = "SPORTS",
   FOOD = "FOOD",
+  ASK_NEARBY = "ASK_NEARBY",
 }
 
 @Entity("activities")

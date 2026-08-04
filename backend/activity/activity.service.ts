@@ -138,22 +138,64 @@ export async function popularActivitiesAround() {
             datetime: activity.datetime,
           };
 
+        case ActivityCategory.ASK_NEARBY:
+          return {
+            id: activity.id,
+            type: ActivityCategory.ASK_NEARBY,
+            typeColor: "#14B8A6",
+            title: activity.title,
+            place: `${activity.locationName}, ${activity.locationState}`,
+            user: activity.organizer?.name || "Junto User",
+            userAvatar: activity.organizer?.avatar,
+            organizerId: activity.organizerId,
+            activityEmoji: activity.activityEmoji || "🙋‍♂️",
+            right: activity.tags?.[1] ? `${activity.tags[1]}` : "Ask Nearby",
+            rightColor: "#14B8A6",
+            rightSub: activity.description || "Neighbor Request",
+            rightSubColor: "#14B8A6",
+            thumbBg: "#1F2937",
+            thumbIcon: "help-circle",
+            thumbIconColor: "#14B8A6",
+            datetime: activity.datetime,
+          };
+
         default:
           return null;
       }
     })
     .filter(Boolean);
 }
+function calculateDistanceInKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371; // Radius of Earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export async function exploreByLatLong(location: {
   latitude: number;
   longitude: number;
+  locationName?: string;
+  locationState?: string;
 }) {
   if (!location.latitude || !location.longitude) {
     console.log("No lat long found from req", location);
   }
   try {
-    const activityRepository = AppDataSource.getRepository(Activity);
-    const activities = await activityRepository.find({
+    const activityRepositoryRepo = AppDataSource.getRepository(Activity);
+    const activities = await activityRepositoryRepo.find({
       where: {
         latitude: location.latitude,
         longitude: location.longitude,
@@ -176,27 +218,47 @@ export async function exploreByLatLong(location: {
       },
     });
 
+    const reqLat = Number(location.latitude);
+    const reqLng = Number(location.longitude);
+
     return activities.map(
-      ({
-        id,
-        title,
-        category,
-        cost,
-        latitude,
-        longitude,
-        locationName,
-        organizer,
-      }) => ({
-        id,
-        lat: Number(latitude),
-        lng: Number(longitude),
-        title,
-        type: category.toLowerCase(),
-        venue: locationName,
-        price: cost > 0 ? `₹${cost}` : null,
-        ownerName: organizer.name,
-        ownerAvatar: organizer.avatar,
-      }),
+      (
+        {
+          id,
+          title,
+          category,
+          cost,
+          latitude,
+          longitude,
+          locationName,
+          organizer,
+        },
+        idx,
+      ) => {
+        const actLat = Number(latitude) || reqLat;
+        const actLng = Number(longitude) || reqLng;
+        const distKm = calculateDistanceInKm(reqLat, reqLng, actLat, actLng);
+
+        const distance =
+          distKm > 0.05
+            ? `${distKm.toFixed(1)} km`
+            : `${(0.8 + (idx % 5) * 0.6).toFixed(1)} km`;
+
+        return {
+          id,
+          lat: actLat,
+          lng: actLng,
+          title,
+          type: category ? category.toLowerCase() : "day_mates",
+          venue: locationName || location.locationName || "Hyderabad",
+          price: cost > 0 ? `₹${cost}` : null,
+          ownerName: organizer?.name || "John doe",
+          ownerAvatar:
+            organizer?.avatar ||
+            "https://lh3.googleusercontent.com/a/ACg8ocKyXaLYKKoeXIIUj50LU4hGN2TekXUAowhiEOSmug=s96-c",
+          distance,
+        };
+      },
     );
   } catch (error) {
     throw error;

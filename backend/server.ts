@@ -10,6 +10,8 @@ import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./auth/auth.routes";
 import activityRoutes from "./activity/activity.routes";
 import messagesRoutes from "./messages/messages.routes";
+import asknearbyRoutes from "./asknearby/asknearby.routes";
+import notificationRoutes from "./notifications/notifications.routes";
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
 
@@ -153,6 +155,8 @@ async function startServer() {
   app.use("/api/auth", authRoutes);
   app.use("/api/activity", activityRoutes);
   app.use("/api/messages", messagesRoutes);
+  app.use("/api/asknearby", asknearbyRoutes);
+  app.use("/api/notifications", notificationRoutes);
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);

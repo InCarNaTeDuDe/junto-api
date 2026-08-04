@@ -585,7 +585,7 @@ export default function AskNearbyScreen({
         type: "ASK_NEARBY",
       };
 
-      await ApiService.post("/api/activities", payload);
+      await ApiService.post("/api/asknearby", payload);
       setPostedSuccess(true);
       onSubmitSuccess?.(payload);
       setTimeout(() => {
