@@ -151,7 +151,9 @@ export async function popularActivitiesAround() {
             activityEmoji: activity.activityEmoji || "🙋‍♂️",
             right: activity.tags?.[1] ? `${activity.tags[1]}` : "Ask Nearby",
             rightColor: "#14B8A6",
-            rightSub: activity.description || "Neighbor Request",
+            rightSub: (activity.description || "Neighbor Request")
+              .replace(/[\r\n]+/g, " ")
+              .trim(),
             rightSubColor: "#14B8A6",
             thumbBg: "#1F2937",
             thumbIcon: "help-circle",

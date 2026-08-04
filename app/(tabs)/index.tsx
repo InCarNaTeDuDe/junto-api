@@ -306,13 +306,25 @@ const FeedRow = ({ item, s, C }) => {
           )}
         </View>
       </View>
-      <View style={{ alignItems: "flex-end", justifyContent: "space-between" }}>
+      <View
+        style={{
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          maxWidth: scale(110),
+        }}
+      >
         <Text
           style={[s.feedRight, item.rightColor && { color: item.rightColor }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {item.right}
         </Text>
-        <Text style={[s.feedRightSub, { color: item.rightSubColor }]}>
+        <Text
+          style={[s.feedRightSub, { color: item.rightSubColor }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {item.rightSub}
         </Text>
       </View>
@@ -458,6 +470,7 @@ const UserFeedRow = ({ item, s, C }) => {
           alignItems: "flex-end",
           justifyContent: "space-between",
           minWidth: scale(75),
+          maxWidth: scale(110),
           paddingLeft: scale(4),
         }}
       >
@@ -508,6 +521,8 @@ const UserFeedRow = ({ item, s, C }) => {
 
         <Text
           style={[s.feedRight, { color: item.rightColor, textAlign: "right" }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {item.right}
         </Text>
@@ -517,6 +532,8 @@ const UserFeedRow = ({ item, s, C }) => {
             s.feedRightSub,
             { color: item.rightSubColor, textAlign: "right" },
           ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {item.rightSub}
         </Text>
@@ -994,7 +1011,7 @@ export const createStyles = (theme) => {
     },
     badge: {
       alignSelf: "flex-start",
-      paddingHorizontal: scale(8),
+      paddingHorizontal: scale(2),
       paddingVertical: 3,
       borderRadius: 6,
       borderWidth: 1,
@@ -1052,17 +1069,19 @@ export const createStyles = (theme) => {
     youTagText: {
       fontSize: moderateScale(8),
       fontWeight: "800",
-      color: "#C084FC",
+      color: C.primary,
     },
     feedRight: {
       color: C.text,
       fontSize: moderateScale(12),
       fontWeight: "700",
+      maxWidth: scale(105),
     },
     feedRightSub: {
       fontSize: moderateScale(11),
       fontWeight: "700",
-      marginTop: verticalScale(10),
+      marginTop: verticalScale(4),
+      maxWidth: scale(105),
     },
   });
 };
