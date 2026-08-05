@@ -297,7 +297,7 @@ export default function ExploreScreen() {
       edges={["top"]}
     >
       {/* 1. TOP HEADER BAR */}
-      <View style={[s.headerBar, { backgroundColor: bgColor }]}>
+      {/* <View style={[s.headerBar, { backgroundColor: bgColor }]}>
         <View style={s.headerLeft}>
           <Text style={[s.greetingText, { color: headerTextColor }]}>
             Good evening, {userNameDisplay} 👋
@@ -340,7 +340,7 @@ export default function ExploreScreen() {
             <Ionicons name="options-outline" size={18} color={iconColor} />
           </TouchableOpacity>
         </View>
-      </View>
+      </View> */}
 
       <ScrollView
         style={s.scrollContainer}
@@ -781,48 +781,6 @@ const s = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: verticalScale(30),
-  },
-
-  /* 1. Header Bar */
-  headerBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: scale(18),
-    paddingTop: verticalScale(10),
-    paddingBottom: verticalScale(12),
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  greetingText: {
-    fontSize: moderateScale(17),
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  locationPickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: verticalScale(3),
-  },
-  locationText: {
-    fontSize: moderateScale(12),
-    fontWeight: "600",
-    maxWidth: scale(180),
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(10),
-  },
-  iconButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
   },
 
   /* 2. Radar Banner Card */
