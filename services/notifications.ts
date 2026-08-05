@@ -72,7 +72,7 @@ export const PushNotificationService = {
   ): () => void {
     const handlePushNotification = (data: PushNotificationPayload) => {
       console.log("🔔 REALTIME PUSH NOTIFICATION RECEIVED:", data);
-
+      Alert.alert("Push Notification", JSON.stringify(data, null, 2));
       if (onNotificationReceived) {
         onNotificationReceived(data);
       } else {

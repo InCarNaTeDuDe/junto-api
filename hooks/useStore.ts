@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+import { ApiService } from "@/services/api";
+
 export interface Host {
   name: string;
   avatar: string;
@@ -48,14 +50,17 @@ export interface Chat {
 
 export interface AppNotification {
   id: string;
-  actor: {
+  title?: string;
+  message?: string;
+  actor?: {
     name: string;
     avatar: string;
   };
-  type: "message" | "join_request" | "like" | "system";
-  content: string;
-  timestamp: string;
+  type?: string;
+  content?: string;
+  timestamp: string | Date;
   read: boolean;
+  data?: any;
 }
 
 export interface AppState {
@@ -317,6 +322,76 @@ function updateListeners() {
   listeners.forEach((listener) => listener());
 }
 
+export function addNotificationToStore(
+  notif: Partial<AppNotification> & { title?: string; message?: string },
+) {
+  const newNotif: AppNotification = {
+    id: notif.id || `n-${Date.now()}`,
+    title: notif.title || "Notification",
+    message: notif.message || notif.content || "",
+    type: notif.type || "system",
+    timestamp: notif.timestamp || new Date().toISOString(),
+    read: notif.read ?? false,
+    actor: notif.actor,
+    content: notif.content || notif.message,
+    data: notif.data,
+  };
+
+  const exists = state.notifications.some((n) => n.id === newNotif.id);
+  if (!exists) {
+    state.notifications = [newNotif, ...state.notifications];
+    updateListeners();
+  }
+}
+
+export async function fetchNotificationsFromApi() {
+  try {
+    const res = await ApiService.get<{
+      success: boolean;
+      notifications: any[];
+    }>("/api/notifications");
+    if (res?.success && Array.isArray(res.notifications)) {
+      const fetched: AppNotification[] = res.notifications.map((n) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        read: n.read,
+        timestamp: n.timestamp,
+      }));
+
+      // Preserve local un-synced ones if any
+      const existingIds = new Set(fetched.map((f) => f.id));
+      const localOnly = state.notifications.filter(
+        (n) => !existingIds.has(n.id),
+      );
+
+      // state.notifications = [...localOnly, ...fetched];
+      state.notifications = [...fetched];
+      updateListeners();
+    }
+  } catch (e) {
+    console.log("Failed to fetch notifications from API:", e);
+  }
+}
+
+export async function markNotificationsReadInStore() {
+  const unreadList = state.notifications.filter((n) => !n.read);
+  state.notifications = state.notifications.map((n) => ({
+    ...n,
+    read: true,
+  }));
+  updateListeners();
+
+  for (const n of unreadList) {
+    try {
+      await ApiService.patch(`/api/notifications/${n.id}/read`, {});
+    } catch (e) {
+      // Ignore individually failed read patches
+    }
+  }
+}
+
 export function useStore() {
   const [localState, setLocalState] = useState<AppState>({ ...state });
 
@@ -480,11 +555,7 @@ export function useStore() {
   const setShowNotifications = (show: boolean) => {
     state.showNotifications = show;
     if (show) {
-      // Mark notifications as read
-      state.notifications = state.notifications.map((n) => ({
-        ...n,
-        read: true,
-      }));
+      markNotificationsReadInStore();
     }
     updateListeners();
   };

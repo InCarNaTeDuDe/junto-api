@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 import { ApiService } from "@/services/api";
 import { socket, connectSocket } from "@/services/socket";
@@ -224,9 +224,11 @@ export default function ChatsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchChannels();
-  }, [fetchChannels]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchChannels();
+    }, [fetchChannels]),
+  );
 
   // Connect socket and listen to live incoming message events
   useEffect(() => {
@@ -326,6 +328,9 @@ export default function ChatsScreen() {
       prev.map((t) => (t.id === thread.id ? { ...t, unreadCount: 0 } : t)),
     );
     setActiveChatId(thread.id);
+    ApiService.post("/api/messages/mark-read", { activityId: thread.id }).catch(
+      () => {},
+    );
 
     router.push({
       pathname: "/(screens)/activity-chat",

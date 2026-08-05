@@ -42,7 +42,7 @@ export function JuntoOrbit({
   labels,
 }: JuntoOrbitProps) {
   const { width } = useWindowDimensions();
-  const dimension = size ?? Math.min(width - 48, 220);
+  const dimension = size ?? Math.min(width - 48, 250);
   const s = useStyles(createStyles);
   const { theme: t } = useTheme();
 
@@ -104,9 +104,9 @@ export function JuntoOrbit({
     outputRange: reverse ? ["0deg", "360deg"] : ["0deg", "-360deg"],
   });
 
-  const logoSize = dimension * 0.36;
-  const bubbleSize = dimension * 0.18;
-  const radius = dimension / 2 - bubbleSize / 2;
+  const logoSize = dimension * 0.28;
+  const bubbleSize = dimension * 0.16;
+  const radius = dimension / 2 - bubbleSize / 2 - 2;
 
   const positions = useMemo(
     () =>
@@ -140,9 +140,9 @@ export function JuntoOrbit({
         style={[
           s.innerRing,
           {
-            width: dimension * 0.58,
-            height: dimension * 0.58,
-            borderRadius: (dimension * 0.58) / 2,
+            width: dimension * 0.52,
+            height: dimension * 0.52,
+            borderRadius: (dimension * 0.52) / 2,
           },
         ]}
       />
@@ -203,7 +203,7 @@ export interface SpinnerLoaderProps {
 export function SpinnerLoader({
   message,
   // messages,
-  size = 200,
+  size = 240,
   fullScreen = true,
 }: SpinnerLoaderProps) {
   const s = useStyles(createStyles);
@@ -268,6 +268,7 @@ const createStyles = (t: any) => {
       alignItems: "center",
       justifyContent: "center",
       alignSelf: "center",
+      position: "relative",
     },
     orbit: {
       position: "absolute",
@@ -297,14 +298,17 @@ const createStyles = (t: any) => {
       elevation: 3,
     },
     center: {
+      position: "absolute",
       alignItems: "center",
       justifyContent: "center",
+      zIndex: 10,
     },
     label: {
-      marginTop: 6,
-      fontSize: 11,
+      marginTop: 4,
+      fontSize: 10,
       fontWeight: "800",
-      letterSpacing: 2,
+      letterSpacing: 1.5,
+      textAlign: "center",
       color: t?.primary || "#A855F7",
     },
     fullScreenContainer: {
@@ -316,7 +320,7 @@ const createStyles = (t: any) => {
     centerBox: {
       alignItems: "center",
       justifyContent: "center",
-      gap: 16,
+      gap: 20,
     },
     loadingText: {
       color: t?.primary || "#A855F7",
@@ -324,7 +328,7 @@ const createStyles = (t: any) => {
       fontWeight: "800",
       letterSpacing: 0.5,
       textAlign: "center",
-      marginTop: 8,
+      marginTop: 12,
     },
   });
 };

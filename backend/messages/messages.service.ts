@@ -13,6 +13,14 @@ const activityRepo = new ActivityRepository();
 const notificationRepo = new NotificationRepository();
 const deviceRepo = new DeviceRepository();
 
+const readChannelsStore = new Map<string, number>();
+
+export function markChannelAsRead(userId: string, activityId: string) {
+  if (userId && activityId) {
+    readChannelsStore.set(`${userId}:${activityId}`, Date.now());
+  }
+}
+
 export async function fetchMessages(activityId: string) {
   const msgs = await messageRepo.findByActivityId(activityId);
 
@@ -128,9 +136,7 @@ export async function createAndSaveMessage(
     // });
 
     // io.to(`user:${computedParticipantId}`).emit("notification", notification);
-    console.log(
-      `✉️ Sending push notification for message in activity ${activityId} to recipient: ${computedParticipantId}`,
-    );
+
     await sendPushNotification(
       computedParticipantId,
       "New Message",
@@ -291,7 +297,12 @@ export async function fetchUserChannels(userId: string) {
       if (isUserInvolved && participantId) {
         const lastMsg =
           messages.length > 0 ? messages[messages.length - 1] : null;
-        const unread = messages.filter((m) => m.senderId !== userId).length;
+        const lastRead = readChannelsStore.get(`${userId}:${act.id}`) || 0;
+        const unread = messages.filter((m) => {
+          if (m.senderId === userId) return false;
+          const mTime = new Date(m.timestamp).getTime();
+          return mTime > lastRead;
+        }).length;
 
         const emoji =
           act.activityEmoji ||

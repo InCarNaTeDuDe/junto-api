@@ -8,7 +8,7 @@ import {
   Easing,
   Platform,
 } from "react-native";
-import { Sun, Moon, Mail, Bell, MessageSquare } from "lucide-react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/useTheme";
@@ -211,9 +211,9 @@ export default function Header() {
           }`}
         >
           {isDark ? (
-            <Sun size={15} color="#f59e0b" />
+            <Ionicons name="sunny" size={15} color="#f59e0b" />
           ) : (
-            <Moon size={15} color="#4f46e5" />
+            <Ionicons name="moon" size={15} color="#4f46e5" />
           )}
         </Pressable>
 
@@ -228,7 +228,11 @@ export default function Header() {
         >
           {/* Animated Bell / Mail Icon */}
           <AnimatedView style={{ transform: [{ rotate: ringInterpolate }] }}>
-            <Bell size={14} color={isDark ? "#cbd5e1" : "#475569"} />
+            <Ionicons
+              name="notifications-outline"
+              size={14}
+              color={isDark ? "#cbd5e1" : "#475569"}
+            />
           </AnimatedView>
 
           <Text

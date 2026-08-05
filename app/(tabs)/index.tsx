@@ -557,7 +557,7 @@ export default function Home() {
   const { selectedLocation } = useLocation();
   const { theme, setThemeMode, themeMode, user } = useAuthContext();
   const { state, setShowNotifications } = useStore();
-  const unreadNotifCount = /*state.notifications.filter((n) => !n.read).length*/ 0;
+  const unreadNotifCount = state.notifications.filter((n) => !n.read).length;
   const C = { ...FALLBACK, ...(theme || {}) };
   const { width: winW } = useWindowDimensions();
   const isWide = winW >= 900;

@@ -7,6 +7,7 @@ import {
   getMessages,
   sendMessage,
   getUnreadMessagesCount,
+  markChannelRead,
 } from "./messages.controller";
 
 const router = Router();
@@ -27,5 +28,8 @@ router.post(
 
 // Get total unread message count for tab badge reflection
 router.get("/unread-count", authenticate, getUnreadMessagesCount);
+
+// Mark channel as read
+router.post("/mark-read", authenticate, markChannelRead);
 
 export default router;

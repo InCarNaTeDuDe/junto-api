@@ -47,6 +47,10 @@ import { useColorScheme } from "react-native";
 import { ApiService } from "@/services/api";
 import { connectSocket } from "@/services/socket";
 import { PushNotificationService } from "@/services/notifications";
+import {
+  addNotificationToStore,
+  fetchNotificationsFromApi,
+} from "@/hooks/useStore";
 
 export interface UserData {
   // accessToken: string | null;
@@ -192,9 +196,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("Auth user changed:", user);
     if (user?.id) {
       connectSocket(user.id);
+      fetchNotificationsFromApi();
       const unsubscribe = PushNotificationService.initPushNotificationListener(
         (notification) => {
           console.log("🔔 Global Push Notification Received:", notification);
+          addNotificationToStore({
+            id: notification.id,
+            title: notification.title,
+            message: notification.message || notification.text,
+            type: notification.type,
+            timestamp: notification.timestamp || new Date().toISOString(),
+            read: false,
+            data: notification.data,
+          });
         },
       );
       return () => {
