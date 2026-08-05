@@ -22,6 +22,7 @@ import { useStore } from "@/hooks/useStore";
 import { useTabRefresh } from "@/context/TabRefreshContext";
 import { useAuthContext } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
+// import Header from "@/components/Header";
 
 interface Thread {
   id: string;
@@ -383,6 +384,7 @@ export default function ChatsScreen() {
     <SafeAreaView style={s.safeArea}>
       <View style={s.container}>
         {/* ================= HEADER ================= */}
+        {/* <Header/> */}
         <View style={s.header}>
           <View style={s.headerRow}>
             <View style={s.headerTitleCol}>
@@ -504,94 +506,98 @@ export default function ChatsScreen() {
             />
           }
         >
-          {filteredThreads.map((thread) => {
-            const badge = getBadgeStyle(thread.category);
+          {loading ? (
+            <ActivityIndicator size="large" color={t.primary} />
+          ) : (
+            filteredThreads.map((thread) => {
+              const badge = getBadgeStyle(thread.category);
 
-            return (
-              <TouchableOpacity
-                key={thread.id}
-                style={s.chatCard}
-                activeOpacity={0.7}
-                onPress={() => openChat(thread)}
-              >
-                {/* Left Avatar */}
-                <View style={s.avatarWrapper}>
-                  {thread.avatar ? (
-                    <Image
-                      source={{ uri: thread.avatar }}
-                      style={s.avatarImage}
-                    />
-                  ) : (
-                    <View style={s.avatarEmojiBox}>
-                      <Text style={s.avatarEmojiText}>
-                        {thread.activityEmoji || "👥"}
-                      </Text>
-                    </View>
-                  )}
-                  {/* Online / Status indicator */}
-                  <View
-                    style={[
-                      s.statusDot,
-                      {
-                        backgroundColor: thread.isOnline
-                          ? "#22C55E"
-                          : "#CBD5E1",
-                      },
-                    ]}
-                  />
-                </View>
-
-                {/* Center Content */}
-                <View style={s.chatMainCol}>
-                  {/* Row 1: Name and Timestamp */}
-                  <View style={s.cardTopRow}>
-                    <Text style={s.partnerName} numberOfLines={1}>
-                      {thread.name}
-                    </Text>
-                    <Text style={s.timestampText}>{thread.lastTime}</Text>
-                  </View>
-
-                  {/* Row 2: Category Badge + Dot + Activity Context */}
-                  <View style={s.cardMiddleRow}>
-                    <View
-                      style={[s.categoryBadge, { backgroundColor: badge.bg }]}
-                    >
-                      <Text
-                        style={[s.categoryBadgeText, { color: badge.text }]}
-                      >
-                        {thread.category}
-                      </Text>
-                    </View>
-                    <Text style={s.dotSeparator}>•</Text>
-                    <Text style={s.contextText} numberOfLines={1}>
-                      {thread.contextTitle}
-                    </Text>
-                  </View>
-
-                  {/* Row 3: Last Message + Unread Counter */}
-                  <View style={s.cardBottomRow}>
-                    <Text
-                      style={[
-                        s.lastMessageText,
-                        thread.unreadCount > 0 && s.lastMessageUnread,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {thread.lastMessage}
-                    </Text>
-
-                    {thread.unreadCount > 0 && (
-                      <View style={s.unreadBadge}>
-                        <Text style={s.unreadBadgeText}>
-                          {thread.unreadCount}
+              return (
+                <TouchableOpacity
+                  key={thread.id}
+                  style={s.chatCard}
+                  activeOpacity={0.7}
+                  onPress={() => openChat(thread)}
+                >
+                  {/* Left Avatar */}
+                  <View style={s.avatarWrapper}>
+                    {thread.avatar ? (
+                      <Image
+                        source={{ uri: thread.avatar }}
+                        style={s.avatarImage}
+                      />
+                    ) : (
+                      <View style={s.avatarEmojiBox}>
+                        <Text style={s.avatarEmojiText}>
+                          {thread.activityEmoji || "👥"}
                         </Text>
                       </View>
                     )}
+                    {/* Online / Status indicator */}
+                    <View
+                      style={[
+                        s.statusDot,
+                        {
+                          backgroundColor: thread.isOnline
+                            ? "#22C55E"
+                            : "#CBD5E1",
+                        },
+                      ]}
+                    />
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+
+                  {/* Center Content */}
+                  <View style={s.chatMainCol}>
+                    {/* Row 1: Name and Timestamp */}
+                    <View style={s.cardTopRow}>
+                      <Text style={s.partnerName} numberOfLines={1}>
+                        {thread.name}
+                      </Text>
+                      <Text style={s.timestampText}>{thread.lastTime}</Text>
+                    </View>
+
+                    {/* Row 2: Category Badge + Dot + Activity Context */}
+                    <View style={s.cardMiddleRow}>
+                      <View
+                        style={[s.categoryBadge, { backgroundColor: badge.bg }]}
+                      >
+                        <Text
+                          style={[s.categoryBadgeText, { color: badge.text }]}
+                        >
+                          {thread.category}
+                        </Text>
+                      </View>
+                      <Text style={s.dotSeparator}>•</Text>
+                      <Text style={s.contextText} numberOfLines={1}>
+                        {thread.contextTitle}
+                      </Text>
+                    </View>
+
+                    {/* Row 3: Last Message + Unread Counter */}
+                    <View style={s.cardBottomRow}>
+                      <Text
+                        style={[
+                          s.lastMessageText,
+                          thread.unreadCount > 0 && s.lastMessageUnread,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {thread.lastMessage}
+                      </Text>
+
+                      {thread.unreadCount > 0 && (
+                        <View style={s.unreadBadge}>
+                          <Text style={s.unreadBadgeText}>
+                            {thread.unreadCount}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
 
           {filteredThreads.length === 0 && (
             <View style={s.emptyState}>

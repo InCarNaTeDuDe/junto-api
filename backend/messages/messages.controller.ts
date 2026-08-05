@@ -5,6 +5,7 @@ import {
   fetchUserChannels,
   fetchUnreadCount,
 } from "./messages.service";
+import { sendPushNotification } from "../notifications/notifications.service";
 
 export async function getChannels(req: Request, res: Response) {
   try {
@@ -49,6 +50,16 @@ export async function sendMessage(req: Request, res: Response) {
       senderId,
       content,
       participantId,
+    );
+    await sendPushNotification(
+      participantId,
+      "New Message",
+      content,
+      "message",
+      {
+        chatId: targetChatId,
+        senderId,
+      },
     );
     res.json({ status: "success", message: savedMessage });
   } catch (err: any) {

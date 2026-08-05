@@ -92,10 +92,13 @@ export default function ActivityChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const chatId = params.activityId || params.id;
+
+  const [chatsLoading, setChatsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
   const loadMessages = async () => {
     try {
+      setChatsLoading(true);
       const res = await ApiService.get<any>(
         `/api/messages?activityId=${chatId}`,
       );
@@ -111,6 +114,8 @@ export default function ActivityChatScreen() {
       setMessages(mapped);
     } catch (err) {
       console.log("load messages error", err);
+    } finally {
+      setChatsLoading(false);
     }
   };
 
@@ -175,9 +180,6 @@ export default function ActivityChatScreen() {
   // Find or initialize chat in global store
 
   const targetChatId = params.activityId;
-
-  const [dbMessages, setDbMessages] = useState<Message[]>([]);
-  const [isSending, setIsSending] = useState(false);
 
   const activeChat = {
     id: targetChatId,
@@ -474,34 +476,40 @@ export default function ActivityChatScreen() {
           }
           keyboardShouldPersistTaps="handled"
         >
-          {displayedMessages.map((msg: Message) => {
-            const isMe = msg.sender === "me";
-            return (
-              <View
-                key={msg.id}
-                style={[
-                  s.messageWrapper,
-                  isMe
-                    ? { alignSelf: "flex-end" }
-                    : { alignSelf: "flex-start" },
-                ]}
-              >
-                <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
-                  <Text
-                    style={[
-                      s.messageText,
-                      isMe ? s.messageTextMe : s.messageTextThem,
-                    ]}
-                  >
-                    {msg.text}
-                  </Text>
-                  <Text style={[s.timestampText, isMe ? s.timeMe : s.timeThem]}>
-                    {msg.timestamp}
-                  </Text>
+          {chatsLoading ? (
+            <ActivityIndicator size="large" color={t.primary} />
+          ) : (
+            displayedMessages.map((msg: Message) => {
+              const isMe = msg.sender === "me";
+              return (
+                <View
+                  key={msg.id}
+                  style={[
+                    s.messageWrapper,
+                    isMe
+                      ? { alignSelf: "flex-end" }
+                      : { alignSelf: "flex-start" },
+                  ]}
+                >
+                  <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
+                    <Text
+                      style={[
+                        s.messageText,
+                        isMe ? s.messageTextMe : s.messageTextThem,
+                      ]}
+                    >
+                      {msg.text}
+                    </Text>
+                    <Text
+                      style={[s.timestampText, isMe ? s.timeMe : s.timeThem]}
+                    >
+                      {msg.timestamp}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
 
           {isPartnerTyping && (
             <View style={[s.messageWrapper, { alignSelf: "flex-start" }]}>
