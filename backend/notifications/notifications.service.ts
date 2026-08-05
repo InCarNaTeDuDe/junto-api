@@ -3,6 +3,8 @@ import { Notification } from "../db/entities/Notification.entity";
 import { User } from "../db/entities/User.entity";
 import { io } from "../socket/socket";
 
+const notificationRepo = AppDataSource.getRepository(Notification);
+
 export async function getUserNotifications(user: User) {
   const notificationRepo = AppDataSource.getRepository(Notification);
   const notifications = await notificationRepo.find({
@@ -22,15 +24,22 @@ export async function getUserNotifications(user: User) {
 }
 
 export async function markNotificationAsRead(id: string, user: User) {
-  const notificationRepo = AppDataSource.getRepository(Notification);
-  const notif = await notificationRepo.findOne({
-    where: { id, userId: user.id },
+  const notification = await notificationRepo.findOne({
+    where: {
+      id,
+      userId: user.id,
+    },
   });
 
-  if (notif) {
-    notif.read = true;
-    await notificationRepo.save(notif);
+  if (!notification) {
+    return {
+      success: false,
+      message: "Notification not found",
+    };
   }
+
+  notification.read = true;
+  await notificationRepo.save(notification);
 
   return { success: true };
 }
@@ -39,12 +48,11 @@ export async function sendPushNotification(
   targetUserId: string,
   title: string,
   message: string,
-  type = "activity",
-  metaData: any = {},
+  type: string = "activity",
+  data: Record<string, any> = {},
 ) {
-  const notificationRepo = AppDataSource.getRepository(Notification);
-
-  const notif = notificationRepo.create({
+  // Save notification in DB
+  const notification = notificationRepo.create({
     userId: targetUserId,
     title,
     message,
@@ -52,19 +60,30 @@ export async function sendPushNotification(
     read: false,
   });
 
-  await notificationRepo.save(notif);
+  await notificationRepo.save(notification);
 
-  // Trigger real-time push notification via Socket
-  if (io) {
-    io.to(`user:${targetUserId}`).emit("push_notification", {
-      id: notif.id,
-      title,
-      message,
-      type,
-      timestamp: notif.timestamp || new Date().toISOString(),
-      data: metaData,
-    });
+  // Payload sent to frontend
+  const payload = {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    read: notification.read,
+    timestamp: notification.timestamp,
+    data,
+  };
+
+  // Real-time Socket.IO notification
+  try {
+    io?.to(`user:${targetUserId}`).emit("push_notification", payload);
+  } catch (err) {
+    console.error("Failed to emit socket notification:", err);
   }
 
-  return notif;
+  /**
+   * Later:
+   * await sendExpoPushNotification(targetUserId, payload);
+   */
+
+  return payload;
 }
