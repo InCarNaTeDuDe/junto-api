@@ -5,6 +5,7 @@ import { NotificationRepository } from "../db/repository/Notification.repository
 import { DeviceRepository } from "../db/repository/Device.repository";
 import { ActivityCategory } from "../db/entities/Activity.entity";
 import { User } from "../db/entities/User.entity";
+import { sendPushNotification } from "../notifications/notifications.service";
 
 const messageRepo = new MessageRepository();
 const userRepo = new UserRepository();
@@ -117,16 +118,27 @@ export async function createAndSaveMessage(
   if (computedParticipantId && computedParticipantId !== senderId && activity) {
     const senderName = senderUser?.name || "A participant";
 
-    const notification = await notificationRepo.createNotification({
-      userId: computedParticipantId,
-      title: `New message in ${activity.title}`,
-      message: `${senderName}: "${content.substring(0, 60)}${
-        content.length > 60 ? "..." : ""
-      }"`,
-      type: "activity",
-    });
+    // const notification = await notificationRepo.createNotification({
+    //   userId: computedParticipantId,
+    //   title: `New message in ${activity.title}`,
+    //   message: `${senderName}: "${content.substring(0, 60)}${
+    //     content.length > 60 ? "..." : ""
+    //   }"`,
+    //   type: "activity",
+    // });
 
-    io.to(`user:${computedParticipantId}`).emit("notification", notification);
+    // io.to(`user:${computedParticipantId}`).emit("notification", notification);
+
+    await sendPushNotification(
+      computedParticipantId,
+      "New Message",
+      content,
+      "message",
+      {
+        chatId: activityId,
+        senderId,
+      },
+    );
   }
 
   return {

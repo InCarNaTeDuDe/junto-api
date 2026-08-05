@@ -61,7 +61,7 @@ async function request<T>(
     hasBody && options.body ? JSON.parse(options.body as string) : undefined;
 
   // Global preprocessing for requests with a body
-  if (hasBody && !endpoint.startsWith("/api/auth/google")) {
+  if (hasBody && !endpoint.startsWith("/api/auth/")) {
     // Example:
     const location = await getSelectedLocation();
 

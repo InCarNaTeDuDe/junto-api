@@ -51,16 +51,7 @@ export async function sendMessage(req: Request, res: Response) {
       content,
       participantId,
     );
-    await sendPushNotification(
-      participantId,
-      "New Message",
-      content,
-      "message",
-      {
-        chatId: targetChatId,
-        senderId,
-      },
-    );
+
     res.json({ status: "success", message: savedMessage });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to send message" });
