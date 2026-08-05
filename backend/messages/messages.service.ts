@@ -128,7 +128,9 @@ export async function createAndSaveMessage(
     // });
 
     // io.to(`user:${computedParticipantId}`).emit("notification", notification);
-
+    console.log(
+      `✉️ Sending push notification for message in activity ${activityId} to recipient: ${computedParticipantId}`,
+    );
     await sendPushNotification(
       computedParticipantId,
       "New Message",

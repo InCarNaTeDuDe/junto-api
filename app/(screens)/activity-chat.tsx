@@ -124,13 +124,17 @@ export default function ActivityChatScreen() {
 
     connectSocket(user.id);
 
-    const onConnect = () => {
-      console.log("JOINING CHAT", chatId);
-
+    const joinRoom = () => {
+      console.log("JOINING CHAT ROOM:", chatId);
       socket.emit("join_conversation", chatId);
+      socket.emit("join_user", user.id);
     };
 
-    socket.on("connect", onConnect);
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    socket.on("connect", joinRoom);
 
     socket.on(
       "user_typing",
@@ -142,6 +146,9 @@ export default function ActivityChatScreen() {
     );
 
     socket.on("receive_message", (msg: any) => {
+      console.log("CLIENT RECEIVED MESSAGE VIA SOCKET:", msg);
+      if (msg.activityId && msg.activityId !== chatId) return;
+
       setIsPartnerTyping(false);
       const newMessage: Message = {
         id: msg.id,
@@ -154,14 +161,14 @@ export default function ActivityChatScreen() {
       };
 
       setMessages((prev) => {
-        // remove optimistic message if same content exists
+        // remove optimistic message or existing message with same id
         const filtered = prev.filter(
           (m) =>
             !(
               m.id.startsWith("temp-") &&
               m.text === msg.content &&
               m.sender === "me"
-            ),
+            ) && m.id !== msg.id,
         );
 
         return [...filtered, newMessage];
@@ -171,7 +178,7 @@ export default function ActivityChatScreen() {
     loadMessages();
 
     return () => {
-      socket.off("connect", onConnect);
+      socket.off("connect", joinRoom);
       socket.off("receive_message");
       socket.off("user_typing");
     };

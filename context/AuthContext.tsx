@@ -45,6 +45,8 @@ import {
 import { LightTheme, DarkTheme, Theme } from "@/theme";
 import { useColorScheme } from "react-native";
 import { ApiService } from "@/services/api";
+import { connectSocket } from "@/services/socket";
+import { PushNotificationService } from "@/services/notifications";
 
 export interface UserData {
   // accessToken: string | null;
@@ -188,7 +190,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     console.log("Auth user changed:", user);
-  }, [user]);
+    if (user?.id) {
+      connectSocket(user.id);
+      const unsubscribe = PushNotificationService.initPushNotificationListener(
+        (notification) => {
+          console.log("🔔 Global Push Notification Received:", notification);
+        },
+      );
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [user?.id]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

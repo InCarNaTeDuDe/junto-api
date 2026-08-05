@@ -34,11 +34,11 @@ export default function TabsLayout() {
     }
   }, []);
 
-  React.useEffect(() => {
-    checkUnread();
-    const interval = setInterval(checkUnread, 120000);
-    return () => clearInterval(interval);
-  }, [checkUnread]);
+  // React.useEffect(() => {
+  //   checkUnread();
+  //   const interval = setInterval(checkUnread, 120000);
+  //   return () => clearInterval(interval);
+  // }, [checkUnread]);
 
   const totalUnread = Math.max(
     serverUnreadCount,

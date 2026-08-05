@@ -74,10 +74,24 @@ export async function sendPushNotification(
   };
 
   // Real-time Socket.IO notification
-  try {
-    io?.to(`user:${targetUserId}`).emit("push_notification", payload);
-  } catch (err) {
-    console.error("Failed to emit socket notification:", err);
+  // try {
+  //   io?.to(`user:${targetUserId}`).emit("push_notification", payload);
+  // } catch (err) {
+  //   console.error("Failed to emit socket notification:", err);
+  // }
+
+  if (io) {
+    const roomName = `user:${targetUserId}`;
+    const roomSockets = io.sockets.adapter.rooms.get(roomName);
+    const socketCount = roomSockets ? roomSockets.size : 0;
+
+    console.log(
+      `📡 Emitting 'push_notification' to room '${roomName}' (Active sockets in room: ${socketCount})`,
+    );
+
+    io.to(roomName).emit("push_notification", payload);
+  } else {
+    console.warn("⚠️ Socket.io instance (io) is not initialized!");
   }
 
   /**
