@@ -71,39 +71,41 @@ export async function createAndSaveMessage(
 
   let computedParticipantId = participantIdInput || null;
   let activity = null;
+
   try {
     activity = await activityRepo.findById(activityId);
+
     if (activity) {
+      // Add participant automatically
       if (senderId !== activity.organizerId) {
         const currentParts = activity.participantIds || [];
+
         if (!currentParts.includes(senderId)) {
           const updatedParts = [...currentParts, senderId];
+
           await activityRepo.update(activity.id, {
             participantIds: updatedParts,
           });
+
           activity.participantIds = updatedParts;
         }
       }
 
+      // Figure out recipient
       if (!computedParticipantId) {
-        if (activity.organizerId && activity.organizerId !== senderId) {
+        if (activity.organizerId !== senderId) {
           computedParticipantId = activity.organizerId;
-        } else if (
-          activity.organizerId === senderId &&
-          activity.participantIds?.length
-        ) {
+        } else if (activity.participantIds?.length) {
           computedParticipantId =
             activity.participantIds.find((id) => id !== senderId) || null;
         }
       }
     }
   } catch (e) {
-    console.log("Error processing activity participants:", e);
+    console.log("Error processing activity:", e);
   }
 
-  console.log("Computed participantId:", computedParticipantId);
-
-  // Save message using repository
+  // Save message
   const savedMsg = await messageRepo.createMessage({
     activityId,
     senderId,
@@ -111,29 +113,27 @@ export async function createAndSaveMessage(
     content,
   });
 
-  // Notify activity organizer
-  try {
-    const activity = await activityRepo.findById(activityId);
+  // Notify the other participant (not yourself)
+  if (computedParticipantId && computedParticipantId !== senderId && activity) {
+    const senderName = senderUser?.name || "A participant";
 
-    if (activity && activity.organizerId !== senderId) {
-      await notificationRepo.createNotification({
-        userId: activity.organizerId,
-        title: `New message in ${activity.title}`,
-        message: `${
-          senderUser?.name || "A participant"
-        }: "${content.substring(0, 60)}${content.length > 60 ? "..." : ""}"`,
-        type: "activity",
-      });
-    }
-  } catch (e) {
-    console.log("Notification failed:", e);
+    const notification = await notificationRepo.createNotification({
+      userId: computedParticipantId,
+      title: `New message in ${activity.title}`,
+      message: `${senderName}: "${content.substring(0, 60)}${
+        content.length > 60 ? "..." : ""
+      }"`,
+      type: "activity",
+    });
+
+    io.to(`user:${computedParticipantId}`).emit("notification", notification);
   }
 
   return {
     id: savedMsg.id,
     activityId: savedMsg.activityId,
     senderId: savedMsg.senderId,
-    participantId: savedMsg.participantId || null,
+    participantId: savedMsg.participantId ?? null,
 
     sender: senderUser
       ? {
@@ -205,35 +205,60 @@ export async function fetchUserChannels(userId: string) {
   // Fetch activities linked with Messages & User
   try {
     const allActivities = await activityRepo.findAll();
+    const userCache = new Map<string, User | null>();
 
+    const getUser = async (id: string): Promise<User | null> => {
+      if (!id) return null;
+      if (userCache.has(id)) return userCache.get(id)!;
+      try {
+        const user = await userRepo.findById(id);
+        userCache.set(id, user || null);
+        return user || null;
+      } catch (e) {
+        userCache.set(id, null);
+        return null;
+      }
+    };
+
+    // Pre-populate cache with organizer objects already loaded on activities
     for (const act of allActivities) {
-      // Find all messages linked via activityId in messages table
-      const messages = await messageRepo.findByActivityId(act.id);
+      if (act.organizer?.id) {
+        userCache.set(act.organizer.id, act.organizer);
+      }
+    }
 
+    // Fetch messages for all activities in parallel
+    const activityMessagesPairs = await Promise.all(
+      allActivities.map(async (act) => {
+        try {
+          const messages = await messageRepo.findByActivityId(act.id);
+          return { act, messages };
+        } catch (err) {
+          return { act, messages: [] };
+        }
+      }),
+    );
+
+    for (const { act, messages } of activityMessagesPairs) {
       // Determine partner / organizer user we chatted with
       let partnerUser: User | null = null;
-      try {
-        if (act.organizerId && act.organizerId !== userId) {
-          partnerUser = await userRepo.findById(act.organizerId);
-        } else if (act.organizerId === userId) {
-          const otherParticipantId = act.participantIds?.find(
-            (id) => id !== userId,
-          );
-          if (otherParticipantId) {
-            partnerUser = await userRepo.findById(otherParticipantId);
-          }
+      if (act.organizerId && act.organizerId !== userId) {
+        partnerUser = await getUser(act.organizerId);
+      } else if (act.organizerId === userId) {
+        const otherParticipantId = act.participantIds?.find(
+          (id) => id !== userId,
+        );
+        if (otherParticipantId) {
+          partnerUser = await getUser(otherParticipantId);
         }
-      } catch (e) {}
+      }
 
       if (!partnerUser && messages.length > 0) {
         const otherMsg = [...messages]
           .reverse()
           .find((m) => m.senderId !== userId);
         if (otherMsg) {
-          try {
-            const sender = await userRepo.findById(otherMsg.senderId);
-            if (sender) partnerUser = sender;
-          } catch (e) {}
+          partnerUser = await getUser(otherMsg.senderId);
         }
       }
 
@@ -269,29 +294,32 @@ export async function fetchUserChannels(userId: string) {
           ? lastMsg.content
           : `${(act.participantIds?.length || 0) + 1} mates registered`;
 
+        const partnerName = partnerUser?.name || null;
+        const partnerAvatar = partnerUser?.avatar || null;
+
         // Generate logo avatar URL for chatted partner / user
         const logoAvatar =
-          partnerUser?.avatar ||
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerUser?.name || act.title)}&background=8B5CF6&color=fff`;
+          partnerAvatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || act.title)}&background=8B5CF6&color=fff`;
 
         // Determine active status from device_session
         let isOnline = true;
-        if (partnerUser?.id) {
-          // isOnline = await deviceRepo.isUserActive(partnerUser.id);
-        }
 
         channelsList.push({
           id: act.id,
           name: act.title,
           activityEmoji: emoji,
           avatar: logoAvatar,
+          partnerName: partnerName || null,
+          partnerAvatar: partnerAvatar || logoAvatar,
+          partnerUrl: partnerAvatar || logoAvatar,
           type: formatCategoryLabel(act.category),
           category: formatCategoryLabel(act.category),
           subtitle: subtitleText,
           lastMessage: lastMsg ? lastMsg.content : "Tap to open channel",
           lastTime: lastTimeFormatted,
           organizerId: act.organizerId,
-          participantId: participantId,
+          // participantId: participantId,
           participantIds: act.participantIds || [],
           locationName: act.locationName,
           unreadCount: unread,

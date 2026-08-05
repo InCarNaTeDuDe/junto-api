@@ -26,6 +26,9 @@ import { useTheme } from "@/hooks/useTheme";
 interface Thread {
   id: string;
   name: string;
+  partnerName?: string | null;
+  partnerAvatar?: string | null;
+  partnerUrl?: string | null;
   avatar?: string | null;
   category: "DAY MATES" | "TICKET SWAP" | "LOST & FOUND" | "GROUP" | string;
   contextTitle: string;
@@ -148,7 +151,7 @@ export default function ChatsScreen() {
   const { state: storeState, setActiveChatId } = useStore();
   const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
 
-  const [threads, setThreads] = useState<Thread[]>(DEFAULT_THREADS);
+  const [threads, setThreads] = useState<Thread[]>(/*DEFAULT_THREADS*/ []);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [showBanner, setShowBanner] = useState(true);
@@ -179,23 +182,37 @@ export default function ChatsScreen() {
 
       if (serverChannels.length > 0) {
         // Map server channels from /api/messages/channels response
-        const mappedServerThreads: Thread[] = serverChannels.map((ch: any) => ({
-          id: ch.id,
-          name: ch.name || "Community Channel",
-          avatar:
-            ch.avatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(ch.name || "Chat")}&background=8B5CF6&color=fff`,
-          category: (ch.category || ch.type || "DAY MATES").toUpperCase(),
-          contextTitle: ch.subtitle || ch.type || "Channel",
-          lastMessage: ch.lastMessage || "Tap to open channel",
-          lastTime: ch.lastTime || "Active",
-          unreadCount: typeof ch.unreadCount === "number" ? ch.unreadCount : 0,
-          isOnline: typeof ch.isOnline === "boolean" ? ch.isOnline : true,
-          isGroup: true,
-          activityEmoji: ch.activityEmoji || "💬",
-          place: ch.locationName || "Nearby",
-          participantId: ch.participantId || ch.organizerId || null,
-        }));
+        const mappedServerThreads: Thread[] = serverChannels.map((ch: any) => {
+          const pName = ch.partnerName || null;
+          const pAvatar =
+            ch.partnerAvatar || ch.partnerUrl || ch.avatar || null;
+          const displayName = pName || ch.name || "Community Channel";
+
+          return {
+            id: ch.id,
+            name: displayName,
+            partnerName: pName,
+            partnerAvatar: pAvatar,
+            partnerUrl: pAvatar,
+            avatar:
+              pAvatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=8B5CF6&color=fff`,
+            category: (ch.category || ch.type || "DAY MATES").toUpperCase(),
+            contextTitle:
+              pName && ch.name !== pName
+                ? ch.name
+                : ch.subtitle || ch.type || "Channel",
+            lastMessage: ch.lastMessage || "Tap to open channel",
+            lastTime: ch.lastTime || "Active",
+            unreadCount:
+              typeof ch.unreadCount === "number" ? ch.unreadCount : 0,
+            isOnline: typeof ch.isOnline === "boolean" ? ch.isOnline : true,
+            isGroup: false,
+            activityEmoji: ch.activityEmoji || "💬",
+            place: ch.locationName || "Nearby",
+            participantId: ch.participantId || ch.organizerId || null,
+          };
+        });
 
         setThreads(mappedServerThreads);
       }
@@ -243,6 +260,7 @@ export default function ChatsScreen() {
     socket.on("receive_message", handleMessageReceived);
     socket.on("chat_message", handleMessageReceived);
     socket.on("message_sent", handleMessageReceived);
+    socket.on("message_read", (data: any) => {});
 
     return () => {
       socket.off("receive_message", handleMessageReceived);
@@ -313,14 +331,16 @@ export default function ChatsScreen() {
       params: {
         id: thread.id,
         name: thread.name,
-        partner: thread.name,
+        user: thread.partnerName || thread.name,
+        partner: thread.partnerName || thread.name,
         title: thread.contextTitle,
         contextTitle: thread.contextTitle,
         type: thread.category,
         category: thread.category,
         place: thread.place || "Nearby",
         right: thread.lastTime,
-        avatar: thread.avatar || "",
+        avatar:
+          thread.partnerAvatar || thread.partnerUrl || thread.avatar || "",
         activityEmoji: thread.activityEmoji || "💬",
       },
     });
