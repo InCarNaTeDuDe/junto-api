@@ -196,29 +196,10 @@ export async function exploreByLatLong(location: {
     console.log("No lat long found from req", location);
   }
   try {
-    const activityRepositoryRepo = AppDataSource.getRepository(Activity);
-    const activities = await activityRepositoryRepo.find({
-      where: {
-        latitude: location.latitude,
-        longitude: location.longitude,
-      },
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        cost: true,
-        latitude: true,
-        longitude: true,
-        locationName: true,
-        organizer: {
-          name: true,
-          avatar: true,
-        },
-      },
-      relations: {
-        organizer: true,
-      },
-    });
+    const activities = await activityRepository.findByLocation(
+      location.latitude,
+      location.longitude,
+    );
 
     const reqLat = Number(location.latitude);
     const reqLng = Number(location.longitude);
@@ -272,9 +253,7 @@ export async function addTicketForSale(
   organizer: User,
 ) {
   try {
-    const activityRepository = AppDataSource.getRepository(Activity);
-
-    const activity = activityRepository.create({
+    return await activityRepository.create({
       organizerId: organizer.id,
 
       title: body.movieName,
@@ -297,8 +276,6 @@ export async function addTicketForSale(
       longitude: body.longitude,
       isAutoDetected: body.isAutoDetected ?? false,
     });
-
-    return await activityRepository.save(activity);
   } catch (error) {
     throw error;
   }

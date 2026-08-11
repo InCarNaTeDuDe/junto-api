@@ -1,991 +1,912 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
-  Alert,
-  ActivityIndicator,
-  Modal,
   TextInput,
+  TouchableOpacity,
+  Pressable,
+  Image,
   StyleSheet,
-  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useStyles } from "@/hooks/useStyles";
-import { useLocation } from "@/context/LocationContext";
-import { ApiService } from "@/services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, router } from "expo-router";
+import { useAuthContext } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
+import { socket, connectSocket } from "@/services/socket";
+import { ApiService } from "@/services/api";
 
-const { width } = Dimensions.get("window");
-
-export interface AskNearbyFormProps {
-  from?: "create" | "activity-chat" | "activity-details";
-  colors?: any;
-  selectedLocation?: any;
-  onSubmitSuccess?: (data: any) => void;
-  onBack?: () => void;
-  onClose?: () => void;
-}
-
-interface RequestCategory {
+interface Message {
   id: string;
-  title: string;
-  subtitle: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-  iconBgDark: string;
-  iconBgLight: string;
-  iconColor: string;
+  sender: "me" | "them";
+  text: string;
+  timestamp: string;
 }
 
-const CATEGORIES: RequestCategory[] = [
-  {
-    id: "blood",
-    title: "Blood Donation",
-    subtitle: "Be a hero",
-    iconName: "heart",
-    iconBgDark: "rgba(244, 63, 94, 0.2)",
-    iconBgLight: "rgba(244, 63, 94, 0.12)",
-    iconColor: "#F43F5E",
-  },
-  {
-    id: "wallet",
-    title: "Lost Wallet",
-    subtitle: "Help me find it",
-    iconName: "wallet",
-    iconBgDark: "rgba(56, 189, 248, 0.2)",
-    iconBgLight: "rgba(56, 189, 248, 0.12)",
-    iconColor: "#0284C7",
-  },
-  {
-    id: "keys",
-    title: "Lost Keys",
-    subtitle: "Need your eyes",
-    iconName: "key",
-    iconBgDark: "rgba(245, 158, 11, 0.2)",
-    iconBgLight: "rgba(245, 158, 11, 0.12)",
-    iconColor: "#D97706",
-  },
-  {
-    id: "bag",
-    title: "Lost Bag",
-    subtitle: "Missing items",
-    iconName: "briefcase",
-    iconBgDark: "rgba(16, 185, 129, 0.2)",
-    iconBgLight: "rgba(16, 185, 129, 0.12)",
-    iconColor: "#059669",
-  },
-  {
-    id: "vehicle",
-    title: "Vehicle Help",
-    subtitle: "Roadside help",
-    iconName: "car",
-    iconBgDark: "rgba(129, 140, 248, 0.2)",
-    iconBgLight: "rgba(129, 140, 248, 0.12)",
-    iconColor: "#6366F1",
-  },
-  {
-    id: "phone",
-    title: "Lost Phone",
-    subtitle: "Can't reach it",
-    iconName: "phone-portrait",
-    iconBgDark: "rgba(167, 139, 250, 0.2)",
-    iconBgLight: "rgba(167, 139, 250, 0.12)",
-    iconColor: "#7C3AED",
-  },
-  {
-    id: "medicine",
-    title: "Medicine",
-    subtitle: "Need urgently",
-    iconName: "medkit",
-    iconBgDark: "rgba(239, 68, 68, 0.2)",
-    iconBgLight: "rgba(239, 68, 68, 0.12)",
-    iconColor: "#DC2626",
-  },
-  {
-    id: "other",
-    title: "Other",
-    subtitle: "Something else",
-    iconName: "ellipsis-horizontal-circle",
-    iconBgDark: "rgba(192, 132, 252, 0.2)",
-    iconBgLight: "rgba(192, 132, 252, 0.12)",
-    iconColor: "#9333EA",
-  },
-];
+export default function ActivityChatScreen() {
+  const params = useLocalSearchParams<{
+    activityId?: string;
+    id?: string;
+    title?: string;
+    user?: string;
+    userId?: string;
+    organizerId?: string;
+    participantId?: string;
+    partner?: string;
+    place?: string;
+    right?: string;
+    type?: string;
+    category?: string;
+    avatar?: string;
+    activityEmoji?: string;
+    emoji?: string;
+  }>();
 
-interface UrgencyOption {
-  id: string;
-  title: string;
-  subtitle: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-}
+  const { user } = useAuthContext();
+  const { theme: t, isDark } = useTheme();
+  const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
-const URGENCY_OPTIONS: UrgencyOption[] = [
-  {
-    id: "urgent",
-    title: "Urgent",
-    subtitle: "Right now",
-    iconName: "flash",
-  },
-  {
-    id: "soon",
-    title: "Soon",
-    subtitle: "Within a few hrs",
-    iconName: "time-outline",
-  },
-  {
-    id: "not_urgent",
-    title: "Not Urgent",
-    subtitle: "Later today",
-    iconName: "calendar-outline",
-  },
-];
+  const organizerId = params.organizerId || params.userId;
 
-const createStyles = (t: any) => {
-  const isDark =
-    t?.mode === "dark" || t?.bg === "#0B0714" || t?.text === "#FFFFFF";
+  const isOwnActivity =
+    (user?.id && organizerId === user.id) ||
+    ((user?.name &&
+      params.user &&
+      params.user.toLowerCase().trim() ===
+        user.name.toLowerCase().trim()) as boolean);
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: t.bg || (isDark ? "#0B0714" : "#F8FAFC"),
-    },
-    scrollContent: {
-      paddingHorizontal: 14,
-      paddingTop: 0,
-      paddingBottom: 20,
-      gap: 18,
-      maxWidth: 780,
-      alignSelf: "center",
-      width: "100%",
-    },
+  const rawUserParam =
+    params.partner || params.user || user?.name || "Ananya R.";
+  const partnerName = rawUserParam;
 
-    /* Hero Banner */
-    heroCard: {
-      backgroundColor: isDark
-        ? "rgba(255,255,255,0.04)"
-        : t.cardSecondary || "#F1F5F9",
-      borderRadius: 20,
-      padding: 18,
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 85, 247, 0.2)" : t.border || "#E2E8F0",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      overflow: "hidden",
-    },
-    heroTextContainer: {
-      flex: 1,
-      paddingRight: 10,
-    },
-    heroHeading: {
-      fontSize: 22,
-      fontWeight: "800",
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      lineHeight: 28,
-    },
-    heroHeadingHighlight: {
-      color: t.primary || "#A855F7",
-    },
-    heroSubText: {
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      fontSize: 12.5,
-      marginTop: 6,
-      lineHeight: 17,
-    },
-    heroIllustration: {
-      width: 80,
-      height: 80,
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-    },
-    heroGlowPulse: {
-      position: "absolute",
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
-      borderWidth: 1,
-      borderColor: "rgba(168, 85, 247, 0.25)",
-    },
-    heroPinGlow: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: t.primary || "#8B5CF6",
-      alignItems: "center",
-      justifyContent: "center",
-      elevation: 6,
-    },
-    chatBadge: {
-      position: "absolute",
-      top: 4,
-      right: 0,
-      backgroundColor: t.primary || "#A855F7",
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 10,
-      flexDirection: "row",
-      gap: 2,
-    },
-    chatBadgeDot: {
-      width: 3.5,
-      height: 3.5,
-      borderRadius: 2,
-      backgroundColor: "#FFFFFF",
-    },
+  const contextTitle = params.title || "Morning Walk / Jogging Partner";
+  const activityType = params.type || params.category || "DAY MATES";
+  const activityPlace = params.place || "Bandra Reclamation, Mumbai";
+  const rightDetail = params.right || "1.1 km away";
 
-    /* Section Headers */
-    sectionHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 12,
-    },
-    sectionTitle: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 15,
-      fontWeight: "700",
-    },
-    seeAllText: {
-      color: t.primary || "#A855F7",
-      fontSize: 13,
-      fontWeight: "600",
-    },
+  const activityEmoji =
+    params.activityEmoji ||
+    params.emoji ||
+    (contextTitle.toLowerCase().includes("phone")
+      ? "📱"
+      : contextTitle.toLowerCase().includes("wallet")
+        ? "👛"
+        : contextTitle.toLowerCase().includes("pushpa") ||
+            activityType.includes("TICKET")
+          ? "🎟️"
+          : contextTitle.toLowerCase().includes("coffee")
+            ? "☕"
+            : contextTitle.toLowerCase().includes("walk") ||
+                contextTitle.toLowerCase().includes("jog")
+              ? "🏃‍♂️"
+              : "🙋‍♂️");
+  const partnerAvatar =
+    params.avatar ||
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150";
+  const myAvatar =
+    user?.avatar ||
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
 
-    /* Categories Grid */
-    gridRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -4,
-    },
-    gridCol: {
-      width: "25%",
-      padding: 4,
-    },
-    categoryCard: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderRadius: 16,
-      paddingVertical: 12,
-      paddingHorizontal: 4,
-      alignItems: "center",
-      borderWidth: 1.5,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      position: "relative",
-      minHeight: 114,
-      justifyContent: "space-between",
-    },
-    categoryCardSelected: {
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.2)"
-        : t.primarySoft || "rgba(168, 85, 247, 0.12)",
-      borderColor: t.primary || "#A855F7",
-    },
-    selectedCheckBadge: {
-      position: "absolute",
-      top: -5,
-      right: -3,
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      backgroundColor: t.primary || "#A855F7",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: t.bg || (isDark ? "#0B0714" : "#FFFFFF"),
-    },
-    categoryIconCircle: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    categoryTitleText: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 11,
-      fontWeight: "700",
-      textAlign: "center",
-    },
-    categoryTitleTextSelected: {
-      color: t.primary || "#A855F7",
-    },
-    categorySubText: {
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      fontSize: 9,
-      fontWeight: "500",
-      textAlign: "center",
-      marginTop: 2,
-    },
+  const [inputMessage, setInputMessage] = useState("");
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [typingUserName, setTypingUserName] = useState<string>("");
+  const typingTimeoutRef = useRef<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-    /* Urgency Options */
-    urgencyRow: {
-      flexDirection: "row",
-      gap: 8,
-    },
-    urgencyCard: {
-      flex: 1,
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderRadius: 14,
-      padding: 10,
-      borderWidth: 1.5,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      position: "relative",
-    },
-    urgencyCardSelected: {
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.2)"
-        : t.primarySoft || "rgba(168, 85, 247, 0.12)",
-      borderColor: t.primary || "#A855F7",
-    },
-    urgencyIconWrap: {
-      width: 30,
-      height: 30,
-      borderRadius: 10,
-      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    urgencyTitleText: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 12,
-      fontWeight: "700",
-    },
-    urgencySubText: {
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      fontSize: 10,
-      marginTop: 1,
-    },
+  const chatId = params.activityId || params.id;
 
-    /* Description Input */
-    inputCard: {
-      backgroundColor: t.inputBg || t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderRadius: 16,
-      padding: 14,
-      borderWidth: 1,
-      borderColor:
-        t.inputBorder ||
-        t.border ||
-        (isDark ? "rgba(255, 255, 255, 0.08)" : "#CBD5E1"),
-    },
-    inputLabel: {
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      fontSize: 12,
-      fontWeight: "600",
-      marginBottom: 6,
-    },
-    textInput: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 13,
-      minHeight: 44,
-      textAlignVertical: "top",
-    },
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
 
-    /* Location Card */
-    locationCard: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderRadius: 16,
-      padding: 14,
-      borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"),
-      gap: 10,
-    },
-    locationIconWrap: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    locationNameText: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 13.5,
-      fontWeight: "700",
-    },
-    locationSubText: {
-      color: t.sub || (isDark ? "#94A3B8" : "#64748B"),
-      fontSize: 11,
-      marginTop: 1,
-    },
-    autoBadge: {
-      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: t.primary || "rgba(168, 85, 247, 0.3)",
-    },
-    autoBadgeText: {
-      color: t.primary || "#A855F7",
-      fontSize: 10,
-      fontWeight: "600",
-    },
-
-    /* Bottom Post Request Bar */
-    bottomBar: {
-      backgroundColor: t.card || (isDark ? "#121528" : "#FFFFFF"),
-      borderRadius: 20,
-      padding: 12,
-      marginHorizontal: 14,
-      marginBottom: 10,
-      marginTop: 6,
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 85, 247, 0.3)" : t.border || "#E2E8F0",
-      shadowColor: t.shadow || "#000",
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 8,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-    },
-    bottomIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: t.primarySoft || "rgba(168, 85, 247, 0.15)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    bottomBarText: {
-      color: t.sub || (isDark ? "#E2E8F0" : "#475569"),
-      fontSize: 11,
-      lineHeight: 15,
-      flex: 1,
-    },
-    postBtn: {
-      backgroundColor: t.primary || "#8B5CF6",
-      paddingHorizontal: 16,
-      paddingVertical: 11,
-      borderRadius: 14,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
-    postBtnSuccess: {
-      backgroundColor: t.success || "#22C55E",
-    },
-    postBtnText: {
-      color: "#FFFFFF",
-      fontSize: 13,
-      fontWeight: "700",
-    },
-
-    /* Modal */
-    modalOverlay: {
-      flex: 1,
-      backgroundColor:
-        t.overlay || (isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.5)"),
-      justifyContent: "flex-end",
-    },
-    modalContent: {
-      backgroundColor: t.card || (isDark ? "#1A152E" : "#FFFFFF"),
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      padding: 20,
-      maxHeight: "80%",
-      borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.12)" : "transparent"),
-    },
-    modalTitle: {
-      color: t.text || (isDark ? "#FFFFFF" : "#111827"),
-      fontSize: 17,
-      fontWeight: "700",
-    },
-    modalItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: 13,
-      backgroundColor: isDark
-        ? "rgba(255,255,255,0.06)"
-        : t.cardSecondary || "#F8FAFC",
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor:
-        t.border || (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
-    },
-    modalItemSelected: {
-      backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.25)"
-        : t.primarySoft || "rgba(168, 85, 247, 0.12)",
-      borderColor: t.primary || "#A855F7",
-    },
-  });
-
-  return {
-    ...t,
-    isDark,
-    styles,
-  };
-};
-
-export default function AskNearbyScreen({
-  from,
-  colors: propColors,
-  selectedLocation: propLocation,
-  onSubmitSuccess,
-  onBack,
-  onClose,
-}: AskNearbyFormProps) {
-  const router = useRouter();
-  const theme = useStyles((t: any) => createStyles(propColors || t));
-  const { styles, isDark, primary, text, sub, placeholder } = theme;
-
-  const { selectedLocation: contextLocation } = useLocation();
-  const locationObj = propLocation || contextLocation;
-
-  const [selectedCategory, setSelectedCategory] = useState<string>("blood");
-  const [selectedUrgency, setSelectedUrgency] = useState<string>("urgent");
-  const [description, setDescription] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
-  const [postedSuccess, setPostedSuccess] = useState<boolean>(false);
-
-  const activeCategoryObj =
-    CATEGORIES.find((c) => c.id === selectedCategory) || CATEGORIES[0];
-  const activeUrgencyObj =
-    URGENCY_OPTIONS.find((u) => u.id === selectedUrgency) || URGENCY_OPTIONS[0];
-
-  const handleHeaderBack = () => {
-    if (onBack) {
-      onBack();
-    } else if (router) {
-      router.replace("/(tabs)/create");
-    }
-  };
-
-  const handleHeaderClose = () => {
-    if (onClose) {
-      onClose();
-    } else if (router) {
-      router.replace("/(tabs)");
-    }
-  };
-
-  const handlePostRequest = async () => {
-    setIsSubmitting(true);
+  const loadMessages = async () => {
     try {
-      const payload = {
-        title: `${activeCategoryObj.title}: Need Help`,
-        category: activeCategoryObj.title,
-        description:
-          description ||
-          `${activeCategoryObj.title} - ${activeCategoryObj.subtitle}`,
-        urgency: activeUrgencyObj.title,
-        locationName: locationObj?.name || "Koramangala, Bengaluru",
-        type: "ASK_NEARBY",
+      setChatsLoading(true);
+      const res = await ApiService.get<any>(
+        `/api/messages?activityId=${chatId}`,
+      );
+      const mapped = res.messages.map((m: any) => ({
+        id: m.id,
+        sender: m.senderId === user?.id ? "me" : "them",
+        text: m.content,
+        timestamp: new Date(m.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+      setMessages(mapped);
+    } catch (err) {
+      console.log("load messages error", err);
+    } finally {
+      setChatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id || !chatId) return;
+
+    connectSocket(user.id);
+
+    const joinRoom = () => {
+      console.log("JOINING CHAT ROOM:", chatId);
+      socket.emit("join_conversation", chatId);
+      socket.emit("join_user", user.id);
+    };
+
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    socket.on("connect", joinRoom);
+
+    socket.on(
+      "user_typing",
+      (data: { userId: string; userName?: string; isTyping: boolean }) => {
+        if (data.userId !== user?.id) {
+          setIsPartnerTyping(data.isTyping);
+          if (data.isTyping && data.userName) {
+            setTypingUserName(data.userName);
+          }
+        }
+      },
+    );
+
+    socket.on("receive_message", (msg: any) => {
+      console.log("CLIENT RECEIVED MESSAGE VIA SOCKET:", msg);
+      if (msg.activityId && msg.activityId !== chatId) return;
+
+      setIsPartnerTyping(false);
+      const newMessage: Message = {
+        id: msg.id,
+        sender: msg.senderId === user.id ? "me" : "them",
+        text: msg.content,
+        timestamp: new Date(msg.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       };
 
-      await ApiService.post("/api/asknearby", payload);
-      setPostedSuccess(true);
-      onSubmitSuccess?.(payload);
-      setTimeout(() => {
-        setPostedSuccess(false);
-      }, 1500);
-    } catch (err) {
-      // Fallback response for offline or transient API
-      setPostedSuccess(true);
-      setTimeout(() => {
-        setPostedSuccess(false);
-      }, 1500);
-    } finally {
-      setIsSubmitting(false);
+      setMessages((prev) => {
+        // remove optimistic message or existing message with same id
+        const filtered = prev.filter(
+          (m) =>
+            !(
+              m.id.startsWith("temp-") &&
+              m.text === msg.content &&
+              m.sender === "me"
+            ) && m.id !== msg.id,
+        );
+
+        return [...filtered, newMessage];
+      });
+    });
+
+    loadMessages();
+
+    return () => {
+      socket.off("connect", joinRoom);
+      socket.off("receive_message");
+      socket.off("user_typing");
+    };
+  }, [chatId, user?.id]);
+
+  // Find or initialize chat in global store
+
+  const targetChatId = params.activityId;
+
+  const activeChat = {
+    id: targetChatId,
+    partner: {
+      name: partnerName,
+      avatar: partnerAvatar,
+      rating: 4.9,
+      isOnline: true,
+    },
+    category: "Day Mates",
+    contextTitle,
+    unreadCount: 0,
+  };
+
+  const displayedMessages = messages;
+
+  const handleInputChange = (text: string) => {
+    setInputMessage(text);
+    if (!user?.id || !chatId) return;
+
+    if (text.trim().length > 0) {
+      socket.emit("typing", { chatId, userId: user.id, userName: user.name });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("stop_typing", { chatId, userId: user.id });
+      }, 2500);
+    } else {
+      socket.emit("stop_typing", { chatId, userId: user.id });
     }
   };
 
+  const handleSend = () => {
+    if (!inputMessage.trim() || !user?.id || !chatId) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    socket.emit("stop_typing", { chatId, userId: user.id });
+
+    const text = inputMessage.trim();
+
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      sender: "me",
+      text,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    // show immediately
+    setMessages((prev) => [...prev, tempMessage]);
+
+    setInputMessage("");
+
+    const now = new Date();
+    console.log("📱 UI SEND TIME");
+    console.log("Local String:", now.toString());
+    console.log("ISO UTC:", now.toISOString());
+    console.log("Locale Time:", now.toLocaleString());
+    console.log("Timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+    console.log("EMITTING MESSAGE", {
+      chatId,
+      senderId: user.id,
+      content: text,
+      socketConnected: socket.connected,
+      sentAtLocal: now.toString(),
+      sentAtUTC: now.toISOString(),
+    });
+
+    const targetParticipantId =
+      params.participantId ||
+      (organizerId && organizerId !== user.id ? organizerId : null);
+
+    if (socket.connected) {
+      socket.emit("send_message", {
+        chatId,
+        senderId: user.id,
+        participantId: targetParticipantId,
+        content: text,
+      });
+    } else {
+      ApiService.post("/api/messages/send", {
+        chatId,
+        activityId: chatId,
+        content: text,
+        participantId: targetParticipantId,
+      }).catch((err) => {
+        console.log("REST API message send fallback error:", err);
+      });
+    }
+  };
+
+  const handleQuickReply = (text: string) => {
+    if (isOwnActivity) return;
+    setInputMessage(text);
+  };
+
+  const categoryColor =
+    activityType.includes("TICKET") || activityType.includes("MOVIE")
+      ? "#A855F7"
+      : activityType.includes("LOST")
+        ? "#14B8A6"
+        : "#EA580C";
+
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
-    >
-      <ScrollView
+    <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        {/* Top Header if back action exists */}
+        {/* Header Bar */}
+        <View style={s.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={s.backBtn}
+            hitSlop={12}
+          >
+            <Ionicons name="arrow-back" size={22} color={t.text} />
+          </TouchableOpacity>
 
-        {/* Hero Section */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroTextContainer}>
-            <Text style={styles.heroHeading}>
-              Need help{"\n"}
-              <Text style={styles.heroHeadingHighlight}>with something?</Text>
-            </Text>
-            <Text style={styles.heroSubText}>
-              Post once. People nearby will see and help if they can.
-            </Text>
-          </View>
-
-          {/* Hero Illustration */}
-          <View style={styles.heroIllustration}>
-            <View style={styles.heroGlowPulse} />
-            <View style={styles.heroPinGlow}>
-              <Ionicons name="location" size={26} color="#FFFFFF" />
+          <View style={s.headerUser}>
+            <View style={{ position: "relative" }}>
+              {activeChat.partner.avatar &&
+              !activeChat.partner.avatar.includes("unsplash.com") ? (
+                <Image
+                  source={{ uri: activeChat.partner.avatar }}
+                  style={s.avatar}
+                />
+              ) : (
+                <View style={s.headerEmojiBox}>
+                  <Text style={{ fontSize: 20 }}>{activityEmoji}</Text>
+                </View>
+              )}
+              <View style={s.onlineDot} />
             </View>
 
-            <View style={styles.chatBadge}>
-              <View style={styles.chatBadgeDot} />
-              <View style={styles.chatBadgeDot} />
-              <View style={styles.chatBadgeDot} />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={s.partnerName} numberOfLines={1}>
+                {activeChat.partner.name}
+              </Text>
+
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="sparkles" size={12} color="#4ADE80" />
+                <Text style={s.onlineText}>Active • Wants to join</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Section 1: Categories */}
-        <View>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>What’s your request about?</Text>
-            <TouchableOpacity onPress={() => setShowDetailModal(true)}>
-              <Text style={styles.seeAllText}>See all &gt;</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity style={s.actionBtn}>
+              <Ionicons name="call-outline" size={18} color={t.text} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.actionBtn}>
+              <Ionicons name="ellipsis-vertical" size={18} color={t.text} />
             </TouchableOpacity>
           </View>
-
-          {/* 4-column Grid for 8 items */}
-          <View style={styles.gridRow}>
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              const bgCircle = isDark ? cat.iconBgDark : cat.iconBgLight;
-              return (
-                <View key={cat.id} style={styles.gridCol}>
-                  <TouchableOpacity
-                    onPress={() => setSelectedCategory(cat.id)}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.categoryCard,
-                      isSelected && styles.categoryCardSelected,
-                    ]}
-                  >
-                    {/* Selected Check Badge */}
-                    {isSelected && (
-                      <View style={styles.selectedCheckBadge}>
-                        <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-                      </View>
-                    )}
-
-                    {/* Icon Container */}
-                    <View
-                      style={[
-                        styles.categoryIconCircle,
-                        { backgroundColor: bgCircle },
-                      ]}
-                    >
-                      <Ionicons
-                        name={cat.iconName}
-                        size={20}
-                        color={cat.iconColor}
-                      />
-                    </View>
-
-                    {/* Title & Subtitle */}
-                    <View style={{ alignItems: "center", marginTop: 4 }}>
-                      <Text
-                        style={[
-                          styles.categoryTitleText,
-                          isSelected && styles.categoryTitleTextSelected,
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {cat.title}
-                      </Text>
-                      <Text style={styles.categorySubText} numberOfLines={1}>
-                        {cat.subtitle}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
         </View>
 
-        {/* Section 2: Urgency */}
-        <View>
-          <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
-            How urgent is this?
-          </Text>
-
-          <View style={styles.urgencyRow}>
-            {URGENCY_OPTIONS.map((urg) => {
-              const isSelected = selectedUrgency === urg.id;
-              return (
-                <TouchableOpacity
-                  key={urg.id}
-                  onPress={() => setSelectedUrgency(urg.id)}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.urgencyCard,
-                    isSelected && styles.urgencyCardSelected,
-                  ]}
-                >
-                  {isSelected && (
-                    <View style={styles.selectedCheckBadge}>
-                      <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                    </View>
-                  )}
-
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.urgencyIconWrap,
-                        isSelected && {
-                          backgroundColor: "rgba(168, 85, 247, 0.25)",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={urg.iconName}
-                        size={17}
-                        color={
-                          isSelected ? primary || "#C084FC" : sub || "#94A3B8"
-                        }
-                      />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.urgencyTitleText,
-                          isSelected && { color: primary || "#A855F7" },
-                        ]}
-                      >
-                        {urg.title}
-                      </Text>
-                      <Text style={styles.urgencySubText}>{urg.subtitle}</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Optional Description Input */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Additional Details (Optional)</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Add specific instructions, location details, or contact preference..."
-            placeholderTextColor={placeholder || "#94A3B8"}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-          />
-        </View>
-
-        {/* Section 3: Nearby Audience */}
-        <View style={{ gap: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={styles.sectionTitle}>Nearby audience</Text>
-            <View style={styles.autoBadge}>
-              <Text style={styles.autoBadgeText}>Auto-detected</Text>
+        {/* Activity Banner Context */}
+        <View style={s.activityCard}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={s.bannerEmojiBox}>
+              <Text style={{ fontSize: 26 }}>{activityEmoji}</Text>
             </View>
-          </View>
 
-          {/* Location Card */}
-          <View style={styles.locationCard}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
+            <View style={{ flex: 1 }}>
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 10,
-                  flex: 1,
+                  justifyContent: "space-between",
+                  marginBottom: 4,
                 }}
               >
-                <View style={styles.locationIconWrap}>
-                  <Ionicons
-                    name="location"
-                    size={19}
-                    color={primary || "#A855F7"}
-                  />
+                <View
+                  style={[
+                    s.badge,
+                    {
+                      backgroundColor: categoryColor + "22",
+                      borderColor: categoryColor + "55",
+                    },
+                  ]}
+                >
+                  <Text style={[s.badgeText, { color: categoryColor }]}>
+                    {activityType}
+                  </Text>
                 </View>
 
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.locationNameText}>
-                    {locationObj?.name || "Koramangala, Bengaluru"}
-                  </Text>
-                  <Text style={styles.locationSubText}>Within 3 km radius</Text>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
+                  <Ionicons name="location-outline" size={14} color="#A855F7" />
+                  <Text style={s.distanceText}>{rightDetail}</Text>
                 </View>
               </View>
 
+              <Text style={s.activityTitle}>{contextTitle}</Text>
+
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 4,
-                  paddingHorizontal: 6,
-                  paddingVertical: 4,
+                  marginTop: 2,
+                  gap: 12,
                 }}
               >
-                <Ionicons
-                  name="navigate-outline"
-                  size={14}
-                  color={primary || "#C084FC"}
-                />
-                <Text
-                  style={{
-                    color: primary || "#C084FC",
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                 >
-                  Current Location
+                  <Ionicons name="navigate-outline" size={14} color={t.sub} />
+                  <Text style={s.placeText} numberOfLines={1}>
+                    {activityPlace}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Join Match Notice / Self Activity Notice */}
+          {
+            /*isOwnActivity*/ false ? (
+              <View
+                style={[
+                  s.matchNotice,
+                  {
+                    backgroundColor: "rgba(245,158,11,0.12)",
+                    borderColor: "rgba(245,158,11,0.3)",
+                  },
+                ]}
+              >
+                <Ionicons name="information-circle" size={18} color="#F59E0B" />
+                <Text style={[s.matchNoticeText, { color: "#FBBF24" }]}>
+                  This is your activity post! You cannot join or chat with
+                  yourself as a partner.
+                </Text>
+              </View>
+            ) : (
+              <View style={s.matchNotice}>
+                {isOwnActivity ? (
+                  <View
+                    style={[
+                      s.matchNotice,
+                      {
+                        backgroundColor: "rgba(245,158,11,0.12)",
+                        borderColor: "rgba(245,158,11,0.3)",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="information-circle"
+                      size={18}
+                      color="#F59E0B"
+                    />
+                    <Text style={[s.matchNoticeText, { color: "#FBBF24" }]}>
+                      This is your activity post! You cannot join or chat with
+                      yourself as a partner.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="people" size={16} color="#A855F7" />
+                    <Text style={s.matchNoticeText}>
+                      You and{" "}
+                      <Text style={{ fontWeight: "700", color: "#A855F7" }}>
+                        {partnerName}
+                      </Text>{" "}
+                      are connected for this activity! Coordinate time & spot
+                      below.
+                    </Text>
+                  </>
+                )}
+              </View>
+            )
+          }
+        </View>
+
+        {/* Chat Messages Stream */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={{ flex: 1, paddingHorizontal: 16 }}
+          contentContainerStyle={{ paddingVertical: 12, gap: 12 }}
+          onContentSizeChange={() =>
+            scrollViewRef.current?.scrollToEnd({ animated: true })
+          }
+          keyboardShouldPersistTaps="handled"
+        >
+          {chatsLoading ? (
+            <ActivityIndicator size="large" color={t.primary} />
+          ) : (
+            displayedMessages.map((msg: Message) => {
+              const isMe = msg.sender === "me";
+              return (
+                <View
+                  key={msg.id}
+                  style={[
+                    s.messageWrapper,
+                    isMe
+                      ? { alignSelf: "flex-end" }
+                      : { alignSelf: "flex-start" },
+                  ]}
+                >
+                  <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
+                    <Text
+                      style={[
+                        s.messageText,
+                        isMe ? s.messageTextMe : s.messageTextThem,
+                      ]}
+                    >
+                      {msg.text}
+                    </Text>
+                    <Text
+                      style={[s.timestampText, isMe ? s.timeMe : s.timeThem]}
+                    >
+                      {msg.timestamp}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+
+          {isPartnerTyping && (
+            <View style={[s.messageWrapper, { alignSelf: "flex-start" }]}>
+              <View style={[s.bubble, s.bubbleThem, s.typingBubble]}>
+                <View style={s.typingEmojiBox}>
+                  <Text style={{ fontSize: 12 }}>{activityEmoji}</Text>
+                </View>
+                <Text style={[s.messageText, s.messageTextThem, s.typingText]}>
+                  {(typingUserName || partnerName).split(" ")[0]} is typing...
                 </Text>
               </View>
             </View>
-
-            {/* Privacy Subtext */}
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-              <Text style={{ color: sub || "#94A3B8", fontSize: 11 }}>
-                Your location is only used to show your request nearby.
-              </Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Floating Post Request Bar */}
-      <View style={styles.bottomBar}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <View style={styles.bottomIconWrap}>
-            <Ionicons name="people" size={18} color={primary || "#A855F7"} />
-          </View>
-
-          <Text style={styles.bottomBarText}>
-            Post once and people nearby will be notified instantly. 👋
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={handlePostRequest}
-          disabled={isSubmitting || postedSuccess}
-          activeOpacity={0.85}
-          style={[styles.postBtn, postedSuccess && styles.postBtnSuccess]}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : postedSuccess ? (
-            <>
-              <Ionicons name="checkmark-circle" size={17} color="#FFFFFF" />
-              <Text style={styles.postBtnText}>Posted!</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
-              <Text style={styles.postBtnText}>Post Request</Text>
-            </>
           )}
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
 
-      {/* Categories View All Modal */}
-      <Modal visible={showDetailModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <Text style={styles.modalTitle}>Select Request Category</Text>
-              <TouchableOpacity onPress={() => setShowDetailModal(false)}>
-                <Ionicons
-                  name="close-circle"
-                  size={26}
-                  color={sub || "#94A3B8"}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ gap: 10 }}>
-              {CATEGORIES.map((cat) => (
+        {/* Quick Suggestion Chips */}
+        <View style={s.quickRepliesContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 12 }}
+          >
+            {isOwnActivity ? (
+              <>
                 <TouchableOpacity
-                  key={cat.id}
-                  onPress={() => {
-                    setSelectedCategory(cat.id);
-                    setShowDetailModal(false);
-                  }}
-                  style={[
-                    styles.modalItem,
-                    selectedCategory === cat.id && styles.modalItemSelected,
-                  ]}
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Welcome everyone! Excited to meet up 👋")
+                  }
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
-                    <Ionicons
-                      name={cat.iconName}
-                      size={22}
-                      color={cat.iconColor}
-                    />
-                    <View>
-                      <Text
-                        style={{
-                          color: text || "#FFFFFF",
-                          fontWeight: "700",
-                          fontSize: 14,
-                        }}
-                      >
-                        {cat.title}
-                      </Text>
-                      <Text style={{ color: sub || "#94A3B8", fontSize: 11 }}>
-                        {cat.subtitle}
-                      </Text>
-                    </View>
-                  </View>
-                  {selectedCategory === cat.id && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={primary || "#A855F7"}
-                    />
-                  )}
+                  <Text style={s.chipText}>Welcome everyone! 👋</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply(
+                      "I'm at the location, see you all soon! 📍",
+                    )
+                  }
+                >
+                  <Text style={s.chipText}>I'm at location 📍</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply(
+                      "Let me know if anyone needs directions! 🗺️",
+                    )
+                  }
+                >
+                  <Text style={s.chipText}>Need directions? 🗺️</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Count me in! What time works best? 🏃‍♂️")
+                  }
+                >
+                  <Text style={s.chipText}>Count me in! 🏃‍♂️</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("See you at the location! 👋")
+                  }
+                >
+                  <Text style={s.chipText}>See you there! 👋</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() =>
+                    handleQuickReply("Is this still open to join? ☕")
+                  }
+                >
+                  <Text style={s.chipText}>Still open to join? ☕</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
         </View>
-      </Modal>
-      {/* </View> */}
+
+        {/* Input Bar */}
+        <View style={s.inputContainer}>
+          <TouchableOpacity style={s.iconInputBtn}>
+            <Ionicons name="add-circle-outline" size={24} color={t.sub} />
+          </TouchableOpacity>
+
+          <TextInput
+            style={s.textInput}
+            placeholder={
+              isOwnActivity
+                ? "Send a message as host..."
+                : `Message ${partnerName.split(" ")[0]}...`
+            }
+            placeholderTextColor={t.placeholder}
+            value={inputMessage}
+            onChangeText={handleInputChange}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            editable={true}
+          />
+
+          <TouchableOpacity
+            style={[s.sendBtn, !inputMessage.trim() && { opacity: 0.5 }]}
+            onPress={handleSend}
+            disabled={!inputMessage.trim()}
+          >
+            <Ionicons name="send" size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const createStyles = (t: any, isDark: boolean) => {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.border,
+      backgroundColor: t.bg2,
+    },
+    backBtn: {
+      padding: 6,
+      marginRight: 6,
+    },
+    headerUser: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: t.primary,
+    },
+    headerEmojiBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderWidth: 1.5,
+      borderColor: t.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    bannerEmojiBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(168, 85, 247, 0.35)" : "#E9D5FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    typingEmojiBox: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark ? "rgba(168, 85, 247, 0.2)" : "#F3E8FF",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 6,
+    },
+    onlineDot: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 11,
+      height: 11,
+      borderRadius: 6,
+      backgroundColor: "#22C55E",
+      borderWidth: 2,
+      borderColor: t.bg2,
+    },
+    partnerName: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: t.text,
+    },
+    onlineText: {
+      fontSize: 11,
+      color: "#4ADE80",
+      fontWeight: "600",
+    },
+    actionBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: t.cardSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    activityCard: {
+      marginHorizontal: 12,
+      marginTop: 10,
+      marginBottom: 6,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: isDark ? "rgba(168,85,247,0.08)" : "#F1F5F9",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(168,85,247,0.2)" : "#E2E8F0",
+    },
+    badge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    badgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+    distanceText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: t.primary,
+    },
+    activityTitle: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: t.text,
+      marginBottom: 2,
+    },
+    placeText: {
+      fontSize: 12,
+      color: t.sub,
+    },
+    matchNotice: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 10,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? "rgba(168,85,247,0.15)" : "#E2E8F0",
+    },
+    matchNoticeText: {
+      flex: 1,
+      fontSize: 12,
+      color: t.sub,
+      lineHeight: 16,
+    },
+    messageWrapper: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 8,
+      maxWidth: "82%",
+    },
+    smallAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      marginBottom: 2,
+    },
+    bubble: {
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bubbleMe: {
+      backgroundColor: t.primary,
+      borderBottomRightRadius: 4,
+    },
+    bubbleThem: {
+      backgroundColor: isDark ? "#1E1535" : "#E2E8F0",
+      borderBottomLeftRadius: 4,
+    },
+    messageText: {
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    messageTextMe: {
+      color: "#FFFFFF",
+      fontWeight: "500",
+    },
+    messageTextThem: {
+      color: t.text,
+      fontWeight: "500",
+    },
+    timestampText: {
+      fontSize: 10,
+      marginTop: 4,
+      alignSelf: "flex-end",
+    },
+    timeMe: {
+      color: "rgba(255,255,255,0.8)",
+    },
+    timeThem: {
+      color: t.sub,
+    },
+    quickRepliesContainer: {
+      paddingVertical: 6,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    chip: {
+      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    chipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: t.text,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: t.bg2,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    iconInputBtn: {
+      padding: 4,
+    },
+    textInput: {
+      flex: 1,
+      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F1F5F9",
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === "ios" ? 10 : 8,
+      color: t.text,
+      fontSize: 14,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    sendBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: t.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    typingBubble: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: isDark ? "rgba(168,85,247,0.15)" : "#E2E8F0",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(168,85,247,0.25)" : "#CBD5E1",
+    },
+    typingAvatar: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+    },
+    typingText: {
+      fontSize: 12,
+      fontStyle: "italic",
+      color: t.sub,
+    },
+  });
+};

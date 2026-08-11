@@ -1,9 +1,10 @@
 import { AppDataSource } from "../data-source";
 import { AuditLog } from "../entities/AuditLog.entity";
 
-
 export class AuditRepository {
-  private repo = AppDataSource.getRepository(AuditLog);
+  private get repo() {
+    return AppDataSource.getRepository(AuditLog);
+  }
 
   async create(data: { userId: string; action: string; details: string }) {
     const log = this.repo.create({
@@ -21,3 +22,5 @@ export class AuditRepository {
     });
   }
 }
+
+export const auditRepository = new AuditRepository();

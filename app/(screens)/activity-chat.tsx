@@ -36,6 +36,7 @@ export default function ActivityChatScreen() {
     userId?: string;
     organizerId?: string;
     participantId?: string;
+    partner?: string;
     place?: string;
     right?: string;
     type?: string;
@@ -49,7 +50,19 @@ export default function ActivityChatScreen() {
   const { theme: t, isDark } = useTheme();
   const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
-  const partnerName = params.user || "Ananya R.";
+  const organizerId = params.organizerId || params.userId;
+
+  const isOwnActivity =
+    (user?.id && organizerId === user.id) ||
+    ((user?.name &&
+      params.user &&
+      params.user.toLowerCase().trim() ===
+        user.name.toLowerCase().trim()) as boolean);
+
+  const rawUserParam =
+    params.partner || params.user || user?.name || "Ananya R.";
+  const partnerName = rawUserParam;
+
   const contextTitle = params.title || "Morning Walk / Jogging Partner";
   const activityType = params.type || params.category || "DAY MATES";
   const activityPlace = params.place || "Bandra Reclamation, Mumbai";
@@ -78,16 +91,9 @@ export default function ActivityChatScreen() {
     user?.avatar ||
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
 
-  const organizerId = params.organizerId || params.userId;
-
-  const isOwnActivity =
-    (user?.id && organizerId === user.id) ||
-    ((user?.name &&
-      partnerName.toLowerCase().trim() ===
-        user.name.toLowerCase().trim()) as boolean);
-
   const [inputMessage, setInputMessage] = useState("");
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [typingUserName, setTypingUserName] = useState<string>("");
   const typingTimeoutRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -141,6 +147,9 @@ export default function ActivityChatScreen() {
       (data: { userId: string; userName?: string; isTyping: boolean }) => {
         if (data.userId !== user?.id) {
           setIsPartnerTyping(data.isTyping);
+          if (data.isTyping && data.userName) {
+            setTypingUserName(data.userName);
+          }
         }
       },
     );
@@ -525,7 +534,7 @@ export default function ActivityChatScreen() {
                   <Text style={{ fontSize: 12 }}>{activityEmoji}</Text>
                 </View>
                 <Text style={[s.messageText, s.messageTextThem, s.typingText]}>
-                  {partnerName.split(" ")[0]} is typing...
+                  {(typingUserName || partnerName).split(" ")[0]} is typing...
                 </Text>
               </View>
             </View>

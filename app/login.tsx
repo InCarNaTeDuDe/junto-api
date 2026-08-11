@@ -25,6 +25,8 @@ import { ApiService } from "@/services/api";
 import { useStyles } from "@/hooks/useStyles";
 import { DarkTheme, Theme } from "@/theme";
 
+import { WalkingCoffeeMascot } from "@/components/WalkingCoffeeMascot";
+
 const C = {
   purple: "#7C3AED",
   purpleSoft: "#EDE7FE",
@@ -208,6 +210,9 @@ export default function Login() {
                 memories.
               </Text>
             </View>
+
+            {/* Animated Walking Coffee Bag Mascot */}
+            {/* <WalkingCoffeeMascot scale={1.1} label="Walking for Coffee! ☕" /> */}
 
             {/* Hero - full image, no overlays clipping it */}
             <View style={s.hero}>

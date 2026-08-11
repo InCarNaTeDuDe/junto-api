@@ -43,6 +43,12 @@ export class User {
   })
   passwordHash?: string;
 
+  @Column({
+    type: "varchar",
+    nullable: true,
+  })
+  pushToken?: string;
+
   @CreateDateColumn({
     type: "timestamp",
   })

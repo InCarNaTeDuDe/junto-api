@@ -2,7 +2,9 @@ import { AppDataSource } from "../data-source";
 import { DeviceSession } from "../entities/DeviceSession.entity";
 
 export class DeviceRepository {
-  private repo = AppDataSource.getRepository(DeviceSession);
+  private get repo() {
+    return AppDataSource.getRepository(DeviceSession);
+  }
 
   async findByDeviceId(userId: string, deviceId: string) {
     return this.repo.findOne({
@@ -53,3 +55,5 @@ export class DeviceRepository {
     });
   }
 }
+
+export const deviceRepository = new DeviceRepository();

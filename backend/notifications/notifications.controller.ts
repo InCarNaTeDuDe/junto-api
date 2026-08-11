@@ -3,7 +3,27 @@ import {
   getUserNotifications,
   markNotificationAsRead,
   sendPushNotification,
+  registerUserPushToken,
 } from "./notifications.service";
+
+export async function registerToken(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { pushToken } = req.body;
+    if (!pushToken) {
+      return res
+        .status(400)
+        .json({ success: false, message: "pushToken is required" });
+    }
+    const result = await registerUserPushToken(req.user!, pushToken);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {

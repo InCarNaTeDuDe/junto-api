@@ -158,7 +158,13 @@ export default function CreateScreen() {
 
   const { selectedLocation } = useLocation();
 
-  const close = () => router.back();
+  const close = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
   const back = () => setSelected(null);
 
   const submit = async () => {

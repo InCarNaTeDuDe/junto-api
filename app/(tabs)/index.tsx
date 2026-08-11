@@ -33,6 +33,7 @@ import { RefreshControl } from "react-native";
 import { SpinnerLoader } from "@/components/SpinnerLoader";
 
 import { useStore } from "@/hooks/useStore";
+import { WalkingCoffeeMascot } from "@/components/WalkingCoffeeMascot";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -716,6 +717,14 @@ export default function Home() {
             />
           </Pressable>
         </View>
+
+        {/* Animated Coffee Bag Mascot */}
+        {/* <View style={{ marginVertical: 4, alignItems: "center" }}>
+          <WalkingCoffeeMascot
+            scale={0.95}
+            label="Walking around DayMates! ☕"
+          />
+        </View> */}
 
         {/* Hero cards */}
         <ScrollView

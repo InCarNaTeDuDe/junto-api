@@ -5,6 +5,13 @@ import { io } from "../socket/socket";
 
 const notificationRepo = AppDataSource.getRepository(Notification);
 
+export async function registerUserPushToken(user: User, pushToken: string) {
+  const userRepo = AppDataSource.getRepository(User);
+  user.pushToken = pushToken;
+  await userRepo.save(user);
+  return { success: true, message: "Push token registered successfully" };
+}
+
 export async function getUserNotifications(user: User) {
   const notificationRepo = AppDataSource.getRepository(Notification);
   const notifications = await notificationRepo.find({

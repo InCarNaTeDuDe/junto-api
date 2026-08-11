@@ -36,3 +36,4 @@ export class MessageRepository {
     return this.repo.save(msg);
   }
 }
+export const messageRepository = new MessageRepository();

@@ -1,6 +1,8 @@
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 import { Alert, Platform } from "react-native";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 
 export interface PushNotificationPayload {
   id?: string;
@@ -16,6 +18,139 @@ export interface PushNotificationPayload {
 }
 
 export const PushNotificationService = {
+  /**
+   * Configure default notification behavior for foreground push notifications.
+   */
+  configureNotificationHandler() {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  },
+
+  /**
+   * Register device for Expo Push Notifications, request permissions, and store token on server.
+   */
+  async registerForPushNotificationsAsync(): Promise<string | null> {
+    let token: string | null = null;
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#A855F7",
+      });
+    }
+
+    try {
+      if (Device.isDevice || Platform.OS !== "web") {
+        const existingPerm: any = await Notifications.getPermissionsAsync();
+        let finalStatus = existingPerm.status || (existingPerm.granted ? "granted" : "denied");
+
+        if (finalStatus !== "granted") {
+          const reqPerm: any = await Notifications.requestPermissionsAsync();
+          finalStatus = reqPerm.status || (reqPerm.granted ? "granted" : "denied");
+        }
+
+        if (finalStatus !== "granted") {
+          console.warn("Push notification permission not granted.");
+          return null;
+        }
+
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        token = tokenData.data;
+        console.log("📲 Expo Push Token:", token);
+
+        if (token) {
+          await ApiService.post("/api/notifications/register-token", { pushToken: token });
+        }
+      } else {
+        console.log("Expo Push Notifications active (web fallback).");
+      }
+    } catch (err) {
+      console.warn("Could not retrieve Expo push token:", err);
+    }
+
+    return token;
+  },
+
+  /**
+   * Listen for incoming Expo notifications in foreground and taps on notifications.
+   */
+  addExpoNotificationListeners(
+    onReceived?: (notification: Notifications.Notification) => void,
+    onResponse?: (response: Notifications.NotificationResponse) => void,
+  ) {
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      console.log("🔔 Expo Push Notification received:", notification);
+      const title = notification.request.content.title || "New Push Notification";
+      const body = notification.request.content.body || "";
+      Alert.alert(`🔔 ${title}`, body);
+      if (onReceived) onReceived(notification);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log("👆 Expo Push Notification clicked:", response);
+      const title = response.notification.request.content.title || "Notification Tapped";
+      const body = response.notification.request.content.body || "";
+      Alert.alert(`👆 ${title}`, body);
+      if (onResponse) onResponse(response);
+    });
+
+    return () => {
+      try {
+        if (receivedSubscription && typeof receivedSubscription.remove === "function") {
+          receivedSubscription.remove();
+        } else if (typeof (Notifications as any).removeNotificationSubscription === "function") {
+          (Notifications as any).removeNotificationSubscription(receivedSubscription);
+        }
+      } catch (e) {
+        // Safe fallback
+      }
+
+      try {
+        if (responseSubscription && typeof responseSubscription.remove === "function") {
+          responseSubscription.remove();
+        } else if (typeof (Notifications as any).removeNotificationSubscription === "function") {
+          (Notifications as any).removeNotificationSubscription(responseSubscription);
+        }
+      } catch (e) {
+        // Safe fallback
+      }
+    };
+  },
+
+  /**
+   * Trigger a local push notification and display a debug Alert popup.
+   */
+  async triggerLocalPushNotification(title: string, body: string, data: any = {}): Promise<void> {
+    try {
+      console.log("🚀 Triggering Local Push Notification:", title, body);
+      
+      // Always show debug Alert for immediate confirmation
+      Alert.alert(`📢 Push Notification`, `${title}\n\n${body}`);
+
+      // Schedule Expo Push Notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+          sound: true,
+        },
+        trigger: null, // deliver immediately
+      });
+    } catch (err) {
+      console.warn("Could not schedule local notification:", err);
+    }
+  },
+
   /**
    * Helper to join an activity and trigger a push notification to the owner/organizer.
    */

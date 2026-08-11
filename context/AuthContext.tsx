@@ -197,13 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.id) {
       connectSocket(user.id);
       fetchNotificationsFromApi();
+
+      // Configure Expo Push Notifications
+      PushNotificationService.configureNotificationHandler();
+      PushNotificationService.registerForPushNotificationsAsync();
+
       const unsubscribe = PushNotificationService.initPushNotificationListener(
         (notification) => {
           console.log("🔔 Global Push Notification Received:", notification);
           addNotificationToStore({
             id: notification.id,
             title: notification.title,
-            message: notification.message || notification.text,
+            message: notification.message || (notification as any).text || "",
             type: notification.type,
             timestamp: notification.timestamp || new Date().toISOString(),
             read: false,
@@ -211,8 +216,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         },
       );
+      const unsubscribeExpo =
+        PushNotificationService.addExpoNotificationListeners(
+          (notif) => {
+            console.log("🔔 Expo Push Received:", notif.request.content);
+          },
+          (resp) => {
+            console.log(
+              "👆 Expo Push Clicked:",
+              resp.notification.request.content,
+            );
+          },
+        );
+
       return () => {
         unsubscribe();
+        if (unsubscribeExpo) unsubscribeExpo();
       };
     }
   }, [user?.id]);

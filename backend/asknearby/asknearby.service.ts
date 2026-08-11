@@ -1,7 +1,7 @@
-import { AppDataSource } from "../db/data-source";
-import { Activity, ActivityCategory } from "../db/entities/Activity.entity";
+import { activityRepository } from "../db/repository/Activity.repository";
+import { notificationRepository } from "../db/repository/Notification.repository";
+import { ActivityCategory } from "../db/entities/Activity.entity";
 import { User } from "../db/entities/User.entity";
-import { Notification } from "../db/entities/Notification.entity";
 import {
   CreateAskNearbyRequest,
   QueryAskNearbyRequest,
@@ -13,9 +13,7 @@ export async function createAskNearby(
   body: CreateAskNearbyRequest,
   organizer: User,
 ) {
-  const activityRepository = AppDataSource.getRepository(Activity);
-
-  const request = activityRepository.create({
+  const request = await activityRepository.create({
     organizerId: organizer.id,
     title: body.title || `${body.category}: Need Help`,
     description:
@@ -35,23 +33,35 @@ export async function createAskNearby(
     isAutoDetected: body.isAutoDetected ?? false,
   });
 
-  return await activityRepository.save(request);
+  // Create push notification entry
+  const notification = await notificationRepository.createNotification({
+    userId: organizer.id,
+    title: `Ask Nearby Broadcasted! 📢`,
+    message: `Your request "${request.title}" was posted to DayMates nearby in ${request.locationName}.`,
+    type: "ask_nearby",
+  });
+
+  if (io) {
+    io.to(`user:${organizer.id}`).emit("push_notification", {
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: "ask_nearby",
+      requestId: request.id,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return request;
 }
 
 export async function listAskNearbyRequests(query: QueryAskNearbyRequest) {
-  const activityRepository = AppDataSource.getRepository(Activity);
+  const requests = await activityRepository.findAll();
+  const askNearbyRequests = requests.filter(
+    (req) => req.category === ActivityCategory.ASK_NEARBY,
+  );
 
-  const whereCondition: any = {
-    category: ActivityCategory.ASK_NEARBY,
-  };
-
-  const requests = await activityRepository.find({
-    where: whereCondition,
-    relations: { organizer: true },
-    order: { createdAt: "DESC" },
-  });
-
-  return requests.map((req) => ({
+  return askNearbyRequests.map((req) => ({
     id: req.id,
     title: req.title,
     description: req.description,
@@ -72,11 +82,7 @@ export async function listAskNearbyRequests(query: QueryAskNearbyRequest) {
 }
 
 export async function getAskNearbyById(id: string) {
-  const activityRepository = AppDataSource.getRepository(Activity);
-  const req = await activityRepository.findOne({
-    where: { id },
-    relations: { organizer: true },
-  });
+  const req = await activityRepository.findById(id);
 
   if (!req) return null;
 
@@ -106,13 +112,7 @@ export async function respondToAskNearby(
   helper: User,
   body: RespondAskNearbyRequest,
 ) {
-  const activityRepository = AppDataSource.getRepository(Activity);
-  const notificationRepository = AppDataSource.getRepository(Notification);
-
-  const request = await activityRepository.findOne({
-    where: { id },
-    relations: { organizer: true },
-  });
+  const request = await activityRepository.findById(id);
 
   if (!request) {
     throw new Error("AskNearby request not found");
@@ -122,17 +122,17 @@ export async function respondToAskNearby(
   const participants = new Set(request.participantIds || []);
   participants.add(helper.id);
   request.participantIds = Array.from(participants);
-  await activityRepository.save(request);
+  await activityRepository.update(id, {
+    participantIds: request.participantIds,
+  });
 
   // Send push notification record to database
-  const notification = notificationRepository.create({
+  const notification = await notificationRepository.createNotification({
     userId: request.organizerId,
     title: `Someone is helping! 🆘`,
     message: `${helper.name || "A neighbor nearby"} offered help on your request "${request.title}"! ${body.message ? `Note: "${body.message}"` : ""}`,
     type: "ask_nearby",
-    read: false,
   });
-  await notificationRepository.save(notification);
 
   // Real-time Push Notification socket event to organizer
   if (io) {
@@ -156,11 +156,7 @@ export async function respondToAskNearby(
 }
 
 export async function resolveAskNearby(id: string, organizer: User) {
-  const activityRepository = AppDataSource.getRepository(Activity);
-
-  const request = await activityRepository.findOne({
-    where: { id },
-  });
+  const request = await activityRepository.findById(id);
 
   if (!request) {
     throw new Error("AskNearby request not found");
@@ -170,8 +166,7 @@ export async function resolveAskNearby(id: string, organizer: User) {
     throw new Error("Unauthorized to resolve this request");
   }
 
-  request.remainingSeats = 0;
-  await activityRepository.save(request);
+  await activityRepository.update(id, { remainingSeats: 0 });
 
   return {
     success: true,

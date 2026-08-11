@@ -2,7 +2,14 @@ import { AppDataSource } from "../data-source";
 import { Activity } from "../entities/Activity.entity";
 
 export class ActivityRepository {
-  private repo = AppDataSource.getRepository(Activity);
+  private get repo() {
+    return AppDataSource.getRepository(Activity);
+  }
+
+  async countOrganizerActivities(organizerId: string): Promise<number> {
+    if (!AppDataSource.isInitialized) return 0;
+    return this.repo.count({ where: { organizerId } });
+  }
 
   async create(data: Partial<Activity>) {
     const activity = this.repo.create(data);
@@ -19,9 +26,36 @@ export class ActivityRepository {
   }
 
   async findAll() {
+    if (!AppDataSource.isInitialized) return [];
     return this.repo.find({
       relations: { organizer: true },
       order: { createdAt: "DESC" },
+    });
+  }
+
+  async findByLocation(latitude: number, longitude: number) {
+    if (!AppDataSource.isInitialized) return [];
+    return this.repo.find({
+      where: {
+        latitude,
+        longitude,
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        cost: true,
+        latitude: true,
+        longitude: true,
+        locationName: true,
+        organizer: {
+          name: true,
+          avatar: true,
+        },
+      },
+      relations: {
+        organizer: true,
+      },
     });
   }
 
@@ -32,22 +66,71 @@ export class ActivityRepository {
     });
   }
 
-  async findUserActivities(userId: string) {
-    // return this.repo
-    //   .createQueryBuilder("activity")
-    //   .leftJoinAndSelect("activity.organizer", "organizer")
-    //   .where("activity.organizerId = :userId", { userId })
-    //   .orWhere(":userId = ANY(activity.participantIds)", { userId }) // Postgres array
-    //   .orderBy("activity.createdAt", "DESC")
-    //   .getMany();
+  async findUserActivities(userId: any, userEmail?: string, userName?: string) {
+    const targetUserId =
+      typeof userId === "string"
+        ? userId
+        : userId?.id || userId?.userId || userId?.sub || userId?._id || "";
 
-    const activities = await this.findAll();
+    if (!targetUserId && !userEmail && !userName) return [];
 
-    return activities.filter(
-      (activity) =>
-        activity.organizerId === userId ||
-        activity.participantIds?.includes(userId),
-    );
+    if (AppDataSource.isInitialized) {
+      try {
+        const activities = await this.repo.find({
+          where: {
+            organizer: {
+              id: userId,
+            },
+          },
+          relations: {
+            organizer: true,
+          },
+          order: {
+            createdAt: "DESC",
+          },
+        });
+
+        return activities.filter((activity) => {
+          const orgId = activity.organizerId || activity.organizer?.id;
+          const orgEmail = activity.organizer?.email;
+          const orgName = activity.organizer?.name;
+
+          const isOrganizer = Boolean(
+            (targetUserId && orgId && String(orgId) === String(targetUserId)) ||
+            (userEmail &&
+              orgEmail &&
+              orgEmail.toLowerCase() === userEmail.toLowerCase()) ||
+            (userName &&
+              orgName &&
+              orgName.toLowerCase() === userName.toLowerCase()),
+          );
+
+          let isParticipant = false;
+          if (activity.participantIds) {
+            if (Array.isArray(activity.participantIds)) {
+              isParticipant = activity.participantIds.some(
+                (p) =>
+                  (targetUserId && String(p) === String(targetUserId)) ||
+                  (userEmail && String(p) === userEmail),
+              );
+            } else if (typeof activity.participantIds === "string") {
+              const pList = (activity.participantIds as string).split(",");
+              isParticipant = pList.some(
+                (p) =>
+                  (targetUserId && p.trim() === String(targetUserId)) ||
+                  (userEmail && p.trim() === userEmail),
+              );
+            }
+          }
+
+          return isOrganizer || isParticipant;
+        });
+      } catch (err) {
+        console.error("Error finding user activities:", err);
+      }
+    }
+
+    return [];
   }
 }
 

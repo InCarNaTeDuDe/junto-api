@@ -22,6 +22,7 @@ import { useStore } from "@/hooks/useStore";
 import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/theme";
 import { router } from "expo-router";
+import { ApiService } from "@/services/api";
 
 function hexA(hex: string, a: number) {
   if (!hex) return `rgba(168,85,247,${a})`;
@@ -62,16 +63,56 @@ export default function ProfileScreen() {
     | null
   >(null);
 
+  // Realtime backend API user state fetched from /api/me
+  const [apiUser, setApiUser] = useState<any>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function fetchMe() {
+      try {
+        const res = await ApiService.get<{ success: boolean; user: any }>(
+          "/api/auth/me",
+        );
+        if (isMounted && res && res.user) {
+          console.log("Fetched /api/me user data successfully:", res.user);
+          setApiUser(res.user);
+        }
+      } catch (err) {
+        console.log("Note: /api/me fetch skipped or offline:", err);
+      }
+    }
+    fetchMe();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Edit profile form state
-  const [editName, setEditName] = useState(user?.name || "Bharath Maska");
+  const userName =
+    apiUser?.name || user?.name || state.currentUser?.name || "User";
+  const [editName, setEditName] = useState(userName);
   const [editBio, setEditBio] = useState(
-    (user as any)?.bio ||
+    apiUser?.bio ||
+      (user as any)?.bio ||
+      state.currentUser?.bio ||
       "Love meeting new people and exploring new things! ✨",
   );
   const [editAvatar, setEditAvatar] = useState(
-    user?.avatar ||
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    apiUser?.avatar ||
+      user?.avatar ||
+      state.currentUser?.avatar ||
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
   );
+
+  // Sync edit form state when user or apiUser changes
+  React.useEffect(() => {
+    const name = apiUser?.name || user?.name;
+    const bio = apiUser?.bio || (user as any)?.bio || state.currentUser?.bio;
+    const avatar = apiUser?.avatar || user?.avatar || state.currentUser?.avatar;
+    if (name) setEditName(name);
+    if (bio) setEditBio(bio);
+    if (avatar) setEditAvatar(avatar);
+  }, [apiUser, user, state.currentUser]);
 
   // Settings toggles
   const [pushNotifs, setPushNotifs] = useState(true);
@@ -86,58 +127,192 @@ export default function ProfileScreen() {
     state.currentUser?.location ||
     "Koramangala, Bengaluru";
 
-  const userHandle = `@${(user?.name || "bharath_m")
+  const userHandle = `@${(
+    apiUser?.name ||
+    user?.name ||
+    state.currentUser?.name ||
+    user?.email?.split("@")[0] ||
+    "user"
+  )
     .toLowerCase()
     .replace(/\s+/g, "_")}`;
 
   const userBio =
+    apiUser?.bio ||
     (user as any)?.bio ||
     state.currentUser?.bio ||
     "Love meeting new people and exploring new things! ✨";
 
   const userAvatar =
+    apiUser?.avatar ||
     user?.avatar ||
     state.currentUser?.avatar ||
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150";
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
 
-  // Filter user's posts
+  // Helper to open activity details
+  const handleOpenActivity = (post: any) => {
+    setActiveModal(null);
+    router.push({
+      pathname: "/(screens)/activity-chat",
+      params: {
+        activityId: post.id,
+        id: post.id,
+        title: post.title,
+        user: post.host?.name || user?.name || "Junto User",
+        organizerId: user?.id,
+        place: post.location,
+        type: post.category,
+        category: post.category,
+        avatar: post.host?.avatar || user?.avatar,
+      },
+    });
+  };
+
+  // Filter user's activities dynamically from local context
   const myPosts = useMemo(() => {
-    return state.posts.filter(
-      (p) =>
-        p.host.name.toLowerCase() === (user?.name || "").toLowerCase() ||
-        p.host.name === state.currentUser?.name,
-    );
-  }, [state.posts, user]);
+    const currentUserId =
+      apiUser?.id || (user as any)?.id || (state.currentUser as any)?.id;
+    const currentName = (
+      user?.name ||
+      state.currentUser?.name ||
+      apiUser?.name ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
+    return state.posts.filter((p: any) => {
+      if (currentUserId && p.organizerId) {
+        return p.organizerId === currentUserId;
+      }
+      if (currentName) {
+        const hostName = (p.host?.name || "").toLowerCase().trim();
+        return hostName.includes(currentName) || currentName.includes(hostName);
+      }
+      return false;
+    });
+  }, [state.posts, user, state.currentUser, apiUser?.id, apiUser?.name]);
 
+  // Combined activities list from backend API /api/me response or local posts fallback
+  const userActivitiesList = useMemo(() => {
+    if (apiUser?.activities) {
+      let rawList: any[] = [];
+      if (Array.isArray(apiUser.activities)) {
+        rawList = apiUser.activities;
+      } else if (typeof apiUser.activities === "object") {
+        rawList = Object.values(apiUser.activities).flat();
+      }
+
+      if (rawList.length > 0) {
+        return rawList.map((act: any) => ({
+          id: act.id,
+          title: act.title,
+          category: act.category,
+          location: act.locationName || act.location || "Location",
+          image:
+            act.bannerImage ||
+            act.image ||
+            "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600",
+          status: act.remainingSeats === 0 ? "Resolved" : "Active",
+          host: {
+            name: act.organizer?.name || apiUser.name || "User",
+            avatar: act.organizer?.avatar || apiUser.avatar,
+          },
+          raw: act,
+        }));
+      }
+    }
+    return myPosts;
+  }, [apiUser, myPosts]);
+
+  // Filter user's ticket listings dynamically from API MOVIES activities and local posts
   const ticketPosts = useMemo(() => {
-    return state.posts.filter(
-      (p) =>
-        p.category === "Movie Tickets" ||
-        (p.category as string) === "MOVIE TICKET" ||
-        (p.category as string) === "TICKETS",
-    );
-  }, [state.posts]);
+    let apiTickets: any[] = [];
+    if (apiUser?.activities) {
+      if (
+        typeof apiUser.activities === "object" &&
+        !Array.isArray(apiUser.activities)
+      ) {
+        apiTickets = apiUser.activities.MOVIES || [];
+      } else if (Array.isArray(apiUser.activities)) {
+        apiTickets = apiUser.activities.filter(
+          (a: any) =>
+            a.category === "MOVIES" ||
+            a.category === "Movie Tickets" ||
+            a.category === "MOVIE TICKET" ||
+            a.category === "TICKETS",
+        );
+      }
+    }
+
+    const mappedApiTickets = apiTickets.map((act: any) => ({
+      id: act.id,
+      title: act.title,
+      category: "Movie Tickets",
+      location: act.locationName || act.location || "Location",
+      image:
+        act.bannerImage ||
+        act.image ||
+        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600",
+      price: act.cost ? `₹${act.cost}` : act.price || "₹500 each",
+      status: act.remainingSeats === 0 ? "Resolved" : "Active",
+      host: {
+        name: act.organizer?.name || apiUser?.name || "User",
+        avatar: act.organizer?.avatar || apiUser?.avatar,
+      },
+      raw: act,
+    }));
+
+    const localTickets = myPosts
+      .filter(
+        (p: any) =>
+          p.category === "Movie Tickets" ||
+          p.category === "MOVIE TICKET" ||
+          p.category === "TICKETS" ||
+          p.category === "MOVIES",
+      )
+      .map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        category: p.category || "Movie Tickets",
+        location: p.location || "Location",
+        image:
+          p.image ||
+          "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600",
+        price: p.price || (p.raw?.cost ? `₹${p.raw.cost}` : "₹500 each"),
+        status: p.status || "Active",
+        host: p.host || { name: "User", avatar: "" },
+        raw: p,
+      }));
+
+    const combined = [...mappedApiTickets];
+    for (const t of localTickets) {
+      if (!combined.some((item) => item.id === t.id)) {
+        combined.push(t);
+      }
+    }
+    return combined;
+  }, [apiUser, myPosts]);
 
   // Real Connections count calculated from chats and current user
-  const realConnectionsCount = useMemo(() => {
-    if (
-      (user as any)?.connectionsCount !== undefined &&
-      (user as any)?.connectionsCount !== null
-    ) {
-      return (user as any).connectionsCount;
-    }
-    if (
-      state.currentUser?.connectionsCount !== undefined &&
-      state.currentUser?.connectionsCount !== null
-    ) {
-      return state.currentUser.connectionsCount;
-    }
-    const partners = new Set<string>();
-    state.chats.forEach((c) => {
-      if (c.partner?.name) partners.add(c.partner.name);
-    });
-    return partners.size;
-  }, [state.chats, state.currentUser, user]);
+  // const realConnectionsCount = useMemo(() => {
+  //   if (
+  //     (user as any)?.connectionsCount !== undefined &&
+  //     (user as any)?.connectionsCount !== null
+  //   ) {
+  //     return (user as any).connectionsCount;
+  //   }
+  //   if (
+  //     state.currentUser?.connectionsCount !== undefined &&
+  //     state.currentUser?.connectionsCount !== null
+  //   ) {
+  //     return state.currentUser.connectionsCount;
+  //   }
+  //   const partners = new Set<string>();
+  //   state.chats.forEach((c) => {
+  //     if (c.partner?.name) partners.add(c.partner.name);
+  //   });
+  //   return partners.size;
+  // }, [state.chats, state.currentUser, user]);
 
   // Total unread chat count
   const unreadChatsCount = useMemo(() => {
@@ -220,7 +395,7 @@ export default function ProfileScreen() {
               {/* Name & Verified Badge */}
               <View style={s.nameBadgeRow}>
                 <Text style={s.nameText} numberOfLines={1}>
-                  {user?.name || "Bharath Maska"}
+                  {user?.name || state.currentUser?.name || "User"}
                 </Text>
                 <Ionicons
                   name="checkmark-circle"
@@ -262,13 +437,17 @@ export default function ProfileScreen() {
         <View style={s.statsCardWrapper}>
           <View style={s.statsCard}>
             {/* Column 1: Connections */}
-            <View style={s.statCol}>
+            {/* <TouchableOpacity
+              style={s.statCol}
+              onPress={() => router.push("/(tabs)/chats")}
+              activeOpacity={0.75}
+            >
               <Ionicons name="people" size={scale(18)} color={t.primary} />
               <Text style={s.statNumber}>{realConnectionsCount}</Text>
               <Text style={s.statLabel}>Connections</Text>
-            </View>
+            </TouchableOpacity> */}
 
-            <View style={s.statDivider} />
+            {/* <View style={s.statDivider} /> */}
 
             {/* Column 2: Activities */}
             <TouchableOpacity
@@ -277,8 +456,10 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Ionicons name="calendar" size={scale(18)} color={t.error} />
-              <Text style={s.statNumber}>{myPosts.length}</Text>
-              <Text style={s.statLabel}>Activities</Text>
+              <Text style={s.statNumber}>
+                {apiUser?.createdActivitiesCount ?? userActivitiesList.length}
+              </Text>
+              <Text style={s.statLabel}>All Activities</Text>
             </TouchableOpacity>
 
             <View style={s.statDivider} />
@@ -290,31 +471,46 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Ionicons name="ticket" size={scale(18)} color={t.info} />
-              <Text style={s.statNumber}>{ticketPosts.length}</Text>
+              <Text style={s.statNumber}>
+                {apiUser?.ticketsCount ?? ticketPosts.length}
+              </Text>
               <Text style={s.statLabel}>Tickets</Text>
             </TouchableOpacity>
 
             <View style={s.statDivider} />
 
             {/* Column 4: Trusted */}
-            <View style={s.statCol}>
+            <TouchableOpacity
+              style={s.statCol}
+              onPress={() =>
+                Alert.alert(
+                  "Trust & Safety 🛡️",
+                  `Your Trust Score is ${
+                    apiUser?.rating || user?.rating
+                      ? `${Math.round(((apiUser?.rating || user?.rating) / 5) * 100)}%`
+                      : "100%"
+                  }.\n\nCalculated based on verified account, positive activity ratings & completed daymate interactions.`,
+                )
+              }
+              activeOpacity={0.75}
+            >
               <Ionicons
                 name="shield-checkmark"
                 size={scale(18)}
                 color={t.success}
               />
               <Text style={s.statNumber}>
-                {user?.rating
-                  ? `${Math.round((user.rating / 5) * 100)}%`
+                {apiUser?.rating || user?.rating
+                  ? `${Math.round(((apiUser?.rating || user?.rating) / 5) * 100)}%`
                   : "100%"}
               </Text>
               <Text style={s.statLabel}>Trusted</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* 3. JUNTO PREMIUM BANNER CARD */}
-        <View style={s.premiumCardWrapper}>
+        {/* <View style={s.premiumCardWrapper}>
           <TouchableOpacity
             style={s.premiumCard}
             onPress={() => setActiveModal("premium")}
@@ -345,7 +541,7 @@ export default function ProfileScreen() {
               />
             </TouchableOpacity>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* 4. "MY SPACE" SECTION */}
         <View style={s.sectionContainer}>
@@ -730,7 +926,7 @@ export default function ProfileScreen() {
           </View>
 
           <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
-            {myPosts.length === 0 ? (
+            {userActivitiesList.length === 0 ? (
               <View style={s.emptyStateBox}>
                 <Ionicons
                   name="calendar-outline"
@@ -752,8 +948,13 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              myPosts.map((post) => (
-                <View key={post.id} style={s.postCard}>
+              userActivitiesList.map((post: any) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={s.postCard}
+                  activeOpacity={0.85}
+                  onPress={() => handleOpenActivity(post)}
+                >
                   <Image source={{ uri: post.image }} style={s.postImage} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.postCategory}>{post.category}</Text>
@@ -767,7 +968,10 @@ export default function ProfileScreen() {
                     <View style={s.postActionRow}>
                       <TouchableOpacity
                         style={s.resolveBtn}
-                        onPress={() => resolvePost(post.id)}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          resolvePost(post.id);
+                        }}
                       >
                         <Text style={s.resolveBtnText}>
                           {post.status === "Resolved"
@@ -777,7 +981,10 @@ export default function ProfileScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={s.deleteBtn}
-                        onPress={() => deletePost(post.id)}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deletePost(post.id);
+                        }}
                       >
                         <Ionicons
                           name="trash-outline"
@@ -787,7 +994,7 @@ export default function ProfileScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </ScrollView>
@@ -814,29 +1021,73 @@ export default function ProfileScreen() {
           </View>
 
           <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
-            {ticketPosts.map((ticket) => (
-              <View key={ticket.id} style={s.postCard}>
-                <Image source={{ uri: ticket.image }} style={s.postImage} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.postCategory}>{ticket.category}</Text>
-                  <Text style={s.postTitle}>{ticket.title}</Text>
-                  <Text style={s.postLocation}>
-                    {ticket.price || "₹500 each"}
-                  </Text>
-                  <TouchableOpacity
-                    style={s.resolveBtn}
-                    onPress={() =>
-                      Alert.alert(
-                        "Ticket Selected",
-                        `Managing ticket listing: ${ticket.title}`,
-                      )
-                    }
-                  >
-                    <Text style={s.resolveBtnText}>View Swap Requests</Text>
-                  </TouchableOpacity>
-                </View>
+            {ticketPosts.length === 0 ? (
+              <View style={s.emptyStateBox}>
+                <Ionicons
+                  name="ticket-outline"
+                  size={scale(48)}
+                  color={t.info}
+                />
+                <Text style={s.emptyStateTitle}>No Active Tickets Listed</Text>
+                <Text style={s.emptyStateSub}>
+                  You haven't listed any tickets for sale or swap yet.
+                </Text>
+                <TouchableOpacity
+                  style={s.primaryActionBtn}
+                  onPress={() => {
+                    setActiveModal(null);
+                    router.push("/(screens)/add-ticket");
+                  }}
+                >
+                  <Text style={s.primaryActionText}>Sell / Swap a Ticket</Text>
+                </TouchableOpacity>
               </View>
-            ))}
+            ) : (
+              ticketPosts.map((ticket) => (
+                <TouchableOpacity
+                  key={ticket.id}
+                  style={s.postCard}
+                  activeOpacity={0.85}
+                  onPress={() => handleOpenActivity(ticket)}
+                >
+                  <Image source={{ uri: ticket.image }} style={s.postImage} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.postCategory}>{ticket.category}</Text>
+                    <Text style={s.postTitle} numberOfLines={1}>
+                      {ticket.title}
+                    </Text>
+                    <Text style={s.postLocation} numberOfLines={1}>
+                      {ticket.price || "₹500 each"} •{" "}
+                      {ticket.location || "Bengaluru"}
+                    </Text>
+                    <View style={s.postActionRow}>
+                      <TouchableOpacity
+                        style={s.resolveBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleOpenActivity(ticket);
+                        }}
+                      >
+                        <Text style={s.resolveBtnText}>View Swap Requests</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.deleteBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deletePost(ticket.id);
+                        }}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={scale(16)}
+                          color={t.error}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>

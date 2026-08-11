@@ -7,7 +7,9 @@ import { DeviceSession } from "../db/entities/DeviceSession.entity";
 import { LoginHistory } from "../db/entities/LoginHistory.entity";
 import { AuditLog } from "../db/entities/AuditLog.entity";
 import { generateAccessToken } from "./jwt.service";
-import { AppDataSource } from "../db/data-source";
+import { userRepository } from "../db/repository/User.repository";
+import { activityRepository } from "../db/repository/Activity.repository";
+import { ticketRepository } from "../db/repository/Ticket.repository";
 
 export async function loginWithGoogle(
   request: GoogleLoginSchema,
@@ -115,16 +117,89 @@ export async function loginWithGoogle(
 
 export async function getCurrentUser(userId: string) {
   try {
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: {
-        id: userId,
-      },
-    });
-
+    const user = await userRepository.findById(userId);
     if (!user) throw new Error("User not found.");
     return user;
   } catch (error) {
     console.log("auth.service.ts [getCurrentUser] failed:", error);
+    return null;
+  }
+}
+
+export async function getUserProfile(currentUser: any) {
+  try {
+    const userId =
+      typeof currentUser === "string"
+        ? currentUser
+        : currentUser?.id ||
+          currentUser?.userId ||
+          currentUser?.sub ||
+          currentUser?._id ||
+          "";
+
+    const userEmail =
+      typeof currentUser === "object" ? currentUser?.email : undefined;
+    const userName =
+      typeof currentUser === "object" ? currentUser?.name : undefined;
+
+    const userActivities = await activityRepository.findUserActivities(
+      userId,
+      userEmail,
+      userName,
+    );
+
+    const activitiesGrouped: Record<string, any[]> = {
+      ASK_NEARBY: [],
+      MOVIES: [],
+      DAY_MATES: [],
+    };
+
+    for (const act of userActivities || []) {
+      const cat = String(act.category || "").toUpperCase();
+      if (cat === "MOVIES" || cat.includes("MOVIE") || cat.includes("TICKET")) {
+        activitiesGrouped.MOVIES.push(act);
+      } else if (
+        cat === "ASK_NEARBY" ||
+        cat.includes("ASK") ||
+        cat.includes("NEARBY") ||
+        cat.includes("LOST")
+      ) {
+        activitiesGrouped.ASK_NEARBY.push(act);
+      } else if (
+        cat === "DAY_MATES" ||
+        cat.includes("DAY") ||
+        cat.includes("MATE")
+      ) {
+        activitiesGrouped.DAY_MATES.push(act);
+      } else {
+        if (!activitiesGrouped[cat]) {
+          activitiesGrouped[cat] = [];
+        }
+        activitiesGrouped[cat].push(act);
+      }
+    }
+
+    const totalActivitiesCount = userActivities.length;
+    const directTicketsCount = await ticketRepository.countUserTickets(userId);
+    const ticketsCount = activitiesGrouped.MOVIES.length + directTicketsCount;
+
+    return {
+      ...currentUser,
+      createdActivitiesCount: totalActivitiesCount,
+      ticketsCount: ticketsCount,
+      activities: activitiesGrouped,
+    };
+  } catch (error) {
+    console.log("auth.service.ts [getUserProfile] error:", error);
+    return {
+      ...currentUser,
+      createdActivitiesCount: 0,
+      ticketsCount: 0,
+      activities: {
+        ASK_NEARBY: [],
+        MOVIES: [],
+        DAY_MATES: [],
+      },
+    };
   }
 }

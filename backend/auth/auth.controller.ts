@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { getCurrentUser, loginWithGoogle } from "./auth.service";
+import {
+  getCurrentUser,
+  getUserProfile,
+  loginWithGoogle,
+} from "./auth.service";
 import type { GoogleLoginSchema } from "./auth.schema";
 
 export async function googleLogin(
@@ -24,5 +28,17 @@ export async function googleLogin(
 }
 
 export async function me(req: Request, res: Response) {
-  return res.json({ success: true, user: req.user });
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+
+  try {
+    const userProfile = await getUserProfile(req.user);
+    return res.json({
+      success: true,
+      user: userProfile,
+    });
+  } catch (err) {
+    return res.json({ success: true, user: req.user });
+  }
 }

@@ -63,11 +63,22 @@ async function request<T>(
   // Global preprocessing for requests with a body
   if (hasBody && !endpoint.startsWith("/api/auth/google")) {
     console.log(`Passing Location to this endpoint -> ${endpoint}`);
-    // Example:
+
     const location = await getSelectedLocation();
+    // this is the 1st route hits immediateky after logging in, so all POST request exopect location.
+    if (endpoint === "/api/activity/activities-around" && !location) {
+      console.log(
+        `Skipping ${endpoint} request because location is not available yet.`,
+      );
+      return undefined as T;
+    }
+    // Example:
 
     if (!location) {
-      Alert.alert("Error", "Please add location");
+      Alert.alert(
+        "Error",
+        `location missing for endpoint: ${endpoint}, method: ${method}`,
+      );
       throw new Error("Location is required");
     }
 
