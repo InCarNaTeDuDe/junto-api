@@ -192,10 +192,52 @@ const FEED = [
 ];
 
 /* ---------- Small components ---------- */
-const Chip = ({ icon, label, color, s }) => (
-  <Pressable style={s.chip}>
-    <Ionicons name={icon} size={moderateScale(20)} color={color} />
-    <Text style={s.chipLabel}>{label}</Text>
+const Chip = ({ icon, label, color, s, isSelected, onPress }: any) => (
+  <Pressable
+    style={[
+      s.chip,
+      isSelected && {
+        backgroundColor: "rgba(34, 197, 94, 0.15)",
+        borderColor: "#22C55E",
+        borderWidth: 1.5,
+      },
+    ]}
+    onPress={onPress}
+  >
+    <Ionicons
+      name={icon}
+      size={moderateScale(18)}
+      color={isSelected ? "#22C55E" : color}
+    />
+    <Text
+      style={[
+        s.chipLabel,
+        isSelected && { color: "#22C55E", fontWeight: "800" },
+      ]}
+    >
+      {label}
+    </Text>
+    {isSelected && (
+      <View
+        style={{
+          position: "absolute",
+          top: -4,
+          right: -4,
+          width: scale(16),
+          height: scale(16),
+          borderRadius: scale(8),
+          backgroundColor: "#22C55E",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1.5,
+          borderColor: "#FFFFFF",
+          elevation: 4,
+          zIndex: 10,
+        }}
+      >
+        <Ionicons name="checkmark" size={moderateScale(10)} color="#FFFFFF" />
+      </View>
+    )}
   </Pressable>
 );
 
@@ -565,11 +607,15 @@ export default function Home() {
   const { refreshing, onRefresh, registerRefreshHandler } = useTabRefresh();
 
   const [q, setQ] = useState("");
+  const [selectedChip, setSelectedChip] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<"newest" | "title">("newest");
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
 
   // hero card is ~55% of viewport on phone, capped on wide screens
   const { cardW: heroW, artH: heroArtHeight } = useHeroCardSize();
 
-  const [userActs, setUserActs] = useState<[]>([]);
+  const [userActs, setUserActs] = useState<any[]>([]);
   const [loadingActs, setLoadingActs] = useState(true);
 
   const loadActivities = React.useCallback(async () => {
@@ -596,6 +642,122 @@ export default function Home() {
   useEffect(() => {
     return registerRefreshHandler(loadActivities);
   }, [registerRefreshHandler, loadActivities]);
+
+  // Optimized filtering
+  const filteredUserActs = React.useMemo(() => {
+    if (!userActs || !Array.isArray(userActs)) return [];
+
+    return userActs
+      .filter((item: any) => {
+        // Search text filter
+        if (q.trim()) {
+          const query = q.toLowerCase().trim();
+          const matchTitle = item.title?.toLowerCase().includes(query);
+          const matchPlace =
+            item.place?.toLowerCase().includes(query) ||
+            item.locationName?.toLowerCase().includes(query);
+          const matchUser =
+            item.user?.toLowerCase().includes(query) ||
+            item.organizer?.name?.toLowerCase().includes(query);
+          const matchType =
+            item.type?.toLowerCase().includes(query) ||
+            item.category?.toLowerCase().includes(query);
+          const matchDesc =
+            item.description?.toLowerCase().includes(query) ||
+            item.movieName?.toLowerCase().includes(query);
+
+          if (
+            !matchTitle &&
+            !matchPlace &&
+            !matchUser &&
+            !matchType &&
+            !matchDesc
+          ) {
+            return false;
+          }
+        }
+
+        // Category Filter from Modal
+        if (categoryFilter && categoryFilter !== "ALL") {
+          const itemType = (item.type || item.category || "").toUpperCase();
+          if (categoryFilter === "MOVIES") {
+            if (!itemType.includes("MOVIE") && !itemType.includes("TICKET"))
+              return false;
+          } else if (categoryFilter === "DAY_MATES") {
+            if (!itemType.includes("DAY") && !itemType.includes("MATE"))
+              return false;
+          } else if (categoryFilter === "ASK_NEARBY") {
+            if (
+              !itemType.includes("ASK") &&
+              !itemType.includes("LOST") &&
+              !itemType.includes("NEARBY")
+            )
+              return false;
+          } else if (categoryFilter === "HOST_EVENT") {
+            if (!itemType.includes("HOST") && !itemType.includes("EVENT"))
+              return false;
+          }
+        }
+
+        // Popular Activity Chip Filter
+        if (selectedChip && selectedChip !== "More") {
+          const chipLower = selectedChip.toLowerCase();
+          const titleLower = (item.title || "").toLowerCase();
+          const typeLower = (item.type || "").toLowerCase();
+          const catLower = (item.category || "").toLowerCase();
+          const placeLower = (
+            item.place ||
+            item.locationName ||
+            ""
+          ).toLowerCase();
+          const descLower = (item.description || "").toLowerCase();
+          const fullText = `${titleLower} ${typeLower} ${catLower} ${placeLower} ${descLower}`;
+
+          if (chipLower === "walking") {
+            if (!fullText.match(/walk|jog|stroll|step|foot/)) return false;
+          } else if (chipLower === "coffee") {
+            if (!fullText.match(/coffee|cafe|café|tea|chai|beverage|drink/))
+              return false;
+          } else if (chipLower === "gym") {
+            if (!fullText.match(/gym|workout|fit|fitness|train|lift|cardio/))
+              return false;
+          } else if (chipLower === "movies") {
+            if (
+              !fullText.match(/movie|film|cinema|ticket|show|pvr|inox|theater/)
+            )
+              return false;
+          } else if (chipLower === "cycling") {
+            if (!fullText.match(/cycl|bike|ride|pedal/)) return false;
+          } else {
+            if (!fullText.includes(chipLower)) return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (sortBy === "title") {
+          return (a.title || "").localeCompare(b.title || "");
+        }
+        const timeA = new Date(a.datetime || a.createdAt || 0).getTime();
+        const timeB = new Date(b.datetime || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+  }, [userActs, q, selectedChip, categoryFilter, sortBy]);
+
+  const hasActiveFilters = Boolean(
+    (categoryFilter && categoryFilter !== "ALL") ||
+    sortBy !== "newest" ||
+    selectedChip !== null,
+  );
+
+  const handleChipPress = (label: string) => {
+    if (label === "More") {
+      setShowFilterModal(true);
+      return;
+    }
+    setSelectedChip((prev) => (prev === label ? null : label));
+  };
 
   const getGreeting = () => {
     const hr = new Date().getHours();
@@ -708,13 +870,32 @@ export default function Home() {
               placeholderTextColor={C.mute}
               style={s.searchInput}
             />
+            {q.length > 0 && (
+              <Pressable onPress={() => setQ("")} hitSlop={8}>
+                <Ionicons
+                  name="close-circle"
+                  size={moderateScale(18)}
+                  color={C.mute}
+                />
+              </Pressable>
+            )}
           </View>
-          <Pressable style={s.filterBtn}>
+          <Pressable
+            style={[
+              s.filterBtn,
+              hasActiveFilters && {
+                borderColor: C.primary,
+                backgroundColor: "rgba(168,85,247,0.15)",
+              },
+            ]}
+            onPress={() => setShowFilterModal(true)}
+          >
             <Ionicons
               name="options-outline"
               size={moderateScale(18)}
-              color={C.text}
+              color={hasActiveFilters ? C.primary : C.text}
             />
+            {hasActiveFilters && <View style={s.filterBadgeDot} />}
           </Pressable>
         </View>
 
@@ -748,14 +929,16 @@ export default function Home() {
         {/* Popular activities */}
         <View style={s.sectionHead}>
           <Text style={s.sectionTitle}>Popular Activities</Text>
-          <Pressable style={s.viewAll}>
-            <Text style={s.viewAllText}>View all</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={moderateScale(14)}
-              color={C.primary}
-            />
-          </Pressable>
+          {selectedChip && (
+            <Pressable style={s.viewAll} onPress={() => setSelectedChip(null)}>
+              <Text style={s.viewAllText}>Clear chip</Text>
+              <Ionicons
+                name="close-circle"
+                size={moderateScale(14)}
+                color={C.primary}
+              />
+            </Pressable>
+          )}
         </View>
         <ScrollView
           horizontal
@@ -766,23 +949,55 @@ export default function Home() {
           }}
         >
           {ACTIVITIES.map((item) => {
-            const { key, ...props } = item;
-            return <Chip key={key} {...props} s={s} />;
+            const { key, label, ...props } = item;
+            const isSelected = selectedChip === label;
+            return (
+              <Chip
+                key={key}
+                label={label}
+                {...props}
+                s={s}
+                isSelected={isSelected}
+                onPress={() => handleChipPress(label)}
+              />
+            );
           })}
         </ScrollView>
 
         {/* Popular around you */}
         <View style={s.sectionHead}>
           <Text style={s.sectionTitle}>Popular around you</Text>
-          <Pressable style={s.viewAll}>
-            <Text style={s.viewAllText}>View all</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={moderateScale(14)}
-              color={C.primary}
-            />
-          </Pressable>
+          {(hasActiveFilters || q.trim().length > 0) && (
+            <Pressable
+              style={s.viewAll}
+              onPress={() => {
+                setQ("");
+                setSelectedChip(null);
+                setCategoryFilter("ALL");
+                setSortBy("newest");
+              }}
+            >
+              <Text style={s.viewAllText}>Reset filters</Text>
+              <Ionicons
+                name="refresh"
+                size={moderateScale(14)}
+                color={C.primary}
+              />
+            </Pressable>
+          )}
         </View>
+
+        {(hasActiveFilters || q.trim().length > 0) && (
+          <View style={s.activeFilterBar}>
+            <Text style={s.activeFilterText}>
+              Showing {filteredUserActs.length}{" "}
+              {filteredUserActs.length === 1 ? "activity" : "activities"}
+              {q.trim() ? ` for "${q.trim()}"` : ""}
+              {selectedChip ? ` (${selectedChip})` : ""}
+            </Text>
+          </View>
+        )}
+
         <View style={{ paddingHorizontal: scale(10), gap: verticalScale(10) }}>
           {loadingActs ? (
             <View style={{ paddingVertical: scale(20), alignItems: "center" }}>
@@ -798,22 +1013,176 @@ export default function Home() {
                 Finding activities near you...
               </Text>
             </View>
-          ) : userActs.length > 0 ? (
-            userActs.map((f, i) => <UserFeedRow key={i} item={f} s={s} C={C} />)
+          ) : filteredUserActs.length > 0 ? (
+            filteredUserActs.map((f, i) => (
+              <UserFeedRow key={f.id || i} item={f} s={s} C={C} />
+            ))
           ) : (
-            <View style={{ paddingVertical: scale(16), alignItems: "center" }}>
+            <View
+              style={{
+                paddingVertical: scale(24),
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ionicons
+                name="search-outline"
+                size={moderateScale(32)}
+                color={C.mute || "#94A3B8"}
+              />
               <Text
                 style={{
                   color: C.mute || "#94A3B8",
-                  fontSize: moderateScale(12),
+                  fontSize: moderateScale(13),
                   fontWeight: "600",
+                  textAlign: "center",
                 }}
               >
-                No activities found nearby. Tap '+' to host one!
+                {hasActiveFilters || q.trim().length > 0
+                  ? "No activities match your filters."
+                  : "No activities found nearby. Tap '+' to host one!"}
               </Text>
+              {(hasActiveFilters || q.trim().length > 0) && (
+                <Pressable
+                  style={{
+                    marginTop: 4,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                  }}
+                  onPress={() => {
+                    setQ("");
+                    setSelectedChip(null);
+                    setCategoryFilter("ALL");
+                    setSortBy("newest");
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#FFF",
+                      fontWeight: "700",
+                      fontSize: moderateScale(12),
+                    }}
+                  >
+                    Clear Filters
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
         </View>
+
+        {/* Filter Modal */}
+        <Modal
+          visible={showFilterModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFilterModal(false)}
+        >
+          <Pressable
+            style={s.modalOverlay}
+            onPress={() => setShowFilterModal(false)}
+          >
+            <Pressable
+              style={s.modalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={s.modalHeader}>
+                <Text style={s.modalTitle}>Filter & Sort Activities</Text>
+                <Pressable
+                  onPress={() => setShowFilterModal(false)}
+                  hitSlop={10}
+                >
+                  <Ionicons name="close" size={22} color={C.text} />
+                </Pressable>
+              </View>
+
+              <Text style={s.filterGroupTitle}>Category</Text>
+              <View style={s.filterChipContainer}>
+                {[
+                  { id: "ALL", label: "All Categories" },
+                  { id: "DAY_MATES", label: "Day Mates" },
+                  { id: "MOVIES", label: "Movie Tickets" },
+                  { id: "ASK_NEARBY", label: "Ask / Lost & Found" },
+                  { id: "HOST_EVENT", label: "Host Event" },
+                ].map((cat) => {
+                  const isSelected = categoryFilter === cat.id;
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      style={[
+                        s.filterSelectChip,
+                        isSelected && s.filterSelectChipActive,
+                      ]}
+                      onPress={() => setCategoryFilter(cat.id)}
+                    >
+                      <Text
+                        style={[
+                          s.filterSelectChipText,
+                          isSelected && s.filterSelectChipTextActive,
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[s.filterGroupTitle, { marginTop: 16 }]}>
+                Sort By
+              </Text>
+              <View style={s.filterChipContainer}>
+                {[
+                  { id: "newest", label: "Newest First" },
+                  { id: "title", label: "Alphabetical (A-Z)" },
+                ].map((sItem) => {
+                  const isSelected = sortBy === sItem.id;
+                  return (
+                    <Pressable
+                      key={sItem.id}
+                      style={[
+                        s.filterSelectChip,
+                        isSelected && s.filterSelectChipActive,
+                      ]}
+                      onPress={() => setSortBy(sItem.id as any)}
+                    >
+                      <Text
+                        style={[
+                          s.filterSelectChipText,
+                          isSelected && s.filterSelectChipTextActive,
+                        ]}
+                      >
+                        {sItem.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={s.modalFooter}>
+                <Pressable
+                  style={s.resetBtn}
+                  onPress={() => {
+                    setCategoryFilter("ALL");
+                    setSortBy("newest");
+                    setSelectedChip(null);
+                  }}
+                >
+                  <Text style={s.resetBtnText}>Reset</Text>
+                </Pressable>
+
+                <Pressable
+                  style={s.applyBtn}
+                  onPress={() => setShowFilterModal(false)}
+                >
+                  <Text style={s.applyBtnText}>Apply Filters</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -997,6 +1366,8 @@ export const createStyles = (theme) => {
       borderColor: C.border,
       alignItems: "center",
       gap: 6,
+      position: "relative",
+      overflow: "visible",
     },
     chipLabel: {
       color: C.text,
@@ -1094,6 +1465,120 @@ export const createStyles = (theme) => {
       fontWeight: "700",
       marginTop: verticalScale(4),
       maxWidth: scale(105),
+    },
+    filterBadgeDot: {
+      position: "absolute",
+      top: 6,
+      right: 6,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: C.primary,
+    },
+    activeFilterBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: scale(20),
+      marginBottom: verticalScale(8),
+    },
+    activeFilterText: {
+      color: C.sub,
+      fontSize: moderateScale(11),
+      fontWeight: "600",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.65)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(16),
+    },
+    modalContent: {
+      width: "100%",
+      maxWidth: 400,
+      backgroundColor: C.bg2 || C.bg,
+      borderRadius: scale(20),
+      borderWidth: 1,
+      borderColor: C.border,
+      padding: scale(20),
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: verticalScale(16),
+    },
+    modalTitle: {
+      color: C.text,
+      fontSize: moderateScale(16),
+      fontWeight: "800",
+    },
+    filterGroupTitle: {
+      color: C.sub,
+      fontSize: moderateScale(11),
+      fontWeight: "700",
+      marginBottom: verticalScale(8),
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    filterChipContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: scale(8),
+    },
+    filterSelectChip: {
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(8),
+      borderRadius: scale(12),
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+    filterSelectChipActive: {
+      backgroundColor: "rgba(168,85,247,0.2)",
+      borderColor: C.primary,
+    },
+    filterSelectChipText: {
+      color: C.sub,
+      fontSize: moderateScale(12),
+      fontWeight: "600",
+    },
+    filterSelectChipTextActive: {
+      color: C.primary,
+      fontWeight: "800",
+    },
+    modalFooter: {
+      flexDirection: "row",
+      gap: scale(12),
+      marginTop: verticalScale(24),
+    },
+    resetBtn: {
+      flex: 1,
+      height: verticalScale(44),
+      borderRadius: scale(12),
+      borderWidth: 1,
+      borderColor: C.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    resetBtnText: {
+      color: C.sub,
+      fontSize: moderateScale(13),
+      fontWeight: "700",
+    },
+    applyBtn: {
+      flex: 2,
+      height: verticalScale(44),
+      borderRadius: scale(12),
+      backgroundColor: C.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    applyBtnText: {
+      color: "#FFF",
+      fontSize: moderateScale(13),
+      fontWeight: "800",
     },
   });
 };
