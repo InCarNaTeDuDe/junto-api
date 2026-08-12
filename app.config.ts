@@ -26,9 +26,7 @@ const config: ExpoConfig = {
 
   android: {
     adaptiveIcon: {
-      foregroundImage: IS_DEV
-        ? "./assets/adaptive-foreground.png"
-        : "./assets/icon.png",
+      foregroundImage: "./assets/icon-maskable-512.png",
       backgroundColor: "#090212",
     },
     package: IS_DEV ? "com.junto.dev" : "com.junto",
