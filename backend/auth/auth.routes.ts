@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { googleLogin,me } from "./auth.controller";
+import { googleLogin, me, updateMe } from "./auth.controller";
 import { GoogleLoginSchema, GoogleWebLoginSchema } from "./auth.schema";
 
 import { validate } from "../middleware/validate";
@@ -25,5 +25,7 @@ router.post(
 );
 
 router.get("/me", authenticate, me);
+router.patch("/me", authenticate, updateMe);
+router.put("/profile", authenticate, updateMe);
 
 export default router;

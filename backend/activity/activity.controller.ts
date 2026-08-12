@@ -31,7 +31,14 @@ export async function fetchActivitiesByLoc(
   next: NextFunction,
 ) {
   try {
-    const feed = await popularActivitiesAround();
+    const location = {
+      latitude: req.body?.latitude ?? req.query?.latitude,
+      longitude: req.body?.longitude ?? req.query?.longitude,
+      locationName: req.body?.locationName ?? req.query?.locationName,
+      locationState: req.body?.locationState ?? req.query?.locationState,
+      radiusKm: req.body?.radiusKm ?? req.query?.radiusKm,
+    };
+    const feed = await popularActivitiesAround(location);
     res.status(200).json({ userActivities: feed });
   } catch (error) {
     next(error);

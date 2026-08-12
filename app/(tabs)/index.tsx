@@ -534,7 +534,7 @@ const UserFeedRow = ({ item, s, C }) => {
               style={{ marginRight: 4 }}
             />
             <Text style={{ fontSize: moderateScale(10), color: C.sub }}>
-              {new Date(item.datetime).toLocaleDateString([], {
+              {new Date(item.createdAt).toLocaleDateString([], {
                 day: "2-digit",
                 month: "short",
               })}
@@ -555,7 +555,7 @@ const UserFeedRow = ({ item, s, C }) => {
               style={{ marginRight: 4 }}
             />
             <Text style={{ fontSize: moderateScale(10), color: C.sub }}>
-              {new Date(item.datetime).toLocaleTimeString([], {
+              {new Date(item.createdAt).toLocaleTimeString([], {
                 hour: "numeric",
                 minute: "2-digit",
                 hour12: true,

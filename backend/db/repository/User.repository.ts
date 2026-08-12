@@ -44,13 +44,10 @@ export class UserRepository {
       });
     }
 
-    await this.repo.update(
-      { id: user.id },
-      {
-        name: data.name,
-        avatar: data.avatar,
-      },
-    );
+    await this.updateUser(user.id, {
+      name: data.name,
+      avatar: data.avatar,
+    });
 
     return this.findById(user.id);
   }

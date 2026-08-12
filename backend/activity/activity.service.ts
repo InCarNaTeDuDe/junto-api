@@ -49,11 +49,79 @@ export async function createActivity(
   });
 }
 
-export async function popularActivitiesAround() {
-  const activities = await activityRepository.findAll();
+export async function popularActivitiesAround(locationFilter?: {
+  latitude?: number | string;
+  longitude?: number | string;
+  locationName?: string;
+  locationState?: string;
+  radiusKm?: number | string;
+}) {
+  const allActivities = await activityRepository.findAll();
+
+  const reqLat =
+    locationFilter?.latitude != null && locationFilter.latitude !== ""
+      ? Number(locationFilter.latitude)
+      : NaN;
+  const reqLng =
+    locationFilter?.longitude != null && locationFilter.longitude !== ""
+      ? Number(locationFilter.longitude)
+      : NaN;
+  const reqName = locationFilter?.locationName?.trim().toLowerCase();
+  const reqState = locationFilter?.locationState?.trim().toLowerCase();
+  const maxRadius =
+    locationFilter?.radiusKm != null && locationFilter.radiusKm !== ""
+      ? Number(locationFilter.radiusKm)
+      : 50;
+
+  const hasGeo = !isNaN(reqLat) && !isNaN(reqLng);
+  const hasNameOrState = Boolean(reqName || reqState);
+
+  let activities = allActivities;
+
+  if (hasGeo || hasNameOrState) {
+    const matched = allActivities.filter((activity) => {
+      let matchesGeo = false;
+      let matchesNameOrState = false;
+
+      const actLat = Number(activity.latitude);
+      const actLng = Number(activity.longitude);
+
+      if (hasGeo && !isNaN(actLat) && !isNaN(actLng)) {
+        const dist = calculateDistanceInKm(reqLat, reqLng, actLat, actLng);
+        if (dist <= maxRadius) {
+          matchesGeo = true;
+        }
+      }
+
+      if (hasNameOrState) {
+        const actName = (activity.locationName || "").toLowerCase();
+        const actState = (activity.locationState || "").toLowerCase();
+
+        if (
+          reqName &&
+          (actName.includes(reqName) || reqName.includes(actName))
+        ) {
+          matchesNameOrState = true;
+        }
+        if (
+          reqState &&
+          (actState.includes(reqState) || reqState.includes(actState))
+        ) {
+          matchesNameOrState = true;
+        }
+      }
+
+      return matchesGeo || matchesNameOrState;
+    });
+
+    if (matched.length > 0) {
+      activities = matched;
+    }
+  }
 
   return activities
     .map((activity) => {
+      const createdAt = activity.createdAt || activity.datetime;
       switch (activity.category) {
         case ActivityCategory.MOVIES:
           return {
@@ -61,7 +129,7 @@ export async function popularActivitiesAround() {
             type: ActivityCategory.MOVIES,
             typeColor: "#A855F7",
             title: activity.title,
-            place: `${activity.locationName}, ${activity.locationState}`,
+            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
@@ -72,7 +140,9 @@ export async function popularActivitiesAround() {
             thumbBg: "#3B1F5E",
             thumbIcon: "film",
             thumbIconColor: "#C084FC",
-            datetime: activity.datetime,
+            createdAt,
+            latitude: activity.latitude,
+            longitude: activity.longitude,
           };
 
         case ActivityCategory.DAY_MATES:
@@ -81,7 +151,7 @@ export async function popularActivitiesAround() {
             type: ActivityCategory.DAY_MATES,
             typeColor: "#EA580C",
             title: activity.title,
-            place: `${activity.locationName}, ${activity.locationState}`,
+            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
@@ -93,7 +163,9 @@ export async function popularActivitiesAround() {
             thumbBg: "#1E3A2E",
             thumbIcon: "people",
             thumbIconColor: "#4ADE80",
-            datetime: activity.datetime,
+            createdAt,
+            latitude: activity.latitude,
+            longitude: activity.longitude,
           };
 
         case ActivityCategory.SPORTS:
@@ -102,7 +174,7 @@ export async function popularActivitiesAround() {
             type: ActivityCategory.SPORTS,
             typeColor: "#22C55E",
             title: activity.title,
-            place: `${activity.locationName}, ${activity.locationState}`,
+            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
@@ -114,7 +186,9 @@ export async function popularActivitiesAround() {
             thumbBg: "#123524",
             thumbIcon: "football",
             thumbIconColor: "#4ADE80",
-            datetime: activity.datetime,
+            createdAt,
+            latitude: activity.latitude,
+            longitude: activity.longitude,
           };
 
         case ActivityCategory.FOOD:
@@ -123,7 +197,7 @@ export async function popularActivitiesAround() {
             type: ActivityCategory.FOOD,
             typeColor: "#F97316",
             title: activity.title,
-            place: `${activity.locationName}, ${activity.locationState}`,
+            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
@@ -135,7 +209,9 @@ export async function popularActivitiesAround() {
             thumbBg: "#3A1F10",
             thumbIcon: "restaurant",
             thumbIconColor: "#FDBA74",
-            datetime: activity.datetime,
+            createdAt,
+            latitude: activity.latitude,
+            longitude: activity.longitude,
           };
 
         case ActivityCategory.ASK_NEARBY:
@@ -144,7 +220,7 @@ export async function popularActivitiesAround() {
             type: ActivityCategory.ASK_NEARBY,
             typeColor: "#14B8A6",
             title: activity.title,
-            place: `${activity.locationName}, ${activity.locationState}`,
+            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
             user: activity.organizer?.name || "Junto User",
             userAvatar: activity.organizer?.avatar,
             organizerId: activity.organizerId,
@@ -158,7 +234,9 @@ export async function popularActivitiesAround() {
             thumbBg: "#1F2937",
             thumbIcon: "help-circle",
             thumbIconColor: "#14B8A6",
-            datetime: activity.datetime,
+            createdAt,
+            latitude: activity.latitude,
+            longitude: activity.longitude,
           };
 
         default:

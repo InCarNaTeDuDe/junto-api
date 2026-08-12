@@ -131,21 +131,18 @@ export async function getUserProfile(currentUser: any) {
     const userId =
       typeof currentUser === "string"
         ? currentUser
-        : currentUser?.id ||
-          currentUser?.userId ||
-          currentUser?.sub ||
-          currentUser?._id ||
-          "";
+        : currentUser?.id || currentUser?.sub || "";
 
-    const userEmail =
-      typeof currentUser === "object" ? currentUser?.email : undefined;
-    const userName =
-      typeof currentUser === "object" ? currentUser?.name : undefined;
+    const dbUser = await userRepository.findById(userId);
+    const user = {
+      ...(typeof currentUser === "object" ? currentUser : {}),
+      ...(dbUser || {}),
+    };
 
     const userActivities = await activityRepository.findUserActivities(
       userId,
-      userEmail,
-      userName,
+      user.email,
+      user.name,
     );
 
     const activitiesGrouped: Record<string, any[]> = {
@@ -156,50 +153,45 @@ export async function getUserProfile(currentUser: any) {
 
     for (const act of userActivities || []) {
       const cat = String(act.category || "").toUpperCase();
-      if (cat === "MOVIES" || cat.includes("MOVIE") || cat.includes("TICKET")) {
+      if (cat.includes("MOVIE") || cat.includes("TICKET")) {
         activitiesGrouped.MOVIES.push(act);
       } else if (
-        cat === "ASK_NEARBY" ||
         cat.includes("ASK") ||
         cat.includes("NEARBY") ||
         cat.includes("LOST")
       ) {
         activitiesGrouped.ASK_NEARBY.push(act);
-      } else if (
-        cat === "DAY_MATES" ||
-        cat.includes("DAY") ||
-        cat.includes("MATE")
-      ) {
+      } else if (cat.includes("DAY") || cat.includes("MATE")) {
         activitiesGrouped.DAY_MATES.push(act);
       } else {
-        if (!activitiesGrouped[cat]) {
-          activitiesGrouped[cat] = [];
-        }
-        activitiesGrouped[cat].push(act);
+        (activitiesGrouped[cat] ||= []).push(act);
       }
     }
 
-    const totalActivitiesCount = userActivities.length;
     const directTicketsCount = await ticketRepository.countUserTickets(userId);
-    const ticketsCount = activitiesGrouped.MOVIES.length + directTicketsCount;
 
     return {
-      ...currentUser,
-      createdActivitiesCount: totalActivitiesCount,
-      ticketsCount: ticketsCount,
+      ...user,
+      userHandle: user.userHandle,
+      createdActivitiesCount: userActivities.length,
+      ticketsCount: activitiesGrouped.MOVIES.length + directTicketsCount,
       activities: activitiesGrouped,
     };
   } catch (error) {
     console.log("auth.service.ts [getUserProfile] error:", error);
     return {
       ...currentUser,
+      userHandle: currentUser?.userHandle,
       createdActivitiesCount: 0,
       ticketsCount: 0,
-      activities: {
-        ASK_NEARBY: [],
-        MOVIES: [],
-        DAY_MATES: [],
-      },
+      activities: { ASK_NEARBY: [], MOVIES: [], DAY_MATES: [] },
     };
   }
+}
+
+export async function updateProfile(
+  userId: string,
+  data: { name?: string; bio?: string; avatar?: string; userHandle?: string },
+) {
+  return userRepository.updateUser(userId, data);
 }

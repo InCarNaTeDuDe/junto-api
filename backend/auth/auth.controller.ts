@@ -3,6 +3,7 @@ import {
   getCurrentUser,
   getUserProfile,
   loginWithGoogle,
+  updateProfile,
 } from "./auth.service";
 import type { GoogleLoginSchema } from "./auth.schema";
 
@@ -40,5 +41,21 @@ export async function me(req: Request, res: Response) {
     });
   } catch (err) {
     return res.json({ success: true, user: req.user });
+  }
+}
+
+export async function updateMe(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+
+  try {
+    const updatedUser = await updateProfile(req.user.id, req.body);
+    return res.json({
+      success: true,
+      user: updatedUser,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
   }
 }

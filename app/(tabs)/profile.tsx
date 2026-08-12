@@ -127,15 +127,26 @@ export default function ProfileScreen() {
     state.currentUser?.location ||
     "Koramangala, Bengaluru";
 
-  const userHandle = `@${(
-    apiUser?.name ||
-    user?.name ||
-    state.currentUser?.name ||
-    user?.email?.split("@")[0] ||
-    "user"
-  )
-    .toLowerCase()
-    .replace(/\s+/g, "_")}`;
+  const rawHandle =
+    apiUser?.userHandle ||
+    (user as any)?.userHandle ||
+    (state.currentUser as any)?.userHandle ||
+    apiUser?.handle ||
+    (user as any)?.handle;
+
+  const userHandle = rawHandle
+    ? rawHandle.startsWith("@")
+      ? rawHandle
+      : `@${rawHandle}`
+    : `@${(
+        apiUser?.name ||
+        user?.name ||
+        state.currentUser?.name ||
+        user?.email?.split("@")[0] ||
+        "user"
+      )
+        .toLowerCase()
+        .replace(/\s+/g, "_")}`;
 
   const userBio =
     apiUser?.bio ||
@@ -329,16 +340,25 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!editName.trim()) {
       Alert.alert("Validation Error", "Name cannot be empty");
       return;
     }
-    updateCurrentUserProfile({
+    const updated = {
       name: editName.trim(),
       bio: editBio.trim(),
       avatar: editAvatar.trim(),
-    });
+    };
+    updateCurrentUserProfile(updated);
+    if (apiUser) {
+      setApiUser((prev: any) => ({ ...prev, ...updated }));
+    }
+    try {
+      await ApiService.patch("/api/me", updated);
+    } catch (err) {
+      console.log("Note: profile patch endpoint:", err);
+    }
     setActiveModal(null);
     Alert.alert("Success", "Profile updated successfully!");
   };

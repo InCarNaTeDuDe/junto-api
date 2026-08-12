@@ -28,6 +28,19 @@ export class User {
 
   @Column({
     type: "varchar",
+    unique: true,
+    nullable: false,
+  })
+  userHandle!: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+  })
+  bio?: string;
+
+  @Column({
+    type: "varchar",
   })
   name!: string;
 
