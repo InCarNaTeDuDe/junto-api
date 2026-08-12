@@ -23,6 +23,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/theme";
 import { router } from "expo-router";
 import { ApiService } from "@/services/api";
+import CustomerCareChatModal from "@/components/CustomerCareChatModal";
 
 function hexA(hex: string, a: number) {
   if (!hex) return `rgba(168,85,247,${a})`;
@@ -60,6 +61,7 @@ export default function ProfileScreen() {
     | "invite"
     | "settings"
     | "premium"
+    | "customerCare"
     | null
   >(null);
 
@@ -373,6 +375,18 @@ export default function ProfileScreen() {
         <View style={s.headerSection}>
           {/* Top Right Action Icons */}
           <View style={s.topActionsRow}>
+            <TouchableOpacity
+              style={s.topIconButton}
+              onPress={() => setActiveModal("customerCare")}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="headset-outline"
+                size={scale(18)}
+                color={t.primary}
+              />
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={s.topIconButton}
               onPress={handleShareProfile}
@@ -1233,6 +1247,50 @@ export default function ProfileScreen() {
 
           <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
             <TouchableOpacity
+              style={[
+                s.helpItem,
+                {
+                  backgroundColor: hexA(t.primary, 0.1),
+                  borderColor: t.primary,
+                  borderWidth: 1,
+                  borderRadius: 14,
+                  paddingVertical: 12,
+                  marginBottom: 8,
+                },
+              ]}
+              onPress={() => setActiveModal("customerCare")}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  flex: 1,
+                }}
+              >
+                <Ionicons name="headset" size={scale(18)} color={t.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      s.helpTitle,
+                      { color: t.primary, fontWeight: "800" },
+                    ]}
+                  >
+                    Chat with Customer Care AI
+                  </Text>
+                  <Text style={{ fontSize: 11, color: t.sub }}>
+                    Instant answers trained on Junto knowledge base
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={scale(16)}
+                color={t.primary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={s.helpItem}
               onPress={() =>
                 Alert.alert(
@@ -1487,6 +1545,16 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* 10. CUSTOMER CARE AI CHAT MODAL */}
+      <Modal
+        visible={activeModal === "customerCare"}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <CustomerCareChatModal onClose={() => setActiveModal(null)} />
       </Modal>
     </SafeAreaView>
   );

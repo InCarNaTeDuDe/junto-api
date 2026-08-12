@@ -12,6 +12,7 @@ import activityRoutes from "./activity/activity.routes";
 import messagesRoutes from "./messages/messages.routes";
 import asknearbyRoutes from "./asknearby/asknearby.routes";
 import notificationRoutes from "./notifications/notifications.routes";
+import supportRoutes from "./support/support.routes";
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
 
@@ -157,6 +158,7 @@ async function startServer() {
   app.use("/api/messages", messagesRoutes);
   app.use("/api/asknearby", asknearbyRoutes);
   app.use("/api/notifications", notificationRoutes);
+  app.use("/api/support", supportRoutes);
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);
