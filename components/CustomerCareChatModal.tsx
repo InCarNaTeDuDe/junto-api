@@ -17,7 +17,6 @@ import { ApiService } from "@/services/api";
 import FormattedMarkdownText from "@/components/FormattedMarkdownText";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 export interface SupportChatMessage {
   id: string;
   sender: "user" | "bot";
@@ -129,7 +128,8 @@ export default function CustomerCareChatModal({
     >
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: t.bg }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View
@@ -357,10 +357,12 @@ export default function CustomerCareChatModal({
         <View
           style={{
             paddingHorizontal: 16,
-            paddingVertical: 12,
+            paddingTop: 12,
+
             borderTopWidth: 1,
             borderColor: t.border,
             backgroundColor: t.card,
+
             flexDirection: "row",
             alignItems: "center",
             gap: 10,
