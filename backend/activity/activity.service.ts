@@ -56,187 +56,124 @@ export async function popularActivitiesAround(locationFilter?: {
   locationState?: string;
   radiusKm?: number | string;
 }) {
-  const allActivities = await activityRepository.findAll();
+  const all = await activityRepository.findAll();
 
-  const reqLat =
-    locationFilter?.latitude != null && locationFilter.latitude !== ""
-      ? Number(locationFilter.latitude)
-      : NaN;
-  const reqLng =
-    locationFilter?.longitude != null && locationFilter.longitude !== ""
-      ? Number(locationFilter.longitude)
-      : NaN;
-  const reqName = locationFilter?.locationName?.trim().toLowerCase();
-  const reqState = locationFilter?.locationState?.trim().toLowerCase();
-  const maxRadius =
-    locationFilter?.radiusKm != null && locationFilter.radiusKm !== ""
-      ? Number(locationFilter.radiusKm)
-      : 50;
+  const lat = Number(locationFilter?.latitude);
+  const lng = Number(locationFilter?.longitude);
+  const radius = Number(locationFilter?.radiusKm) || 50;
+  const name = locationFilter?.locationName?.trim().toLowerCase();
+  const state = locationFilter?.locationState?.trim().toLowerCase();
 
-  const hasGeo = !isNaN(reqLat) && !isNaN(reqLng);
-  const hasNameOrState = Boolean(reqName || reqState);
+  const hasGeo = Number.isFinite(lat) && Number.isFinite(lng);
 
-  let activities = allActivities;
+  const activities = hasGeo
+    ? all.filter((a) => {
+        const aLat = Number(a.latitude);
+        const aLng = Number(a.longitude);
 
-  if (hasGeo || hasNameOrState) {
-    const matched = allActivities.filter((activity) => {
-      let matchesGeo = false;
-      let matchesNameOrState = false;
+        return (
+          Number.isFinite(aLat) &&
+          Number.isFinite(aLng) &&
+          calculateDistanceInKm(lat, lng, aLat, aLng) <= radius
+        );
+      })
+    : name || state
+      ? all.filter((a) => {
+          const aName = a.locationName?.trim().toLowerCase() || "";
+          const aState = a.locationState?.trim().toLowerCase() || "";
 
-      const actLat = Number(activity.latitude);
-      const actLng = Number(activity.longitude);
-
-      if (hasGeo && !isNaN(actLat) && !isNaN(actLng)) {
-        const dist = calculateDistanceInKm(reqLat, reqLng, actLat, actLng);
-        if (dist <= maxRadius) {
-          matchesGeo = true;
-        }
-      }
-
-      if (hasNameOrState) {
-        const actName = (activity.locationName || "").toLowerCase();
-        const actState = (activity.locationState || "").toLowerCase();
-
-        if (
-          reqName &&
-          (actName.includes(reqName) || reqName.includes(actName))
-        ) {
-          matchesNameOrState = true;
-        }
-        if (
-          reqState &&
-          (actState.includes(reqState) || reqState.includes(actState))
-        ) {
-          matchesNameOrState = true;
-        }
-      }
-
-      return matchesGeo || matchesNameOrState;
-    });
-
-    if (matched.length > 0) {
-      activities = matched;
-    }
-  }
+          return (
+            (name && aName.includes(name)) || (state && aState.includes(state))
+          );
+        })
+      : all;
 
   return activities
-    .map((activity) => {
-      const createdAt = activity.createdAt || activity.datetime;
-      switch (activity.category) {
+    .map((a) => {
+      const base = {
+        id: a.id,
+        title: a.title,
+        place: `${a.locationName || ""}${a.locationState ? `, ${a.locationState}` : ""}`,
+        user: a.organizer?.name || "Junto User",
+        userAvatar: a.organizer?.avatar,
+        organizerId: a.organizerId,
+        activityEmoji: a.activityEmoji,
+        createdAt: a.createdAt || a.datetime,
+        latitude: a.latitude,
+        longitude: a.longitude,
+      };
+
+      switch (a.category) {
         case ActivityCategory.MOVIES:
           return {
-            id: activity.id,
-            type: ActivityCategory.MOVIES,
+            ...base,
+            type: a.category,
             typeColor: "#A855F7",
-            title: activity.title,
-            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
-            user: activity.organizer?.name || "Junto User",
-            userAvatar: activity.organizer?.avatar,
-            organizerId: activity.organizerId,
-            activityEmoji: activity.activityEmoji,
-            right: `${activity.remainingSeats} Ticket${activity.remainingSeats > 1 ? "s" : ""}`,
-            rightSub: `₹${activity.cost} each`,
+            right: `${a.remainingSeats} Ticket${a.remainingSeats > 1 ? "s" : ""}`,
+            rightSub: `₹${a.cost} each`,
             rightSubColor: "#A855F7",
             thumbBg: "#3B1F5E",
             thumbIcon: "film",
             thumbIconColor: "#C084FC",
-            createdAt,
-            latitude: activity.latitude,
-            longitude: activity.longitude,
           };
 
         case ActivityCategory.DAY_MATES:
           return {
-            id: activity.id,
-            type: ActivityCategory.DAY_MATES,
+            ...base,
+            type: a.category,
             typeColor: "#EA580C",
-            title: activity.title,
-            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
-            user: activity.organizer?.name || "Junto User",
-            userAvatar: activity.organizer?.avatar,
-            organizerId: activity.organizerId,
-            activityEmoji: activity.activityEmoji,
-            right: `${activity.remainingSeats} Mates`,
+            right: `${a.remainingSeats} Mates`,
             rightColor: "#F59E0B",
-            rightSub: `${activity.maxParticipants} Needed`,
+            rightSub: `${a.maxParticipants} Needed`,
             rightSubColor: "#A855F7",
             thumbBg: "#1E3A2E",
             thumbIcon: "people",
             thumbIconColor: "#4ADE80",
-            createdAt,
-            latitude: activity.latitude,
-            longitude: activity.longitude,
           };
 
         case ActivityCategory.SPORTS:
           return {
-            id: activity.id,
-            type: ActivityCategory.SPORTS,
+            ...base,
+            type: a.category,
             typeColor: "#22C55E",
-            title: activity.title,
-            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
-            user: activity.organizer?.name || "Junto User",
-            userAvatar: activity.organizer?.avatar,
-            organizerId: activity.organizerId,
-            activityEmoji: activity.activityEmoji,
-            right: `${activity.remainingSeats} Spots`,
+            right: `${a.remainingSeats} Spots`,
             rightColor: "#22C55E",
-            rightSub: activity.description,
+            rightSub: a.description,
             rightSubColor: "#22C55E",
             thumbBg: "#123524",
             thumbIcon: "football",
             thumbIconColor: "#4ADE80",
-            createdAt,
-            latitude: activity.latitude,
-            longitude: activity.longitude,
           };
 
         case ActivityCategory.FOOD:
           return {
-            id: activity.id,
-            type: ActivityCategory.FOOD,
+            ...base,
+            type: a.category,
             typeColor: "#F97316",
-            title: activity.title,
-            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
-            user: activity.organizer?.name || "Junto User",
-            userAvatar: activity.organizer?.avatar,
-            organizerId: activity.organizerId,
-            activityEmoji: activity.activityEmoji,
-            right: `${activity.remainingSeats} Seats`,
+            right: `${a.remainingSeats} Seats`,
             rightColor: "#F97316",
-            rightSub: activity.description,
+            rightSub: a.description,
             rightSubColor: "#F97316",
             thumbBg: "#3A1F10",
             thumbIcon: "restaurant",
             thumbIconColor: "#FDBA74",
-            createdAt,
-            latitude: activity.latitude,
-            longitude: activity.longitude,
           };
 
         case ActivityCategory.ASK_NEARBY:
           return {
-            id: activity.id,
-            type: ActivityCategory.ASK_NEARBY,
+            ...base,
+            type: a.category,
             typeColor: "#14B8A6",
-            title: activity.title,
-            place: `${activity.locationName || ""}${activity.locationState ? ", " + activity.locationState : ""}`,
-            user: activity.organizer?.name || "Junto User",
-            userAvatar: activity.organizer?.avatar,
-            organizerId: activity.organizerId,
-            activityEmoji: activity.activityEmoji || "🙋‍♂️",
-            right: activity.tags?.[1] ? `${activity.tags[1]}` : "Ask Nearby",
+            activityEmoji: a.activityEmoji || "🙋‍♂️",
+            right: a.tags?.[1] || "Ask Nearby",
             rightColor: "#14B8A6",
-            rightSub: (activity.description || "Neighbor Request")
+            rightSub: (a.description || "Neighbor Request")
               .replace(/[\r\n]+/g, " ")
               .trim(),
             rightSubColor: "#14B8A6",
             thumbBg: "#1F2937",
             thumbIcon: "help-circle",
             thumbIconColor: "#14B8A6",
-            createdAt,
-            latitude: activity.latitude,
-            longitude: activity.longitude,
           };
 
         default:
