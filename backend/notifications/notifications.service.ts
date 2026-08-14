@@ -7,14 +7,26 @@ const notificationRepo = AppDataSource.getRepository(Notification);
 
 export async function registerUserPushToken(user: User, pushToken: string) {
   const userRepo = AppDataSource.getRepository(User);
-  user.pushToken = pushToken;
-  await userRepo.save(user);
-  console.log(
-    `📱 Registered push token for user ${user.name} (${user.id}): ${pushToken}`,
-  );
-  return { success: true, message: "Push token registered successfully" };
-}
 
+  const dbUser = await userRepo.findOne({
+    where: { id: user.id },
+  });
+
+  if (!dbUser) {
+    throw new Error("User not found");
+  }
+
+  dbUser.pushToken = pushToken;
+
+  await userRepo.save(dbUser);
+
+  console.log(`✅ Push token saved for ${dbUser.email}: ${pushToken}`);
+
+  return {
+    success: true,
+    message: "Push token registered successfully",
+  };
+}
 export async function sendExpoPushNotification(
   targetUserId: string,
   title: string,
