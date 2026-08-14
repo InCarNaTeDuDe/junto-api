@@ -12,6 +12,7 @@ import {
   sendExpoPushNotification,
   broadcastExpoPushNotification,
 } from "../notifications/notifications.service";
+import { userRepository } from "../db/repository/User.repository";
 
 export async function createAskNearby(
   body: CreateAskNearbyRequest,
@@ -240,5 +241,86 @@ function getEmojiForCategory(category: string): string {
       return "💊";
     default:
       return "🆘";
+  }
+}
+export async function broadcastAskNearby(
+  activityId: string,
+  title: string,
+  message: string,
+  data: Record<string, any> = {},
+) {
+  const activity = await activityRepository.findById(activityId);
+
+  if (!activity) {
+    throw new Error("Ask Nearby activity not found");
+  }
+
+  if (activity.category !== ActivityCategory.ASK_NEARBY) {
+    throw new Error("Activity is not an Ask Nearby activity");
+  }
+
+  if (activity.latitude == null || activity.longitude == null) {
+    throw new Error("Ask Nearby activity has no location");
+  }
+
+  const users = await userRepository.findUsersByLatLong(
+    Number(activity.latitude),
+    Number(activity.longitude),
+  );
+
+  if (!users.length) {
+    return { recipients: 0 };
+  }
+
+  const notifications = await notificationRepository.createNotifications(
+    users.map((user) => ({
+      userId: user.id,
+      title,
+      message,
+      type: "ask_nearby",
+    })),
+  );
+
+  await sendAskNearbyPushNotifications(
+    users,
+    activity.id,
+    title,
+    message,
+    data,
+  );
+
+  return {
+    recipients: users.length,
+  };
+}
+
+async function sendAskNearbyPushNotifications(
+  users: User[],
+  activityId: string,
+  title: string,
+  message: string,
+  data: Record<string, any> = {},
+) {
+  const BATCH_SIZE = 50;
+
+  for (let i = 0; i < users.length; i += BATCH_SIZE) {
+    const batch = users.slice(i, i + BATCH_SIZE);
+
+    await Promise.allSettled(
+      batch.map((user) =>
+        sendExpoPushNotification(user.id, title, message, {
+          ...data,
+          type: "ask_nearby",
+          activityId,
+        }),
+      ),
+    );
+
+    console.log(
+      `📢 Ask Nearby push batch sent: ${Math.min(
+        i + BATCH_SIZE,
+        users.length,
+      )}/${users.length}`,
+    );
   }
 }

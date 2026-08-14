@@ -35,9 +35,15 @@ export async function loginWithGoogle(
       console.log("User from db", user);
 
       if (!user) {
+        const userHandle =
+          `${googleUser.name.split(" ")[0]}_${googleUser.email.split("@")[0]}`
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, "");
+
         user = userRepo.create({
           email: googleUser.email,
           name: googleUser.name,
+          userHandle,
           avatar: googleUser.picture,
           identityVerified: true,
           rating: 5,

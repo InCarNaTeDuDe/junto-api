@@ -31,6 +31,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const requests = await listAskNearbyRequests(req.query as any);
+
     return res.status(200).json({
       success: true,
       requests,
@@ -43,6 +44,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
     const request = await getAskNearbyById(req.params.id as string);
+
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -76,6 +78,7 @@ export async function respond(req: Request, res: Response, next: NextFunction) {
 export async function resolve(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await resolveAskNearby(req.params.id as string, req.user!);
+
     return res.status(200).json(result);
   } catch (err) {
     next(err);

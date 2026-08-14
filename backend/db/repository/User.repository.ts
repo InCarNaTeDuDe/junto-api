@@ -59,6 +59,16 @@ export class UserRepository {
       .andWhere("user.longitude = :longitude", { longitude })
       .getMany();
   }
+
+  async updateLocation(userId: string, latitude: number, longitude: number) {
+    return this.repo.update(
+      { id: userId },
+      {
+        latitude,
+        longitude,
+      },
+    );
+  }
 }
 
 export const userRepository = new UserRepository();

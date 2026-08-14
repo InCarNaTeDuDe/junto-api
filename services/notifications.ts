@@ -90,9 +90,29 @@ export const PushNotificationService = {
         console.log("📲 Expo Push Token registered:", token);
 
         if (token) {
-          await ApiService.post("/api/notifications/register-token", {
-            pushToken: token,
-          });
+          try {
+            const response = await ApiService.post(
+              "/api/notifications/register-token",
+              {
+                pushToken: token,
+              },
+            );
+
+            Alert.alert(
+              "Push Token Registered ✅",
+              `Token:\n\n${token}\n\nServer response:\n${JSON.stringify(response)}`,
+            );
+
+            console.log("✅ Push token registered:", token);
+            console.log("✅ Register-token response:", response);
+          } catch (error: any) {
+            Alert.alert(
+              "Push Token Registration Failed ❌",
+              error?.message || "Unable to register push token",
+            );
+
+            console.error("❌ Register-token failed:", error);
+          }
         }
       } else {
         console.log("Expo Push Notifications active (web fallback).");

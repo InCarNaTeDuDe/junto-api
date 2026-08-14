@@ -19,7 +19,31 @@ export class NotificationRepository {
       type: data.type || "activity",
       read: false,
     });
+
     return this.repo.save(notif);
+  }
+
+  async createNotifications(
+    users: {
+      userId: string;
+      title: string;
+      message: string;
+      type?: string;
+    }[],
+  ) {
+    if (!users.length) return [];
+
+    const notifications = this.repo.create(
+      users.map((data) => ({
+        userId: data.userId,
+        title: data.title,
+        message: data.message,
+        type: data.type || "activity",
+        read: false,
+      })),
+    );
+
+    return this.repo.save(notifications);
   }
 
   async findByUserId(userId: string) {
@@ -29,4 +53,6 @@ export class NotificationRepository {
     });
   }
 }
-export const notificationRepository = new NotificationRepository();
+
+export const notificationRepository =
+  new NotificationRepository();
