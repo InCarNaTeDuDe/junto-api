@@ -51,11 +51,13 @@ export const PushNotificationService = {
     try {
       if (Device.isDevice || Platform.OS !== "web") {
         const existingPerm: any = await Notifications.getPermissionsAsync();
-        let finalStatus = existingPerm.status || (existingPerm.granted ? "granted" : "denied");
+        let finalStatus =
+          existingPerm.status || (existingPerm.granted ? "granted" : "denied");
 
         if (finalStatus !== "granted") {
           const reqPerm: any = await Notifications.requestPermissionsAsync();
-          finalStatus = reqPerm.status || (reqPerm.granted ? "granted" : "denied");
+          finalStatus =
+            reqPerm.status || (reqPerm.granted ? "granted" : "denied");
         }
 
         if (finalStatus !== "granted") {
@@ -63,12 +65,34 @@ export const PushNotificationService = {
           return null;
         }
 
-        const tokenData = await Notifications.getExpoPushTokenAsync();
-        token = tokenData.data;
-        console.log("📲 Expo Push Token:", token);
+        let tokenData;
+        try {
+          const Constants = require("expo-constants").default;
+          const projectId =
+            Constants?.expoConfig?.extra?.eas?.projectId ||
+            Constants?.easConfig?.projectId;
+          if (projectId) {
+            tokenData = await Notifications.getExpoPushTokenAsync({
+              projectId,
+            });
+          } else {
+            tokenData = await Notifications.getExpoPushTokenAsync();
+          }
+        } catch (tokenErr) {
+          console.warn(
+            "Retrying getExpoPushTokenAsync fallback without options:",
+            tokenErr,
+          );
+          tokenData = await Notifications.getExpoPushTokenAsync();
+        }
+
+        token = tokenData?.data || null;
+        console.log("📲 Expo Push Token registered:", token);
 
         if (token) {
-          await ApiService.post("/api/notifications/register-token", { pushToken: token });
+          await ApiService.post("/api/notifications/register-token", {
+            pushToken: token,
+          });
         }
       } else {
         console.log("Expo Push Notifications active (web fallback).");
@@ -87,38 +111,59 @@ export const PushNotificationService = {
     onReceived?: (notification: Notifications.Notification) => void,
     onResponse?: (response: Notifications.NotificationResponse) => void,
   ) {
-    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      console.log("🔔 Expo Push Notification received:", notification);
-      const title = notification.request.content.title || "New Push Notification";
-      const body = notification.request.content.body || "";
-      Alert.alert(`🔔 ${title}`, body);
-      if (onReceived) onReceived(notification);
-    });
+    const receivedSubscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log("🔔 Expo Push Notification received:", notification);
+        const title =
+          notification.request.content.title || "New Push Notification";
+        const body = notification.request.content.body || "";
+        Alert.alert(`🔔 ${title}`, body);
+        if (onReceived) onReceived(notification);
+      },
+    );
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log("👆 Expo Push Notification clicked:", response);
-      const title = response.notification.request.content.title || "Notification Tapped";
-      const body = response.notification.request.content.body || "";
-      Alert.alert(`👆 ${title}`, body);
-      if (onResponse) onResponse(response);
-    });
+    const responseSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log("👆 Expo Push Notification clicked:", response);
+        const title =
+          response.notification.request.content.title || "Notification Tapped";
+        const body = response.notification.request.content.body || "";
+        Alert.alert(`👆 ${title}`, body);
+        if (onResponse) onResponse(response);
+      });
 
     return () => {
       try {
-        if (receivedSubscription && typeof receivedSubscription.remove === "function") {
+        if (
+          receivedSubscription &&
+          typeof receivedSubscription.remove === "function"
+        ) {
           receivedSubscription.remove();
-        } else if (typeof (Notifications as any).removeNotificationSubscription === "function") {
-          (Notifications as any).removeNotificationSubscription(receivedSubscription);
+        } else if (
+          typeof (Notifications as any).removeNotificationSubscription ===
+          "function"
+        ) {
+          (Notifications as any).removeNotificationSubscription(
+            receivedSubscription,
+          );
         }
       } catch (e) {
         // Safe fallback
       }
 
       try {
-        if (responseSubscription && typeof responseSubscription.remove === "function") {
+        if (
+          responseSubscription &&
+          typeof responseSubscription.remove === "function"
+        ) {
           responseSubscription.remove();
-        } else if (typeof (Notifications as any).removeNotificationSubscription === "function") {
-          (Notifications as any).removeNotificationSubscription(responseSubscription);
+        } else if (
+          typeof (Notifications as any).removeNotificationSubscription ===
+          "function"
+        ) {
+          (Notifications as any).removeNotificationSubscription(
+            responseSubscription,
+          );
         }
       } catch (e) {
         // Safe fallback
@@ -129,10 +174,14 @@ export const PushNotificationService = {
   /**
    * Trigger a local push notification and display a debug Alert popup.
    */
-  async triggerLocalPushNotification(title: string, body: string, data: any = {}): Promise<void> {
+  async triggerLocalPushNotification(
+    title: string,
+    body: string,
+    data: any = {},
+  ): Promise<void> {
     try {
       console.log("🚀 Triggering Local Push Notification:", title, body);
-      
+
       // Always show debug Alert for immediate confirmation
       Alert.alert(`📢 Push Notification`, `${title}\n\n${body}`);
 

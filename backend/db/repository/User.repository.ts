@@ -51,6 +51,14 @@ export class UserRepository {
 
     return this.findById(user.id);
   }
+
+  async findUsersByLatLong(latitude: number, longitude: number) {
+    return this.repo
+      .createQueryBuilder("user")
+      .where("user.latitude = :latitude", { latitude })
+      .andWhere("user.longitude = :longitude", { longitude })
+      .getMany();
+  }
 }
 
 export const userRepository = new UserRepository();

@@ -17,6 +17,7 @@ import { useStyles } from "@/hooks/useStyles";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { PushNotificationService } from "@/services/notifications";
 
 const { width } = Dimensions.get("window");
 
@@ -588,6 +589,11 @@ export default function AskNearbyScreen({
       await ApiService.post("/api/asknearby", payload);
       setPostedSuccess(true);
       onSubmitSuccess?.(payload);
+      PushNotificationService.triggerLocalPushNotification(
+        `Ask Nearby Broadcasted! 📢`,
+        `Your request "${payload.title}" was posted to nearby DayMates in ${payload.locationName}.`,
+        { category: activeCategoryObj.title, type: "ask_nearby" },
+      );
       setTimeout(() => {
         setPostedSuccess(false);
       }, 1500);

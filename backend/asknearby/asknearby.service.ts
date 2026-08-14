@@ -8,6 +8,10 @@ import {
   RespondAskNearbyRequest,
 } from "./asknearby.schema";
 import { io } from "../socket/socket";
+import {
+  sendExpoPushNotification,
+  broadcastExpoPushNotification,
+} from "../notifications/notifications.service";
 
 export async function createAskNearby(
   body: CreateAskNearbyRequest,
@@ -33,11 +37,14 @@ export async function createAskNearby(
     isAutoDetected: body.isAutoDetected ?? false,
   });
 
+  const notifTitle = `Ask Nearby Broadcasted! 📢`;
+  const notifMsg = `Your request "${request.title}" was posted to DayMates nearby in ${request.locationName}.`;
+
   // Create push notification entry
   const notification = await notificationRepository.createNotification({
     userId: organizer.id,
-    title: `Ask Nearby Broadcasted! 📢`,
-    message: `Your request "${request.title}" was posted to DayMates nearby in ${request.locationName}.`,
+    title: notifTitle,
+    message: notifMsg,
     type: "ask_nearby",
   });
 
@@ -51,6 +58,29 @@ export async function createAskNearby(
       timestamp: new Date().toISOString(),
     });
   }
+
+  // Dispatch mobile push notification to organizer
+  sendExpoPushNotification(organizer.id, notifTitle, notifMsg, {
+    type: "ask_nearby",
+    requestId: request.id,
+  }).catch((e) => console.error("Error sending push to organizer:", e));
+
+  // Broadcast Mobile Push Notification to all nearby DayMates users!
+  const broadcastTitle = `🆘 New Request Nearby: ${body.category || "Help Needed"}`;
+  const broadcastMsg = `${organizer.name || "A neighbor"} in ${request.locationName} posted a request: "${request.title}".`;
+
+  broadcastExpoPushNotification(
+    broadcastTitle,
+    broadcastMsg,
+    {
+      type: "ask_nearby",
+      requestId: request.id,
+      category: body.category,
+      urgency: body.urgency,
+      organizerId: organizer.id,
+    },
+    organizer.id, // exclude organizer from broadcast
+  ).catch((e) => console.error("Error broadcasting push:", e));
 
   return request;
 }
@@ -126,11 +156,14 @@ export async function respondToAskNearby(
     participantIds: request.participantIds,
   });
 
+  const notifTitle = `Someone is helping! 🆘`;
+  const notifMsg = `${helper.name || "A neighbor nearby"} offered help on your request "${request.title}"! ${body.message ? `Note: "${body.message}"` : ""}`;
+
   // Send push notification record to database
   const notification = await notificationRepository.createNotification({
     userId: request.organizerId,
-    title: `Someone is helping! 🆘`,
-    message: `${helper.name || "A neighbor nearby"} offered help on your request "${request.title}"! ${body.message ? `Note: "${body.message}"` : ""}`,
+    title: notifTitle,
+    message: notifMsg,
     type: "ask_nearby",
   });
 
@@ -147,6 +180,15 @@ export async function respondToAskNearby(
       timestamp: new Date().toISOString(),
     });
   }
+
+  // Send Expo Mobile Push Notification to request organizer
+  sendExpoPushNotification(request.organizerId, notifTitle, notifMsg, {
+    type: "ask_nearby",
+    requestId: request.id,
+    helperId: helper.id,
+  }).catch((e) =>
+    console.error("Error sending response push to organizer:", e),
+  );
 
   return {
     success: true,

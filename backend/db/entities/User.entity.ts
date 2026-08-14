@@ -72,6 +72,22 @@ export class User {
   })
   updatedAt!: Date;
 
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 7,
+    nullable: true,
+  })
+  latitude?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 7,
+    nullable: true,
+  })
+  longitude?: number;
+
   // relations
   @OneToMany(() => DeviceSession, (s) => s.user)
   deviceSessions!: DeviceSession[];

@@ -9,7 +9,130 @@ export async function registerUserPushToken(user: User, pushToken: string) {
   const userRepo = AppDataSource.getRepository(User);
   user.pushToken = pushToken;
   await userRepo.save(user);
+  console.log(
+    `📱 Registered push token for user ${user.name} (${user.id}): ${pushToken}`,
+  );
   return { success: true, message: "Push token registered successfully" };
+}
+
+export async function sendExpoPushNotification(
+  targetUserId: string,
+  title: string,
+  message: string,
+  data: Record<string, any> = {},
+) {
+  try {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOne({ where: { id: targetUserId } });
+
+    if (!user || !user.pushToken) {
+      console.log(
+        `ℹ️ User ${targetUserId} has no registered Expo pushToken. Skipping mobile push.`,
+      );
+      return false;
+    }
+
+    const pushToken = user.pushToken;
+    const payload = [
+      {
+        to: pushToken,
+        sound: "default",
+        title: title,
+        body: message,
+        data: data,
+        priority: "high",
+        channelId: "default",
+      },
+    ];
+
+    console.log(
+      `🚀 Dispatching Expo Mobile Push Notification to user ${user.name} (${pushToken})...`,
+    );
+
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    console.log(
+      `📲 Expo Push API Response for ${user.name}:`,
+      JSON.stringify(result),
+    );
+    return true;
+  } catch (err: any) {
+    console.error(
+      `❌ Failed to send Expo push notification to user ${targetUserId}:`,
+      err?.message || err,
+    );
+    return false;
+  }
+}
+
+export async function broadcastExpoPushNotification(
+  title: string,
+  message: string,
+  data: Record<string, any> = {},
+  excludeUserId?: string,
+) {
+  try {
+    const userRepo = AppDataSource.getRepository(User);
+    const users = await userRepo.find();
+
+    const validUsers = users.filter((u) => {
+      if (!u.pushToken) return false;
+      if (excludeUserId && u.id === excludeUserId) return false;
+      return true;
+    });
+
+    if (validUsers.length === 0) {
+      console.log("ℹ️ No registered push tokens found to broadcast to.");
+      return;
+    }
+
+    const messages = validUsers.map((u) => ({
+      to: u.pushToken,
+      sound: "default",
+      title: title,
+      body: message,
+      data: data,
+      priority: "high",
+      channelId: "default",
+    }));
+
+    console.log(
+      `📢 Broadcasting Expo Mobile Push Notification to ${validUsers.length} users...`,
+    );
+
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chunk),
+      });
+
+      const result = await response.json();
+      console.log(
+        "📲 Broadcast Expo Push API Response Chunk:",
+        JSON.stringify(result),
+      );
+    }
+  } catch (err: any) {
+    console.error(
+      "❌ Failed to broadcast Expo push notification:",
+      err?.message || err,
+    );
+  }
 }
 
 export async function getUserNotifications(user: User) {
@@ -80,13 +203,6 @@ export async function sendPushNotification(
     data,
   };
 
-  // Real-time Socket.IO notification
-  // try {
-  //   io?.to(`user:${targetUserId}`).emit("push_notification", payload);
-  // } catch (err) {
-  //   console.error("Failed to emit socket notification:", err);
-  // }
-
   if (io) {
     const roomName = `user:${targetUserId}`;
     const roomSockets = io.sockets.adapter.rooms.get(roomName);
@@ -101,10 +217,14 @@ export async function sendPushNotification(
     console.warn("⚠️ Socket.io instance (io) is not initialized!");
   }
 
-  /**
-   * Later:
-   * await sendExpoPushNotification(targetUserId, payload);
-   */
+  // Dispatch mobile push notification via Expo Push API
+  sendExpoPushNotification(targetUserId, title, message, {
+    ...data,
+    type,
+    id: notification.id,
+  }).catch((err) =>
+    console.error("Error in background sendExpoPushNotification:", err),
+  );
 
   return payload;
 }
