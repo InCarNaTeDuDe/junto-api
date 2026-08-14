@@ -52,6 +52,12 @@ export async function loginWithGoogle(
         });
 
         await userRepo.save(user);
+        console.log("✅ New user saved:", {
+          id: user.id,
+          email: user.email,
+          userHandle: user.userHandle,
+          pushToken: user.pushToken,
+        });
       } else {
         user.lastLogin = new Date();
         user.avatar = googleUser.picture;
