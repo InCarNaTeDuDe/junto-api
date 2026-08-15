@@ -31,6 +31,7 @@ const config: ExpoConfig = {
     },
     package: IS_DEV ? "com.junto.dev" : "com.junto",
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    googleServicesFile: "./google-services.json",
   },
 
   web: {
@@ -43,6 +44,7 @@ const config: ExpoConfig = {
     "expo-web-browser",
     "expo-secure-store",
     "@react-native-google-signin/google-signin",
+    "expo-notifications",
     [
       "expo-location",
       {

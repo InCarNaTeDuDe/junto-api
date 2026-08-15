@@ -5,7 +5,12 @@ import { io } from "../socket/socket";
 
 const notificationRepo = AppDataSource.getRepository(Notification);
 
-export async function registerUserPushToken(user: User, pushToken: string) {
+export async function registerUserPushToken(
+  user: User,
+  pushToken: string,
+  pushTokenType?: string,
+  platform?: string,
+) {
   const userRepo = AppDataSource.getRepository(User);
 
   const dbUser = await userRepo.findOne({
@@ -20,11 +25,17 @@ export async function registerUserPushToken(user: User, pushToken: string) {
 
   await userRepo.save(dbUser);
 
-  console.log(`✅ Push token saved for ${dbUser.email}: ${pushToken}`);
+  console.log(`Push Debug: Push token saved for ${dbUser.email}`, {
+    platform,
+    pushTokenType,
+    pushToken,
+  });
 
   return {
     success: true,
     message: "Push token registered successfully",
+    platform,
+    pushTokenType,
   };
 }
 export async function sendExpoPushNotification(

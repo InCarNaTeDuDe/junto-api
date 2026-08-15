@@ -43,7 +43,7 @@ import {
   useEffect,
 } from "react";
 import { LightTheme, DarkTheme, Theme } from "@/theme";
-import { useColorScheme } from "react-native";
+import { Alert, useColorScheme } from "react-native";
 import { ApiService } from "@/services/api";
 import { connectSocket } from "@/services/socket";
 import { PushNotificationService } from "@/services/notifications";

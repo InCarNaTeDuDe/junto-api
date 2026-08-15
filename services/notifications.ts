@@ -37,93 +37,85 @@ export const PushNotificationService = {
    * Register device for Expo Push Notifications, request permissions, and store token on server.
    */
   async registerForPushNotificationsAsync(): Promise<string | null> {
-    let token: string | null = null;
-
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "Default",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#A855F7",
-      });
-    }
+    let devicePushToken: string | null = null;
 
     try {
-      if (Device.isDevice || Platform.OS !== "web") {
-        const existingPerm: any = await Notifications.getPermissionsAsync();
-        let finalStatus =
-          existingPerm.status || (existingPerm.granted ? "granted" : "denied");
+      // Android notification channel
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "Default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#A855F7",
+        });
+      }
 
-        if (finalStatus !== "granted") {
-          const reqPerm: any = await Notifications.requestPermissionsAsync();
-          finalStatus =
-            reqPerm.status || (reqPerm.granted ? "granted" : "denied");
-        }
+      // Permission
 
-        if (finalStatus !== "granted") {
-          console.warn("Push notification permission not granted.");
+      const existingPerm = await Notifications.getPermissionsAsync();
+
+      let finalStatus =
+        existingPerm.status || (existingPerm.granted ? "granted" : "denied");
+
+      if (finalStatus !== "granted") {
+        const reqPerm = await Notifications.requestPermissionsAsync();
+
+        finalStatus =
+          reqPerm.status || (reqPerm.granted ? "granted" : "denied");
+      }
+
+      if (finalStatus !== "granted") {
+        return null;
+      }
+
+      // =====================================================
+      // GET NATIVE DEVICE PUSH TOKEN
+      // Android -> FCM token
+      // iOS     -> APNs token
+      // =====================================================
+
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+
+      // Alert.alert(
+      //   "Push Debug",
+      //   `12. Device token received\n\nType: ${tokenData.type}\n\nToken:\n${tokenData.data}`,
+      // );
+
+      devicePushToken = tokenData.data;
+
+      // =====================================================
+      // SYNC TOKEN WITH YOUR BACKEND
+      // =====================================================
+
+      if (devicePushToken) {
+        try {
+          const response = await ApiService.post(
+            "/api/notifications/register-token",
+            {
+              pushToken: devicePushToken,
+              pushTokenType: tokenData.type,
+              platform: Platform.OS,
+            },
+          );
+        } catch (error: any) {
+          console.log("Push Debug 15: Device token sync FAILED:", error);
+
           return null;
         }
-
-        let tokenData;
-        try {
-          const Constants = require("expo-constants").default;
-          const projectId =
-            Constants?.expoConfig?.extra?.eas?.projectId ||
-            Constants?.easConfig?.projectId;
-          if (projectId) {
-            tokenData = await Notifications.getExpoPushTokenAsync({
-              projectId,
-            });
-          } else {
-            tokenData = await Notifications.getExpoPushTokenAsync();
-          }
-        } catch (tokenErr) {
-          console.warn(
-            "Retrying getExpoPushTokenAsync fallback without options:",
-            tokenErr,
-          );
-          tokenData = await Notifications.getExpoPushTokenAsync();
-        }
-
-        token = tokenData?.data || null;
-        console.log("📲 Expo Push Token registered:", token);
-
-        if (token) {
-          try {
-            const response = await ApiService.post(
-              "/api/notifications/register-token",
-              {
-                pushToken: token,
-              },
-            );
-
-            Alert.alert(
-              "Push Token Registered ✅",
-              `Token:\n\n${token}\n\nServer response:\n${JSON.stringify(response)}`,
-            );
-
-            console.log("✅ Push token registered:", token);
-            console.log("✅ Register-token response:", response);
-          } catch (error: any) {
-            Alert.alert(
-              "Push Token Registration Failed ❌",
-              error?.message || "Unable to register push token",
-            );
-
-            console.error("❌ Register-token failed:", error);
-          }
-        }
-      } else {
-        console.log("Expo Push Notifications active (web fallback).");
       }
-    } catch (err) {
-      console.warn("Could not retrieve Expo push token:", err);
+
+      return devicePushToken;
+    } catch (err: any) {
+      console.log("Push Debug ERROR:", err);
+
+      Alert.alert(
+        "Push Debug",
+        `PUSH ERROR ❌\n\n${err?.message || String(err)}`,
+      );
+
+      return null;
     }
-
-    return token;
   },
-
   /**
    * Listen for incoming Expo notifications in foreground and taps on notifications.
    */

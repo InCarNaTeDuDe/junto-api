@@ -12,11 +12,7 @@ export async function registerToken(
   next: NextFunction,
 ) {
   try {
-    console.log("📲 REGISTER TOKEN REQUEST");
-    console.log("User:", req.user);
-    console.log("Push token:", req.body.pushToken);
-
-    const { pushToken } = req.body;
+    const { pushToken, pushTokenType, platform } = req.body;
 
     if (!pushToken) {
       return res.status(400).json({
@@ -25,13 +21,15 @@ export async function registerToken(
       });
     }
 
-    const result = await registerUserPushToken(req.user!, pushToken);
-
-    console.log("✅ REGISTER TOKEN RESULT:", result);
+    const result = await registerUserPushToken(
+      req.user!,
+      pushToken,
+      pushTokenType,
+      platform,
+    );
 
     return res.status(200).json(result);
   } catch (err) {
-    console.error("❌ REGISTER TOKEN ERROR:", err);
     next(err);
   }
 }

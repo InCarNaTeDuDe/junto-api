@@ -21,7 +21,8 @@
         "foregroundImage": "./assets/icon-maskable-512.png",
         "backgroundColor": "#090212"
       },
-      "package": "com.daymates.app"
+      "package": "com.daymates.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/icon_64x64.png",
@@ -31,7 +32,8 @@
       "expo-router",
       "expo-web-browser",
       "expo-secure-store",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-notifications"
     ],
     "scheme": "daymates",
     "extra": {
