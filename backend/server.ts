@@ -13,6 +13,10 @@ import messagesRoutes from "./messages/messages.routes";
 import asknearbyRoutes from "./asknearby/asknearby.routes";
 import notificationRoutes from "./notifications/notifications.routes";
 import supportRoutes from "./support/support.routes";
+
+import ridesRoutes from "./rides/rides.routes";
+import localservicesRoutes from "./localservices/localservices.routes";
+import dealsRoutes from "./deals/deals.routes";
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
 
@@ -159,6 +163,10 @@ async function startServer() {
   app.use("/api/asknearby", asknearbyRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/support", supportRoutes);
+
+  app.use("/api/rides", ridesRoutes);
+  app.use("/api/localservices", localservicesRoutes);
+  app.use("/api/deals", dealsRoutes);
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);

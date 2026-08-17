@@ -37,80 +37,137 @@ export const PushNotificationService = {
    * Register device for Expo Push Notifications, request permissions, and store token on server.
    */
   async registerForPushNotificationsAsync(): Promise<string | null> {
-    let devicePushToken: string | null = null;
+    let expoPushToken: string | null = null;
 
     try {
-      // Android notification channel
+      console.log("Push Debug 1: registerForPushNotificationsAsync()");
+
+      // =====================================================
+      // ANDROID NOTIFICATION CHANNEL
+      // =====================================================
       if (Platform.OS === "android") {
+        console.log("Push Debug 2: Creating Android notification channel");
+
         await Notifications.setNotificationChannelAsync("default", {
           name: "Default",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#A855F7",
         });
+
+        console.log("Push Debug 3: Android channel created");
       }
 
-      // Permission
-
+      // =====================================================
+      // PERMISSION
+      // =====================================================
       const existingPerm = await Notifications.getPermissionsAsync();
+
+      console.log(
+        "Push Debug 4: Permission:",
+        existingPerm.status,
+        existingPerm.granted,
+      );
 
       let finalStatus =
         existingPerm.status || (existingPerm.granted ? "granted" : "denied");
 
       if (finalStatus !== "granted") {
+        console.log("Push Debug 5: Requesting permission");
+
         const reqPerm = await Notifications.requestPermissionsAsync();
 
         finalStatus =
           reqPerm.status || (reqPerm.granted ? "granted" : "denied");
+
+        console.log("Push Debug 6: Requested permission:", finalStatus);
       }
 
       if (finalStatus !== "granted") {
+        console.log("Push Debug 7: Permission denied");
         return null;
       }
 
       // =====================================================
-      // GET NATIVE DEVICE PUSH TOKEN
-      // Android -> FCM token
-      // iOS     -> APNs token
+      // GET EXPO PROJECT ID
       // =====================================================
+      const Constants = require("expo-constants").default;
 
-      const tokenData = await Notifications.getDevicePushTokenAsync();
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ||
+        Constants?.easConfig?.projectId;
 
-      // Alert.alert(
-      //   "Push Debug",
-      //   `12. Device token received\n\nType: ${tokenData.type}\n\nToken:\n${tokenData.data}`,
-      // );
+      console.log("Push Debug 8: Expo Project ID:", projectId || "NOT FOUND");
 
-      devicePushToken = tokenData.data;
+      if (!projectId) {
+        console.log("Push Debug 9: Expo Project ID is missing");
 
-      // =====================================================
-      // SYNC TOKEN WITH YOUR BACKEND
-      // =====================================================
+        Alert.alert("Push Debug", "Expo Project ID is missing.");
 
-      if (devicePushToken) {
-        try {
-          const response = await ApiService.post(
-            "/api/notifications/register-token",
-            {
-              pushToken: devicePushToken,
-              pushTokenType: tokenData.type,
-              platform: Platform.OS,
-            },
-          );
-        } catch (error: any) {
-          console.log("Push Debug 15: Device token sync FAILED:", error);
-
-          return null;
-        }
+        return null;
       }
 
-      return devicePushToken;
+      // =====================================================
+      // GET EXPO PUSH TOKEN
+      // =====================================================
+      console.log("Push Debug 10: Calling getExpoPushTokenAsync()");
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+
+      console.log("Push Debug 11: Expo token response:", tokenData);
+
+      expoPushToken = tokenData.data;
+
+      console.log("Push Debug 12: Expo Push Token:", expoPushToken);
+
+      Alert.alert("Expo Push Token", expoPushToken || "TOKEN NOT GENERATED");
+
+      // =====================================================
+      // SEND TOKEN TO YOUR BACKEND
+      // =====================================================
+      if (!expoPushToken) {
+        console.log("Push Debug 13: No Expo token. Stopping.");
+
+        return null;
+      }
+
+      console.log("Push Debug 13: Registering Expo token with backend");
+
+      try {
+        const response = await ApiService.post(
+          "/api/notifications/register-token",
+          {
+            pushToken: expoPushToken,
+            pushTokenType: "expo",
+            platform: Platform.OS,
+          },
+        );
+
+        console.log("Push Debug 14: Token registered successfully:", response);
+
+        Alert.alert("Push Debug", "Expo Push Token registered successfully ✅");
+      } catch (error: any) {
+        console.log("Push Debug 14: Token registration FAILED:", error);
+
+        Alert.alert(
+          "Push Debug",
+          `Token registration failed ❌\n\n${error?.message || String(error)}`,
+        );
+
+        return null;
+      }
+
+      console.log("Push Debug 15: Push registration COMPLETE");
+
+      return expoPushToken;
     } catch (err: any) {
       console.log("Push Debug ERROR:", err);
 
       Alert.alert(
         "Push Debug",
-        `PUSH ERROR ❌\n\n${err?.message || String(err)}`,
+        `Push registration error ❌\n\n${err?.message || String(err)}`,
       );
 
       return null;

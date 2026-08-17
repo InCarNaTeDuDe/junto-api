@@ -31,7 +31,7 @@ const config: ExpoConfig = {
     },
     package: IS_DEV ? "com.junto.dev" : "com.junto",
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
-    googleServicesFile: "./google-services.json",
+    // googleServicesFile: "./google-services.json",
   },
 
   web: {
@@ -57,6 +57,9 @@ const config: ExpoConfig = {
   scheme: "daymates",
 
   extra: {
+    eas: {
+      projectId: "abd87e6e-ee7a-4967-a6b0-9866b21eebd6",
+    },
     router: {
       origin:
         "https://ais-dev-do6tm66cxhkyor7idpd6ap-692488307747.asia-east1.run.app",

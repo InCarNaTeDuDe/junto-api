@@ -34,6 +34,10 @@ import { SpinnerLoader } from "@/components/SpinnerLoader";
 
 import { useStore } from "@/hooks/useStore";
 import { WalkingCoffeeMascot } from "@/components/WalkingCoffeeMascot";
+import { JuntoNow } from "@/components/JuntoNow";
+import { QuickFeatures } from "@/components/QuickFeatures";
+import { UniversalNeedBar } from "@/components/UniversalNeedBar";
+import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -612,6 +616,12 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<"newest" | "title">("newest");
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
 
+  const {
+    isListening: isSearchListening,
+    startListening: startSearchListening,
+    stopListening: stopSearchListening,
+  } = useVoiceSpeech();
+
   // hero card is ~55% of viewport on phone, capped on wide screens
   const { cardW: heroW, artH: heroArtHeight } = useHeroCardSize();
 
@@ -859,6 +869,9 @@ export default function Home() {
           </View>
         </View>
 
+        {/* 🎯 "I Need This" Universal Intent Router */}
+        <UniversalNeedBar />
+
         {/* Search */}
         <View style={s.searchRow}>
           <View style={s.search}>
@@ -866,16 +879,35 @@ export default function Home() {
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="Search tickets, lost items, day mates…"
+              placeholder="Search anything on Junto..."
               placeholderTextColor={C.mute}
               style={s.searchInput}
             />
-            {q.length > 0 && (
+            {q.length > 0 ? (
               <Pressable onPress={() => setQ("")} hitSlop={8}>
                 <Ionicons
                   name="close-circle"
                   size={moderateScale(18)}
                   color={C.mute}
+                />
+              </Pressable>
+            ) : (
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  if (isSearchListening) {
+                    stopSearchListening();
+                  } else {
+                    startSearchListening((spoken) => {
+                      setQ(spoken);
+                    });
+                  }
+                }}
+              >
+                <Ionicons
+                  name="mic"
+                  size={moderateScale(18)}
+                  color={isSearchListening ? "#EF4444" : C.primary || "#8B5CF6"}
                 />
               </Pressable>
             )}
@@ -892,27 +924,47 @@ export default function Home() {
           >
             <Ionicons
               name="options-outline"
-              size={moderateScale(18)}
+              size={moderateScale(17)}
               color={hasActiveFilters ? C.primary : C.text}
             />
+            <Text
+              style={{
+                fontSize: moderateScale(13),
+                fontWeight: "600",
+                color: hasActiveFilters ? C.primary : C.text,
+              }}
+            >
+              Filters
+            </Text>
             {hasActiveFilters && <View style={s.filterBadgeDot} />}
           </Pressable>
         </View>
 
-        {/* Animated Coffee Bag Mascot */}
-        {/* <View style={{ marginVertical: 4, alignItems: "center" }}>
-          <WalkingCoffeeMascot
-            scale={0.95}
-            label="Walking around DayMates! ☕"
-          />
-        </View> */}
+        {/* Quick Features Row */}
+        <QuickFeatures
+          isDark={themeMode === "dark"}
+          onSelectFeature={(id, kw) => {
+            if (kw && kw !== "all") {
+              setQ(kw);
+            } else if (kw === "all") {
+              setQ("");
+            }
+          }}
+        />
 
-        {/* Hero cards */}
-        <ScrollView
+        {/* JUNTO Now Section */}
+        <JuntoNow
+          isDark={themeMode === "dark"}
+          cityName={selectedLocation?.name}
+          onFilter={(kw) => setQ(kw)}
+        />
+
+        {/* Hero cards (commented out to reduce vertical space) */}
+        {/* <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.heroScroll}
-          snapToInterval={heroW + 8} // snaps card-by-card on swipe
+          snapToInterval={heroW + 8}
           decelerationRate="fast"
         >
           {HERO.map((h) => (
@@ -924,7 +976,7 @@ export default function Home() {
               artHeight={heroArtHeight}
             />
           ))}
-        </ScrollView>
+        </ScrollView> */}
 
         {/* Popular activities */}
         <View style={s.sectionHead}>
@@ -1281,14 +1333,16 @@ export const createStyles = (theme) => {
       ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
     },
     filterBtn: {
-      width: verticalScale(48),
       height: verticalScale(48),
       borderRadius: scale(14),
       backgroundColor: C.card,
       borderWidth: 1,
       borderColor: C.border,
+      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
+      paddingHorizontal: scale(12),
+      gap: scale(4),
     },
 
     heroScroll: {

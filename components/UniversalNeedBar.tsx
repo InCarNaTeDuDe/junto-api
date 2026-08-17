@@ -1,0 +1,671 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Platform,
+  Animated,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useTheme } from "@/hooks/useTheme";
+import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
+import {
+  parseUserNeed,
+  SUGGESTED_NEED_PROMPTS,
+  IntentMatch,
+} from "@/utils/intentRouter";
+import { INeedThisModal } from "./NeedThisModal";
+
+const ROTATING_EXAMPLES = [
+  "I need a bike mechanic near me",
+  "I need someone to go to Vijayawada with",
+  "I need a movie ticket for tonight",
+  "I lost my wallet in Hitec City",
+  "I'm visiting Hyderabad tomorrow",
+  "I want to buy a used cycle",
+  "Need a badminton partner for 7 PM",
+  "Looking for home tiffin food",
+];
+
+export const UniversalNeedBar: React.FC = () => {
+  const router = useRouter();
+  const { theme: C, isDark } = useTheme();
+
+  const [query, setQuery] = useState("");
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [matchedIntent, setMatchedIntent] = useState<IntentMatch | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [directFeedback, setDirectFeedback] = useState<string | null>(null);
+
+  const { isListening, startListening, stopListening } = useVoiceSpeech();
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Cycle placeholder
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIdx((prev) => (prev + 1) % ROTATING_EXAMPLES.length);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Voice listening animation
+  useEffect(() => {
+    if (isListening) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isListening]);
+
+  // Parse intent on change
+  useEffect(() => {
+    if (query.trim().length >= 3) {
+      const match = parseUserNeed(query);
+      setMatchedIntent(match);
+      setIsExpanded(true);
+    } else {
+      setMatchedIntent(null);
+    }
+  }, [query]);
+
+  const handleRoute = (route: string) => {
+    router.push(route as any);
+  };
+
+  const handleChipPress = (promptText: string) => {
+    setQuery(promptText);
+    const match = parseUserNeed(promptText);
+    setMatchedIntent(match);
+    setIsExpanded(true);
+  };
+
+  const handleDirectContact = (title: string, actionText?: string) => {
+    setDirectFeedback(`✓ Connected: ${title} (${actionText || "Dispatched"})`);
+    setTimeout(() => setDirectFeedback(null), 3000);
+  };
+
+  return (
+    <View style={styles.outerContainer}>
+      {/* Universal Need Header Card */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: C.card || "#FFFFFF",
+            borderColor: isListening
+              ? "#EF4444"
+              : matchedIntent
+                ? matchedIntent.color
+                : "#E2E8F0",
+          },
+        ]}
+      >
+        {/* Top title line */}
+        <View style={styles.topHeader}>
+          <View style={styles.titleWithIcon}>
+            <View
+              style={[styles.targetIconCircle, { backgroundColor: "#EEF2FF" }]}
+            >
+              <Ionicons name="sparkles" size={15} color="#6366F1" />
+            </View>
+            <View>
+              <Text
+                style={[styles.sectionTitle, { color: C.text || "#0F172A" }]}
+              >
+                I Need This
+              </Text>
+              <Text
+                style={[styles.sectionSubtitle, { color: C.mute || "#64748B" }]}
+              >
+                Universal AI Intent Router
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.expandModalBtn}
+            onPress={() => setIsModalOpen(true)}
+            accessibilityLabel="Open Full Universal Assistant"
+          >
+            <Text style={styles.expandModalBtnText}>Full Hub</Text>
+            <Ionicons name="expand-outline" size={13} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Input Bar */}
+        <View
+          style={[
+            styles.inputRow,
+            {
+              backgroundColor: "#F8FAFC",
+              borderColor: isListening ? "#EF4444" : "#CBD5E1",
+            },
+          ]}
+        >
+          <Ionicons
+            name="search"
+            size={18}
+            color={matchedIntent ? matchedIntent.color : "#64748B"}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={ROTATING_EXAMPLES[placeholderIdx]}
+            placeholderTextColor="#94A3B8"
+            style={[styles.input, { color: C.text || "#0F172A" }]}
+            autoCapitalize="none"
+          />
+
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setQuery("");
+                setMatchedIntent(null);
+                setIsExpanded(false);
+              }}
+              style={styles.clearBtn}
+            >
+              <Ionicons name="close-circle" size={17} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={() => {
+              if (isListening) {
+                stopListening();
+              } else {
+                startListening((spoken) => {
+                  setQuery(spoken);
+                });
+              }
+            }}
+            style={[
+              styles.micBtn,
+              { backgroundColor: isListening ? "#EF4444" : "#EEF2FF" },
+            ]}
+          >
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons
+                name={isListening ? "mic" : "mic-outline"}
+                size={17}
+                color={isListening ? "#FFFFFF" : "#6366F1"}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Voice listening indicator */}
+        {isListening && (
+          <View style={styles.inlineListening}>
+            <View style={styles.pulsingRedDot} />
+            <Text style={styles.inlineListeningText}>
+              Listening... Speak your requirement (e.g. "I need a bike
+              mechanic")
+            </Text>
+          </View>
+        )}
+
+        {/* Feedback alert */}
+        {directFeedback && (
+          <View style={styles.feedbackToast}>
+            <Ionicons name="checkmark-circle" size={15} color="#15803D" />
+            <Text style={styles.feedbackText}>{directFeedback}</Text>
+          </View>
+        )}
+
+        {/* Suggested Need Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsScroll}
+          style={{ marginTop: 10 }}
+        >
+          {SUGGESTED_NEED_PROMPTS.slice(0, 6).map((prompt) => (
+            <TouchableOpacity
+              key={prompt.id}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: prompt.bg,
+                  borderColor:
+                    query === prompt.text ? prompt.color : "transparent",
+                },
+              ]}
+              onPress={() => handleChipPress(prompt.text)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.chipEmoji}>{prompt.emoji}</Text>
+              <Text style={[styles.chipText, { color: prompt.color }]}>
+                {prompt.text}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Live Intent Match Preview Card */}
+        {matchedIntent && isExpanded && (
+          <View
+            style={[
+              styles.matchedCard,
+              {
+                backgroundColor: matchedIntent.bg,
+                borderColor: matchedIntent.color,
+              },
+            ]}
+          >
+            <View style={styles.matchTop}>
+              <View
+                style={[
+                  styles.matchIconCircle,
+                  { backgroundColor: matchedIntent.color },
+                ]}
+              >
+                <Ionicons
+                  name={matchedIntent.icon as any}
+                  size={18}
+                  color="#FFFFFF"
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <View style={styles.matchBadgeRow}>
+                  <Text
+                    style={[
+                      styles.matchModuleName,
+                      { color: matchedIntent.color },
+                    ]}
+                  >
+                    {matchedIntent.moduleName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.matchBadgePill,
+                      { backgroundColor: matchedIntent.color },
+                    ]}
+                  >
+                    <Text style={styles.matchBadgePillText}>
+                      {matchedIntent.badge}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.matchHeadline}>
+                  {matchedIntent.headline}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.matchExplanation}>
+              {matchedIntent.explanation}
+            </Text>
+
+            {/* Direct Matched Preview Items */}
+            <View style={styles.instantList}>
+              {matchedIntent.instantResults.slice(0, 2).map((item) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.instantRowItem,
+                    {
+                      backgroundColor: C.card || "#FFFFFF",
+                      borderColor: "rgba(0,0,0,0.06)",
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.itemTitle,
+                          { color: C.text || "#0F172A" },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.title}
+                      </Text>
+                      {item.badge && (
+                        <View
+                          style={[
+                            styles.itemPill,
+                            { backgroundColor: matchedIntent.bg },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.itemPillText,
+                              { color: matchedIntent.color },
+                            ]}
+                          >
+                            {item.badge}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text
+                      style={[styles.itemSub, { color: C.mute || "#64748B" }]}
+                      numberOfLines={1}
+                    >
+                      {item.subtitle}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.itemActionBtn,
+                      { backgroundColor: matchedIntent.color },
+                    ]}
+                    onPress={() =>
+                      handleDirectContact(item.title, item.actionText)
+                    }
+                  >
+                    <Text style={styles.itemActionText}>
+                      {item.actionText || "Contact"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            {/* 1-Tap Route Action */}
+            <TouchableOpacity
+              style={[
+                styles.primaryRouteBtn,
+                { backgroundColor: matchedIntent.color },
+              ]}
+              onPress={() => handleRoute(matchedIntent.route)}
+            >
+              <Text style={styles.primaryRouteText}>
+                {matchedIntent.actionLabel}
+              </Text>
+              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Full Modal */}
+      <INeedThisModal
+        visible={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialQuery={query}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  outerContainer: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+  },
+  card: {
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  topHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  titleWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  targetIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  expandModalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  expandModalBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6366F1",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    paddingVertical: 4,
+  },
+  clearBtn: {
+    padding: 4,
+    marginRight: 2,
+  },
+  micBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 2,
+  },
+  inlineListening: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  pulsingRedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#EF4444",
+    marginRight: 6,
+  },
+  inlineListeningText: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "600",
+    flex: 1,
+  },
+  feedbackToast: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    gap: 6,
+  },
+  feedbackText: {
+    fontSize: 12,
+    color: "#15803D",
+    fontWeight: "600",
+  },
+  chipsScroll: {
+    gap: 8,
+    paddingRight: 10,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 6,
+  },
+  chipEmoji: {
+    fontSize: 13,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  matchedCard: {
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1.5,
+    marginTop: 12,
+  },
+  matchTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  matchIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  matchBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 2,
+  },
+  matchModuleName: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  matchBadgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  matchBadgePillText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  matchHeadline: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  matchExplanation: {
+    fontSize: 12,
+    color: "#334155",
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  instantList: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  instantRowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  itemTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  itemPill: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  itemPillText: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  itemSub: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  itemActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  itemActionText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  primaryRouteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  primaryRouteText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+});
