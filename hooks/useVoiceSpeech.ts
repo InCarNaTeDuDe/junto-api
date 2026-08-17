@@ -1,18 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 
 export interface ParsedDealVoice {
   rawTranscript: string;
   title: string;
-  category:
-    | "Cycles"
-    | "Mobiles"
-    | "Electronics"
-    | "Furniture"
-    | "Appliances"
-    | "Books"
-    | "Fitness"
-    | "General";
+  category: "Cycles" | "Mobiles" | "Electronics" | "Furniture" | "Appliances" | "Books" | "Fitness" | "General";
   price: string;
   condition: "Brand New" | "Like New" | "Good" | "Fair";
   location: string;
@@ -24,9 +16,11 @@ export function useVoiceSpeech() {
   const [transcript, setTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported, setIsSupported] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<"prompt" | "granted" | "denied">("prompt");
   const recognitionRef = useRef<any>(null);
 
+  // Check Web Speech API support
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const SpeechRecognition =
@@ -34,12 +28,66 @@ export function useVoiceSpeech() {
         (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         setIsSupported(true);
+      } else {
+        setIsSupported(false);
+      }
+
+      // Check existing permissions if supported by browser
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions
+          .query({ name: "microphone" as PermissionName })
+          .then((permission) => {
+            if (permission.state === "granted") {
+              setPermissionStatus("granted");
+            } else if (permission.state === "denied") {
+              setPermissionStatus("denied");
+            } else {
+              setPermissionStatus("prompt");
+            }
+            permission.onchange = () => {
+              setPermissionStatus(permission.state as any);
+            };
+          })
+          .catch(() => {
+            // Permission query not supported for mic in this environment
+          });
       }
     }
   }, []);
 
+  /**
+   * Explicitly ask the user for microphone permission
+   */
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Release tracks immediately
+          stream.getTracks().forEach((track) => track.stop());
+          setPermissionStatus("granted");
+          setError(null);
+          return true;
+        } catch (permErr: any) {
+          console.warn("Microphone permission request error:", permErr);
+          setPermissionStatus("denied");
+          const msg =
+            "Microphone access was denied or is blocked. Please enable microphone permissions in your browser address bar/settings to use voice recognition.";
+          setError(msg);
+          Alert.alert(
+            "Microphone Permission Needed",
+            "Please allow microphone access in your browser or device settings to speak your request.",
+            [{ text: "OK" }],
+          );
+          return false;
+        }
+      }
+    }
+    return true;
+  }, []);
+
   const startListening = useCallback(
-    (onFinalTranscript?: (text: string) => void) => {
+    async (onFinalTranscript?: (text: string) => void) => {
       setError(null);
       setTranscript("");
       setInterimTranscript("");
@@ -52,13 +100,39 @@ export function useVoiceSpeech() {
         if (!SpeechRecognition) {
           setIsSupported(false);
           setIsListening(true);
-          // Fallback simulation handled via UI or manual preset
+          setError("Speech recognition is not natively supported in this browser. Please type or tap quick presets.");
           return;
+        }
+
+        // Ask / ensure microphone permission before starting
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+            setPermissionStatus("granted");
+          } catch (permErr: any) {
+            console.warn("getUserMedia failed before recognition:", permErr);
+            setPermissionStatus("denied");
+            const msg =
+              "Microphone permission is required. Please grant microphone access in your browser/device settings.";
+            setError(msg);
+            setIsListening(false);
+            Alert.alert(
+              "Microphone Access Denied",
+              "Please click the microphone/lock icon in your browser address bar and select 'Allow' to enable voice input.",
+              [{ text: "Got It" }],
+            );
+            return;
+          }
         }
 
         try {
           if (recognitionRef.current) {
-            recognitionRef.current.abort();
+            try {
+              recognitionRef.current.abort();
+            } catch (e) {
+              // ignore
+            }
           }
 
           const recognition = new SpeechRecognition();
@@ -99,10 +173,15 @@ export function useVoiceSpeech() {
 
           recognition.onerror = (event: any) => {
             console.warn("Speech recognition error:", event.error);
-            if (event.error !== "no-speech") {
-              setError(
-                `Microphone note: ${event.error || "Could not hear audio clearly"}`,
+            if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+              setPermissionStatus("denied");
+              setError("Microphone permission was blocked. Please allow mic access in your browser.");
+              Alert.alert(
+                "Microphone Access Blocked",
+                "Please click the lock or settings icon in your browser address bar to grant microphone permissions.",
               );
+            } else if (event.error !== "no-speech") {
+              setError(`Microphone notice: ${event.error || "Could not hear audio clearly"}`);
             }
             setIsListening(false);
           };
@@ -142,6 +221,8 @@ export function useVoiceSpeech() {
     interimTranscript,
     error,
     isSupported,
+    permissionStatus,
+    requestPermission,
     startListening,
     stopListening,
   };
@@ -150,10 +231,7 @@ export function useVoiceSpeech() {
 /**
  * Intelligent parser that converts natural speech into structured OLX-style item listings
  */
-export function parseVoiceListing(
-  spokenText: string,
-  defaultCity = "Hyderabad",
-): ParsedDealVoice {
+export function parseVoiceListing(spokenText: string, defaultCity = "Hyderabad"): ParsedDealVoice {
   const text = spokenText.trim();
   const lower = text.toLowerCase();
 
@@ -240,10 +318,9 @@ export function parseVoiceListing(
   // 2. Detect Price
   let price = "₹1,500";
   // Matches "₹ 5000", "5000 rupees", "rs 5000", "rs. 5000", "5000 bucks", "for 6500", "price 4000"
-  const priceRegex =
-    /(?:₹|rs\.?|inr|for|price|cost|rupees)?\s*(\d{2,7})\s*(?:₹|rs\.?|rupees|bucks|k)?/i;
+  const priceRegex = /(?:₹|rs\.?|inr|for|price|cost|rupees)?\s*(\d{2,7})\s*(?:₹|rs\.?|rupees|bucks|k)?/i;
   const priceMatch = text.match(priceRegex);
-
+  
   if (lower.includes("free") || lower.includes("giving away")) {
     price = "Free";
   } else if (priceMatch && priceMatch[1]) {
@@ -255,46 +332,20 @@ export function parseVoiceListing(
 
   // 3. Detect Condition
   let condition: ParsedDealVoice["condition"] = "Good";
-  if (
-    lower.includes("brand new") ||
-    lower.includes("sealed") ||
-    lower.includes("unopened")
-  ) {
+  if (lower.includes("brand new") || lower.includes("sealed") || lower.includes("unopened")) {
     condition = "Brand New";
-  } else if (
-    lower.includes("like new") ||
-    lower.includes("mint") ||
-    lower.includes("scratchless") ||
-    lower.includes("excellent")
-  ) {
+  } else if (lower.includes("like new") || lower.includes("mint") || lower.includes("scratchless") || lower.includes("excellent")) {
     condition = "Like New";
-  } else if (
-    lower.includes("fair") ||
-    lower.includes("used") ||
-    lower.includes("minor scratch")
-  ) {
+  } else if (lower.includes("fair") || lower.includes("used") || lower.includes("minor scratch")) {
     condition = "Fair";
   }
 
   // 4. Detect Location / Area
   let location = defaultCity.split(",")[0].trim();
   const knownAreas = [
-    "Hitec City",
-    "Madhapur",
-    "Gachibowli",
-    "Kondapur",
-    "Kukatpally",
-    "Jubilee Hills",
-    "Banjara Hills",
-    "Secunderabad",
-    "Begumpet",
-    "Manikonda",
-    "Miyapur",
-    "Koramangala",
-    "Indiranagar",
-    "Whitefield",
-    "Bandra",
-    "Andheri",
+    "Hitec City", "Madhapur", "Gachibowli", "Kondapur", "Kukatpally",
+    "Jubilee Hills", "Banjara Hills", "Secunderabad", "Begumpet", "Manikonda",
+    "Miyapur", "Koramangala", "Indiranagar", "Whitefield", "Bandra", "Andheri"
   ];
   for (const area of knownAreas) {
     if (lower.includes(area.toLowerCase())) {
@@ -308,26 +359,15 @@ export function parseVoiceListing(
     .replace(/^selling\s*(my)?/i, "")
     .replace(/^i want to sell\s*(my)?/i, "")
     .replace(/^giving away\s*(my)?/i, "")
-    .replace(
-      /(?:for|at|in|price)\s*(?:₹|rs\.?|inr)?\s*\d+\s*(?:rupees|bucks)?/gi,
-      "",
-    )
-    .replace(
-      /(?:at|in|near)\s+(?:hitec city|madhapur|gachibowli|kondapur|kukatpally|jubilee hills|banjara hills|secunderabad)/gi,
-      "",
-    )
+    .replace(/(?:for|at|in|price)\s*(?:₹|rs\.?|inr)?\s*\d+\s*(?:rupees|bucks)?/gi, "")
+    .replace(/(?:at|in|near)\s+(?:hitec city|madhapur|gachibowli|kondapur|kukatpally|jubilee hills|banjara hills|secunderabad)/gi, "")
     .trim();
 
   // Capitalize first letter
   if (cleanTitle.length > 2) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
   } else {
-    cleanTitle =
-      category === "Cycles"
-        ? "Pre-owned Gear Cycle"
-        : category === "Mobiles"
-          ? "Smartphone"
-          : "Pre-loved Item";
+    cleanTitle = category === "Cycles" ? "Pre-owned Gear Cycle" : category === "Mobiles" ? "Smartphone" : "Pre-loved Item";
   }
 
   return {

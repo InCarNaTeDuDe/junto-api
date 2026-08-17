@@ -11,11 +11,7 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import {
-  Ionicons,
-  MaterialCommunityIcons,
-  MaterialIcons,
-} from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
@@ -326,13 +322,7 @@ export default function RidesScreen() {
             <Text style={[styles.headerTitle, { color: textPrimary }]}>
               RideMate
             </Text>
-            <View style={styles.headerIconBadge}>
-              <MaterialCommunityIcons
-                name="car-multiple"
-                size={16}
-                color="#8B5CF6"
-              />
-            </View>
+            <Text style={{ fontSize: 16 }}>🚗</Text>
           </View>
           <Text style={[styles.headerSub, { color: textMute }]}>
             Carpool & Ride share • {cityName.split(",")[0]}
@@ -494,27 +484,17 @@ export default function RidesScreen() {
               )}
             </View>
 
-            {/* Vehicle Type Filter Pills */}
-            <View style={styles.filterRow}>
+            {/* Vehicle Type Filter Bar - Compact Rectangle Box */}
+            <View
+              style={[
+                styles.vehicleSegmentedBox,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
               {[
-                {
-                  id: "all",
-                  label: "All Rides",
-                  icon: "layers-outline",
-                  isMCI: false,
-                },
-                {
-                  id: "car",
-                  label: "Cars Only",
-                  icon: "car-estate",
-                  isMCI: true,
-                },
-                {
-                  id: "bike",
-                  label: "Bikes Only",
-                  icon: "motorbike",
-                  isMCI: true,
-                },
+                { id: "all", label: "All Rides", icon: "apps-outline" },
+                { id: "car", label: "Car", icon: "car" },
+                { id: "bike", label: "Bike", icon: "bicycle" },
               ].map((pill) => {
                 const active = vehicleFilter === pill.id;
                 return (
@@ -522,35 +502,21 @@ export default function RidesScreen() {
                     key={pill.id}
                     onPress={() => setVehicleFilter(pill.id as any)}
                     style={[
-                      styles.filterPill,
-                      {
-                        backgroundColor: active
-                          ? isDark
-                            ? "#8B5CF630"
-                            : "#EDE9FE"
-                          : isDark
-                            ? "#1E293B60"
-                            : "#FFFFFF",
-                        borderColor: active ? "#8B5CF6" : border,
+                      styles.vehicleSegmentItem,
+                      active && {
+                        backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
+                        borderColor: "#8B5CF6",
                       },
                     ]}
                   >
-                    {pill.isMCI ? (
-                      <MaterialCommunityIcons
-                        name={pill.icon as any}
-                        size={15}
-                        color={active ? "#8B5CF6" : textMute}
-                      />
-                    ) : (
-                      <Ionicons
-                        name={pill.icon as any}
-                        size={15}
-                        color={active ? "#8B5CF6" : textMute}
-                      />
-                    )}
+                    <Ionicons
+                      name={pill.icon as any}
+                      size={20}
+                      color={active ? "#8B5CF6" : textMute}
+                    />
                     <Text
                       style={[
-                        styles.filterPillText,
+                        styles.vehicleSegmentText,
                         {
                           color: active ? "#8B5CF6" : textMute,
                           fontWeight: active ? "700" : "500",
@@ -748,16 +714,9 @@ export default function RidesScreen() {
                   </View>
 
                   {ride.notes && (
-                    <View style={styles.notesRow}>
-                      <Ionicons
-                        name="chatbox-ellipses-outline"
-                        size={13}
-                        color="#8B5CF6"
-                      />
-                      <Text style={[styles.notesText, { color: textMute }]}>
-                        {ride.notes}
-                      </Text>
-                    </View>
+                    <Text style={[styles.notesText, { color: textMute }]}>
+                      💬 {ride.notes}
+                    </Text>
                   )}
 
                   {/* Action Button */}
@@ -807,12 +766,9 @@ export default function RidesScreen() {
             </View>
 
             {/* Quick Popular Routes Presets */}
-            <View style={styles.sectionHeaderRow}>
-              <Ionicons name="flash" size={14} color="#F59E0B" />
-              <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                Popular Routes (1-Tap):
-              </Text>
-            </View>
+            <Text style={[styles.sectionLabel, { color: textPrimary }]}>
+              ⚡ Popular Routes (1-Tap):
+            </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -884,105 +840,95 @@ export default function RidesScreen() {
               </View>
             </View>
 
-            {/* Vehicle Type with Creative Material Expo Icons */}
-            <View style={styles.sectionHeaderRow}>
-              <MaterialCommunityIcons
-                name="car-cog"
-                size={15}
-                color="#8B5CF6"
-              />
-              <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                Vehicle Type:
-              </Text>
-            </View>
-            <View style={styles.pillChoiceRow}>
-              {[
-                {
-                  id: "car",
-                  label: "Car",
-                  sub: "Comfort / AC",
-                  iconName: "car-estate",
-                  activeColor: "#10B981",
-                  activeBg: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5",
-                },
-                {
-                  id: "bike",
-                  label: "Bike / Scooter",
-                  sub: "Fast Commute",
-                  iconName: "motorbike",
-                  activeColor: "#8B5CF6",
-                  activeBg: isDark ? "rgba(139, 92, 246, 0.15)" : "#F5F3FF",
-                },
-              ].map((v) => {
-                const active = offerVehicle === v.id;
-                return (
-                  <TouchableOpacity
-                    key={v.id}
-                    onPress={() => setOfferVehicle(v.id as any)}
+            {/* Vehicle Type - Compact Rectangle Box with Large Left (Car) & Right (Bike) Icons */}
+            <Text style={[styles.sectionLabel, { color: textPrimary }]}>
+              Vehicle Type:
+            </Text>
+            <View
+              style={[
+                styles.vehicleOfferBox,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => setOfferVehicle("car")}
+                style={[
+                  styles.vehicleOfferItem,
+                  offerVehicle === "car" && {
+                    backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
+                    borderColor: "#8B5CF6",
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="car"
+                  size={26}
+                  color={offerVehicle === "car" ? "#8B5CF6" : textMute}
+                />
+                <View style={styles.vehicleOfferTextWrap}>
+                  <Text
                     style={[
-                      styles.vehiclePill,
+                      styles.vehicleOfferTitle,
                       {
-                        backgroundColor: active ? v.activeBg : cardBg,
-                        borderColor: active ? v.activeColor : border,
+                        color: offerVehicle === "car" ? "#8B5CF6" : textPrimary,
+                        fontWeight: offerVehicle === "car" ? "800" : "600",
                       },
                     ]}
                   >
-                    <View style={styles.vehiclePillHeader}>
-                      <View
-                        style={[
-                          styles.vehicleIconBadge,
-                          {
-                            backgroundColor: active
-                              ? isDark
-                                ? "rgba(255,255,255,0.08)"
-                                : "#FFFFFF"
-                              : isDark
-                                ? "#1E293B"
-                                : "#F1F5F9",
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name={v.iconName as any}
-                          size={24}
-                          color={
-                            active
-                              ? v.activeColor
-                              : isDark
-                                ? "#94A3B8"
-                                : "#64748B"
-                          }
-                        />
-                      </View>
-                      {active && (
-                        <View
-                          style={[
-                            styles.checkCircle,
-                            { backgroundColor: v.activeColor },
-                          ]}
-                        >
-                          <Ionicons
-                            name="checkmark"
-                            size={11}
-                            color="#FFFFFF"
-                          />
-                        </View>
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        styles.vehiclePillLabel,
-                        { color: active ? v.activeColor : textPrimary },
-                      ]}
-                    >
-                      {v.label}
-                    </Text>
-                    <Text style={[styles.vehiclePillSub, { color: textMute }]}>
-                      {v.sub}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    Car
+                  </Text>
+                  <Text
+                    style={[styles.vehicleOfferSubtitle, { color: textMute }]}
+                  >
+                    Comfort / 4-Seater
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.vehicleOfferDivider,
+                  { backgroundColor: border },
+                ]}
+              />
+
+              <TouchableOpacity
+                onPress={() => setOfferVehicle("bike")}
+                style={[
+                  styles.vehicleOfferItem,
+                  offerVehicle === "bike" && {
+                    backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
+                    borderColor: "#8B5CF6",
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="bicycle"
+                  size={26}
+                  color={offerVehicle === "bike" ? "#8B5CF6" : textMute}
+                />
+                <View style={styles.vehicleOfferTextWrap}>
+                  <Text
+                    style={[
+                      styles.vehicleOfferTitle,
+                      {
+                        color:
+                          offerVehicle === "bike" ? "#8B5CF6" : textPrimary,
+                        fontWeight: offerVehicle === "bike" ? "800" : "600",
+                      },
+                    ]}
+                  >
+                    Bike
+                  </Text>
+                  <Text
+                    style={[styles.vehicleOfferSubtitle, { color: textMute }]}
+                  >
+                    Quick / 1-Seater
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* Leaving Time */}
@@ -1185,13 +1131,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.3,
   },
-  headerIconBadge: {
-    padding: 4,
-    borderRadius: 8,
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   headerSub: {
     fontSize: 11.5,
     marginTop: 1,
@@ -1259,13 +1198,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterPill: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    gap: 6,
   },
   filterPillText: {
     fontSize: 12,
@@ -1409,16 +1345,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "600",
   },
-  notesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingTop: 2,
-  },
   notesText: {
     fontSize: 11.5,
     fontStyle: "italic",
-    flex: 1,
   },
   bookBtn: {
     backgroundColor: "#7C3AED",
@@ -1454,15 +1383,10 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     marginTop: 1,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 4,
-  },
   sectionLabel: {
     fontSize: 12.5,
     fontWeight: "700",
+    marginTop: 2,
   },
   presetScroll: {
     gap: 8,
@@ -1496,44 +1420,63 @@ const styles = StyleSheet.create({
   inputDivider: {
     height: 1,
   },
-  pillChoiceRow: {
+  vehicleSegmentedBox: {
     flexDirection: "row",
-    gap: 10,
-  },
-  vehiclePill: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 4,
     gap: 4,
   },
-  vehiclePillHeader: {
+  vehicleSegmentItem: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
+    justifyContent: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "transparent",
+    gap: 6,
   },
-  vehicleIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  vehicleSegmentText: {
+    fontSize: 12.5,
+  },
+  vehicleOfferBox: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    alignItems: "center",
+  },
+  vehicleOfferItem: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "transparent",
+    gap: 10,
   },
-  checkCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: "center",
+  vehicleOfferDivider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: 2,
+  },
+  vehicleOfferTextWrap: {
     justifyContent: "center",
   },
-  vehiclePillLabel: {
-    fontSize: 14,
-    fontWeight: "800",
+  vehicleOfferTitle: {
+    fontSize: 13.5,
+    lineHeight: 16,
   },
-  vehiclePillSub: {
-    fontSize: 11,
-    fontWeight: "500",
+  vehicleOfferSubtitle: {
+    fontSize: 10,
+    marginTop: 1,
   },
   wrapPillRow: {
     flexDirection: "row",
