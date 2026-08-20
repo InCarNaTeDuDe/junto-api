@@ -1,98 +1,94 @@
+import "reflect-metadata";
+
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  CreateDateColumn,
-  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
 } from "typeorm";
 
 import { User } from "./User.entity";
 
-export type RideVehicleType = "car" | "bike";
-
-export type RideStatus = "active" | "in_progress" | "completed" | "cancelled";
-
-export interface RidePassenger {
-  userId: string;
-  userName: string;
-  seats: number;
-  pickupPoint?: string;
-  passengerPhone?: string;
-  joinedAt: string;
-}
-
 @Entity("rides")
 export class Ride {
-  // =========================
-  // ID
-  // =========================
-
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  // =========================
-  // DRIVER
-  // =========================
-
-  @Column()
-  driverId!: string;
+  /**
+   * User who created/owns the ride
+   *
+   * rides.userId -> users.id
+   */
+  @Index()
+  @Column({
+    type: "uuid",
+  })
+  userId!: string;
 
   @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",
   })
   @JoinColumn({
-    name: "driverId",
+    name: "userId",
+    referencedColumnName: "id",
   })
-  driver!: User;
+  user!: User;
 
-  @Column()
+  @Column({
+    type: "varchar",
+    length: 120,
+  })
   driverName!: string;
 
   @Column({
-    type: "float",
+    type: "decimal",
+    precision: 3,
+    scale: 2,
     default: 5.0,
   })
   driverRating!: number;
 
   @Column({
+    type: "varchar",
     nullable: true,
   })
   driverAvatar?: string;
 
   @Column({
-    nullable: true,
+    type: "varchar",
+    length: 20,
     default: "#2563EB",
   })
-  driverAvatarBg?: string;
-
-  // =========================
-  // ROUTE
-  // =========================
-
-  @Column()
-  from!: string;
-
-  @Column()
-  to!: string;
-
-  @Column()
-  time!: string;
-
-  // =========================
-  // VEHICLE
-  // =========================
+  driverAvatarBg!: string;
 
   @Column({
     type: "varchar",
+    length: 120,
   })
-  vehicleType!: RideVehicleType;
+  from!: string;
 
-  // =========================
-  // SEATS
-  // =========================
+  @Column({
+    type: "varchar",
+    length: 120,
+  })
+  to!: string;
+
+  @Column({
+    type: "varchar",
+    length: 80,
+  })
+  time!: string;
+
+  @Column({
+    type: "enum",
+    enum: ["car", "bike"],
+  })
+  vehicleType!: "car" | "bike";
 
   @Column({
     type: "int",
@@ -104,37 +100,35 @@ export class Ride {
   })
   totalSeats!: number;
 
-  // =========================
-  // PRICE
-  // =========================
-
-  @Column()
+  @Column({
+    type: "varchar",
+    length: 50,
+  })
   price!: string;
 
-  // =========================
-  // RIDE DETAILS
-  // =========================
-
   @Column({
+    type: "boolean",
     default: true,
   })
   verified!: boolean;
 
   @Column({
+    type: "varchar",
+    length: 300,
     nullable: true,
   })
   notes?: string;
 
-  // =========================
-  // LOCATION
-  // =========================
-
   @Column({
+    type: "varchar",
+    length: 120,
     nullable: true,
   })
   locationName?: string;
 
   @Column({
+    type: "varchar",
+    length: 120,
     nullable: true,
   })
   locationState?: string;
@@ -151,37 +145,37 @@ export class Ride {
   })
   longitude?: number;
 
-  // =========================
-  // STATUS
-  // =========================
-
   @Column({
-    type: "varchar",
+    type: "enum",
+    enum: ["active", "in_progress", "completed", "cancelled"],
     default: "active",
   })
-  status!: RideStatus;
+  status!: "active" | "in_progress" | "completed" | "cancelled";
 
-  // =========================
-  // PASSENGER
-  // =========================
-  //
-  // Currently:
-  // ONE driver + ONE passenger
-  //
-
+  /**
+   * For now passengers are stored directly
+   * in the rides table as JSONB.
+   */
   @Column({
     type: "jsonb",
-    default: [],
+    default: () => "'[]'",
   })
-  passengers!: RidePassenger[];
+  passengers!: Array<{
+    userId: string;
+    userName: string;
+    seats: number;
+    pickupPoint?: string;
+    passengerPhone?: string;
+    joinedAt: string;
+  }>;
 
-  // =========================
-  // TIMESTAMPS
-  // =========================
-
-  @CreateDateColumn()
+  @CreateDateColumn({
+    type: "timestamp",
+  })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({
+    type: "timestamp",
+  })
   updatedAt!: Date;
 }

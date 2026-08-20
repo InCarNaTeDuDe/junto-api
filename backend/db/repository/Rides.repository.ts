@@ -4,7 +4,8 @@ import { Ride } from "../entities/Rides.entity";
 export interface RideRecord {
   id: string;
 
-  driverId: string;
+  userId: string;
+
   driverName: string;
   driverRating: number;
   driverAvatar?: string;
@@ -56,7 +57,7 @@ export class RideRepository {
     return {
       id: ride.id,
 
-      driverId: ride.driverId,
+      userId: ride.userId,
       driverName: ride.driverName,
       driverRating: ride.driverRating,
       driverAvatar: ride.driverAvatar,
@@ -124,7 +125,7 @@ export class RideRepository {
     longitude?: number;
   }): Promise<RideRecord> {
     const ride = this.repo.create({
-      driverId: data.driverId,
+      userId: data.driverId,
 
       driverName: data.driverName,
       driverRating: data.driverRating ?? 5.0,
@@ -199,7 +200,7 @@ export class RideRepository {
   async findByDriverId(driverId: string): Promise<RideRecord[]> {
     const rides = await this.repo.find({
       where: {
-        driverId,
+        userId: driverId,
       },
       order: {
         createdAt: "DESC",
