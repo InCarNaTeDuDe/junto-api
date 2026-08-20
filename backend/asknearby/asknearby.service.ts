@@ -1,7 +1,7 @@
-import { activityRepository } from "../db/repository/Activity.repository";
-import { notificationRepository } from "../db/repository/Notification.repository";
-import { ActivityCategory } from "../db/entities/Activity.entity";
-import { User } from "../db/entities/User.entity";
+import { activityRepository } from "../repositories/Activity.repository";
+import { notificationRepository } from "../repositories/Notification.repository";
+import { ActivityCategory } from "../entities/Activity.entity";
+import { User } from "../entities/User.entity";
 import {
   CreateAskNearbyRequest,
   QueryAskNearbyRequest,
@@ -12,7 +12,7 @@ import {
   sendExpoPushNotification,
   broadcastExpoPushNotification,
 } from "../notifications/notifications.service";
-import { userRepository } from "../db/repository/User.repository";
+import { userRepository } from "../repositories/User.repository";
 
 export async function createAskNearby(
   body: CreateAskNearbyRequest,

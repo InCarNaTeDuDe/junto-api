@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { DeviceSession } from "../entities/DeviceSession.entity";
 
 export class DeviceRepository {

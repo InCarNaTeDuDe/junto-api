@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { Activity } from "../entities/Activity.entity";
 
 export class ActivityRepository {

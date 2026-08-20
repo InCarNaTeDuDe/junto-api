@@ -1,4 +1,4 @@
-import { User } from "../db/entities/User.entity";
+import { User } from "../entities/User.entity";
 import {
   CreateRideInput,
   QueryRideInput,
@@ -7,7 +7,7 @@ import {
 } from "./rides.schema";
 import { io } from "../socket/socket";
 import { sendExpoPushNotification } from "../notifications/notifications.service";
-import { rideRepository, RideRecord } from "../db/repository/Rides.repository";
+import { rideRepository, RideRecord } from "../repositories/Rides.repository";
 
 /**
  * List rides

@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { AuditLog } from "../entities/AuditLog.entity";
 
 export class AuditRepository {

@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { User } from "../db/entities/User.entity";
+import { User } from "../entities/User.entity";
 // import { DbUser } from "../db"; // Adjust import
 
 const JWT_SECRET =

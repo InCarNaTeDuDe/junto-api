@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { Notification } from "../entities/Notification.entity";
 
 export class NotificationRepository {
@@ -54,5 +54,4 @@ export class NotificationRepository {
   }
 }
 
-export const notificationRepository =
-  new NotificationRepository();
+export const notificationRepository = new NotificationRepository();

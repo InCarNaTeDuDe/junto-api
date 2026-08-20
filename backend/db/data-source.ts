@@ -1,6 +1,18 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 
+import { User } from "../entities/User.entity";
+import { AuditLog } from "../entities/AuditLog.entity";
+import { LoginHistory } from "../entities/LoginHistory.entity";
+import { DeviceSession } from "../entities/DeviceSession.entity";
+import { Ticket } from "../entities/Ticket.entity";
+import { Activity } from "../entities/Activity.entity";
+import { Message } from "../entities/Message.entity";
+import { Notification } from "../entities/Notification.entity";
+import { Ride } from "../entities/Rides.entity";
+import { LocalDeal } from "../entities/LocalDeals.entity";
+import { LocalService } from "../entities/LocalServices.entity";
+
 // import { inMemoryStore } from "../db"; // <-- adjust path if needed
 
 export let isConnectedToPostgres = false;
@@ -17,8 +29,19 @@ export const AppDataSource = new DataSource({
   // migrationsRun: process.env.NODE_ENV === "production",
   logging: false,
   // dropSchema: true,
-  entities: [__dirname + "/entities/*.{ts,js}"],
-
+  entities: [
+    User,
+    DeviceSession,
+    LoginHistory,
+    AuditLog,
+    Activity,
+    Ticket,
+    Notification,
+    Message,
+    Ride,
+    LocalDeal,
+    LocalService,
+  ],
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
 

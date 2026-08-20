@@ -1,10 +1,11 @@
-import { MessageRepository } from "../db/repository/Message.repository";
-import { UserRepository } from "../db/repository/User.repository";
-import { ActivityRepository } from "../db/repository/Activity.repository";
-import { NotificationRepository } from "../db/repository/Notification.repository";
-import { DeviceRepository } from "../db/repository/Device.repository";
-import { ActivityCategory } from "../db/entities/Activity.entity";
-import { User } from "../db/entities/User.entity";
+import { MessageRepository } from "../repositories/Message.repository";
+import { UserRepository } from "../repositories/User.repository";
+import { ActivityRepository } from "../repositories/Activity.repository";
+import { NotificationRepository } from "../repositories/Notification.repository";
+import { DeviceRepository } from "../repositories/Device.repository";
+import { ActivityCategory } from "../entities/Activity.entity";
+import { User } from "../entities/User.entity";
+
 import { sendPushNotification } from "../notifications/notifications.service";
 
 const messageRepo = new MessageRepository();

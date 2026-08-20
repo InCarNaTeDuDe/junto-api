@@ -1,6 +1,6 @@
 import { AppDataSource } from "../db/data-source";
-import { Notification } from "../db/entities/Notification.entity";
-import { User } from "../db/entities/User.entity";
+import { Notification } from "../entities/Notification.entity";
+import { User } from "../entities/User.entity";
 import { io } from "../socket/socket";
 
 const notificationRepo = AppDataSource.getRepository(Notification);

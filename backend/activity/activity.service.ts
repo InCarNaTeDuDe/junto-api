@@ -1,11 +1,11 @@
-import { Activity, ActivityCategory } from "../db/entities/Activity.entity";
+import { Activity, ActivityCategory } from "../entities/Activity.entity";
 import {
   CreateActivityRequest,
   CreateTicketForSaleRequest,
 } from "./activity.schema";
 import { AppDataSource } from "../db/data-source";
-import { User } from "../db/entities/User.entity";
-import { activityRepository } from "../db/repository/Activity.repository";
+import { User } from "../entities/User.entity";
+import { activityRepository } from "../repositories/Activity.repository";
 import { listDeals } from "../deals/deals.service";
 import { listRides } from "../rides/rides.service";
 import { listServicePros } from "../localservices/localservices.service";

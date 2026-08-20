@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 
-import { User } from "../db/entities/User.entity";
+import { User } from "../entities/User.entity";
 import { verifyAccessToken } from "../auth/jwt.service";
 import { AppDataSource } from "../db/data-source";
 

@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { LoginHistory } from "../entities/LoginHistory.entity";
 
 export class LoginHistoryRepository {

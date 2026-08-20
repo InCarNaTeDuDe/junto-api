@@ -1,4 +1,4 @@
-import { User } from "../db/entities/User.entity";
+import { User } from "../entities/User.entity";
 import {
   CreateDealInput,
   QueryDealsInput,

@@ -2,14 +2,14 @@ import { runInTransaction } from "../db/transaction";
 
 import { GoogleLoginSchema } from "./auth.schema";
 import { verifyGoogleToken } from "./google.service";
-import { User } from "../db/entities/User.entity";
-import { DeviceSession } from "../db/entities/DeviceSession.entity";
-import { LoginHistory } from "../db/entities/LoginHistory.entity";
-import { AuditLog } from "../db/entities/AuditLog.entity";
+import { User } from "../entities/User.entity";
+import { DeviceSession } from "../entities/DeviceSession.entity";
+import { LoginHistory } from "../entities/LoginHistory.entity";
+import { AuditLog } from "../entities/AuditLog.entity";
 import { generateAccessToken } from "./jwt.service";
-import { userRepository } from "../db/repository/User.repository";
-import { activityRepository } from "../db/repository/Activity.repository";
-import { ticketRepository } from "../db/repository/Ticket.repository";
+import { userRepository } from "../repositories/User.repository";
+import { activityRepository } from "../repositories/Activity.repository";
+import { ticketRepository } from "../repositories/Ticket.repository";
 
 export async function loginWithGoogle(
   request: GoogleLoginSchema,

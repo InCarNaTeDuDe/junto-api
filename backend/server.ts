@@ -172,87 +172,51 @@ async function startServer() {
   // app.use("/api/events", eventRoutes);
   app.use(errorHandler);
 
-  // Serve static files and handle Expo Dev server proxy
+  // Serve static files from dist or auto-export if missing
   const distPath = path.join(process.cwd(), "dist");
-  const hasDist = fs.existsSync(path.join(distPath, "index.html"));
+  let hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
-  if (
-    process.env.NODE_ENV !== "development" &&
-    process.env.SERVE_STATIC !== "true" &&
-    !hasDist
-  ) {
+  if (!hasDist) {
     console.log(
-      "No compiled static files found in dist/. Routing traffic via Expo proxy on port 8081...",
+      "No compiled static files found in dist/. Exporting web bundle...",
     );
-    const { createProxyMiddleware } = await import("http-proxy-middleware");
-    const proxy = createProxyMiddleware({
-      target: "http://localhost:8081",
-      changeOrigin: true,
-      ws: true,
-      logger: console,
-      // Handle connection errors gracefully instead of throwing unhandled exceptions and crashing Node
-      on: {
-        error: (err, req, res: any) => {
-          console.warn(
-            "Proxy connection error (Metro might still be booting):",
-            err.message,
-          );
-          if (res && !res.headersSent && typeof res.writeHead === "function") {
-            res.writeHead(502, { "Content-Type": "text/html" });
-            res.end(`
-              <div style="font-family:sans-serif;padding:40px;text-align:center;">
-                <h2>Metro Bundler (Expo Dev Server) is booting...</h2>
-                <p>Please wait 5-10 seconds and refresh. The backend is waiting for Metro on port 8081.</p>
-                <script>setTimeout(() => window.location.reload(), 3000);</script>
-              </div>
-            `);
-          }
+    try {
+      const { execSync } = await import("child_process");
+      execSync(
+        "npx tsx generate_assets.js && npx expo export -p web --output-dir dist",
+        {
+          stdio: "inherit",
         },
-      },
-      // For older versions of http-proxy-middleware:
-      onError: (err, req, res: any) => {
-        console.warn(
-          "Proxy connection error (Metro might still be booting):",
-          err.message,
-        );
-        if (res && !res.headersSent && typeof res.writeHead === "function") {
-          res.writeHead(502, { "Content-Type": "text/html" });
-          res.end("502 Bad Gateway: Metro is booting up. Re-trying...");
-        }
-      },
-    } as any);
-
-    app.use((req, res, next) => {
-      if (req.path.startsWith("/api")) {
-        return next();
-      }
-      return proxy(req, res, next);
-    });
-  } else {
-    console.log(
-      `Serving static files from compiled dist/ directory: ${distPath}`,
-    );
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      const indexPath = path.join(distPath, "index.html");
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath, (err) => {
-          if (err) {
-            console.error("Error serving index.html:", err);
-            if (!res.headersSent) {
-              res.status(500).send("Internal Server Error loading index.html");
-            }
-          }
-        });
-      } else {
-        res
-          .status(404)
-          .send(
-            "Application dist/index.html is missing. Run npm run build first.",
-          );
-      }
-    });
+      );
+      hasDist = fs.existsSync(path.join(distPath, "index.html"));
+    } catch (e: any) {
+      console.warn("Auto-exporting web bundle failed:", e?.message || e);
+    }
   }
+
+  console.log(
+    `Serving static files from compiled dist/ directory: ${distPath}`,
+  );
+  app.use(express.static(distPath));
+  app.get("*", (req, res) => {
+    const indexPath = path.join(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error("Error serving index.html:", err);
+          if (!res.headersSent) {
+            res.status(500).send("Internal Server Error loading index.html");
+          }
+        }
+      });
+    } else {
+      res
+        .status(404)
+        .send(
+          "Application dist/index.html is missing. Run npm run build first.",
+        );
+    }
+  });
 
   // app.listen(PORT, "0.0.0.0", () => {
   //   console.log(`Server running on http://localhost:${PORT}`);

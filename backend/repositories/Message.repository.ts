@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { Message } from "../entities/Message.entity";
 
 export class MessageRepository {

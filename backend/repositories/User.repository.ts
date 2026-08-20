@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource } from "../db/data-source";
 import { User } from "../entities/User.entity";
 
 export class UserRepository {
