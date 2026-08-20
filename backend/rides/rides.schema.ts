@@ -8,6 +8,9 @@ export const CreateRideSchema = z.object({
   seatsLeft: z.number().int().min(1).max(8).default(1),
   price: z.string().trim().min(1).max(50).default("₹40"),
   notes: z.string().trim().max(300).optional(),
+  // Ride location
+  locationName: z.string().trim().max(120).optional(),
+  locationState: z.string().trim().max(120).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   verified: z.boolean().optional().default(true),

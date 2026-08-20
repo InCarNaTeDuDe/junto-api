@@ -59,7 +59,13 @@ export async function createRideHandler(
   next: NextFunction,
 ) {
   try {
-    const ride = await createRide(req.body as CreateRideInput, req.user);
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    const ride = await createRide(req.body as CreateRideInput, req.user!);
     return res.status(201).json({
       success: true,
       message: "Ride offer published successfully.",
@@ -79,7 +85,7 @@ export async function joinRideHandler(
     const result = await joinRide(
       req.params.id,
       req.body as JoinRideInput,
-      req.user,
+      req.user!,
     );
     return res.status(200).json(result);
   } catch (err) {
@@ -96,7 +102,7 @@ export async function updateRideHandler(
     const ride = await updateRide(
       req.params.id,
       req.body as UpdateRideInput,
-      req.user,
+      req.user!,
     );
     return res.status(200).json({
       success: true,
