@@ -47,8 +47,8 @@ export class Ride {
 
   @Column({
     type: "decimal",
-    precision: 3,
-    scale: 2,
+    precision: 2,
+    scale: 1,
     default: 5.0,
   })
   driverRating!: number;

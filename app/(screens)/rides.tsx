@@ -577,7 +577,7 @@ export default function RidesScreen() {
                           <Text
                             style={[styles.ratingText, { color: textMute }]}
                           >
-                            {ride.driverRating.toFixed(1)}
+                            {ride.driverRating}
                           </Text>
                         </View>
                       </View>
