@@ -17,7 +17,7 @@ import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
-// Public / optional-auth read endpoints
+// Authenticated local services read endpoints
 router.get("/", authenticate, listServiceProsHandler);
 router.get("/bookings", authenticate, listBookingsHandler);
 router.get("/:id", authenticate, getServiceProByIdHandler);

@@ -5,7 +5,7 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_API_URL; /*||  "http://192.168.29.37:3000";*/
 
 export const socket = io(SOCKET_URL, {
-  transports: ["websocket"],
+  transports: ["websocket", "polling"],
   autoConnect: false,
 });
 

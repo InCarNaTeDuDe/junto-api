@@ -294,7 +294,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView
       style={[s.container, { backgroundColor: bgColor }]}
-      edges={["top"]}
+      edges={["top", "bottom"]}
     >
       {/* 1. TOP HEADER BAR */}
       {/* <View style={[s.headerBar, { backgroundColor: bgColor }]}>

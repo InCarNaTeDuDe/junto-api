@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,109 +9,112 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import {
+  DefaultJuntoNowFeatures,
+  getJuntoNowFeatureColors,
+  JuntoNowItemConfig,
+  JuntoNowColors,
+} from "@/theme";
+import { ApiService } from "@/services/api";
+import { socket } from "@/services/socket";
+
+export { JuntoNowColors, DefaultJuntoNowFeatures, type JuntoNowItemConfig };
 
 interface JuntoNowProps {
   isDark?: boolean;
   cityName?: string;
+  features?: JuntoNowItemConfig[];
   onFilter?: (keyword: string) => void;
+  onItemPress?: (item: JuntoNowItemConfig) => void;
 }
 
-const ITEMS = [
-  {
-    id: "ride",
-    icon: "car" as const,
-    title: "Need a Ride",
-    subtitle: "2 people going your way",
-    btn: "View Rides",
-    color: "#16A34A",
-    bg: "#F0FDF4",
-    border: "#DCFCE7",
-    btnBg: "#DCFCE7",
-    iconBg: "#DCFCE7",
-    route: "/(screens)/rides",
-    query: "ride",
-  },
-  {
-    id: "help",
-    icon: "heart" as const,
-    title: "Need Help",
-    subtitle: "4 people available",
-    btn: "Get Help",
-    color: "#EA580C",
-    bg: "#FFF7ED",
-    border: "#FFEDD5",
-    btnBg: "#FFEDD5",
-    iconBg: "#FFEDD5",
-    route: "/(screens)/ask-nearby",
-    query: "help",
-  },
-  {
-    id: "service",
-    icon: "construct" as const,
-    title: "Need a Service",
-    subtitle: "3 professionals available",
-    btn: "Find Service",
-    color: "#9333EA",
-    bg: "#FAF5FF",
-    border: "#F3E8FF",
-    btnBg: "#F3E8FF",
-    iconBg: "#F3E8FF",
-    route: "/(screens)/services",
-    query: "service",
-  },
-  {
-    id: "something",
-    icon: "bag-handle" as const,
-    title: "Local Deals",
-    subtitle: "Buy & Sell items nearby",
-    btn: "See Deals",
-    color: "#CA8A04",
-    bg: "#FEFCE8",
-    border: "#FEF08A",
-    btnBg: "#FEF08A",
-    iconBg: "#FEF08A",
-    route: "/(screens)/deals",
-    query: "deals",
-  },
-  {
-    id: "company",
-    icon: "people" as const,
-    title: "Need Company",
-    subtitle: "6 people looking for something fun",
-    btn: "Find People",
-    color: "#2563EB",
-    bg: "#EFF6FF",
-    border: "#DBEAFE",
-    btnBg: "#DBEAFE",
-    iconBg: "#DBEAFE",
-    route: "/(screens)/add-daymate",
-    query: "mates",
-  },
-  {
-    id: "new_here",
-    icon: "location" as const,
-    title: "New Here",
-    subtitle: "Visiting {city}?",
-    btn: "Explore Now",
-    color: "#059669",
-    bg: "#ECFDF5",
-    border: "#D1FAE5",
-    btnBg: "#D1FAE5",
-    iconBg: "#D1FAE5",
-    route: "/(screens)/new-here",
-    query: "explore",
-  },
-];
+interface JuntoNowStats {
+  ridesCount: number;
+  helpCount: number;
+  servicesCount: number;
+  dealsCount: number;
+  companyCount: number;
+  newHereCount: number;
+}
 
 export const JuntoNow: React.FC<JuntoNowProps> = ({
-  isDark,
+  isDark = false,
   cityName = "Hyderabad",
+  features = DefaultJuntoNowFeatures,
   onFilter,
+  onItemPress,
 }) => {
   const { width } = useWindowDimensions();
   const isCompact = width < 360;
 
-  const handlePress = (item: (typeof ITEMS)[0]) => {
+  const [stats, setStats] = useState<JuntoNowStats>({
+    ridesCount: 0,
+    helpCount: 0,
+    servicesCount: 0,
+    dealsCount: 0,
+    companyCount: 0,
+    newHereCount: 0,
+  });
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await ApiService.get<{
+        success: boolean;
+        stats: JuntoNowStats;
+      }>(
+        `/api/activity/junto-now-stats?locationName=${encodeURIComponent(cityName)}`,
+      );
+      if (res?.success && res.stats) {
+        setStats(res.stats);
+      }
+    } catch (err) {
+      // Graceful fallback to cached state
+    }
+  }, [cityName]);
+
+  useEffect(() => {
+    fetchStats();
+
+    // Listen to real-time events over Socket.IO
+    const onRideUpdated = () => {
+      fetchStats();
+    };
+    const onDealUpdated = () => {
+      fetchStats();
+    };
+    const onServiceUpdated = () => {
+      fetchStats();
+    };
+    const onActivityUpdated = () => {
+      fetchStats();
+    };
+
+    socket.on("ride_created", onRideUpdated);
+    socket.on("rides_updated", onRideUpdated);
+    socket.on("deal_created", onDealUpdated);
+    socket.on("deals_updated", onDealUpdated);
+    socket.on("service_pro_created", onServiceUpdated);
+    socket.on("service_pros_updated", onServiceUpdated);
+    socket.on("activity_created", onActivityUpdated);
+    socket.on("asknearby_created", onActivityUpdated);
+
+    return () => {
+      socket.off("ride_created", onRideUpdated);
+      socket.off("rides_updated", onRideUpdated);
+      socket.off("deal_created", onDealUpdated);
+      socket.off("deals_updated", onDealUpdated);
+      socket.off("service_pro_created", onServiceUpdated);
+      socket.off("service_pros_updated", onServiceUpdated);
+      socket.off("activity_created", onActivityUpdated);
+      socket.off("asknearby_created", onActivityUpdated);
+    };
+  }, [fetchStats]);
+
+  const handlePress = (item: JuntoNowItemConfig) => {
+    if (onItemPress) {
+      onItemPress(item);
+      return;
+    }
     if (onFilter && item.query) {
       onFilter(item.query);
     }
@@ -120,37 +123,49 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
     }
   };
 
+  const getDynamicSubtitle = (item: JuntoNowItemConfig, rawCity: string) => {
+    switch (item.id) {
+      case "ride":
+        return `${stats.ridesCount} active near you`;
+      case "help":
+        return `${stats.helpCount} nearby requests`;
+      case "service":
+        return `${stats.servicesCount} pros available`;
+      case "something":
+        return `${stats.dealsCount} deals posted`;
+      case "company":
+        return `${stats.companyCount} looking for mates`;
+      case "new_here":
+        return `Explore ${rawCity}`;
+      default:
+        return item.subtitle.replace("{city}", rawCity);
+    }
+  };
+
+  const headerTitleColor = isDark ? "#FFFFFF" : "#0F172A";
+  const headerSubtitleColor = isDark ? "rgba(255, 255, 255, 0.65)" : "#64748B";
+
   return (
     <View style={styles.container}>
+      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Text
-            style={[styles.title, { color: isDark ? "#FFFFFF" : "#0F172A" }]}
-          >
+          <Text style={[styles.title, { color: headerTitleColor }]}>
             JUNTO Now
           </Text>
           <Text style={styles.bolt}>⚡</Text>
         </View>
-        <Text
-          style={[
-            styles.subtitle,
-            { color: isDark ? "rgba(255,255,255,0.65)" : "#64748B" },
-          ]}
-        >
+        <Text style={[styles.subtitle, { color: headerSubtitleColor }]}>
           What people around you need right now
         </Text>
       </View>
 
+      {/* Grid of Configurable Features */}
       <View style={styles.grid}>
-        {ITEMS.map((item) => {
-          const sub = item.subtitle.replace(
-            "{city}",
-            cityName.split(",")[0].trim() || "Hyderabad",
-          );
-          const cardBg = isDark ? `${item.color}15` : item.bg;
-          const cardBorder = isDark ? `${item.color}35` : item.border;
-          const iconBg = isDark ? `${item.color}25` : item.iconBg;
-          const btnBg = isDark ? `${item.color}25` : item.btnBg;
+        {features.map((item) => {
+          const colors = getJuntoNowFeatureColors(item, isDark);
+          const rawCity = cityName.split(",")[0].trim() || "Hyderabad";
+          const sub = getDynamicSubtitle(item, rawCity);
 
           return (
             <Pressable
@@ -158,32 +173,35 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
               style={[
                 styles.card,
                 {
-                  backgroundColor: cardBg,
-                  borderColor: cardBorder,
+                  backgroundColor: colors.bg,
+                  borderColor: colors.border,
                   width: isCompact ? "100%" : "31.3%",
                 },
               ]}
               onPress={() => handlePress(item)}
             >
               <View style={styles.cardTop}>
-                <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
+                {/* Feature Icon container */}
+                <View
+                  style={[styles.iconWrap, { backgroundColor: colors.iconBg }]}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={18}
+                    color={colors.tint}
+                  />
                 </View>
+
+                {/* Text Wrap */}
                 <View style={styles.cardTextWrap}>
                   <Text
-                    style={[
-                      styles.cardTitle,
-                      { color: isDark ? "#F8FAFC" : "#0F172A" },
-                    ]}
+                    style={[styles.cardTitle, { color: colors.title }]}
                     numberOfLines={1}
                   >
                     {item.title}
                   </Text>
                   <Text
-                    style={[
-                      styles.cardSub,
-                      { color: isDark ? "rgba(255,255,255,0.7)" : "#64748B" },
-                    ]}
+                    style={[styles.cardSub, { color: colors.sub }]}
                     numberOfLines={2}
                   >
                     {sub}
@@ -191,12 +209,13 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
                 </View>
               </View>
 
+              {/* Action Button */}
               <Pressable
-                style={[styles.actionBtn, { backgroundColor: btnBg }]}
+                style={[styles.actionBtn, { backgroundColor: colors.btnBg }]}
                 onPress={() => handlePress(item)}
               >
                 <Text
-                  style={[styles.actionBtnText, { color: item.color }]}
+                  style={[styles.actionBtnText, { color: colors.btnText }]}
                   numberOfLines={1}
                 >
                   {item.btn}

@@ -12,6 +12,7 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
@@ -22,6 +23,7 @@ import {
   ParsedDealVoice,
 } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
+import { socket } from "@/services/socket";
 
 interface DealItem {
   id: string;
@@ -51,113 +53,7 @@ interface DealItem {
   views: number;
 }
 
-const INITIAL_DEALS: DealItem[] = [
-  {
-    id: "deal-1",
-    title: "Firefox 21-Speed Hybrid Cycle (Shimano)",
-    category: "Cycles",
-    price: "₹6,500",
-    originalPrice: "₹16,000",
-    condition: "Like New",
-    location: "Madhapur, Hyderabad",
-    distance: "1.2 km away",
-    sellerName: "Aditya Verma",
-    sellerRating: 4.9,
-    sellerPhone: "+91 98480 23456",
-    sellerAvatarBg: "#3B82F6",
-    verified: true,
-    postedTime: "25m ago",
-    image:
-      "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=500&auto=format&fit=crop&q=60",
-    description:
-      "Bought 6 months ago for office commute. Dual disc brakes, lock & helmet included free. Smooth gear shifting.",
-    views: 48,
-  },
-  {
-    id: "deal-2",
-    title: "Apple iPhone 13 128GB (Starlight)",
-    category: "Mobiles",
-    price: "₹28,500",
-    originalPrice: "₹59,900",
-    condition: "Like New",
-    location: "Hitec City, Hyderabad",
-    distance: "0.9 km away",
-    sellerName: "Neha Sharma",
-    sellerRating: 5.0,
-    sellerPhone: "+91 97001 98765",
-    sellerAvatarBg: "#EC4899",
-    verified: true,
-    postedTime: "1h ago",
-    image:
-      "https://images.unsplash.com/photo-1591337676887-a217a6970a8a?w=500&auto=format&fit=crop&q=60",
-    description:
-      "Battery health 88%. Comes with original box, bill and Spigen armor case. No scratches, tempered glass applied.",
-    views: 112,
-  },
-  {
-    id: "deal-3",
-    title: "Ergonomic Mesh Study / Work Chair",
-    category: "Furniture",
-    price: "₹2,800",
-    originalPrice: "₹7,500",
-    condition: "Good",
-    location: "Gachibowli, Hyderabad",
-    distance: "2.1 km away",
-    sellerName: "Karan Roy",
-    sellerRating: 4.8,
-    sellerPhone: "+91 91234 88776",
-    sellerAvatarBg: "#10B981",
-    verified: true,
-    postedTime: "2h ago",
-    image:
-      "https://images.unsplash.com/photo-1580481077195-c3f25539eb88?w=500&auto=format&fit=crop&q=60",
-    description:
-      "Hydraulic height adjustment and lumbar support working 100%. Relocating to Bangalore hence selling.",
-    views: 34,
-  },
-  {
-    id: "deal-4",
-    title: "Sony WH-1000XM4 Noise Canceling Headphones",
-    category: "Electronics",
-    price: "₹11,500",
-    originalPrice: "₹22,990",
-    condition: "Like New",
-    location: "Kondapur, Hyderabad",
-    distance: "1.8 km away",
-    sellerName: "Tanmay Rao",
-    sellerRating: 4.9,
-    sellerPhone: "+91 98888 12340",
-    sellerAvatarBg: "#8B5CF6",
-    verified: true,
-    postedTime: "3h ago",
-    image:
-      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60",
-    description:
-      "Industry leading noise cancellation with case, 30hr battery life. Minimal usage.",
-    views: 79,
-  },
-  {
-    id: "deal-5",
-    title: "Decathlon 20kg Adjustable Dumbbells & Bar Set",
-    category: "Fitness",
-    price: "₹1,900",
-    originalPrice: "₹4,500",
-    condition: "Good",
-    location: "Kukatpally, Hyderabad",
-    distance: "3.5 km away",
-    sellerName: "Praveen M.",
-    sellerRating: 4.7,
-    sellerPhone: "+91 98499 55443",
-    sellerAvatarBg: "#EA580C",
-    verified: true,
-    postedTime: "5h ago",
-    image:
-      "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=500&auto=format&fit=crop&q=60",
-    description:
-      "Cast iron weight plates with spinlock collars. Great for home workouts.",
-    views: 62,
-  },
-];
+const INITIAL_DEALS: DealItem[] = [];
 
 const CATEGORIES = [
   { id: "all", name: "All Deals", icon: "grid" as const, color: "#2563EB" },
@@ -279,6 +175,18 @@ export default function LocalDealsScreen() {
 
   useEffect(() => {
     fetchDeals();
+
+    const handleRealtimeDeal = () => {
+      fetchDeals();
+    };
+
+    socket.on("deal_created", handleRealtimeDeal);
+    socket.on("deals_updated", handleRealtimeDeal);
+
+    return () => {
+      socket.off("deal_created", handleRealtimeDeal);
+      socket.off("deals_updated", handleRealtimeDeal);
+    };
   }, [fetchDeals]);
 
   // Voice Modals and State
@@ -288,7 +196,32 @@ export default function LocalDealsScreen() {
   const [selectedDealForAction, setSelectedDealForAction] =
     useState<DealItem | null>(null);
   const [offerPrice, setOfferPrice] = useState("");
+  const [pickupDate, setPickupDate] = useState(new Date());
+  const [pickupTime, setPickupTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [offerSuccessModal, setOfferSuccessModal] = useState(false);
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const formatTime = (t: Date) =>
+    t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const formattedPickup = `${formatDate(pickupDate)} at ${formatTime(pickupTime)}`;
+
+  const onDateChange = (_: any, date?: Date) => {
+    if (Platform.OS !== "web") setShowDatePicker(false);
+    if (date) setPickupDate(date);
+  };
+
+  const onTimeChange = (_: any, time?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (time) setPickupTime(time);
+  };
 
   // Voice Hook
   const {
@@ -431,8 +364,9 @@ export default function LocalDealsScreen() {
           {
             buyerName: "You (Neighbor)",
             buyerPhone: "+91 98765 00000",
-            message: `I'm interested in ${selectedDealForAction.title}. Is it available?`,
+            message: `I'm interested in ${selectedDealForAction.title}. Preferred pickup: ${formattedPickup}.`,
             offeredPrice: offerPrice || selectedDealForAction.price,
+            preferredPickupTime: formattedPickup,
           },
         );
       } catch (err) {
@@ -1157,6 +1091,148 @@ export default function LocalDealsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Preferred Inspection & Pickup Date & Time Picker */}
+            <Text style={[styles.offerSectionLabel, { color: textPrimary }]}>
+              Preferred Inspection &amp; Pickup Time:
+            </Text>
+            <View style={styles.dateTimeRow}>
+              {/* Pickup Date Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  {
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
+                  },
+                ]}
+                onPress={() => setShowDatePicker(!showDatePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
+                    style={[
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#10B98125" : "#ECFDF5" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#10B981"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Pickup Date
+                    </Text>
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(pickupDate)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={14} color={textMute} />
+              </TouchableOpacity>
+
+              {/* Pickup Time Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  {
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
+                  },
+                ]}
+                onPress={() => setShowTimePicker(!showTimePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
+                    style={[
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#F59E0B25" : "#FEF3C7" },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Slot
+                    </Text>
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatTime(pickupTime)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={14} color={textMute} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Date Picker Modal / Inline Controls */}
+            {(showDatePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    📅 Select Preferred Pickup Date
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: "#10B981", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={pickupDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
+
+            {/* Time Picker Modal / Inline Controls */}
+            {(showTimePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    ⏰ Select Preferred Time Slot
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                      <Text style={{ color: "#10B981", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={pickupTime}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.sendOfferConfirmBtn}

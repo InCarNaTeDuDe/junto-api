@@ -9,9 +9,9 @@ import {
   Image,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -386,7 +386,7 @@ export default function ChatsScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safeArea}>
+    <SafeAreaView style={s.safeArea} edges={["top", "bottom"]}>
       <View style={s.container}>
         {/* ================= HEADER ================= */}
         {/* <Header/> */}

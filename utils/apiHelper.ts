@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Application from "expo-application";
-import { StyleSheet as InteropStyleSheet } from "react-native-css-interop";
+// import { StyleSheet as InteropStyleSheet } from "react-native-css-interop";
 
 let cachedDeviceInfo: any = null;
 
@@ -33,21 +33,21 @@ export async function getDeviceInfo() {
 }
 
 // Safe patch for stylesheet flags to prevent "Cannot manually set color scheme, as dark mode is type 'media'" error
-try {
-  if (InteropStyleSheet) {
-    const originalGetFlag = InteropStyleSheet.getFlag;
-    InteropStyleSheet.getFlag = function (name: string) {
-      if (name === "darkMode") {
-        return "class dark";
-      }
-      return typeof originalGetFlag === "function"
-        ? originalGetFlag(name)
-        : undefined;
-    };
-  }
-} catch (err) {
-  console.warn("[API HELPER] Failed to patch InteropStyleSheet.getFlag:", err);
-}
+// try {
+//   if (InteropStyleSheet) {
+//     const originalGetFlag = InteropStyleSheet.getFlag;
+//     InteropStyleSheet.getFlag = function (name: string) {
+//       if (name === "darkMode") {
+//         return "class dark";
+//       }
+//       return typeof originalGetFlag === "function"
+//         ? originalGetFlag(name)
+//         : undefined;
+//     };
+//   }
+// } catch (err) {
+//   console.warn("[API HELPER] Failed to patch InteropStyleSheet.getFlag:", err);
+// }
 
 const DEV_URL = "http://localhost:8081";
 // Use the shared pre URL which has public access and bypasses Cloud Run cookie/redirect checks.

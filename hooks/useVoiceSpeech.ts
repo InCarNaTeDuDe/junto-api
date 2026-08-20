@@ -1,10 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Platform, Alert } from "react-native";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 
 export interface ParsedDealVoice {
   rawTranscript: string;
   title: string;
-  category: "Cycles" | "Mobiles" | "Electronics" | "Furniture" | "Appliances" | "Books" | "Fitness" | "General";
+  category:
+    | "Cycles"
+    | "Mobiles"
+    | "Electronics"
+    | "Furniture"
+    | "Appliances"
+    | "Books"
+    | "Fitness"
+    | "General";
   price: string;
   condition: "Brand New" | "Like New" | "Good" | "Fair";
   location: string;
@@ -17,199 +29,347 @@ export function useVoiceSpeech() {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(true);
-  const [permissionStatus, setPermissionStatus] = useState<"prompt" | "granted" | "denied">("prompt");
-  const recognitionRef = useRef<any>(null);
+  const [permissionStatus, setPermissionStatus] = useState<
+    "prompt" | "granted" | "denied"
+  >("prompt");
 
-  // Check Web Speech API support
+  const webRecognitionRef = useRef<any>(null);
+  const onSpeechChangeRef = useRef<
+    ((text: string, isFinal: boolean) => void) | null
+  >(null);
+  const onErrorCallbackRef = useRef<((errText: string) => void) | null>(null);
+
+  // Check initial permissions & support
   useEffect(() => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setIsSupported(true);
-      } else {
-        setIsSupported(false);
+    async function checkSupportAndPermissions() {
+      try {
+        if (
+          ExpoSpeechRecognitionModule &&
+          typeof ExpoSpeechRecognitionModule.getPermissionsAsync === "function"
+        ) {
+          const perm = await ExpoSpeechRecognitionModule.getPermissionsAsync();
+          if (perm.status === "granted") {
+            setPermissionStatus("granted");
+          } else if (perm.status === "denied") {
+            setPermissionStatus("denied");
+          } else {
+            setPermissionStatus("prompt");
+          }
+          setIsSupported(true);
+          return;
+        }
+      } catch (e) {
+        // Fallback to web checking
       }
 
-      // Check existing permissions if supported by browser
-      if (navigator.permissions && navigator.permissions.query) {
-        navigator.permissions
-          .query({ name: "microphone" as PermissionName })
-          .then((permission) => {
-            if (permission.state === "granted") {
-              setPermissionStatus("granted");
-            } else if (permission.state === "denied") {
-              setPermissionStatus("denied");
-            } else {
-              setPermissionStatus("prompt");
-            }
-            permission.onchange = () => {
-              setPermissionStatus(permission.state as any);
-            };
-          })
-          .catch(() => {
-            // Permission query not supported for mic in this environment
-          });
+      if (typeof window !== "undefined") {
+        const SpeechRecognition =
+          (window as any).SpeechRecognition ||
+          (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          setIsSupported(true);
+        }
+
+        if (navigator?.permissions?.query) {
+          navigator.permissions
+            .query({ name: "microphone" as PermissionName })
+            .then((permission) => {
+              if (permission.state === "granted") {
+                setPermissionStatus("granted");
+              } else if (permission.state === "denied") {
+                setPermissionStatus("denied");
+              } else {
+                setPermissionStatus("prompt");
+              }
+              permission.onchange = () => {
+                setPermissionStatus(permission.state as any);
+              };
+            })
+            .catch(() => {});
+        }
       }
     }
+
+    checkSupportAndPermissions();
   }, []);
+
+  // Listen to expo-speech-recognition events (Native & Web via expo-speech-recognition)
+  useSpeechRecognitionEvent("start", () => {
+    setIsListening(true);
+    setError(null);
+    setPermissionStatus("granted");
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent("result", (event) => {
+    const spoken = event.results[0]?.transcript || "";
+    const isFinal = Boolean(event.isFinal);
+
+    if (spoken) {
+      if (isFinal) {
+        setTranscript(spoken);
+        setInterimTranscript("");
+      } else {
+        setInterimTranscript(spoken);
+        setTranscript(spoken);
+      }
+
+      if (onSpeechChangeRef.current) {
+        onSpeechChangeRef.current(spoken, isFinal);
+      }
+    }
+  });
+
+  useSpeechRecognitionEvent("error", (event) => {
+    console.warn("ExpoSpeechRecognition error:", event.error, event.message);
+    let userMsg = "Could not hear audio clearly. Please try speaking again.";
+
+    if (
+      event.error === "not-allowed" ||
+      event.error === "service-not-allowed"
+    ) {
+      setPermissionStatus("denied");
+      userMsg =
+        "Microphone permission is required. Please allow microphone access in your device settings.";
+    } else if (
+      event.error === "no-speech" ||
+      event.error === "speech-timeout"
+    ) {
+      userMsg = "No speech detected. Please tap the mic and speak clearly.";
+    } else if (event.error === "audio-capture") {
+      userMsg = "Microphone is unavailable or in use by another app.";
+    } else if (event.error === "network") {
+      userMsg =
+        "Network error during speech recognition. Please check your internet connection.";
+    }
+
+    setError(userMsg);
+    setIsListening(false);
+    if (onErrorCallbackRef.current) {
+      onErrorCallbackRef.current(userMsg);
+    }
+  });
 
   /**
    * Explicitly ask the user for microphone permission
    */
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          // Release tracks immediately
-          stream.getTracks().forEach((track) => track.stop());
+    // 1. Try ExpoSpeechRecognitionModule permissions
+    try {
+      if (
+        ExpoSpeechRecognitionModule &&
+        typeof ExpoSpeechRecognitionModule.requestPermissionsAsync ===
+          "function"
+      ) {
+        const perm =
+          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (perm.status === "granted" || perm.granted) {
           setPermissionStatus("granted");
           setError(null);
           return true;
-        } catch (permErr: any) {
-          console.warn("Microphone permission request error:", permErr);
+        } else {
           setPermissionStatus("denied");
           const msg =
-            "Microphone access was denied or is blocked. Please enable microphone permissions in your browser address bar/settings to use voice recognition.";
+            "Microphone permission was denied. Please allow microphone access in settings to speak your request.";
           setError(msg);
-          Alert.alert(
-            "Microphone Permission Needed",
-            "Please allow microphone access in your browser or device settings to speak your request.",
-            [{ text: "OK" }],
-          );
           return false;
         }
       }
+    } catch (e) {
+      console.warn("ExpoSpeechRecognition permission request error:", e);
     }
+
+    // 2. Web browser fallback
+    if (
+      typeof window !== "undefined" &&
+      navigator?.mediaDevices?.getUserMedia
+    ) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        stream.getTracks().forEach((track) => track.stop());
+        setPermissionStatus("granted");
+        setError(null);
+        return true;
+      } catch (permErr: any) {
+        console.warn("Browser microphone permission request error:", permErr);
+        setPermissionStatus("denied");
+        const msg =
+          "Microphone access was denied. Please allow microphone permissions in your browser or device settings.";
+        setError(msg);
+        return false;
+      }
+    }
+
     return true;
   }, []);
 
   const startListening = useCallback(
-    async (onFinalTranscript?: (text: string) => void) => {
+    async (
+      onSpeechChange?: (text: string, isFinal: boolean) => void,
+      onErrorCallback?: (errText: string) => void,
+    ) => {
       setError(null);
       setTranscript("");
       setInterimTranscript("");
 
-      if (Platform.OS === "web" && typeof window !== "undefined") {
+      onSpeechChangeRef.current = onSpeechChange || null;
+      onErrorCallbackRef.current = onErrorCallback || null;
+
+      // First, ensure microphone permission is granted
+      if (permissionStatus !== "granted") {
+        const granted = await requestPermission();
+        if (!granted) {
+          const permMsg =
+            "Microphone permission is required. Please grant microphone access to use voice search.";
+          setError(permMsg);
+          if (onErrorCallback) onErrorCallback(permMsg);
+          return;
+        }
+      }
+
+      // Try ExpoSpeechRecognitionModule first
+      try {
+        if (
+          ExpoSpeechRecognitionModule &&
+          typeof ExpoSpeechRecognitionModule.start === "function"
+        ) {
+          setIsListening(true);
+          await ExpoSpeechRecognitionModule.start({
+            lang: "en-IN",
+            interimResults: true,
+            continuous: true,
+            requiresOnDeviceRecognition: false,
+          });
+          return;
+        }
+      } catch (nativeErr: any) {
+        console.warn(
+          "ExpoSpeechRecognitionModule start error, trying web fallback:",
+          nativeErr,
+        );
+      }
+
+      // Fallback to browser Web Speech API
+      if (typeof window !== "undefined") {
         const SpeechRecognition =
           (window as any).SpeechRecognition ||
           (window as any).webkitSpeechRecognition;
 
-        if (!SpeechRecognition) {
-          setIsSupported(false);
-          setIsListening(true);
-          setError("Speech recognition is not natively supported in this browser. Please type or tap quick presets.");
-          return;
-        }
-
-        // Ask / ensure microphone permission before starting
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        if (SpeechRecognition) {
           try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach((track) => track.stop());
-            setPermissionStatus("granted");
-          } catch (permErr: any) {
-            console.warn("getUserMedia failed before recognition:", permErr);
-            setPermissionStatus("denied");
-            const msg =
-              "Microphone permission is required. Please grant microphone access in your browser/device settings.";
-            setError(msg);
-            setIsListening(false);
-            Alert.alert(
-              "Microphone Access Denied",
-              "Please click the microphone/lock icon in your browser address bar and select 'Allow' to enable voice input.",
-              [{ text: "Got It" }],
-            );
+            if (webRecognitionRef.current) {
+              try {
+                webRecognitionRef.current.abort();
+              } catch (e) {}
+            }
+
+            const recognition = new SpeechRecognition();
+            webRecognitionRef.current = recognition;
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = "en-IN";
+
+            recognition.onstart = () => {
+              setIsListening(true);
+              setError(null);
+              setPermissionStatus("granted");
+            };
+
+            recognition.onresult = (event: any) => {
+              let currentInterim = "";
+              let currentFinal = "";
+
+              for (let i = 0; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                  currentFinal += event.results[i][0].transcript;
+                } else {
+                  currentInterim += event.results[i][0].transcript;
+                }
+              }
+
+              const activeTranscript = (currentFinal || currentInterim).trim();
+
+              if (currentInterim) {
+                setInterimTranscript(currentInterim);
+              }
+              if (currentFinal) {
+                setTranscript(currentFinal);
+              } else if (activeTranscript) {
+                setTranscript(activeTranscript);
+              }
+
+              if (activeTranscript && onSpeechChangeRef.current) {
+                onSpeechChangeRef.current(
+                  activeTranscript,
+                  Boolean(currentFinal),
+                );
+              }
+            };
+
+            recognition.onerror = (event: any) => {
+              console.warn("Web Speech recognition error:", event.error);
+              let errorMsg = "Could not hear audio clearly. Please try again.";
+
+              if (
+                event.error === "not-allowed" ||
+                event.error === "service-not-allowed" ||
+                event.error === "permission-denied"
+              ) {
+                setPermissionStatus("denied");
+                errorMsg =
+                  "Microphone permission was denied. Please allow microphone access in your browser or device settings.";
+              } else if (event.error === "no-speech") {
+                errorMsg =
+                  "No speech detected. Please tap the mic and speak clearly.";
+              }
+
+              setError(errorMsg);
+              setIsListening(false);
+              if (onErrorCallbackRef.current)
+                onErrorCallbackRef.current(errorMsg);
+            };
+
+            recognition.onend = () => {
+              setIsListening(false);
+            };
+
+            recognition.start();
             return;
+          } catch (err: any) {
+            console.error("Web SpeechRecognition start exception:", err);
           }
         }
-
-        try {
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.abort();
-            } catch (e) {
-              // ignore
-            }
-          }
-
-          const recognition = new SpeechRecognition();
-          recognitionRef.current = recognition;
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          recognition.lang = "en-IN"; // English (India) with natural Indian accents & numbers
-
-          recognition.onstart = () => {
-            setIsListening(true);
-            setError(null);
-          };
-
-          recognition.onresult = (event: any) => {
-            let currentInterim = "";
-            let finalResult = "";
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                finalResult += event.results[i][0].transcript;
-              } else {
-                currentInterim += event.results[i][0].transcript;
-              }
-            }
-
-            if (currentInterim) {
-              setInterimTranscript(currentInterim);
-            }
-
-            if (finalResult) {
-              setTranscript(finalResult);
-              setInterimTranscript("");
-              if (onFinalTranscript) {
-                onFinalTranscript(finalResult);
-              }
-            }
-          };
-
-          recognition.onerror = (event: any) => {
-            console.warn("Speech recognition error:", event.error);
-            if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-              setPermissionStatus("denied");
-              setError("Microphone permission was blocked. Please allow mic access in your browser.");
-              Alert.alert(
-                "Microphone Access Blocked",
-                "Please click the lock or settings icon in your browser address bar to grant microphone permissions.",
-              );
-            } else if (event.error !== "no-speech") {
-              setError(`Microphone notice: ${event.error || "Could not hear audio clearly"}`);
-            }
-            setIsListening(false);
-          };
-
-          recognition.onend = () => {
-            setIsListening(false);
-          };
-
-          recognition.start();
-        } catch (err: any) {
-          console.error("SpeechRecognition start exception:", err);
-          setError(err.message || "Microphone access error");
-          setIsListening(false);
-        }
-      } else {
-        setIsListening(true);
       }
+
+      // If no native or browser speech engine is available
+      setIsSupported(false);
+      const unsupportedMsg =
+        "Speech recognition is not available on this device configuration. Please type or tap quick presets.";
+      setError(unsupportedMsg);
+      if (onErrorCallback) onErrorCallback(unsupportedMsg);
     },
-    [],
+    [permissionStatus, requestPermission],
   );
 
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // ignore
+  const stopListening = useCallback(async () => {
+    try {
+      if (
+        ExpoSpeechRecognitionModule &&
+        typeof ExpoSpeechRecognitionModule.stop === "function"
+      ) {
+        await ExpoSpeechRecognitionModule.stop();
       }
+    } catch (e) {}
+
+    if (webRecognitionRef.current) {
+      try {
+        webRecognitionRef.current.stop();
+      } catch (e) {}
     }
     setIsListening(false);
   }, []);
@@ -220,6 +380,7 @@ export function useVoiceSpeech() {
     setTranscript,
     interimTranscript,
     error,
+    setError,
     isSupported,
     permissionStatus,
     requestPermission,
@@ -231,7 +392,10 @@ export function useVoiceSpeech() {
 /**
  * Intelligent parser that converts natural speech into structured OLX-style item listings
  */
-export function parseVoiceListing(spokenText: string, defaultCity = "Hyderabad"): ParsedDealVoice {
+export function parseVoiceListing(
+  spokenText: string,
+  defaultCity = "Hyderabad",
+): ParsedDealVoice {
   const text = spokenText.trim();
   const lower = text.toLowerCase();
 
@@ -318,9 +482,10 @@ export function parseVoiceListing(spokenText: string, defaultCity = "Hyderabad")
   // 2. Detect Price
   let price = "₹1,500";
   // Matches "₹ 5000", "5000 rupees", "rs 5000", "rs. 5000", "5000 bucks", "for 6500", "price 4000"
-  const priceRegex = /(?:₹|rs\.?|inr|for|price|cost|rupees)?\s*(\d{2,7})\s*(?:₹|rs\.?|rupees|bucks|k)?/i;
+  const priceRegex =
+    /(?:₹|rs\.?|inr|for|price|cost|rupees)?\s*(\d{2,7})\s*(?:₹|rs\.?|rupees|bucks|k)?/i;
   const priceMatch = text.match(priceRegex);
-  
+
   if (lower.includes("free") || lower.includes("giving away")) {
     price = "Free";
   } else if (priceMatch && priceMatch[1]) {
@@ -332,20 +497,46 @@ export function parseVoiceListing(spokenText: string, defaultCity = "Hyderabad")
 
   // 3. Detect Condition
   let condition: ParsedDealVoice["condition"] = "Good";
-  if (lower.includes("brand new") || lower.includes("sealed") || lower.includes("unopened")) {
+  if (
+    lower.includes("brand new") ||
+    lower.includes("sealed") ||
+    lower.includes("unopened")
+  ) {
     condition = "Brand New";
-  } else if (lower.includes("like new") || lower.includes("mint") || lower.includes("scratchless") || lower.includes("excellent")) {
+  } else if (
+    lower.includes("like new") ||
+    lower.includes("mint") ||
+    lower.includes("scratchless") ||
+    lower.includes("excellent")
+  ) {
     condition = "Like New";
-  } else if (lower.includes("fair") || lower.includes("used") || lower.includes("minor scratch")) {
+  } else if (
+    lower.includes("fair") ||
+    lower.includes("used") ||
+    lower.includes("minor scratch")
+  ) {
     condition = "Fair";
   }
 
   // 4. Detect Location / Area
   let location = defaultCity.split(",")[0].trim();
   const knownAreas = [
-    "Hitec City", "Madhapur", "Gachibowli", "Kondapur", "Kukatpally",
-    "Jubilee Hills", "Banjara Hills", "Secunderabad", "Begumpet", "Manikonda",
-    "Miyapur", "Koramangala", "Indiranagar", "Whitefield", "Bandra", "Andheri"
+    "Hitec City",
+    "Madhapur",
+    "Gachibowli",
+    "Kondapur",
+    "Kukatpally",
+    "Jubilee Hills",
+    "Banjara Hills",
+    "Secunderabad",
+    "Begumpet",
+    "Manikonda",
+    "Miyapur",
+    "Koramangala",
+    "Indiranagar",
+    "Whitefield",
+    "Bandra",
+    "Andheri",
   ];
   for (const area of knownAreas) {
     if (lower.includes(area.toLowerCase())) {
@@ -359,15 +550,26 @@ export function parseVoiceListing(spokenText: string, defaultCity = "Hyderabad")
     .replace(/^selling\s*(my)?/i, "")
     .replace(/^i want to sell\s*(my)?/i, "")
     .replace(/^giving away\s*(my)?/i, "")
-    .replace(/(?:for|at|in|price)\s*(?:₹|rs\.?|inr)?\s*\d+\s*(?:rupees|bucks)?/gi, "")
-    .replace(/(?:at|in|near)\s+(?:hitec city|madhapur|gachibowli|kondapur|kukatpally|jubilee hills|banjara hills|secunderabad)/gi, "")
+    .replace(
+      /(?:for|at|in|price)\s*(?:₹|rs\.?|inr)?\s*\d+\s*(?:rupees|bucks)?/gi,
+      "",
+    )
+    .replace(
+      /(?:at|in|near)\s+(?:hitec city|madhapur|gachibowli|kondapur|kukatpally|jubilee hills|banjara hills|secunderabad)/gi,
+      "",
+    )
     .trim();
 
   // Capitalize first letter
   if (cleanTitle.length > 2) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
   } else {
-    cleanTitle = category === "Cycles" ? "Pre-owned Gear Cycle" : category === "Mobiles" ? "Smartphone" : "Pre-loved Item";
+    cleanTitle =
+      category === "Cycles"
+        ? "Pre-owned Gear Cycle"
+        : category === "Mobiles"
+          ? "Smartphone"
+          : "Pre-loved Item";
   }
 
   return {

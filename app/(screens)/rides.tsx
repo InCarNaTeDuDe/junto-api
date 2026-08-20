@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
+import { socket } from "@/services/socket";
 
 interface RideItem {
   id: string;
@@ -34,64 +36,7 @@ interface RideItem {
   notes?: string;
 }
 
-const INITIAL_RIDES: RideItem[] = [
-  {
-    id: "r1",
-    driverName: "Vikram R.",
-    driverRating: 4.9,
-    driverAvatarBg: "#3B82F6",
-    from: "Madhapur (Mindspace)",
-    to: "Gachibowli (DLF)",
-    time: "Leaving in 10 mins",
-    vehicleType: "car",
-    seatsLeft: 2,
-    price: "₹40",
-    verified: true,
-    notes: "AC on • Music ok • UPI split",
-  },
-  {
-    id: "r2",
-    driverName: "Ananya S.",
-    driverRating: 4.8,
-    driverAvatarBg: "#EC4899",
-    from: "Hitec City Metro",
-    to: "Financial District",
-    time: "Leaving in 20 mins",
-    vehicleType: "car",
-    seatsLeft: 3,
-    price: "₹50",
-    verified: true,
-    notes: "Women passengers preferred/friendly",
-  },
-  {
-    id: "r3",
-    driverName: "Karthik K.",
-    driverRating: 5.0,
-    driverAvatarBg: "#10B981",
-    from: "Kondapur RTO",
-    to: "Jubilee Hills Checkpost",
-    time: "5:45 PM Today",
-    vehicleType: "bike",
-    seatsLeft: 1,
-    price: "Free",
-    verified: true,
-    notes: "Helmet provided • Quick commute",
-  },
-  {
-    id: "r4",
-    driverName: "Rohit V.",
-    driverRating: 4.7,
-    driverAvatarBg: "#8B5CF6",
-    from: "Kukatpally Housing Board",
-    to: "Inorbit Mall",
-    time: "6:15 PM Today",
-    vehicleType: "car",
-    seatsLeft: 1,
-    price: "₹30",
-    verified: false,
-    notes: "Daily office route",
-  },
-];
+const INITIAL_RIDES: RideItem[] = [];
 
 const PRESET_ROUTES = [
   { from: "Hitec City", to: "Gachibowli" },
@@ -160,15 +105,53 @@ export default function RidesScreen() {
 
   useEffect(() => {
     fetchRides();
+
+    const handleRealtimeRide = () => {
+      fetchRides();
+    };
+
+    socket.on("ride_created", handleRealtimeRide);
+    socket.on("rides_updated", handleRealtimeRide);
+    socket.on("ride_updated", handleRealtimeRide);
+
+    return () => {
+      socket.off("ride_created", handleRealtimeRide);
+      socket.off("rides_updated", handleRealtimeRide);
+      socket.off("ride_updated", handleRealtimeRide);
+    };
   }, [fetchRides]);
 
   // Offer Ride Form State (Ultra minimal inputs)
   const [offerFrom, setOfferFrom] = useState("");
   const [offerTo, setOfferTo] = useState("");
-  const [selectedTime, setSelectedTime] = useState("In 15 mins");
+  const [departureDate, setDepartureDate] = useState(new Date());
+  const [departureTime, setDepartureTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [offerVehicle, setOfferVehicle] = useState<"car" | "bike">("car");
   const [selectedSeats, setSelectedSeats] = useState(2);
   const [selectedPrice, setSelectedPrice] = useState("₹40");
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const formatTime = (t: Date) =>
+    t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const formattedDeparture = `${formatDate(departureDate)} • ${formatTime(departureTime)}`;
+
+  const onDateChange = (_: any, date?: Date) => {
+    if (Platform.OS !== "web") setShowDatePicker(false);
+    if (date) setDepartureDate(date);
+  };
+
+  const onTimeChange = (_: any, time?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (time) setDepartureTime(time);
+  };
 
   // Booking Modal State
   const [bookingSuccessModal, setBookingSuccessModal] =
@@ -199,14 +182,15 @@ export default function RidesScreen() {
 
     try {
       setIsPublishing(true);
+      const departureStr = formattedDeparture;
       const payload = {
         from: offerFrom.trim(),
         to: offerTo.trim(),
-        time: selectedTime,
+        time: departureStr,
         vehicleType: offerVehicle,
         seatsLeft: selectedSeats,
         price: selectedPrice,
-        notes: "Just posted on RideMate • Direct contact",
+        notes: "Scheduled ride • Direct contact",
         verified: true,
       };
 
@@ -222,7 +206,7 @@ export default function RidesScreen() {
           driverAvatarBg: "#8B5CF6",
           from: res.data.from,
           to: res.data.to,
-          time: res.data.time,
+          time: res.data.time || departureStr,
           vehicleType: res.data.vehicleType,
           seatsLeft: res.data.seatsLeft,
           price: res.data.price,
@@ -239,7 +223,7 @@ export default function RidesScreen() {
           driverAvatarBg: "#8B5CF6",
           from: offerFrom.trim(),
           to: offerTo.trim(),
-          time: selectedTime,
+          time: departureStr,
           vehicleType: offerVehicle,
           seatsLeft: selectedSeats,
           price: selectedPrice,
@@ -931,37 +915,141 @@ export default function RidesScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Leaving Time */}
+            {/* Scheduled Departure Date & Time Picker */}
             <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              Departure Time:
+              Scheduled Departure Date & Time:
             </Text>
-            <View style={styles.wrapPillRow}>
-              {TIME_PRESETS.map((time) => {
-                const active = selectedTime === time;
-                return (
-                  <TouchableOpacity
-                    key={time}
-                    onPress={() => setSelectedTime(time)}
+            <View style={styles.dateTimeRow}>
+              {/* Departure Date Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowDatePicker(!showDatePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
                     style={[
-                      styles.timePill,
-                      {
-                        backgroundColor: active ? "#8B5CF6" : cardBg,
-                        borderColor: active ? "#8B5CF6" : border,
-                      },
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE" },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.timePillText,
-                        { color: active ? "#FFF" : textPrimary },
-                      ]}
-                    >
-                      {time}
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color="#8B5CF6"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Departure Date
                     </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(departureDate)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
+
+              {/* Departure Time Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowTimePicker(!showTimePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
+                    style={[
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#F59E0B25" : "#FEF3C7" },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Departure Time
+                    </Text>
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatTime(departureTime)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
             </View>
+
+            {/* Date Picker Modal / Inline Controls */}
+            {(showDatePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    📅 Select Departure Date
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={departureDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
+
+            {/* Time Picker Modal / Inline Controls */}
+            {(showTimePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    ⏰ Select Departure Time
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={departureTime}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
 
             {/* Available Seats & Price */}
             <View style={styles.seatsPriceGrid}>
@@ -1492,6 +1580,62 @@ const styles = StyleSheet.create({
   timePillText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 4,
+  },
+  dateTimeCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  dateTimeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  dateTimeIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateTimeLabel: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dateTimeValue: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  pickerBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  pickerBoxHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  pickerBoxTitle: {
+    fontSize: 13,
+    fontWeight: "700",
   },
   seatsPriceGrid: {
     flexDirection: "row",

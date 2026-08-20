@@ -5,6 +5,7 @@ import {
   createActivity,
   exploreByLatLong,
   popularActivitiesAround,
+  getJuntoNowStats,
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 
@@ -68,4 +69,21 @@ export async function postTicket(
 
     res.status(201).json(d || {});
   } catch (error) {}
+}
+
+export async function getJuntoNowStatsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const locationName = (req.query?.locationName as string) || "";
+    const stats = await getJuntoNowStats(locationName);
+    return res.status(200).json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    next(error);
+  }
 }

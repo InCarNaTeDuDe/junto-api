@@ -535,9 +535,10 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginVertical: 12,
+    marginHorizontal: 16,
   },
   scrollContent: {
-    paddingHorizontal: 12,
+    // paddingHorizontal: 12,
     gap: 16,
     flexDirection: "row",
     alignItems: "flex-start",

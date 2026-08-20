@@ -41,8 +41,18 @@ export const UniversalNeedBar: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [directFeedback, setDirectFeedback] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
-  const { isListening, startListening, stopListening } = useVoiceSpeech();
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    error: speechError,
+    permissionStatus,
+    requestPermission,
+    startListening,
+    stopListening,
+  } = useVoiceSpeech();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -53,6 +63,16 @@ export const UniversalNeedBar: React.FC = () => {
     }, 3200);
     return () => clearInterval(interval);
   }, []);
+
+  // Update query and filter dynamically when transcript updates
+  useEffect(() => {
+    if (transcript) {
+      setQuery(transcript);
+      const match = parseUserNeed(transcript);
+      setMatchedIntent(match);
+      setIsExpanded(true);
+    }
+  }, [transcript]);
 
   // Voice listening animation
   useEffect(() => {
@@ -87,6 +107,40 @@ export const UniversalNeedBar: React.FC = () => {
     }
   }, [query]);
 
+  const handleMicToggle = async () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+
+    setVoiceNotice(null);
+
+    // Request permission if previously denied
+    if (permissionStatus === "denied") {
+      const granted = await requestPermission();
+      if (!granted) {
+        setVoiceNotice(
+          "Microphone permission was denied. Please allow microphone permissions in your browser or device settings.",
+        );
+        return;
+      }
+    }
+
+    startListening(
+      (spokenText, isFinal) => {
+        if (spokenText) {
+          setQuery(spokenText);
+          const match = parseUserNeed(spokenText);
+          setMatchedIntent(match);
+          setIsExpanded(true);
+        }
+      },
+      (errText) => {
+        setVoiceNotice(errText);
+      },
+    );
+  };
+
   const handleRoute = (route: string) => {
     router.push(route as any);
   };
@@ -110,12 +164,16 @@ export const UniversalNeedBar: React.FC = () => {
         style={[
           styles.card,
           {
-            backgroundColor: C.card || "#FFFFFF",
+            backgroundColor: isDark
+              ? C.card || "rgba(255,255,255,0.05)"
+              : C.card || "#FFFFFF",
             borderColor: isListening
               ? "#EF4444"
               : matchedIntent
                 ? matchedIntent.color
-                : "#E2E8F0",
+                : isDark
+                  ? "rgba(255,255,255,0.12)"
+                  : C.border || "#E2E8F0",
           },
         ]}
       >
@@ -123,18 +181,40 @@ export const UniversalNeedBar: React.FC = () => {
         <View style={styles.topHeader}>
           <View style={styles.titleWithIcon}>
             <View
-              style={[styles.targetIconCircle, { backgroundColor: "#EEF2FF" }]}
+              style={[
+                styles.targetIconCircle,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(99, 102, 241, 0.2)"
+                    : "#EEF2FF",
+                },
+              ]}
             >
-              <Ionicons name="sparkles" size={15} color="#6366F1" />
+              <Ionicons
+                name="sparkles"
+                size={15}
+                color={isDark ? "#A5B4FC" : "#6366F1"}
+              />
             </View>
             <View>
               <Text
-                style={[styles.sectionTitle, { color: C.text || "#0F172A" }]}
+                style={[
+                  styles.sectionTitle,
+                  { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+                ]}
               >
                 I Need This
               </Text>
               <Text
-                style={[styles.sectionSubtitle, { color: C.mute || "#64748B" }]}
+                style={[
+                  styles.sectionSubtitle,
+                  {
+                    color:
+                      C.sub ||
+                      C.mute ||
+                      (isDark ? "rgba(255,255,255,0.55)" : "#64748B"),
+                  },
+                ]}
               >
                 Universal AI Intent Router
               </Text>
@@ -142,12 +222,30 @@ export const UniversalNeedBar: React.FC = () => {
           </View>
 
           <TouchableOpacity
-            style={styles.expandModalBtn}
+            style={[
+              styles.expandModalBtn,
+              {
+                backgroundColor: isDark
+                  ? "rgba(99, 102, 241, 0.2)"
+                  : "#EEF2FF",
+              },
+            ]}
             onPress={() => setIsModalOpen(true)}
             accessibilityLabel="Open Full Universal Assistant"
           >
-            <Text style={styles.expandModalBtnText}>Full Hub</Text>
-            <Ionicons name="expand-outline" size={13} color="#6366F1" />
+            <Text
+              style={[
+                styles.expandModalBtnText,
+                { color: isDark ? "#A5B4FC" : "#6366F1" },
+              ]}
+            >
+              Full Hub
+            </Text>
+            <Ionicons
+              name="expand-outline"
+              size={13}
+              color={isDark ? "#A5B4FC" : "#6366F1"}
+            />
           </TouchableOpacity>
         </View>
 
@@ -156,23 +254,41 @@ export const UniversalNeedBar: React.FC = () => {
           style={[
             styles.inputRow,
             {
-              backgroundColor: "#F8FAFC",
-              borderColor: isListening ? "#EF4444" : "#CBD5E1",
+              backgroundColor: isDark
+                ? "rgba(255,255,255,0.06)"
+                : C.cardSecondary || "#F8FAFC",
+              borderColor: isListening
+                ? "#EF4444"
+                : isDark
+                  ? "rgba(255,255,255,0.12)"
+                  : C.border || "#CBD5E1",
             },
           ]}
         >
           <Ionicons
             name="search"
             size={18}
-            color={matchedIntent ? matchedIntent.color : "#64748B"}
+            color={
+              matchedIntent
+                ? matchedIntent.color
+                : isDark
+                  ? "rgba(255,255,255,0.45)"
+                  : "#64748B"
+            }
             style={styles.searchIcon}
           />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder={ROTATING_EXAMPLES[placeholderIdx]}
-            placeholderTextColor="#94A3B8"
-            style={[styles.input, { color: C.text || "#0F172A" }]}
+            placeholderTextColor={
+              C.placeholder ||
+              (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
+            }
+            style={[
+              styles.input,
+              { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+            ]}
             autoCapitalize="none"
           />
 
@@ -185,30 +301,43 @@ export const UniversalNeedBar: React.FC = () => {
               }}
               style={styles.clearBtn}
             >
-              <Ionicons name="close-circle" size={17} color="#94A3B8" />
+              <Ionicons
+                name="close-circle"
+                size={17}
+                color={
+                  C.mute || (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
+                }
+              />
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
-            onPress={() => {
-              if (isListening) {
-                stopListening();
-              } else {
-                startListening((spoken) => {
-                  setQuery(spoken);
-                });
-              }
-            }}
+            onPress={handleMicToggle}
             style={[
               styles.micBtn,
-              { backgroundColor: isListening ? "#EF4444" : "#EEF2FF" },
+              {
+                backgroundColor: isListening
+                  ? "#EF4444"
+                  : isDark
+                    ? "rgba(99, 102, 241, 0.25)"
+                    : "#EEF2FF",
+              },
             ]}
+            accessibilityLabel={
+              isListening ? "Stop listening" : "Speak your requirement"
+            }
           >
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <Ionicons
                 name={isListening ? "mic" : "mic-outline"}
                 size={17}
-                color={isListening ? "#FFFFFF" : "#6366F1"}
+                color={
+                  isListening
+                    ? "#FFFFFF"
+                    : isDark
+                      ? "#A5B4FC"
+                      : "#6366F1"
+                }
               />
             </Animated.View>
           </TouchableOpacity>
@@ -216,20 +345,89 @@ export const UniversalNeedBar: React.FC = () => {
 
         {/* Voice listening indicator */}
         {isListening && (
-          <View style={styles.inlineListening}>
+          <View
+            style={[
+              styles.inlineListening,
+              {
+                backgroundColor: isDark
+                  ? "rgba(239, 68, 68, 0.2)"
+                  : "#FEE2E2",
+              },
+            ]}
+          >
             <View style={styles.pulsingRedDot} />
-            <Text style={styles.inlineListeningText}>
-              Listening... Speak your requirement (e.g. "I need a bike
-              mechanic")
+            <Text
+              style={[
+                styles.inlineListeningText,
+                { color: isDark ? "#FCA5A5" : "#B91C1C" },
+              ]}
+            >
+              Listening... Speak your requirement (e.g. "I need a bike mechanic")
             </Text>
+          </View>
+        )}
+
+        {/* Voice / Permission notice */}
+        {voiceNotice && (
+          <View
+            style={[
+              styles.feedbackToast,
+              {
+                backgroundColor: isDark
+                  ? "rgba(239, 68, 68, 0.2)"
+                  : "#FEE2E2",
+                marginTop: 8,
+              },
+            ]}
+          >
+            <Ionicons
+              name="alert-circle"
+              size={16}
+              color={isDark ? "#FCA5A5" : "#DC2626"}
+            />
+            <Text
+              style={[
+                styles.feedbackText,
+                { color: isDark ? "#FCA5A5" : "#B91C1C", flex: 1 },
+              ]}
+            >
+              {voiceNotice}
+            </Text>
+            <TouchableOpacity onPress={() => setVoiceNotice(null)}>
+              <Ionicons
+                name="close"
+                size={15}
+                color={isDark ? "#FCA5A5" : "#DC2626"}
+              />
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Feedback alert */}
         {directFeedback && (
-          <View style={styles.feedbackToast}>
-            <Ionicons name="checkmark-circle" size={15} color="#15803D" />
-            <Text style={styles.feedbackText}>{directFeedback}</Text>
+          <View
+            style={[
+              styles.feedbackToast,
+              {
+                backgroundColor: isDark
+                  ? "rgba(34, 197, 94, 0.2)"
+                  : "#DCFCE7",
+              },
+            ]}
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={15}
+              color={isDark ? "#86EFAC" : "#15803D"}
+            />
+            <Text
+              style={[
+                styles.feedbackText,
+                { color: isDark ? "#86EFAC" : "#15803D" },
+              ]}
+            >
+              {directFeedback}
+            </Text>
           </View>
         )}
 
@@ -246,16 +444,33 @@ export const UniversalNeedBar: React.FC = () => {
               style={[
                 styles.chip,
                 {
-                  backgroundColor: prompt.bg,
+                  backgroundColor: isDark
+                    ? "rgba(255,255,255,0.08)"
+                    : prompt.bg,
                   borderColor:
-                    query === prompt.text ? prompt.color : "transparent",
+                    query === prompt.text
+                      ? prompt.color
+                      : isDark
+                        ? "rgba(255,255,255,0.12)"
+                        : "transparent",
                 },
               ]}
               onPress={() => handleChipPress(prompt.text)}
               activeOpacity={0.7}
             >
               <Text style={styles.chipEmoji}>{prompt.emoji}</Text>
-              <Text style={[styles.chipText, { color: prompt.color }]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  {
+                    color: isDark
+                      ? query === prompt.text
+                        ? prompt.color
+                        : "#F1F5F9"
+                      : prompt.color,
+                  },
+                ]}
+              >
                 {prompt.text}
               </Text>
             </TouchableOpacity>
@@ -268,7 +483,9 @@ export const UniversalNeedBar: React.FC = () => {
             style={[
               styles.matchedCard,
               {
-                backgroundColor: matchedIntent.bg,
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.06)"
+                  : matchedIntent.bg,
                 borderColor: matchedIntent.color,
               },
             ]}
@@ -307,13 +524,27 @@ export const UniversalNeedBar: React.FC = () => {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.matchHeadline}>
+                <Text
+                  style={[
+                    styles.matchHeadline,
+                    { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+                  ]}
+                >
                   {matchedIntent.headline}
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.matchExplanation}>
+            <Text
+              style={[
+                styles.matchExplanation,
+                {
+                  color:
+                    C.sub ||
+                    (isDark ? "rgba(255,255,255,0.75)" : "#334155"),
+                },
+              ]}
+            >
               {matchedIntent.explanation}
             </Text>
 
@@ -325,8 +556,12 @@ export const UniversalNeedBar: React.FC = () => {
                   style={[
                     styles.instantRowItem,
                     {
-                      backgroundColor: C.card || "#FFFFFF",
-                      borderColor: "rgba(0,0,0,0.06)",
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.04)"
+                        : C.card || "#FFFFFF",
+                      borderColor: isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : C.border || "rgba(0,0,0,0.06)",
                     },
                   ]}
                 >
@@ -341,7 +576,7 @@ export const UniversalNeedBar: React.FC = () => {
                       <Text
                         style={[
                           styles.itemTitle,
-                          { color: C.text || "#0F172A" },
+                          { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
                         ]}
                         numberOfLines={1}
                       >
@@ -351,13 +586,21 @@ export const UniversalNeedBar: React.FC = () => {
                         <View
                           style={[
                             styles.itemPill,
-                            { backgroundColor: matchedIntent.bg },
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(255,255,255,0.12)"
+                                : matchedIntent.bg,
+                            },
                           ]}
                         >
                           <Text
                             style={[
                               styles.itemPillText,
-                              { color: matchedIntent.color },
+                              {
+                                color: isDark
+                                  ? "#F1F5F9"
+                                  : matchedIntent.color,
+                              },
                             ]}
                           >
                             {item.badge}
@@ -366,7 +609,15 @@ export const UniversalNeedBar: React.FC = () => {
                       )}
                     </View>
                     <Text
-                      style={[styles.itemSub, { color: C.mute || "#64748B" }]}
+                      style={[
+                        styles.itemSub,
+                        {
+                          color:
+                            C.sub ||
+                            C.mute ||
+                            (isDark ? "rgba(255,255,255,0.5)" : "#64748B"),
+                        },
+                      ]}
                       numberOfLines={1}
                     >
                       {item.subtitle}

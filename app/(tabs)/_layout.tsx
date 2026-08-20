@@ -1,26 +1,22 @@
 // @ts-nocheck
 import React from "react";
 import { Tabs, usePathname } from "expo-router";
-import { View, Text } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuthContext } from "@/context/AuthContext";
 import { useStore } from "@/hooks/useStore";
 import { GlobalOverlays } from "@/components/GlobalOverlays";
-import { createStyles } from ".";
-import { useStyles } from "@/hooks/useStyles";
-import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
 import { TabRefreshProvider } from "@/context/TabRefreshContext";
 
 export default function TabsLayout() {
   const { state } = useStore();
-  const s = useStyles(createStyles);
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
 
   const { theme } = useAuthContext();
-  const { selectedLocation } = useLocation();
 
   const isCreateScreen = pathname?.includes("create");
 
@@ -40,12 +36,6 @@ export default function TabsLayout() {
     }
   }, []);
 
-  // React.useEffect(() => {
-  //   checkUnread();
-  //   const interval = setInterval(checkUnread, 120000);
-  //   return () => clearInterval(interval);
-  // }, [checkUnread]);
-
   const totalUnread = Math.max(
     serverUnreadCount,
     state.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0),
@@ -53,177 +43,165 @@ export default function TabsLayout() {
 
   return (
     <TabRefreshProvider onGlobalRefresh={checkUnread}>
-      <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
-        <View className="flex-1 bg-slate-950">
-          <Tabs
-            screenOptions={{
-              headerShown: false,
-
-              tabBarStyle: {
-                display: isCreateScreen ? "none" : "flex",
-                position: "relative",
-                bottom: 0,
-                height: 64,
-                backgroundColor: theme.bg2,
-                borderTopWidth: 2,
-                elevation: 0,
-                shadowOpacity: 0,
-                paddingTop: 0,
-                paddingBottom: 0,
-              },
-
-              tabBarActiveTintColor: "#A855F7",
-              tabBarInactiveTintColor: "#8B94A7",
-
-              tabBarLabelStyle: {
-                fontSize: 11,
-                fontWeight: "600",
-                marginTop: 2,
-              },
+      <View style={[styles.rootContainer, { backgroundColor: theme.bg }]}>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: {
+              display: isCreateScreen ? "none" : "flex",
+              height: 54 + Math.max(insets.bottom, 10),
+              backgroundColor: theme.bg2 || theme.bg || "#FFFFFF",
+              borderTopWidth: 1,
+              borderTopColor: theme.border || "#E2E8F0",
+              elevation: 8,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 4,
+              paddingTop: 6,
+              paddingBottom: Math.max(insets.bottom, 8),
+            },
+            tabBarActiveTintColor: theme.primary || "#A855F7",
+            tabBarInactiveTintColor: theme.mute || "#8B94A7",
+            tabBarLabelStyle: {
+              fontSize: 11,
+              fontWeight: "600",
+              marginTop: 2,
+            },
+          }}
+        >
+          {/* Home */}
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: "Home",
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons
+                  name={focused ? "home" : "home-outline"}
+                  size={22}
+                  color={color}
+                />
+              ),
             }}
-          >
-            {/* Home */}
-            <Tabs.Screen
-              name="index"
-              options={{
-                title: "Home",
-                tabBarIcon: ({ color, focused }) => (
+          />
+
+          {/* Explore */}
+          <Tabs.Screen
+            name="explore"
+            options={{
+              title: "Explore",
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons
+                  name={focused ? "compass" : "compass-outline"}
+                  size={22}
+                  color={color}
+                />
+              ),
+            }}
+          />
+
+          {/* Create */}
+          <Tabs.Screen
+            name="create"
+            options={{
+              title: "",
+              tabBarLabel: () => null,
+              tabBarIcon: () => (
+                <View style={styles.createButtonCircle}>
+                  <Ionicons name="add" size={34} color="#FFFFFF" />
+                </View>
+              ),
+            }}
+          />
+
+          {/* Chats */}
+          <Tabs.Screen
+            name="chats"
+            options={{
+              title: "Chats",
+              tabBarIcon: ({ color, focused }) => (
+                <View style={{ position: "relative" }}>
                   <Ionicons
-                    name={focused ? "home" : "home-outline"}
+                    name={
+                      focused
+                        ? "chatbubble-ellipses"
+                        : "chatbubble-ellipses-outline"
+                    }
                     size={22}
                     color={color}
                   />
-                ),
-              }}
-            />
 
-            {/* Explore */}
-            <Tabs.Screen
-              name="explore"
-              options={{
-                title: "Explore",
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "compass" : "compass-outline"}
-                    size={22}
-                    color={color}
-                  />
-                ),
-              }}
-            />
+                  {totalUnread > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+                    </View>
+                  )}
+                </View>
+              ),
+            }}
+          />
 
-            {/* Create */}
-            <Tabs.Screen
-              name="create"
-              options={{
-                title: "",
-                tabBarLabel: () => null,
+          {/* Profile */}
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: "Profile",
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons
+                  name={focused ? "person" : "person-outline"}
+                  size={22}
+                  color={color}
+                />
+              ),
+            }}
+          />
+        </Tabs>
 
-                tabBarIcon: () => (
-                  <View
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 32,
-                      backgroundColor: "#8B5CF6",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginTop: -40,
-
-                      shadowColor: "#8B5CF6",
-                      shadowOpacity: 0.8,
-                      shadowRadius: 18,
-                      shadowOffset: {
-                        width: 0,
-                        height: 8,
-                      },
-
-                      elevation: 18,
-                    }}
-                  >
-                    <Ionicons name="add" size={34} color="#FFFFFF" />
-                  </View>
-                ),
-              }}
-            />
-
-            {/* Chats */}
-            <Tabs.Screen
-              name="chats"
-              options={{
-                title: "Chats",
-
-                tabBarIcon: ({ color, focused }) => (
-                  <View style={{ position: "relative" }}>
-                    <Ionicons
-                      name={
-                        focused
-                          ? "chatbubble-ellipses"
-                          : "chatbubble-ellipses-outline"
-                      }
-                      size={22}
-                      color={color}
-                    />
-
-                    {totalUnread > 0 && (
-                      <View
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          right: -8,
-
-                          minWidth: 18,
-                          height: 18,
-                          borderRadius: 9,
-
-                          backgroundColor: "#A855F7",
-
-                          alignItems: "center",
-                          justifyContent: "center",
-
-                          paddingHorizontal: 4,
-
-                          borderWidth: 2,
-                          borderColor: "#131322",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: "#FFF",
-                            fontSize: 10,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {totalUnread}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ),
-              }}
-            />
-
-            {/* Profile */}
-            <Tabs.Screen
-              name="profile"
-              options={{
-                title: "Profile",
-
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "person" : "person-outline"}
-                    size={22}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-          </Tabs>
-
-          {/* Slide-over overlays for details modals and notifications to behave instantly and fast! */}
-          <GlobalOverlays />
-        </View>
-      </SafeAreaView>
+        {/* Slide-over overlays for details modals and notifications */}
+        <GlobalOverlays />
+      </View>
     </TabRefreshProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+  },
+  createButtonCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -30,
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 10,
+  },
+  unreadBadge: {
+    position: "absolute",
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#A855F7",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  unreadBadgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+});

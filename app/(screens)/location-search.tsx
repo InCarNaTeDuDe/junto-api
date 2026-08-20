@@ -87,7 +87,7 @@ export default function LocationSearch() {
   };
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={s.wrapper}>
+    <SafeAreaView edges={["top", "bottom", "left", "right"]} style={s.wrapper}>
       {/* Header */}
 
       <View style={s.container}>

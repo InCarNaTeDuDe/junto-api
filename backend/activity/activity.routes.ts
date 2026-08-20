@@ -6,22 +6,14 @@ import {
   exploreByArea,
   fetchActivitiesByLoc,
   postTicket,
+  getJuntoNowStatsHandler,
 } from "./activity.controller";
 import { CreateActivitySchema } from "./activity.schema";
 import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
-/**
- * POST /api/auth/google
- *
- * Body:
- * {
- *   idToken: string;
- *   platform: "ANDROID" | "IOS" | "WEB";
- *   deviceInfo?: {...}
- * }
- */
+router.get("/junto-now-stats", authenticate, getJuntoNowStatsHandler);
 router.post("/", authenticate, validate(CreateActivitySchema), create);
 router.post("/activities-around", authenticate, fetchActivitiesByLoc);
 
