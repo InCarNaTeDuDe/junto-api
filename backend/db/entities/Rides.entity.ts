@@ -1,75 +1,183 @@
 import {
+  Entity,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
+
 import { User } from "./User.entity";
+
+export type RideVehicleType = "car" | "bike";
+
+export type RideStatus = "active" | "in_progress" | "completed" | "cancelled";
+
+export interface RidePassenger {
+  userId: string;
+  userName: string;
+  seats: number;
+  pickupPoint?: string;
+  passengerPhone?: string;
+  joinedAt: string;
+}
 
 @Entity("rides")
 export class Ride {
+  // =========================
+  // ID
+  // =========================
+
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Index()
-  @Column({ type: "uuid" })
-  userId!: string;
+  // =========================
+  // DRIVER
+  // =========================
+
+  @Column()
+  driverId!: string;
 
   @ManyToOne(() => User, {
+    nullable: false,
     onDelete: "CASCADE",
   })
-  @JoinColumn({ name: "userId" })
-  user!: User;
+  @JoinColumn({
+    name: "driverId",
+  })
+  driver!: User;
 
-  @Column({ type: "varchar" })
-  fromLocation!: string;
-
-  @Column({ type: "varchar" })
-  toLocation!: string;
+  @Column()
+  driverName!: string;
 
   @Column({
-    type: "decimal",
-    precision: 10,
-    scale: 7,
+    type: "float",
+    default: 5.0,
   })
-  fromLatitude!: number;
+  driverRating!: number;
 
   @Column({
-    type: "decimal",
-    precision: 10,
-    scale: 7,
+    nullable: true,
   })
-  fromLongitude!: number;
+  driverAvatar?: string;
 
   @Column({
-    type: "decimal",
-    precision: 10,
-    scale: 7,
+    nullable: true,
+    default: "#2563EB",
   })
-  toLatitude!: number;
+  driverAvatarBg?: string;
+
+  // =========================
+  // ROUTE
+  // =========================
+
+  @Column()
+  from!: string;
+
+  @Column()
+  to!: string;
+
+  @Column()
+  time!: string;
+
+  // =========================
+  // VEHICLE
+  // =========================
 
   @Column({
-    type: "decimal",
-    precision: 10,
-    scale: 7,
+    type: "varchar",
   })
-  toLongitude!: number;
+  vehicleType!: RideVehicleType;
 
-  @Column({ type: "timestamp" })
-  departureTime!: Date;
+  // =========================
+  // SEATS
+  // =========================
 
-  @Column({ type: "int", default: 1 })
-  availableSeats!: number;
+  @Column({
+    type: "int",
+  })
+  seatsLeft!: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
-  cost!: number;
+  @Column({
+    type: "int",
+  })
+  totalSeats!: number;
 
-  @Column({ type: "text", nullable: true })
-  description?: string;
+  // =========================
+  // PRICE
+  // =========================
+
+  @Column()
+  price!: string;
+
+  // =========================
+  // RIDE DETAILS
+  // =========================
+
+  @Column({
+    default: true,
+  })
+  verified!: boolean;
+
+  @Column({
+    nullable: true,
+  })
+  notes?: string;
+
+  // =========================
+  // LOCATION
+  // =========================
+
+  @Column({
+    nullable: true,
+  })
+  locationName?: string;
+
+  @Column({
+    nullable: true,
+  })
+  locationState?: string;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  latitude?: number;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  longitude?: number;
+
+  // =========================
+  // STATUS
+  // =========================
+
+  @Column({
+    type: "varchar",
+    default: "active",
+  })
+  status!: RideStatus;
+
+  // =========================
+  // PASSENGER
+  // =========================
+  //
+  // Currently:
+  // ONE driver + ONE passenger
+  //
+
+  @Column({
+    type: "jsonb",
+    default: [],
+  })
+  passengers!: RidePassenger[];
+
+  // =========================
+  // TIMESTAMPS
+  // =========================
 
   @CreateDateColumn()
   createdAt!: Date;

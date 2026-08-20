@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -25,7 +26,7 @@ interface RideItem {
   id: string;
   driverName: string;
   driverRating: number;
-  driverAvatarBg: string;
+  driverAvatar: string;
   from: string;
   to: string;
   time: string;
@@ -35,8 +36,6 @@ interface RideItem {
   verified: boolean;
   notes?: string;
 }
-
-const INITIAL_RIDES: RideItem[] = [];
 
 const PRESET_ROUTES = [
   { from: "Hitec City", to: "Gachibowli" },
@@ -67,59 +66,46 @@ export default function RidesScreen() {
   const [vehicleFilter, setVehicleFilter] = useState<"all" | "car" | "bike">(
     "all",
   );
-  const [ridesList, setRidesList] = useState<RideItem[]>(INITIAL_RIDES);
+  const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublishing] = useState(false);
 
   // Fetch real-time rides from backend
-  const fetchRides = useCallback(async () => {
+  const fetchRides = async () => {
     try {
       setIsLoading(true);
-      const res = await ApiService.get<{ success: boolean; data: any[] }>(
-        "/api/rides",
-      );
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped: RideItem[] = res.data.map((r) => ({
-          id: r.id,
-          driverName: r.driverName || "Driver",
-          driverRating: r.driverRating || 4.9,
-          driverAvatarBg: r.driverAvatarBg || "#3B82F6",
-          from: r.from,
-          to: r.to,
-          time: r.time,
-          vehicleType: r.vehicleType || "car",
-          seatsLeft: r.seatsLeft ?? 1,
-          price: r.price || "₹40",
-          verified: r.verified ?? true,
-          notes: r.notes,
-        }));
-        setRidesList(mapped);
+
+      const res = await ApiService.get<{
+        success: boolean;
+        data: RideItem[];
+      }>("/api/rides");
+
+      if (res?.success) {
+        setRidesList(res.data);
       }
     } catch (err) {
-      console.log("Using initial rides cache:", err);
+      console.log("Failed to fetch rides:", err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchRides();
 
-    const handleRealtimeRide = () => {
-      fetchRides();
-    };
+    const refreshRides = () => fetchRides();
 
-    socket.on("ride_created", handleRealtimeRide);
-    socket.on("rides_updated", handleRealtimeRide);
-    socket.on("ride_updated", handleRealtimeRide);
+    socket.on("ride_created", refreshRides);
+    socket.on("rides_updated", refreshRides);
+    socket.on("ride_updated", refreshRides);
 
     return () => {
-      socket.off("ride_created", handleRealtimeRide);
-      socket.off("rides_updated", handleRealtimeRide);
-      socket.off("ride_updated", handleRealtimeRide);
+      socket.off("ride_created", refreshRides);
+      socket.off("rides_updated", refreshRides);
+      socket.off("ride_updated", refreshRides);
     };
-  }, [fetchRides]);
+  }, []);
 
   // Offer Ride Form State (Ultra minimal inputs)
   const [offerFrom, setOfferFrom] = useState("");
@@ -172,6 +158,7 @@ export default function RidesScreen() {
   };
 
   const handlePublishRide = async () => {
+    debugger;
     if (!offerFrom.trim() || !offerTo.trim()) {
       Alert.alert(
         "Missing Route",
@@ -181,70 +168,38 @@ export default function RidesScreen() {
     }
 
     try {
-      setIsPublishing(true);
-      const departureStr = formattedDeparture;
-      const payload = {
+      // setIsPublishing(true);
+
+      const res = await ApiService.post<{
+        success: boolean;
+        data: RideItem;
+      }>("/api/rides", {
         from: offerFrom.trim(),
         to: offerTo.trim(),
-        time: departureStr,
+        time: formattedDeparture,
         vehicleType: offerVehicle,
         seatsLeft: selectedSeats,
         price: selectedPrice,
         notes: "Scheduled ride • Direct contact",
         verified: true,
-      };
+      });
 
-      const res = await ApiService.post<{ success: boolean; data: any }>(
-        "/api/rides",
-        payload,
-      );
       if (res?.success && res.data) {
-        const created: RideItem = {
-          id: res.data.id,
-          driverName: res.data.driverName || "You (Host)",
-          driverRating: 5.0,
-          driverAvatarBg: "#8B5CF6",
-          from: res.data.from,
-          to: res.data.to,
-          time: res.data.time || departureStr,
-          vehicleType: res.data.vehicleType,
-          seatsLeft: res.data.seatsLeft,
-          price: res.data.price,
-          verified: true,
-          notes: res.data.notes,
-        };
-        setRidesList((prev) => [created, ...prev]);
-      } else {
-        // Optimistic local fallback
-        const newRide: RideItem = {
-          id: `ride_${Date.now()}`,
-          driverName: "You (Host)",
-          driverRating: 5.0,
-          driverAvatarBg: "#8B5CF6",
-          from: offerFrom.trim(),
-          to: offerTo.trim(),
-          time: departureStr,
-          vehicleType: offerVehicle,
-          seatsLeft: selectedSeats,
-          price: selectedPrice,
-          verified: true,
-          notes: "Just posted • Direct contact",
-        };
-        setRidesList((prev) => [newRide, ...prev]);
+        setRidesList((prev) => [res.data, ...prev]);
       }
 
       setOfferFrom("");
       setOfferTo("");
       setActiveTab("find");
+
       Alert.alert(
         "🎉 Ride Offered!",
         "Your ride is now visible to people nearby in real-time.",
       );
     } catch (err: any) {
-      Alert.alert("Notice", err?.message || "Offer saved locally.");
-      setActiveTab("find");
+      Alert.alert("Notice", err?.message || "Unable to publish ride.");
     } finally {
-      setIsPublishing(false);
+      // setIsPublishing(false);
     }
   };
 
@@ -253,7 +208,7 @@ export default function RidesScreen() {
       await ApiService.post(`/api/rides/${ride.id}/join`, {
         seatsRequested: 1,
       });
-      // Decrement seats locally
+
       setRidesList((prev) =>
         prev.map((r) =>
           r.id === ride.id
@@ -262,6 +217,7 @@ export default function RidesScreen() {
         ),
       );
     } catch (e) {
+      Alert.alert("Unable to request seat", "Please try again.");
       console.log("Booked ride optimistically");
     }
     setBookingSuccessModal(ride);
@@ -515,7 +471,45 @@ export default function RidesScreen() {
             </View>
 
             {/* Rides List */}
-            {filteredRides.length === 0 ? (
+            {/* Rides List */}
+            {isLoading ? (
+              <View
+                style={[
+                  styles.emptyBox,
+                  {
+                    backgroundColor: cardBg,
+                    borderColor: border,
+                    paddingVertical: 40,
+                  },
+                ]}
+              >
+                <ActivityIndicator size="large" color="#8B5CF6" />
+
+                <Text
+                  style={[
+                    styles.emptyTitle,
+                    {
+                      color: textPrimary,
+                      marginTop: 14,
+                    },
+                  ]}
+                >
+                  Loading rides...
+                </Text>
+
+                <Text
+                  style={[
+                    styles.emptySub,
+                    {
+                      color: textMute,
+                      marginBottom: 0,
+                    },
+                  ]}
+                >
+                  Finding available rides near you
+                </Text>
+              </View>
+            ) : filteredRides.length === 0 ? (
               <View
                 style={[
                   styles.emptyBox,
@@ -523,12 +517,15 @@ export default function RidesScreen() {
                 ]}
               >
                 <Ionicons name="car-outline" size={40} color={textMute} />
+
                 <Text style={[styles.emptyTitle, { color: textPrimary }]}>
                   No rides found
                 </Text>
+
                 <Text style={[styles.emptySub, { color: textMute }]}>
                   Be the first one to offer a ride on this route!
                 </Text>
+
                 <TouchableOpacity
                   style={styles.emptyActionBtn}
                   onPress={() => setActiveTab("offer")}
@@ -550,16 +547,13 @@ export default function RidesScreen() {
                   {/* Driver Header */}
                   <View style={styles.cardDriverRow}>
                     <View style={styles.driverInfo}>
-                      <View
-                        style={[
-                          styles.avatarCircle,
-                          { backgroundColor: ride.driverAvatarBg },
-                        ]}
-                      >
-                        <Text style={styles.avatarLetter}>
-                          {ride.driverName.charAt(0)}
-                        </Text>
+                      <View style={styles.avatarCircle}>
+                        <Image
+                          source={{ uri: ride.driverAvatar }}
+                          style={styles.avatarImage}
+                        />
                       </View>
+
                       <View>
                         <View style={styles.driverNameRow}>
                           <Text
@@ -567,6 +561,7 @@ export default function RidesScreen() {
                           >
                             {ride.driverName}
                           </Text>
+
                           {ride.verified && (
                             <Ionicons
                               name="checkmark-circle"
@@ -575,8 +570,10 @@ export default function RidesScreen() {
                             />
                           )}
                         </View>
+
                         <View style={styles.ratingRow}>
                           <Ionicons name="star" size={12} color="#F59E0B" />
+
                           <Text
                             style={[styles.ratingText, { color: textMute }]}
                           >
@@ -590,6 +587,7 @@ export default function RidesScreen() {
                       <Text style={[styles.priceTag, { color: "#10B981" }]}>
                         {ride.price}
                       </Text>
+
                       <Text style={[styles.priceSub, { color: textMute }]}>
                         per seat
                       </Text>
@@ -605,9 +603,11 @@ export default function RidesScreen() {
                           { backgroundColor: "#10B981" },
                         ]}
                       />
+
                       <View
                         style={[styles.dotLine, { backgroundColor: border }]}
                       />
+
                       <View
                         style={[
                           styles.dotCircle,
@@ -615,6 +615,7 @@ export default function RidesScreen() {
                         ]}
                       />
                     </View>
+
                     <View style={styles.routeTextCol}>
                       <View>
                         <Text
@@ -622,18 +623,21 @@ export default function RidesScreen() {
                         >
                           FROM
                         </Text>
+
                         <Text
                           style={[styles.locationName, { color: textPrimary }]}
                         >
                           {ride.from}
                         </Text>
                       </View>
+
                       <View style={{ marginTop: 10 }}>
                         <Text
                           style={[styles.locationLabel, { color: textMute }]}
                         >
                           TO
                         </Text>
+
                         <Text
                           style={[styles.locationName, { color: textPrimary }]}
                         >
@@ -648,7 +652,9 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons
@@ -656,6 +662,7 @@ export default function RidesScreen() {
                         size={13}
                         color="#8B5CF6"
                       />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
@@ -666,10 +673,13 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons name="time-outline" size={13} color="#F59E0B" />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
@@ -680,7 +690,9 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons
@@ -688,11 +700,12 @@ export default function RidesScreen() {
                         size={13}
                         color="#10B981"
                       />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
-                        {ride.seatsLeft} seat{ride.seatsLeft > 1 ? "s" : ""}{" "}
-                        left
+                        {ride.seatsLeft} seat
+                        {ride.seatsLeft > 1 ? "s" : ""} left
                       </Text>
                     </View>
                   </View>
@@ -710,6 +723,7 @@ export default function RidesScreen() {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
+
                     <Text style={styles.bookBtnText}>Request Seat</Text>
                   </TouchableOpacity>
                 </View>
@@ -1124,10 +1138,18 @@ export default function RidesScreen() {
             <TouchableOpacity
               style={styles.publishBtn}
               onPress={handlePublishRide}
+              disabled={isPublishing}
               activeOpacity={0.88}
             >
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.publishBtnText}>Publish Ride in 1-Tap</Text>
+              <Ionicons
+                name={isPublishing ? "hourglass-outline" : "checkmark-circle"}
+                size={20}
+                color="#FFFFFF"
+              />
+
+              <Text style={styles.publishBtnText}>
+                {isPublishing ? "Publishing..." : "Publish Ride in 1-Tap"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1281,19 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterPillText: {
-    fontSize: 12,
-  },
+
   emptyBox: {
     padding: 28,
     borderRadius: 18,
@@ -1353,6 +1363,11 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "800",
     fontSize: 15,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 999,
   },
   driverNameRow: {
     flexDirection: "row",
@@ -1566,21 +1581,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 1,
   },
-  wrapPillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  timePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  timePillText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
+
   dateTimeRow: {
     flexDirection: "row",
     gap: 10,
