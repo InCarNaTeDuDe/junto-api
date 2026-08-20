@@ -10,20 +10,23 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
+import { socket } from "@/services/socket";
 
 interface RideItem {
   id: string;
   driverName: string;
   driverRating: number;
-  driverAvatarBg: string;
+  driverAvatar: string;
   from: string;
   to: string;
   time: string;
@@ -33,65 +36,6 @@ interface RideItem {
   verified: boolean;
   notes?: string;
 }
-
-const INITIAL_RIDES: RideItem[] = [
-  {
-    id: "r1",
-    driverName: "Vikram R.",
-    driverRating: 4.9,
-    driverAvatarBg: "#3B82F6",
-    from: "Madhapur (Mindspace)",
-    to: "Gachibowli (DLF)",
-    time: "Leaving in 10 mins",
-    vehicleType: "car",
-    seatsLeft: 2,
-    price: "₹40",
-    verified: true,
-    notes: "AC on • Music ok • UPI split",
-  },
-  {
-    id: "r2",
-    driverName: "Ananya S.",
-    driverRating: 4.8,
-    driverAvatarBg: "#EC4899",
-    from: "Hitec City Metro",
-    to: "Financial District",
-    time: "Leaving in 20 mins",
-    vehicleType: "car",
-    seatsLeft: 3,
-    price: "₹50",
-    verified: true,
-    notes: "Women passengers preferred/friendly",
-  },
-  {
-    id: "r3",
-    driverName: "Karthik K.",
-    driverRating: 5.0,
-    driverAvatarBg: "#10B981",
-    from: "Kondapur RTO",
-    to: "Jubilee Hills Checkpost",
-    time: "5:45 PM Today",
-    vehicleType: "bike",
-    seatsLeft: 1,
-    price: "Free",
-    verified: true,
-    notes: "Helmet provided • Quick commute",
-  },
-  {
-    id: "r4",
-    driverName: "Rohit V.",
-    driverRating: 4.7,
-    driverAvatarBg: "#8B5CF6",
-    from: "Kukatpally Housing Board",
-    to: "Inorbit Mall",
-    time: "6:15 PM Today",
-    vehicleType: "car",
-    seatsLeft: 1,
-    price: "₹30",
-    verified: false,
-    notes: "Daily office route",
-  },
-];
 
 const PRESET_ROUTES = [
   { from: "Hitec City", to: "Gachibowli" },
@@ -122,53 +66,78 @@ export default function RidesScreen() {
   const [vehicleFilter, setVehicleFilter] = useState<"all" | "car" | "bike">(
     "all",
   );
-  const [ridesList, setRidesList] = useState<RideItem[]>(INITIAL_RIDES);
+  const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublishing] = useState(false);
 
   // Fetch real-time rides from backend
-  const fetchRides = useCallback(async () => {
+  const fetchRides = async () => {
     try {
       setIsLoading(true);
-      const res = await ApiService.get<{ success: boolean; data: any[] }>(
-        "/api/rides",
-      );
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped: RideItem[] = res.data.map((r) => ({
-          id: r.id,
-          driverName: r.driverName || "Driver",
-          driverRating: r.driverRating || 4.9,
-          driverAvatarBg: r.driverAvatarBg || "#3B82F6",
-          from: r.from,
-          to: r.to,
-          time: r.time,
-          vehicleType: r.vehicleType || "car",
-          seatsLeft: r.seatsLeft ?? 1,
-          price: r.price || "₹40",
-          verified: r.verified ?? true,
-          notes: r.notes,
-        }));
-        setRidesList(mapped);
+
+      const res = await ApiService.get<{
+        success: boolean;
+        data: RideItem[];
+      }>("/api/rides");
+
+      if (res?.success) {
+        setRidesList(res.data);
       }
     } catch (err) {
-      console.log("Using initial rides cache:", err);
+      console.log("Failed to fetch rides:", err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchRides();
-  }, [fetchRides]);
+
+    const refreshRides = () => fetchRides();
+
+    socket.on("ride_created", refreshRides);
+    socket.on("rides_updated", refreshRides);
+    socket.on("ride_updated", refreshRides);
+
+    return () => {
+      socket.off("ride_created", refreshRides);
+      socket.off("rides_updated", refreshRides);
+      socket.off("ride_updated", refreshRides);
+    };
+  }, []);
 
   // Offer Ride Form State (Ultra minimal inputs)
   const [offerFrom, setOfferFrom] = useState("");
   const [offerTo, setOfferTo] = useState("");
-  const [selectedTime, setSelectedTime] = useState("In 15 mins");
+  const [departureDate, setDepartureDate] = useState(new Date());
+  const [departureTime, setDepartureTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [offerVehicle, setOfferVehicle] = useState<"car" | "bike">("car");
   const [selectedSeats, setSelectedSeats] = useState(2);
   const [selectedPrice, setSelectedPrice] = useState("₹40");
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const formatTime = (t: Date) =>
+    t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const formattedDeparture = `${formatDate(departureDate)} • ${formatTime(departureTime)}`;
+
+  const onDateChange = (_: any, date?: Date) => {
+    if (Platform.OS !== "web") setShowDatePicker(false);
+    if (date) setDepartureDate(date);
+  };
+
+  const onTimeChange = (_: any, time?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (time) setDepartureTime(time);
+  };
 
   // Booking Modal State
   const [bookingSuccessModal, setBookingSuccessModal] =
@@ -189,6 +158,7 @@ export default function RidesScreen() {
   };
 
   const handlePublishRide = async () => {
+    debugger;
     if (!offerFrom.trim() || !offerTo.trim()) {
       Alert.alert(
         "Missing Route",
@@ -198,69 +168,38 @@ export default function RidesScreen() {
     }
 
     try {
-      setIsPublishing(true);
-      const payload = {
+      // setIsPublishing(true);
+
+      const res = await ApiService.post<{
+        success: boolean;
+        data: RideItem;
+      }>("/api/rides", {
         from: offerFrom.trim(),
         to: offerTo.trim(),
-        time: selectedTime,
+        time: formattedDeparture,
         vehicleType: offerVehicle,
         seatsLeft: selectedSeats,
         price: selectedPrice,
-        notes: "Just posted on RideMate • Direct contact",
+        notes: "Scheduled ride • Direct contact",
         verified: true,
-      };
+      });
 
-      const res = await ApiService.post<{ success: boolean; data: any }>(
-        "/api/rides",
-        payload,
-      );
       if (res?.success && res.data) {
-        const created: RideItem = {
-          id: res.data.id,
-          driverName: res.data.driverName || "You (Host)",
-          driverRating: 5.0,
-          driverAvatarBg: "#8B5CF6",
-          from: res.data.from,
-          to: res.data.to,
-          time: res.data.time,
-          vehicleType: res.data.vehicleType,
-          seatsLeft: res.data.seatsLeft,
-          price: res.data.price,
-          verified: true,
-          notes: res.data.notes,
-        };
-        setRidesList((prev) => [created, ...prev]);
-      } else {
-        // Optimistic local fallback
-        const newRide: RideItem = {
-          id: `ride_${Date.now()}`,
-          driverName: "You (Host)",
-          driverRating: 5.0,
-          driverAvatarBg: "#8B5CF6",
-          from: offerFrom.trim(),
-          to: offerTo.trim(),
-          time: selectedTime,
-          vehicleType: offerVehicle,
-          seatsLeft: selectedSeats,
-          price: selectedPrice,
-          verified: true,
-          notes: "Just posted • Direct contact",
-        };
-        setRidesList((prev) => [newRide, ...prev]);
+        setRidesList((prev) => [res.data, ...prev]);
       }
 
       setOfferFrom("");
       setOfferTo("");
       setActiveTab("find");
+
       Alert.alert(
         "🎉 Ride Offered!",
         "Your ride is now visible to people nearby in real-time.",
       );
     } catch (err: any) {
-      Alert.alert("Notice", err?.message || "Offer saved locally.");
-      setActiveTab("find");
+      Alert.alert("Notice", err?.message || "Unable to publish ride.");
     } finally {
-      setIsPublishing(false);
+      // setIsPublishing(false);
     }
   };
 
@@ -269,7 +208,7 @@ export default function RidesScreen() {
       await ApiService.post(`/api/rides/${ride.id}/join`, {
         seatsRequested: 1,
       });
-      // Decrement seats locally
+
       setRidesList((prev) =>
         prev.map((r) =>
           r.id === ride.id
@@ -278,6 +217,7 @@ export default function RidesScreen() {
         ),
       );
     } catch (e) {
+      Alert.alert("Unable to request seat", "Please try again.");
       console.log("Booked ride optimistically");
     }
     setBookingSuccessModal(ride);
@@ -531,7 +471,45 @@ export default function RidesScreen() {
             </View>
 
             {/* Rides List */}
-            {filteredRides.length === 0 ? (
+            {/* Rides List */}
+            {isLoading ? (
+              <View
+                style={[
+                  styles.emptyBox,
+                  {
+                    backgroundColor: cardBg,
+                    borderColor: border,
+                    paddingVertical: 40,
+                  },
+                ]}
+              >
+                <ActivityIndicator size="large" color="#8B5CF6" />
+
+                <Text
+                  style={[
+                    styles.emptyTitle,
+                    {
+                      color: textPrimary,
+                      marginTop: 14,
+                    },
+                  ]}
+                >
+                  Loading rides...
+                </Text>
+
+                <Text
+                  style={[
+                    styles.emptySub,
+                    {
+                      color: textMute,
+                      marginBottom: 0,
+                    },
+                  ]}
+                >
+                  Finding available rides near you
+                </Text>
+              </View>
+            ) : filteredRides.length === 0 ? (
               <View
                 style={[
                   styles.emptyBox,
@@ -539,12 +517,15 @@ export default function RidesScreen() {
                 ]}
               >
                 <Ionicons name="car-outline" size={40} color={textMute} />
+
                 <Text style={[styles.emptyTitle, { color: textPrimary }]}>
                   No rides found
                 </Text>
+
                 <Text style={[styles.emptySub, { color: textMute }]}>
                   Be the first one to offer a ride on this route!
                 </Text>
+
                 <TouchableOpacity
                   style={styles.emptyActionBtn}
                   onPress={() => setActiveTab("offer")}
@@ -566,16 +547,13 @@ export default function RidesScreen() {
                   {/* Driver Header */}
                   <View style={styles.cardDriverRow}>
                     <View style={styles.driverInfo}>
-                      <View
-                        style={[
-                          styles.avatarCircle,
-                          { backgroundColor: ride.driverAvatarBg },
-                        ]}
-                      >
-                        <Text style={styles.avatarLetter}>
-                          {ride.driverName.charAt(0)}
-                        </Text>
+                      <View style={styles.avatarCircle}>
+                        <Image
+                          source={{ uri: ride.driverAvatar }}
+                          style={styles.avatarImage}
+                        />
                       </View>
+
                       <View>
                         <View style={styles.driverNameRow}>
                           <Text
@@ -583,6 +561,7 @@ export default function RidesScreen() {
                           >
                             {ride.driverName}
                           </Text>
+
                           {ride.verified && (
                             <Ionicons
                               name="checkmark-circle"
@@ -591,12 +570,14 @@ export default function RidesScreen() {
                             />
                           )}
                         </View>
+
                         <View style={styles.ratingRow}>
                           <Ionicons name="star" size={12} color="#F59E0B" />
+
                           <Text
                             style={[styles.ratingText, { color: textMute }]}
                           >
-                            {ride.driverRating.toFixed(1)}
+                            {ride.driverRating}
                           </Text>
                         </View>
                       </View>
@@ -606,6 +587,7 @@ export default function RidesScreen() {
                       <Text style={[styles.priceTag, { color: "#10B981" }]}>
                         {ride.price}
                       </Text>
+
                       <Text style={[styles.priceSub, { color: textMute }]}>
                         per seat
                       </Text>
@@ -621,9 +603,11 @@ export default function RidesScreen() {
                           { backgroundColor: "#10B981" },
                         ]}
                       />
+
                       <View
                         style={[styles.dotLine, { backgroundColor: border }]}
                       />
+
                       <View
                         style={[
                           styles.dotCircle,
@@ -631,6 +615,7 @@ export default function RidesScreen() {
                         ]}
                       />
                     </View>
+
                     <View style={styles.routeTextCol}>
                       <View>
                         <Text
@@ -638,18 +623,21 @@ export default function RidesScreen() {
                         >
                           FROM
                         </Text>
+
                         <Text
                           style={[styles.locationName, { color: textPrimary }]}
                         >
                           {ride.from}
                         </Text>
                       </View>
+
                       <View style={{ marginTop: 10 }}>
                         <Text
                           style={[styles.locationLabel, { color: textMute }]}
                         >
                           TO
                         </Text>
+
                         <Text
                           style={[styles.locationName, { color: textPrimary }]}
                         >
@@ -664,7 +652,9 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons
@@ -672,6 +662,7 @@ export default function RidesScreen() {
                         size={13}
                         color="#8B5CF6"
                       />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
@@ -682,10 +673,13 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons name="time-outline" size={13} color="#F59E0B" />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
@@ -696,7 +690,9 @@ export default function RidesScreen() {
                     <View
                       style={[
                         styles.metaBadge,
-                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                        },
                       ]}
                     >
                       <Ionicons
@@ -704,11 +700,12 @@ export default function RidesScreen() {
                         size={13}
                         color="#10B981"
                       />
+
                       <Text
                         style={[styles.metaBadgeText, { color: textPrimary }]}
                       >
-                        {ride.seatsLeft} seat{ride.seatsLeft > 1 ? "s" : ""}{" "}
-                        left
+                        {ride.seatsLeft} seat
+                        {ride.seatsLeft > 1 ? "s" : ""} left
                       </Text>
                     </View>
                   </View>
@@ -726,6 +723,7 @@ export default function RidesScreen() {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
+
                     <Text style={styles.bookBtnText}>Request Seat</Text>
                   </TouchableOpacity>
                 </View>
@@ -931,37 +929,141 @@ export default function RidesScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Leaving Time */}
+            {/* Scheduled Departure Date & Time Picker */}
             <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              Departure Time:
+              Scheduled Departure Date & Time:
             </Text>
-            <View style={styles.wrapPillRow}>
-              {TIME_PRESETS.map((time) => {
-                const active = selectedTime === time;
-                return (
-                  <TouchableOpacity
-                    key={time}
-                    onPress={() => setSelectedTime(time)}
+            <View style={styles.dateTimeRow}>
+              {/* Departure Date Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowDatePicker(!showDatePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
                     style={[
-                      styles.timePill,
-                      {
-                        backgroundColor: active ? "#8B5CF6" : cardBg,
-                        borderColor: active ? "#8B5CF6" : border,
-                      },
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE" },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.timePillText,
-                        { color: active ? "#FFF" : textPrimary },
-                      ]}
-                    >
-                      {time}
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color="#8B5CF6"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Departure Date
                     </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(departureDate)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
+
+              {/* Departure Time Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowTimePicker(!showTimePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
+                    style={[
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#F59E0B25" : "#FEF3C7" },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Departure Time
+                    </Text>
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatTime(departureTime)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
             </View>
+
+            {/* Date Picker Modal / Inline Controls */}
+            {(showDatePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    📅 Select Departure Date
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={departureDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
+
+            {/* Time Picker Modal / Inline Controls */}
+            {(showTimePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    ⏰ Select Departure Time
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={departureTime}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
 
             {/* Available Seats & Price */}
             <View style={styles.seatsPriceGrid}>
@@ -1036,10 +1138,18 @@ export default function RidesScreen() {
             <TouchableOpacity
               style={styles.publishBtn}
               onPress={handlePublishRide}
+              disabled={isPublishing}
               activeOpacity={0.88}
             >
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.publishBtnText}>Publish Ride in 1-Tap</Text>
+              <Ionicons
+                name={isPublishing ? "hourglass-outline" : "checkmark-circle"}
+                size={20}
+                color="#FFFFFF"
+              />
+
+              <Text style={styles.publishBtnText}>
+                {isPublishing ? "Publishing..." : "Publish Ride in 1-Tap"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1193,19 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterPillText: {
-    fontSize: 12,
-  },
+
   emptyBox: {
     padding: 28,
     borderRadius: 18,
@@ -1265,6 +1363,11 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "800",
     fontSize: 15,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 999,
   },
   driverNameRow: {
     flexDirection: "row",
@@ -1478,20 +1581,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 1,
   },
-  wrapPillRow: {
+
+  dateTimeRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
+    marginBottom: 4,
   },
-  timePill: {
+  dateTimeCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1,
   },
-  timePillText: {
-    fontSize: 12,
+  dateTimeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  dateTimeIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateTimeLabel: {
+    fontSize: 10.5,
     fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dateTimeValue: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  pickerBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  pickerBoxHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  pickerBoxTitle: {
+    fontSize: 13,
+    fontWeight: "700",
   },
   seatsPriceGrid: {
     flexDirection: "row",

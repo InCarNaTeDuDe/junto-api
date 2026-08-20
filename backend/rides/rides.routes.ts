@@ -17,7 +17,7 @@ import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
-// Public / optional-auth read endpoints
+// Authenticated ride endpoints
 router.get("/", authenticate, getRidesHandler);
 router.get("/my", authenticate, getMyRidesHandler);
 router.get("/:id", authenticate, getRideByIdHandler);

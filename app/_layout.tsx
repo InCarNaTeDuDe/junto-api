@@ -2,9 +2,7 @@ import React, { Suspense } from "react";
 import { Stack, Redirect, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Text } from "react-native";
 
-import "../global.css";
 import { patchFetch } from "../utils/apiHelper";
 import { AuthProvider, useAuthContext } from "@/context/AuthContext";
 import { LocationProvider } from "@/context/LocationContext";

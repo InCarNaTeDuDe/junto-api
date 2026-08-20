@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Platform,
+  StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -70,7 +71,6 @@ export default function Header() {
   // Set up ringing and pulsing loop if there are unread items
   useEffect(() => {
     if (unreadCount > 0) {
-      // Ringing (rotation) sequence: 0 -> -10 -> 10 -> -10 -> 10 -> 0
       const ringSequence = Animated.loop(
         Animated.sequence([
           Animated.timing(ringAnim, {
@@ -103,12 +103,10 @@ export default function Header() {
             easing: Easing.linear,
             useNativeDriver: true,
           }),
-          // Rest period between rings
           Animated.delay(1200),
         ]),
       );
 
-      // Pulsing sequence
       const pulseSequence = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -139,7 +137,6 @@ export default function Header() {
   const getGreeting = () => {
     const hr = new Date().getHours();
     const name = currentUser ? currentUser.name.split(" ")[0] : "";
-    // Use lowercased name style like the screenshot: "bharath"
     const displayName = name.toLowerCase();
     if (hr < 12) return `Good Morning, ${displayName}`;
     if (hr < 17) return `Good Afternoon, ${displayName}`;
@@ -153,32 +150,36 @@ export default function Header() {
 
   return (
     <View
-      style={{
-        paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 16),
-      }}
-      className={`flex-row justify-between items-center px-6 pb-4 border-b ${
-        isDark
-          ? "bg-[#030014] border-slate-900 shadow-xl shadow-black/30"
-          : "bg-white border-slate-200 shadow-sm shadow-slate-100/30"
-      }`}
+      style={[
+        styles.container,
+        {
+          paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 16),
+          backgroundColor: isDark ? "#030014" : "#FFFFFF",
+          borderBottomColor: isDark ? "#0F172A" : "#E2E8F0",
+        },
+      ]}
     >
       {/* Left side: Greeting + User Profile Action */}
-      <View className="flex-row items-center gap-3">
+      <View style={styles.leftSection}>
         <Pressable
           onPress={() => router.push("/(tabs)/profile")}
-          className={`w-9 h-9 rounded-full justify-center items-center overflow-hidden border ${
-            isDark ? "border-slate-800" : "border-slate-200"
-          }`}
+          style={[
+            styles.avatarBtn,
+            { borderColor: isDark ? "#1E293B" : "#E2E8F0" },
+          ]}
         >
           {currentUser?.avatar ? (
             <Image
               source={{ uri: currentUser.avatar }}
-              className="w-full h-full"
+              style={styles.avatarImg}
               referrerPolicy="no-referrer"
             />
           ) : (
             <Text
-              className={`text-xs font-black ${isDark ? "text-indigo-400" : "text-indigo-700"}`}
+              style={[
+                styles.avatarFallback,
+                { color: isDark ? "#818CF8" : "#4338CA" },
+              ]}
             >
               {currentUser ? currentUser.name.charAt(0).toUpperCase() : "B"}
             </Text>
@@ -187,12 +188,18 @@ export default function Header() {
 
         <View>
           <Text
-            className={`text-xs font-semibold uppercase tracking-widest ${isDark ? "text-indigo-400" : "text-indigo-600"}`}
+            style={[
+              styles.brandText,
+              { color: isDark ? "#818CF8" : "#4F46E5" },
+            ]}
           >
             DAYMATES 👋
           </Text>
           <Text
-            className={`text-sm font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}
+            style={[
+              styles.greetingText,
+              { color: isDark ? "#FFFFFF" : "#0F172A" },
+            ]}
           >
             {getGreeting()}
           </Text>
@@ -200,55 +207,64 @@ export default function Header() {
       </View>
 
       {/* Right side: Dark Mode Toggle & Inbox Button */}
-      <View className="flex-row items-center gap-2">
+      <View style={styles.rightSection}>
         {/* Dark Mode toggle */}
         <Pressable
           onPress={toggleTheme}
-          className={`p-2.5 rounded-full border shadow-sm active:opacity-80 ${
-            isDark
-              ? "bg-slate-900 border-slate-800"
-              : "bg-slate-100 border-slate-200"
-          }`}
+          style={[
+            styles.themeBtn,
+            {
+              backgroundColor: isDark ? "#0F172A" : "#F1F5F9",
+              borderColor: isDark ? "#1E293B" : "#E2E8F0",
+            },
+          ]}
         >
           {isDark ? (
-            <Ionicons name="sunny" size={15} color="#f59e0b" />
+            <Ionicons name="sunny" size={15} color="#F59E0B" />
           ) : (
-            <Ionicons name="moon" size={15} color="#4f46e5" />
+            <Ionicons name="moon" size={15} color="#4F46E5" />
           )}
         </Pressable>
 
         {/* Inbox Button */}
         <Pressable
           onPress={() => router.push("/(tabs)/alerts")}
-          className={`px-4 py-2 rounded-2xl flex-row items-center gap-2 border shadow-sm active:opacity-85 ${
-            isDark
-              ? "bg-slate-900 border-slate-800"
-              : "bg-slate-100 border-slate-200"
-          }`}
+          style={[
+            styles.inboxBtn,
+            {
+              backgroundColor: isDark ? "#0F172A" : "#F1F5F9",
+              borderColor: isDark ? "#1E293B" : "#E2E8F0",
+            },
+          ]}
         >
           {/* Animated Bell / Mail Icon */}
           <AnimatedView style={{ transform: [{ rotate: ringInterpolate }] }}>
             <Ionicons
               name="notifications-outline"
               size={14}
-              color={isDark ? "#cbd5e1" : "#475569"}
+              color={isDark ? "#CBD5E1" : "#475569"}
             />
           </AnimatedView>
 
           <Text
-            className={`text-xs font-black ${isDark ? "text-slate-200" : "text-slate-800"}`}
+            style={[
+              styles.inboxText,
+              { color: isDark ? "#E2E8F0" : "#1E293B" },
+            ]}
           >
             Inbox
           </Text>
 
           {/* Unread dot / badge with Pulse animation */}
           {unreadCount > 0 && (
-            <View className="relative w-4.5 h-4.5 justify-center items-center">
+            <View style={styles.badgeContainer}>
               <AnimatedView
-                style={{ transform: [{ scale: pulseAnim }] }}
-                className="absolute w-3.5 h-3.5 rounded-full bg-red-500 opacity-60"
+                style={[
+                  styles.pulseCircle,
+                  { transform: [{ scale: pulseAnim }] },
+                ]}
               />
-              <View className="w-2 h-2 rounded-full bg-red-600" />
+              <View style={styles.badgeDot} />
             </View>
           )}
         </Pressable>
@@ -256,3 +272,90 @@ export default function Header() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  leftSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatarBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  avatarImg: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarFallback: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  brandText: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+  },
+  greetingText: {
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  themeBtn: {
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  inboxBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+  },
+  inboxText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  badgeContainer: {
+    position: "relative",
+    width: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pulseCircle: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#EF4444",
+    opacity: 0.6,
+  },
+  badgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#DC2626",
+  },
+});

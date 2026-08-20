@@ -432,10 +432,12 @@ const UserFeedRow = ({ item, s, C }) => {
   const avatarUrl = item.userAvatar || item.avatar;
 
   const isOwnActivity =
-    (user?.id && item.organizerId === user.id) ||
-    (user?.name &&
-      item.user &&
-      item.user.toLowerCase().trim() === user.name.toLowerCase().trim());
+    Boolean(user?.id && item.organizerId === user.id) ||
+    Boolean(
+      typeof user?.name === "string" &&
+      typeof item?.user === "string" &&
+      item.user.toLowerCase().trim() === user.name.toLowerCase().trim(),
+    );
 
   const handlePress = () => {
     router.push({
@@ -772,8 +774,15 @@ export default function Home() {
   const getGreeting = () => {
     const hr = new Date().getHours();
 
-    const name = user ? user.name.split(" ")[0] : "Guest";
-    const displayName = name.toLowerCase();
+    let rawName = "Friend";
+    if (user?.name && typeof user.name === "string" && user.name.trim()) {
+      rawName = user.name.trim().split(" ")[0];
+    } else if (user?.email && typeof user.email === "string") {
+      rawName = user.email.split("@")[0];
+    }
+    const displayName = rawName
+      ? rawName.charAt(0).toUpperCase() + rawName.slice(1)
+      : "Friend";
 
     if (hr < 12) return `Good Morning, ${displayName}`;
     if (hr < 17) return `Good Afternoon, ${displayName}`;
@@ -781,7 +790,7 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={s.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar
         barStyle={themeMode === "light" ? "dark-content" : "light-content"}
       />

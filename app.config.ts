@@ -45,6 +45,7 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "@react-native-google-signin/google-signin",
     "expo-notifications",
+    "expo-speech-recognition",
     [
       "expo-location",
       {

@@ -40,7 +40,9 @@ export const PushNotificationService = {
     let expoPushToken: string | null = null;
 
     try {
-      console.log("Push Debug 1: registerForPushNotificationsAsync()");
+      if (Platform.OS === "web") {
+        return null;
+      }
 
       // =====================================================
       // ANDROID NOTIFICATION CHANNEL
@@ -76,7 +78,6 @@ export const PushNotificationService = {
         console.log("Push Debug 5: Requesting permission");
 
         const reqPerm = await Notifications.requestPermissionsAsync();
-
         finalStatus =
           reqPerm.status || (reqPerm.granted ? "granted" : "denied");
 
@@ -84,92 +85,66 @@ export const PushNotificationService = {
       }
 
       if (finalStatus !== "granted") {
-        console.log("Push Debug 7: Permission denied");
+        console.log("Push notification permission not granted.");
         return null;
       }
 
       // =====================================================
       // GET EXPO PROJECT ID
       // =====================================================
-      const Constants = require("expo-constants").default;
-
-      const projectId =
-        Constants?.expoConfig?.extra?.eas?.projectId ||
-        Constants?.easConfig?.projectId;
-
-      console.log("Push Debug 8: Expo Project ID:", projectId || "NOT FOUND");
+      let projectId: string | undefined;
+      try {
+        const Constants = require("expo-constants").default;
+        projectId =
+          Constants?.expoConfig?.extra?.eas?.projectId ||
+          Constants?.easConfig?.projectId;
+      } catch (e) {
+        // Safe fallback
+      }
 
       if (!projectId) {
-        console.log("Push Debug 9: Expo Project ID is missing");
-
-        Alert.alert("Push Debug", "Expo Project ID is missing.");
-
+        console.log(
+          "Expo Project ID is not configured. Skipping push token registration.",
+        );
         return null;
       }
 
       // =====================================================
       // GET EXPO PUSH TOKEN
       // =====================================================
-      console.log("Push Debug 10: Calling getExpoPushTokenAsync()");
-
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId,
       });
 
-      console.log("Push Debug 11: Expo token response:", tokenData);
-
-      expoPushToken = tokenData.data;
-
-      console.log("Push Debug 12: Expo Push Token:", expoPushToken);
-
-      Alert.alert("Expo Push Token", expoPushToken || "TOKEN NOT GENERATED");
+      expoPushToken = tokenData?.data || null;
 
       // =====================================================
       // SEND TOKEN TO YOUR BACKEND
       // =====================================================
       if (!expoPushToken) {
-        console.log("Push Debug 13: No Expo token. Stopping.");
-
         return null;
       }
-
-      console.log("Push Debug 13: Registering Expo token with backend");
 
       try {
-        const response = await ApiService.post(
-          "/api/notifications/register-token",
-          {
-            pushToken: expoPushToken,
-            pushTokenType: "expo",
-            platform: Platform.OS,
-          },
-        );
-
-        console.log("Push Debug 14: Token registered successfully:", response);
-
-        Alert.alert("Push Debug", "Expo Push Token registered successfully ✅");
+        await ApiService.post("/api/notifications/register-token", {
+          pushToken: expoPushToken,
+          pushTokenType: "expo",
+          platform: Platform.OS,
+        });
       } catch (error: any) {
-        console.log("Push Debug 14: Token registration FAILED:", error);
-
-        Alert.alert(
-          "Push Debug",
-          `Token registration failed ❌\n\n${error?.message || String(error)}`,
+        console.warn(
+          "Push token backend registration failed:",
+          error?.message || error,
         );
-
         return null;
       }
-
-      console.log("Push Debug 15: Push registration COMPLETE");
 
       return expoPushToken;
     } catch (err: any) {
-      console.log("Push Debug ERROR:", err);
-
-      Alert.alert(
-        "Push Debug",
-        `Push registration error ❌\n\n${err?.message || String(err)}`,
+      console.warn(
+        "Push notification setup skipped / failed:",
+        err?.message || String(err),
       );
-
       return null;
     }
   },
@@ -183,10 +158,6 @@ export const PushNotificationService = {
     const receivedSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
         console.log("🔔 Expo Push Notification received:", notification);
-        const title =
-          notification.request.content.title || "New Push Notification";
-        const body = notification.request.content.body || "";
-        Alert.alert(`🔔 ${title}`, body);
         if (onReceived) onReceived(notification);
       },
     );
@@ -194,10 +165,6 @@ export const PushNotificationService = {
     const responseSubscription =
       Notifications.addNotificationResponseReceivedListener((response) => {
         console.log("👆 Expo Push Notification clicked:", response);
-        const title =
-          response.notification.request.content.title || "Notification Tapped";
-        const body = response.notification.request.content.body || "";
-        Alert.alert(`👆 ${title}`, body);
         if (onResponse) onResponse(response);
       });
 
@@ -241,7 +208,7 @@ export const PushNotificationService = {
   },
 
   /**
-   * Trigger a local push notification and display a debug Alert popup.
+   * Trigger a local push notification.
    */
   async triggerLocalPushNotification(
     title: string,
@@ -250,9 +217,6 @@ export const PushNotificationService = {
   ): Promise<void> {
     try {
       console.log("🚀 Triggering Local Push Notification:", title, body);
-
-      // Always show debug Alert for immediate confirmation
-      Alert.alert(`📢 Push Notification`, `${title}\n\n${body}`);
 
       // Schedule Expo Push Notification
       await Notifications.scheduleNotificationAsync({
@@ -281,11 +245,6 @@ export const PushNotificationService = {
         },
       );
 
-      if (response?.message) {
-        if (Platform.OS !== "web") {
-          Alert.alert("Activity Joined! 🎉", response.message);
-        }
-      }
       return response;
     } catch (err: any) {
       console.error("Failed to join activity:", err?.message || err);
@@ -325,16 +284,8 @@ export const PushNotificationService = {
   ): () => void {
     const handlePushNotification = (data: PushNotificationPayload) => {
       console.log("🔔 REALTIME PUSH NOTIFICATION RECEIVED:", data);
-      Alert.alert("Push Notification", JSON.stringify(data, null, 2));
       if (onNotificationReceived) {
         onNotificationReceived(data);
-      } else {
-        // Default fallback banner / alert
-        const alertTitle = data.title || "Notification";
-        const alertMsg = data.message || "You have a new update.";
-        if (Platform.OS !== "web") {
-          Alert.alert(alertTitle, alertMsg);
-        }
       }
     };
 

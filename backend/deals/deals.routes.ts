@@ -11,7 +11,7 @@ import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
-// Public / optional-auth read endpoints
+// Authenticated deal endpoints
 router.get("/", authenticate, listDealsHandler);
 router.get("/:id", authenticate, getDealByIdHandler);
 

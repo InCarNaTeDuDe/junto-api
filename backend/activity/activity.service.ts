@@ -6,6 +6,9 @@ import {
 import { AppDataSource } from "../db/data-source";
 import { User } from "../db/entities/User.entity";
 import { activityRepository } from "../db/repository/Activity.repository";
+import { listDeals } from "../deals/deals.service";
+import { listRides } from "../rides/rides.service";
+import { listServicePros } from "../localservices/localservices.service";
 
 export async function createActivity(
   body: CreateActivityRequest,
@@ -293,5 +296,45 @@ export async function addTicketForSale(
     });
   } catch (error) {
     throw error;
+  }
+}
+
+export async function getJuntoNowStats(locationName?: string) {
+  try {
+    const rides = await listRides({ vehicleType: "all" });
+    const deals = await listDeals({ category: "All" });
+    const pros = await listServicePros({ category: "all" });
+    const allActs = await activityRepository.findAll();
+
+    const helpCount = allActs.filter(
+      (a) => a.category === ActivityCategory.ASK_NEARBY,
+    ).length;
+    const companyCount = allActs.filter(
+      (a) => a.category === ActivityCategory.DAY_MATES,
+    ).length;
+    const newHereCount = allActs.filter(
+      (a) =>
+        a.category === ActivityCategory.SPORTS ||
+        a.category === ActivityCategory.FOOD ||
+        a.category === ActivityCategory.DAY_MATES,
+    ).length;
+
+    return {
+      ridesCount: rides.length,
+      dealsCount: deals.length,
+      servicesCount: pros.length,
+      helpCount,
+      companyCount,
+      newHereCount,
+    };
+  } catch (err) {
+    return {
+      ridesCount: 0,
+      dealsCount: 0,
+      servicesCount: 0,
+      helpCount: 0,
+      companyCount: 0,
+      newHereCount: 0,
+    };
   }
 }

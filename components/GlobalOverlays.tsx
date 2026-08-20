@@ -8,7 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -60,7 +60,6 @@ function EventDetailOverlay({
   if (!post) return null;
 
   const handleAction = () => {
-    // Open chat with the host of this post
     startOrOpenChat(
       post.host.name,
       post.host.avatar,
@@ -77,95 +76,96 @@ function EventDetailOverlay({
 
   return (
     <View
-      className={`absolute inset-0 z-50 flex-1 ${
-        isDark ? "bg-slate-950" : "bg-slate-50"
-      }`}
+      style={[
+        styles.overlayRoot,
+        { backgroundColor: isDark ? "#020617" : "#F8FAFC" },
+      ]}
     >
       {/* Scrollable Content */}
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.flex1} showsVerticalScrollIndicator={false}>
         {/* Header Visual Image */}
-        <View className="relative h-72 w-full">
+        <View style={styles.eventImageContainer}>
           <Image
             source={{ uri: post.image }}
-            className="w-full h-full"
+            style={styles.eventImage}
             resizeMode="cover"
           />
           {/* Back & Share Buttons Overlaid */}
-          <View className="absolute top-12 left-6 right-6 flex-row justify-between items-center">
-            <Pressable
-              onPress={onClose}
-              className="w-10 h-10 rounded-full bg-slate-900/80 border border-slate-800 items-center justify-center active:bg-slate-900"
-            >
+          <View style={styles.eventHeaderControls}>
+            <Pressable onPress={onClose} style={styles.circleActionBtn}>
               <Ionicons name="arrow-back" size={20} color="#ffffff" />
             </Pressable>
-            <Pressable className="w-10 h-10 rounded-full bg-slate-900/80 border border-slate-800 items-center justify-center active:bg-slate-900">
+            <Pressable style={styles.circleActionBtn}>
               <Ionicons name="share-social-outline" size={18} color="#ffffff" />
             </Pressable>
           </View>
 
           {/* Floated Badge */}
           {post.spotsDetail && (
-            <View className="absolute bottom-4 right-6 bg-purple-600 px-4 py-2 rounded-xl shadow-lg border border-purple-500">
-              <Text className="text-white text-xs font-black uppercase tracking-wider">
-                {post.spotsDetail}
-              </Text>
+            <View style={styles.floatedBadge}>
+              <Text style={styles.floatedBadgeText}>{post.spotsDetail}</Text>
             </View>
           )}
         </View>
 
         {/* Info Block */}
-        <View className="p-6">
-          <View className="flex-row items-center gap-2 mb-2">
-            <Text className="text-purple-400 text-xs font-black uppercase tracking-widest bg-purple-900/30 px-2.5 py-1 rounded-md">
-              {post.category}
-            </Text>
-            <Text className="text-slate-500 text-xs">•</Text>
+        <View style={styles.eventInfoBlock}>
+          <View style={styles.categoryRow}>
+            <Text style={styles.categoryBadgeText}>{post.category}</Text>
+            <Text style={styles.dotSeparator}>•</Text>
             <Text
-              className={`text-xs font-medium ${
-                isDark ? "text-slate-400" : "text-slate-600"
-              }`}
+              style={[
+                styles.tagText,
+                { color: isDark ? "#94A3B8" : "#475569" },
+              ]}
             >
               {post.tag}
             </Text>
           </View>
 
           <Text
-            className={`text-2xl font-black tracking-tight leading-tight mb-4 ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
+            style={[
+              styles.eventTitle,
+              { color: isDark ? "#FFFFFF" : "#0F172A" },
+            ]}
           >
             {post.title}
           </Text>
 
           {/* Quick Stats Grid */}
           <View
-            className={`border rounded-2xl p-4 gap-4 mb-6 ${
-              isDark
-                ? "bg-slate-900 border-slate-800"
-                : "bg-white border-slate-200"
-            }`}
+            style={[
+              styles.statsGrid,
+              {
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                borderColor: isDark ? "#1E293B" : "#E2E8F0",
+              },
+            ]}
           >
             {/* Location */}
-            <View className="flex-row items-center gap-3">
+            <View style={styles.statItemRow}>
               <View
-                className={`w-8 h-8 rounded-lg items-center justify-center ${
-                  isDark ? "bg-slate-950" : "bg-purple-50"
-                }`}
+                style={[
+                  styles.statIconBox,
+                  { backgroundColor: isDark ? "#020617" : "#FAF5FF" },
+                ]}
               >
-                <Ionicons name="location-outline" size={16} color="#c084fc" />
+                <Ionicons name="location-outline" size={16} color="#C084FC" />
               </View>
-              <View className="flex-1">
+              <View style={styles.flex1}>
                 <Text
-                  className={`text-3xs font-semibold uppercase tracking-wider ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
+                  style={[
+                    styles.statLabel,
+                    { color: isDark ? "#94A3B8" : "#64748B" },
+                  ]}
                 >
                   Location
                 </Text>
                 <Text
-                  className={`text-xs font-bold mt-0.5 ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
+                  style={[
+                    styles.statValue,
+                    { color: isDark ? "#FFFFFF" : "#0F172A" },
+                  ]}
                   numberOfLines={1}
                 >
                   {post.location}
@@ -174,26 +174,29 @@ function EventDetailOverlay({
             </View>
 
             {/* Date / Time */}
-            <View className="flex-row items-center gap-3">
+            <View style={styles.statItemRow}>
               <View
-                className={`w-8 h-8 rounded-lg items-center justify-center ${
-                  isDark ? "bg-slate-950" : "bg-purple-50"
-                }`}
+                style={[
+                  styles.statIconBox,
+                  { backgroundColor: isDark ? "#020617" : "#FAF5FF" },
+                ]}
               >
-                <Ionicons name="calendar-outline" size={16} color="#c084fc" />
+                <Ionicons name="calendar-outline" size={16} color="#C084FC" />
               </View>
-              <View className="flex-1">
+              <View style={styles.flex1}>
                 <Text
-                  className={`text-3xs font-semibold uppercase tracking-wider ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
+                  style={[
+                    styles.statLabel,
+                    { color: isDark ? "#94A3B8" : "#64748B" },
+                  ]}
                 >
                   Date & Time
                 </Text>
                 <Text
-                  className={`text-xs font-bold mt-0.5 ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
+                  style={[
+                    styles.statValue,
+                    { color: isDark ? "#FFFFFF" : "#0F172A" },
+                  ]}
                 >
                   {post.date}
                 </Text>
@@ -203,28 +206,32 @@ function EventDetailOverlay({
 
           {/* Tickets Details ("About Tickets" or Description) */}
           {post.aboutTickets && post.aboutTickets.length > 0 && (
-            <View className="mb-6">
+            <View style={styles.mb6}>
               <Text
-                className={`text-sm font-bold mb-3 ${
-                  isDark ? "text-white" : "text-slate-900"
-                }`}
+                style={[
+                  styles.sectionHeading,
+                  { color: isDark ? "#FFFFFF" : "#0F172A" },
+                ]}
               >
                 About tickets
               </Text>
               <View
-                className={`border rounded-2xl p-4 gap-3 ${
-                  isDark
-                    ? "bg-slate-900/60 border-slate-800/80"
-                    : "bg-white border-slate-200"
-                }`}
+                style={[
+                  styles.aboutTicketsBox,
+                  {
+                    backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                    borderColor: isDark ? "#1E293B" : "#E2E8F0",
+                  },
+                ]}
               >
                 {post.aboutTickets.map((detail, idx) => (
-                  <View key={idx} className="flex-row items-start gap-2.5">
-                    <View className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5" />
+                  <View key={idx} style={styles.ticketDetailRow}>
+                    <View style={styles.purpleDot} />
                     <Text
-                      className={`text-xs font-medium flex-1 ${
-                        isDark ? "text-slate-300" : "text-slate-700"
-                      }`}
+                      style={[
+                        styles.ticketDetailText,
+                        { color: isDark ? "#CBD5E1" : "#334155" },
+                      ]}
                     >
                       {detail}
                     </Text>
@@ -236,18 +243,20 @@ function EventDetailOverlay({
 
           {/* General Description */}
           {post.description && (
-            <View className="mb-6">
+            <View style={styles.mb6}>
               <Text
-                className={`text-sm font-bold mb-2 ${
-                  isDark ? "text-white" : "text-slate-900"
-                }`}
+                style={[
+                  styles.sectionHeading,
+                  { color: isDark ? "#FFFFFF" : "#0F172A" },
+                ]}
               >
                 About this post
               </Text>
               <Text
-                className={`text-xs font-normal leading-relaxed ${
-                  isDark ? "text-slate-300" : "text-slate-600"
-                }`}
+                style={[
+                  styles.descriptionBody,
+                  { color: isDark ? "#CBD5E1" : "#475569" },
+                ]}
               >
                 {post.description}
               </Text>
@@ -255,47 +264,52 @@ function EventDetailOverlay({
           )}
 
           {/* About Seller / Host */}
-          <View className="mb-12">
+          <View style={styles.mb12}>
             <Text
-              className={`text-sm font-bold mb-3 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
+              style={[
+                styles.sectionHeading,
+                { color: isDark ? "#FFFFFF" : "#0F172A" },
+              ]}
             >
               About seller
             </Text>
             <View
-              className={`border rounded-2xl p-4 flex-row items-center justify-between ${
-                isDark
-                  ? "bg-slate-900 border-slate-800"
-                  : "bg-white border-slate-200"
-              }`}
+              style={[
+                styles.sellerCard,
+                {
+                  backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                  borderColor: isDark ? "#1E293B" : "#E2E8F0",
+                },
+              ]}
             >
-              <View className="flex-row items-center gap-3">
+              <View style={styles.sellerInfoLeft}>
                 <Image
                   source={{ uri: post.host.avatar }}
-                  className="w-12 h-12 rounded-full border border-slate-800"
+                  style={styles.sellerAvatar}
                 />
                 <View>
-                  <View className="flex-row items-center gap-1">
+                  <View style={styles.sellerNameRow}>
                     <Text
-                      className={`text-sm font-bold ${
-                        isDark ? "text-white" : "text-slate-900"
-                      }`}
+                      style={[
+                        styles.sellerName,
+                        { color: isDark ? "#FFFFFF" : "#0F172A" },
+                      ]}
                     >
                       {post.host.name}
                     </Text>
                     <Ionicons
                       name="shield-checkmark"
                       size={14}
-                      color="#c084fc"
+                      color="#C084FC"
                     />
                   </View>
-                  <View className="flex-row items-center gap-1 mt-0.5">
-                    <Ionicons name="star" size={12} color="#f59e0b" />
+                  <View style={styles.sellerRatingRow}>
+                    <Ionicons name="star" size={12} color="#F59E0B" />
                     <Text
-                      className={`text-3xs font-bold ${
-                        isDark ? "text-slate-400" : "text-slate-500"
-                      }`}
+                      style={[
+                        styles.sellerRatingText,
+                        { color: isDark ? "#94A3B8" : "#64748B" },
+                      ]}
                     >
                       {post.host.rating}{" "}
                       {post.host.reviews
@@ -305,7 +319,7 @@ function EventDetailOverlay({
                   </View>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#64748b" />
+              <Ionicons name="chevron-forward" size={18} color="#64748B" />
             </View>
           </View>
         </View>
@@ -313,27 +327,30 @@ function EventDetailOverlay({
 
       {/* Sticky Bottom Actions */}
       <View
-        className={`p-6 border-t flex-row gap-4 ${
-          isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-        }`}
+        style={[
+          styles.stickyBottomBar,
+          {
+            backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+            borderTopColor: isDark ? "#1E293B" : "#E2E8F0",
+          },
+        ]}
       >
         <Pressable
           onPress={handleAction}
-          className={`flex-1 py-4 border rounded-xl flex-row justify-center items-center gap-2 ${
-            isDark
-              ? "bg-slate-950 border-slate-800 active:bg-slate-900"
-              : "bg-slate-100 border-slate-200 active:bg-slate-200"
-          }`}
+          style={[
+            styles.chatActionButton,
+            {
+              backgroundColor: isDark ? "#020617" : "#F1F5F9",
+              borderColor: isDark ? "#1E293B" : "#E2E8F0",
+            },
+          ]}
         >
-          <Ionicons name="chatbubble-outline" size={16} color="#c084fc" />
-          <Text className="text-purple-500 text-xs font-black">Chat</Text>
+          <Ionicons name="chatbubble-outline" size={16} color="#C084FC" />
+          <Text style={styles.chatActionBtnText}>Chat</Text>
         </Pressable>
 
-        <Pressable
-          onPress={handleAction}
-          className="flex-[2] py-4 bg-purple-600 rounded-xl items-center justify-center active:bg-purple-700 shadow-lg shadow-purple-900/35"
-        >
-          <Text className="text-white text-xs font-black">Buy Now</Text>
+        <Pressable onPress={handleAction} style={styles.buyNowActionButton}>
+          <Text style={styles.buyNowBtnText}>Buy Now</Text>
         </Pressable>
       </View>
     </View>
@@ -361,7 +378,6 @@ function ChatDetailOverlay({
     addMessage(chatId, inputText.trim());
     setInputText("");
 
-    // Auto scroll bottom
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -371,60 +387,64 @@ function ChatDetailOverlay({
 
   return (
     <View
-      className={`absolute inset-0 z-50 flex-1 ${
-        isDark ? "bg-slate-950" : "bg-slate-50"
-      }`}
+      style={[
+        styles.overlayRoot,
+        { backgroundColor: isDark ? "#020617" : "#F8FAFC" },
+      ]}
     >
       {/* Top Header */}
       <View
-        className={`pt-12 pb-4 px-6 border-b flex-row items-center justify-between ${
-          isDark ? "bg-[#0b071e] border-slate-800" : "bg-white border-slate-200"
-        }`}
+        style={[
+          styles.chatHeaderBar,
+          {
+            backgroundColor: isDark ? "#0B071E" : "#FFFFFF",
+            borderBottomColor: isDark ? "#1E293B" : "#E2E8F0",
+          },
+        ]}
       >
-        <View className="flex-row items-center gap-3">
-          <Pressable onPress={onClose} className="p-1 active:opacity-75">
+        <View style={styles.chatHeaderLeft}>
+          <Pressable onPress={onClose} style={styles.p1}>
             <Ionicons
               name="arrow-back"
               size={20}
-              color={isDark ? "#ffffff" : "#0f172a"}
+              color={isDark ? "#FFFFFF" : "#0F172A"}
             />
           </Pressable>
           <Image
             source={{ uri: chat.partner.avatar }}
-            className="w-9 h-9 rounded-full border border-slate-800"
+            style={styles.chatPartnerAvatar}
           />
           <View>
-            <View className="flex-row items-center gap-1">
+            <View style={styles.chatPartnerNameRow}>
               <Text
-                className={`text-sm font-extrabold ${
-                  isDark ? "text-white" : "text-slate-900"
-                }`}
+                style={[
+                  styles.chatPartnerName,
+                  { color: isDark ? "#FFFFFF" : "#0F172A" },
+                ]}
               >
                 {chat.partner.name}
               </Text>
-              {chat.partner.isOnline && (
-                <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              )}
+              {chat.partner.isOnline && <View style={styles.onlineDot} />}
             </View>
-            <Text className="text-slate-400 text-4xs font-bold uppercase tracking-wider">
+            <Text style={styles.onlineStatusText}>
               {chat.partner.isOnline ? "Online" : "Offline"}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row items-center gap-3">
-          <Pressable className="p-1 active:opacity-75">
+        <View style={styles.chatHeaderRight}>
+          <Pressable style={styles.p1}>
             <Ionicons
               name="call-outline"
               size={16}
-              color={isDark ? "#94a3b8" : "#64748b"}
+              color={isDark ? "#94A3B8" : "#64748B"}
             />
           </Pressable>
-          <Pressable className="p-1 active:opacity-75">
+          <Pressable style={styles.p1}>
             <Ionicons
               name="ellipsis-vertical"
               size={16}
-              color={isDark ? "#94a3b8" : "#64748b"}
+              color={isDark ? "#94A3B8" : "#64748B"}
             />
           </Pressable>
         </View>
@@ -432,28 +452,30 @@ function ChatDetailOverlay({
 
       {/* Info Context Bar */}
       <View
-        className={`px-6 py-2.5 border-b flex-row items-center gap-2 ${
-          isDark
-            ? "bg-slate-900/60 border-slate-900"
-            : "bg-slate-100 border-slate-200"
-        }`}
+        style={[
+          styles.chatContextBar,
+          {
+            backgroundColor: isDark ? "#0F172A" : "#F1F5F9",
+            borderBottomColor: isDark ? "#020617" : "#E2E8F0",
+          },
+        ]}
       >
-        <View className="bg-purple-900/30 px-2 py-0.5 rounded">
-          <Text className="text-purple-400 text-5xs font-black uppercase tracking-wider">
-            {chat.category}
-          </Text>
+        <View style={styles.chatCategoryPill}>
+          <Text style={styles.chatCategoryText}>{chat.category}</Text>
         </View>
         <Text
-          className={`text-3xs font-semibold ${
-            isDark ? "text-slate-400" : "text-slate-600"
-          }`}
+          style={[
+            styles.chatContextLabel,
+            { color: isDark ? "#94A3B8" : "#475569" },
+          ]}
           numberOfLines={1}
         >
           This chat is about:{" "}
           <Text
-            className={`font-extrabold ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
+            style={[
+              styles.chatContextBold,
+              { color: isDark ? "#FFFFFF" : "#0F172A" },
+            ]}
           >
             {chat.contextTitle}
           </Text>
@@ -463,63 +485,69 @@ function ChatDetailOverlay({
       {/* Messages Feed */}
       <ScrollView
         ref={scrollViewRef}
-        className="flex-1 px-6 py-4"
+        style={styles.chatMessagesScrollView}
+        contentContainerStyle={styles.chatMessagesContent}
         onContentSizeChange={() =>
           scrollViewRef.current?.scrollToEnd({ animated: true })
         }
         showsVerticalScrollIndicator={false}
       >
         {/* Timeline Divider */}
-        <View className="items-center my-4">
+        <View style={styles.timelineDivider}>
           <Text
-            className={`text-4xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${
-              isDark
-                ? "bg-slate-900 text-slate-500 border-slate-800"
-                : "bg-white text-slate-500 border-slate-200"
-            }`}
+            style={[
+              styles.timelineText,
+              {
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: isDark ? "#64748B" : "#64748B",
+                borderColor: isDark ? "#1E293B" : "#E2E8F0",
+              },
+            ]}
           >
             Yesterday
           </Text>
         </View>
 
         {isDayMatesGroup && (
-          <View className="gap-2 mb-4">
+          <View style={styles.groupNoticeContainer}>
             <View
-              className={`border px-4 py-2 rounded-xl items-center ${
-                isDark
-                  ? "bg-slate-900/40 border-slate-900"
-                  : "bg-white border-slate-200"
-              }`}
+              style={[
+                styles.groupNoticeItem,
+                {
+                  backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                  borderColor: isDark ? "#020617" : "#E2E8F0",
+                },
+              ]}
             >
               <Text
-                className={`text-4xs font-semibold text-center ${
-                  isDark ? "text-slate-400" : "text-slate-600"
-                }`}
+                style={[
+                  styles.groupNoticeText,
+                  { color: isDark ? "#94A3B8" : "#475569" },
+                ]}
               >
                 {chat.partner.name} created this group
               </Text>
-              <Text className="text-slate-500 text-4xs font-medium text-center mt-0.5">
-                Yesterday, 9:15 PM
-              </Text>
+              <Text style={styles.groupNoticeSubtext}>Yesterday, 9:15 PM</Text>
             </View>
 
             <View
-              className={`border px-4 py-2 rounded-xl items-center ${
-                isDark
-                  ? "bg-slate-900/40 border-slate-900"
-                  : "bg-white border-slate-200"
-              }`}
+              style={[
+                styles.groupNoticeItem,
+                {
+                  backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                  borderColor: isDark ? "#020617" : "#E2E8F0",
+                },
+              ]}
             >
               <Text
-                className={`text-4xs font-semibold text-center ${
-                  isDark ? "text-slate-400" : "text-slate-600"
-                }`}
+                style={[
+                  styles.groupNoticeText,
+                  { color: isDark ? "#94A3B8" : "#475569" },
+                ]}
               >
                 You joined the group
               </Text>
-              <Text className="text-slate-500 text-4xs font-medium text-center mt-0.5">
-                Yesterday, 9:16 PM
-              </Text>
+              <Text style={styles.groupNoticeSubtext}>Yesterday, 9:16 PM</Text>
             </View>
           </View>
         )}
@@ -529,38 +557,48 @@ function ChatDetailOverlay({
           return (
             <View
               key={msg.id}
-              className={`flex-row mb-4 ${isMe ? "justify-end" : "justify-start"}`}
+              style={[
+                styles.messageRow,
+                { justifyContent: isMe ? "flex-end" : "flex-start" },
+              ]}
             >
               {!isMe && (
                 <Image
                   source={{ uri: chat.partner.avatar }}
-                  className="w-7 h-7 rounded-full mr-2 mt-1 border border-slate-800"
+                  style={styles.messagePartnerAvatar}
                 />
               )}
-              <View className="max-w-[75%]">
+              <View style={styles.messageBubbleContainer}>
                 <View
-                  className={`px-4 py-3 rounded-2xl ${
+                  style={[
+                    styles.messageBubble,
                     isMe
-                      ? "bg-purple-600 rounded-tr-none"
+                      ? styles.messageBubbleMe
                       : isDark
-                        ? "bg-slate-900 rounded-tl-none border border-slate-800"
-                        : "bg-white rounded-tl-none border border-slate-200"
-                  }`}
+                        ? styles.messageBubbleOtherDark
+                        : styles.messageBubbleOtherLight,
+                  ]}
                 >
                   <Text
-                    className={`text-xs leading-relaxed ${
-                      isMe
-                        ? "text-white font-medium"
-                        : isDark
-                          ? "text-slate-100 font-normal"
-                          : "text-slate-800 font-normal"
-                    }`}
+                    style={[
+                      styles.messageText,
+                      {
+                        color: isMe
+                          ? "#FFFFFF"
+                          : isDark
+                            ? "#F1F5F9"
+                            : "#1E293B",
+                      },
+                    ]}
                   >
                     {msg.text}
                   </Text>
                 </View>
                 <Text
-                  className={`text-4xs font-bold text-slate-500 mt-1 ${isMe ? "text-right mr-1" : "text-left ml-1"}`}
+                  style={[
+                    styles.messageTimestamp,
+                    { textAlign: isMe ? "right" : "left" },
+                  ]}
                 >
                   {msg.timestamp}
                 </Text>
@@ -573,54 +611,57 @@ function ChatDetailOverlay({
       {/* Bottom Message Input bar */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className={`p-4 border-t ${
-          isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-        }`}
+        style={[
+          styles.chatInputBar,
+          {
+            backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+            borderTopColor: isDark ? "#1E293B" : "#E2E8F0",
+          },
+        ]}
       >
-        <View className="flex-row items-center gap-2">
-          {/* Action icon buttons */}
-          <Pressable className="w-10 h-10 items-center justify-center rounded-full active:opacity-70">
+        <View style={styles.chatInputRow}>
+          <Pressable style={styles.chatIconBtn}>
             <Ionicons
               name="happy-outline"
               size={20}
-              color={isDark ? "#94a3b8" : "#64748b"}
+              color={isDark ? "#94A3B8" : "#64748B"}
             />
           </Pressable>
-          <Pressable className="w-10 h-10 items-center justify-center rounded-full active:opacity-70">
+          <Pressable style={styles.chatIconBtn}>
             <Ionicons
               name="attach-outline"
               size={18}
-              color={isDark ? "#94a3b8" : "#64748b"}
+              color={isDark ? "#94A3B8" : "#64748B"}
             />
           </Pressable>
 
           {/* Text input */}
           <View
-            className={`flex-1 border rounded-full px-4 py-2 flex-row items-center ${
-              isDark
-                ? "bg-slate-950 border-slate-800"
-                : "bg-slate-100 border-slate-200"
-            }`}
+            style={[
+              styles.chatTextInputWrapper,
+              {
+                backgroundColor: isDark ? "#020617" : "#F1F5F9",
+                borderColor: isDark ? "#1E293B" : "#E2E8F0",
+              },
+            ]}
           >
             <TextInput
               placeholder="Type a message..."
-              placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+              placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
               value={inputText}
               onChangeText={setInputText}
               onSubmitEditing={handleSend}
-              className={`flex-1 text-xs max-h-20 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
+              style={[
+                styles.chatTextInput,
+                { color: isDark ? "#FFFFFF" : "#0F172A" },
+              ]}
               multiline
             />
           </View>
 
           {/* Send circle */}
-          <Pressable
-            onPress={handleSend}
-            className={`w-10 h-10 items-center justify-center rounded-full bg-purple-600 active:bg-purple-700 shadow shadow-purple-950/40`}
-          >
-            <Ionicons name="send" size={15} color="#ffffff" />
+          <Pressable onPress={handleSend} style={styles.chatSendBtn}>
+            <Ionicons name="send" size={15} color="#FFFFFF" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -665,88 +706,99 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
 
   return (
     <View
-      className={`absolute inset-0 z-50 flex-1 ${
-        isDark ? "bg-[#030014]" : "bg-slate-50"
-      }`}
+      style={[
+        styles.overlayRoot,
+        { backgroundColor: isDark ? "#030014" : "#F8FAFC" },
+      ]}
     >
       {/* Top Fixed Area */}
       <View
-        className={`pt-16 pb-4 px-6 border-b flex-row items-center justify-between ${
-          isDark
-            ? "bg-[#0b071e] border-slate-800"
-            : "bg-white border-slate-200 shadow-sm"
-        }`}
+        style={[
+          styles.notifHeaderBar,
+          {
+            backgroundColor: isDark ? "#0B071E" : "#FFFFFF",
+            borderBottomColor: isDark ? "#1E293B" : "#E2E8F0",
+          },
+        ]}
       >
-        <View className="flex-row items-center gap-3">
-          <Pressable onPress={onClose} className="p-1 active:opacity-75">
+        <View style={styles.notifHeaderLeft}>
+          <Pressable onPress={onClose} style={styles.p1}>
             <Ionicons
               name="arrow-back"
               size={20}
-              color={isDark ? "#ffffff" : "#0f172a"}
+              color={isDark ? "#FFFFFF" : "#0F172A"}
             />
           </Pressable>
           <Text
-            className={`text-2xl font-black tracking-tight ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
+            style={[
+              styles.notifHeaderTitle,
+              { color: isDark ? "#FFFFFF" : "#0F172A" },
+            ]}
           >
             Notifications
           </Text>
         </View>
 
         <Pressable
-          className={`w-9 h-9 border rounded-xl items-center justify-center active:opacity-80 ${
-            isDark
-              ? "bg-slate-950 border-slate-800"
-              : "bg-slate-100 border-slate-200"
-          }`}
+          style={[
+            styles.notifSettingsBtn,
+            {
+              backgroundColor: isDark ? "#020617" : "#F1F5F9",
+              borderColor: isDark ? "#1E293B" : "#E2E8F0",
+            },
+          ]}
         >
           <Ionicons
             name="settings-outline"
             size={16}
-            color={isDark ? "#94a3b8" : "#64748b"}
+            color={isDark ? "#94A3B8" : "#64748B"}
           />
         </Pressable>
       </View>
 
       {/* Notifications list scroll */}
       <ScrollView
-        className="flex-1 px-6 py-4"
+        style={styles.notifScrollView}
+        contentContainerStyle={styles.notifScrollContent}
         showsVerticalScrollIndicator={false}
       >
         {notifications.length === 0 ? (
-          <View className="py-20 items-center justify-center">
+          <View style={styles.notifEmptyContainer}>
             <View
-              className={`w-16 h-16 rounded-full border items-center justify-center mb-4 ${
-                isDark
-                  ? "bg-slate-900 border-slate-800"
-                  : "bg-purple-50 border-purple-100"
-              }`}
+              style={[
+                styles.notifEmptyIconBox,
+                {
+                  backgroundColor: isDark ? "#0F172A" : "#FAF5FF",
+                  borderColor: isDark ? "#1E293B" : "#F3E8FF",
+                },
+              ]}
             >
               <Ionicons
                 name="notifications-outline"
                 size={28}
-                color="#a855f7"
+                color="#A855F7"
               />
             </View>
             <Text
-              className={`text-lg font-bold mb-1 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
+              style={[
+                styles.notifEmptyTitle,
+                { color: isDark ? "#FFFFFF" : "#0F172A" },
+              ]}
             >
               No notifications yet
             </Text>
             <Text
-              className={`text-xs text-center max-w-xs ${
-                isDark ? "text-slate-400" : "text-slate-500"
-              }`}
+              style={[
+                styles.notifEmptySubtitle,
+                { color: isDark ? "#94A3B8" : "#64748B" },
+              ]}
             >
               Real-time push notifications and updates will appear here.
             </Text>
           </View>
         ) : (
-          <View className="mb-12">
-            <View className="gap-2.5">
+          <View style={styles.mb12}>
+            <View style={styles.notifListGap}>
               {notifications.map((notif) => {
                 const title =
                   notif.title || notif.actor?.name || "Notification";
@@ -757,70 +809,75 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
                 return (
                   <View
                     key={notif.id}
-                    className={`p-4 rounded-2xl flex-row items-center gap-3 relative border ${
+                    style={[
+                      styles.notifCard,
                       !notif.read
                         ? isDark
-                          ? "bg-slate-900 border-purple-500/40"
-                          : "bg-purple-50/80 border-purple-200"
+                          ? styles.notifCardUnreadDark
+                          : styles.notifCardUnreadLight
                         : isDark
-                          ? "bg-slate-900/50 border-slate-800/80 opacity-90"
-                          : "bg-white border-slate-200 opacity-90 shadow-xs"
-                    }`}
+                          ? styles.notifCardReadDark
+                          : styles.notifCardReadLight,
+                    ]}
                   >
                     {/* Actor avatar or Icon */}
                     {avatar ? (
                       <Image
                         source={{ uri: avatar }}
-                        className={`w-10 h-10 rounded-full border ${
-                          isDark ? "border-slate-800" : "border-slate-200"
-                        }`}
+                        style={[
+                          styles.notifAvatar,
+                          { borderColor: isDark ? "#1E293B" : "#E2E8F0" },
+                        ]}
                       />
                     ) : (
                       <View
-                        className={`w-10 h-10 rounded-full border items-center justify-center ${
-                          isDark
-                            ? "bg-purple-950/60 border-purple-800/50"
-                            : "bg-purple-100 border-purple-200"
-                        }`}
+                        style={[
+                          styles.notifIconCircle,
+                          {
+                            backgroundColor: isDark ? "#3B0764" : "#F3E8FF",
+                            borderColor: isDark ? "#581C87" : "#E9D5FF",
+                          },
+                        ]}
                       >
                         <Ionicons
                           name="notifications-outline"
                           size={18}
-                          color={isDark ? "#c084fc" : "#9333ea"}
+                          color={isDark ? "#C084FC" : "#9333EA"}
                         />
                       </View>
                     )}
 
-                    <View className="flex-1">
+                    <View style={styles.flex1}>
                       <Text
-                        className={`text-xs font-bold leading-snug ${
-                          isDark ? "text-white" : "text-slate-900"
-                        }`}
+                        style={[
+                          styles.notifItemTitle,
+                          { color: isDark ? "#FFFFFF" : "#0F172A" },
+                        ]}
                       >
                         {title}
                       </Text>
                       {!!message && (
                         <Text
-                          className={`text-xs font-normal mt-0.5 leading-relaxed ${
-                            isDark ? "text-slate-300" : "text-slate-600"
-                          }`}
+                          style={[
+                            styles.notifItemMessage,
+                            { color: isDark ? "#CBD5E1" : "#475569" },
+                          ]}
                         >
                           {message}
                         </Text>
                       )}
                       <Text
-                        className={`text-4xs font-bold mt-1 uppercase tracking-wider ${
-                          isDark ? "text-slate-500" : "text-slate-400"
-                        }`}
+                        style={[
+                          styles.notifItemTimestamp,
+                          { color: isDark ? "#64748B" : "#94A3B8" },
+                        ]}
                       >
                         {relTime}
                       </Text>
                     </View>
 
                     {/* Unread dot indicator */}
-                    {!notif.read && (
-                      <View className="w-2.5 h-2.5 rounded-full bg-purple-500 absolute right-4 top-4 shadow-sm" />
-                    )}
+                    {!notif.read && <View style={styles.notifUnreadDot} />}
                   </View>
                 );
               })}
@@ -831,3 +888,580 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
+  mb6: {
+    marginBottom: 24,
+  },
+  mb12: {
+    marginBottom: 48,
+  },
+  p1: {
+    padding: 4,
+  },
+  overlayRoot: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    flex: 1,
+  },
+  eventImageContainer: {
+    position: "relative",
+    height: 288,
+    width: "100%",
+  },
+  eventImage: {
+    width: "100%",
+    height: "100%",
+  },
+  eventHeaderControls: {
+    position: "absolute",
+    top: 48,
+    left: 24,
+    right: 24,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  circleActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.8)",
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  floatedBadge: {
+    position: "absolute",
+    bottom: 16,
+    right: 24,
+    backgroundColor: "#9333EA",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#A855F7",
+  },
+  floatedBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  eventInfoBlock: {
+    padding: 24,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  categoryBadgeText: {
+    color: "#C084FC",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    backgroundColor: "rgba(88, 28, 135, 0.3)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  dotSeparator: {
+    color: "#64748B",
+    fontSize: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  eventTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    lineHeight: 30,
+    marginBottom: 16,
+  },
+  statsGrid: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 16,
+    marginBottom: 24,
+  },
+  statItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  statIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  statValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  sectionHeading: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  aboutTicketsBox: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  ticketDetailRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  purpleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#C084FC",
+    marginTop: 6,
+  },
+  ticketDetailText: {
+    fontSize: 12,
+    fontWeight: "500",
+    flex: 1,
+  },
+  descriptionBody: {
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 18,
+  },
+  sellerCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sellerInfoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  sellerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
+  sellerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sellerName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  sellerRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  sellerRatingText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  stickyBottomBar: {
+    padding: 24,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 16,
+  },
+  chatActionButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  chatActionBtnText: {
+    color: "#A855F7",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  buyNowActionButton: {
+    flex: 2,
+    paddingVertical: 16,
+    backgroundColor: "#9333EA",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buyNowBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  chatHeaderBar: {
+    paddingTop: 48,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  chatHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  chatPartnerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
+  chatPartnerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  chatPartnerName: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
+  },
+  onlineStatusText: {
+    color: "#94A3B8",
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  chatHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  chatContextBar: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  chatCategoryPill: {
+    backgroundColor: "rgba(88, 28, 135, 0.3)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  chatCategoryText: {
+    color: "#C084FC",
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  chatContextLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    flex: 1,
+  },
+  chatContextBold: {
+    fontWeight: "800",
+  },
+  chatMessagesScrollView: {
+    flex: 1,
+  },
+  chatMessagesContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  timelineDivider: {
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  timelineText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  groupNoticeContainer: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  groupNoticeItem: {
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  groupNoticeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  groupNoticeSubtext: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  messageRow: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
+  messagePartnerAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
+  messageBubbleContainer: {
+    maxWidth: "75%",
+  },
+  messageBubble: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  messageBubbleMe: {
+    backgroundColor: "#9333EA",
+    borderTopRightRadius: 0,
+  },
+  messageBubbleOtherDark: {
+    backgroundColor: "#0F172A",
+    borderTopLeftRadius: 0,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
+  messageBubbleOtherLight: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 0,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  messageText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  messageTimestamp: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#64748B",
+    marginTop: 4,
+    marginHorizontal: 4,
+  },
+  chatInputBar: {
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  chatInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  chatIconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+  },
+  chatTextInputWrapper: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chatTextInput: {
+    flex: 1,
+    fontSize: 12,
+    maxHeight: 80,
+  },
+  chatSendBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "#9333EA",
+  },
+  notifHeaderBar: {
+    paddingTop: 64,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  notifHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  notifHeaderTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  notifSettingsBtn: {
+    width: 36,
+    height: 36,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifScrollView: {
+    flex: 1,
+  },
+  notifScrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  notifEmptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifEmptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  notifEmptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  notifEmptySubtitle: {
+    fontSize: 12,
+    textAlign: "center",
+    maxWidth: 260,
+  },
+  notifListGap: {
+    gap: 10,
+  },
+  notifCard: {
+    padding: 16,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    position: "relative",
+    borderWidth: 1,
+  },
+  notifCardUnreadDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(168, 85, 247, 0.4)",
+  },
+  notifCardUnreadLight: {
+    backgroundColor: "rgba(250, 245, 255, 0.8)",
+    borderColor: "#E9D5FF",
+  },
+  notifCardReadDark: {
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    borderColor: "rgba(30, 41, 59, 0.8)",
+    opacity: 0.9,
+  },
+  notifCardReadLight: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    opacity: 0.9,
+  },
+  notifAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  notifIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifItemTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  notifItemMessage: {
+    fontSize: 12,
+    fontWeight: "400",
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  notifItemTimestamp: {
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  notifUnreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#A855F7",
+    position: "absolute",
+    right: 16,
+    top: 16,
+  },
+});

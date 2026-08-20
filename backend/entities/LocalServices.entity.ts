@@ -11,7 +11,7 @@ import {
 import { User } from "./User.entity";
 
 @Entity("local_services")
-export class Service {
+export class LocalService {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 

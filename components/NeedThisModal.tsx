@@ -51,9 +51,18 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [matchedIntent, setMatchedIntent] = useState<IntentMatch | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
-  const { isListening, transcript, startListening, stopListening } =
-    useVoiceSpeech();
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    error: speechError,
+    permissionStatus,
+    requestPermission,
+    startListening,
+    stopListening,
+  } = useVoiceSpeech();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const inputRef = useRef<TextInput>(null);
@@ -80,6 +89,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
       setQuery("");
       setMatchedIntent(null);
       setActionSuccessMsg(null);
+      setVoiceNotice(null);
     }
   }, [visible, initialQuery]);
 
@@ -87,6 +97,8 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
   useEffect(() => {
     if (transcript) {
       setQuery(transcript);
+      const match = parseUserNeed(transcript);
+      setMatchedIntent(match);
     }
   }, [transcript]);
 
@@ -122,6 +134,38 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
     }
   }, [query]);
 
+  const handleMicToggle = async () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+
+    setVoiceNotice(null);
+
+    if (permissionStatus === "denied") {
+      const granted = await requestPermission();
+      if (!granted) {
+        setVoiceNotice(
+          "Microphone permission was denied. Please allow microphone permissions in your browser or device settings.",
+        );
+        return;
+      }
+    }
+
+    startListening(
+      (spokenText, isFinal) => {
+        if (spokenText) {
+          setQuery(spokenText);
+          const match = parseUserNeed(spokenText);
+          setMatchedIntent(match);
+        }
+      },
+      (errText) => {
+        setVoiceNotice(errText);
+      },
+    );
+  };
+
   const handleSelectPrompt = (prompt: SuggestedNeedPrompt) => {
     setQuery(prompt.text);
   };
@@ -149,32 +193,83 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { backgroundColor: C.bg || "#FFFFFF" }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: C.bg || (isDark ? "#0B0714" : "#FFFFFF") },
+        ]}
+      >
         {/* Top bar */}
         <View
-          style={[styles.header, { borderBottomColor: C.border || "#E2E8F0" }]}
+          style={[
+            styles.header,
+            {
+              borderBottomColor:
+                C.border ||
+                (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"),
+            },
+          ]}
         >
           <View style={styles.headerTitleRow}>
-            <View style={styles.badgeWrapper}>
+            <View
+              style={[
+                styles.badgeWrapper,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(99, 102, 241, 0.2)"
+                    : "#EEF2FF",
+                },
+              ]}
+            >
               <Text style={styles.badgeIcon}>🎯</Text>
-              <Text style={styles.badgeText}>Universal Intent Router</Text>
+              <Text
+                style={[
+                  styles.badgeText,
+                  { color: isDark ? "#A5B4FC" : "#6366F1" },
+                ]}
+              >
+                Universal Intent Router
+              </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
               style={[
                 styles.closeBtn,
-                { backgroundColor: C.card || "#F1F5F9" },
+                {
+                  backgroundColor: isDark
+                    ? "rgba(255,255,255,0.08)"
+                    : C.cardSecondary || "#F1F5F9",
+                },
               ]}
               accessibilityLabel="Close"
             >
-              <Ionicons name="close" size={22} color={C.text || "#1E293B"} />
+              <Ionicons
+                name="close"
+                size={22}
+                color={C.text || (isDark ? "#FFFFFF" : "#1E293B")}
+              />
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.mainHeadline, { color: C.text || "#0F172A" }]}>
+          <Text
+            style={[
+              styles.mainHeadline,
+              { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+            ]}
+          >
             What do you need today?
           </Text>
-          <Text style={[styles.subHeadline, { color: C.mute || "#64748B" }]}>
+          <Text
+            style={[
+              styles.subHeadline,
+              {
+                color:
+                  C.sub ||
+                  C.mute ||
+                  (isDark ? "rgba(255,255,255,0.55)" : "#64748B"),
+              },
+            ]}
+          >
             No need to search multiple menus. Tell JUNTO in plain words, and
             we'll route you instantly.
           </Text>
@@ -184,8 +279,14 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
             style={[
               styles.inputContainer,
               {
-                backgroundColor: C.card || "#FFFFFF",
-                borderColor: isListening ? "#EF4444" : C.primary || "#6366F1",
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.06)"
+                  : C.card || "#FFFFFF",
+                borderColor: isListening
+                  ? "#EF4444"
+                  : isDark
+                    ? "rgba(255,255,255,0.15)"
+                    : C.primary || "#6366F1",
                 borderWidth: 1.5,
               },
             ]}
@@ -193,16 +294,28 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
             <Ionicons
               name="sparkles"
               size={20}
-              color={isListening ? "#EF4444" : C.primary || "#6366F1"}
+              color={
+                isListening
+                  ? "#EF4444"
+                  : isDark
+                    ? "#A5B4FC"
+                    : C.primary || "#6366F1"
+              }
               style={styles.searchIcon}
             />
             <TextInput
               ref={inputRef}
-              style={[styles.input, { color: C.text || "#0F172A" }]}
+              style={[
+                styles.input,
+                { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+              ]}
               value={query}
               onChangeText={setQuery}
               placeholder={ROTATING_EXAMPLES[placeholderIndex]}
-              placeholderTextColor={C.mute || "#94A3B8"}
+              placeholderTextColor={
+                C.placeholder ||
+                (isDark ? "rgba(255,255,255,0.38)" : "#94A3B8")
+              }
               autoCapitalize="none"
               returnKeyType="search"
             />
@@ -215,25 +328,23 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 <Ionicons
                   name="close-circle"
                   size={18}
-                  color={C.mute || "#94A3B8"}
+                  color={
+                    C.mute || (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
+                  }
                 />
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              onPress={() => {
-                if (isListening) {
-                  stopListening();
-                } else {
-                  startListening((spoken) => {
-                    setQuery(spoken);
-                  });
-                }
-              }}
+              onPress={handleMicToggle}
               style={[
                 styles.micBtn,
                 {
-                  backgroundColor: isListening ? "#EF4444" : "#EEF2FF",
+                  backgroundColor: isListening
+                    ? "#EF4444"
+                    : isDark
+                      ? "rgba(99, 102, 241, 0.25)"
+                      : "#EEF2FF",
                 },
               ]}
               accessibilityLabel={
@@ -244,26 +355,100 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 <Ionicons
                   name={isListening ? "mic" : "mic-outline"}
                   size={18}
-                  color={isListening ? "#FFFFFF" : C.primary || "#6366F1"}
+                  color={
+                    isListening
+                      ? "#FFFFFF"
+                      : isDark
+                        ? "#A5B4FC"
+                        : C.primary || "#6366F1"
+                  }
                 />
               </Animated.View>
             </TouchableOpacity>
           </View>
 
           {isListening && (
-            <View style={styles.listeningBar}>
+            <View
+              style={[
+                styles.listeningBar,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(239, 68, 68, 0.2)"
+                    : "#FEE2E2",
+                },
+              ]}
+            >
               <View style={styles.redDot} />
-              <Text style={styles.listeningText}>
+              <Text
+                style={[
+                  styles.listeningText,
+                  { color: isDark ? "#FCA5A5" : "#B91C1C" },
+                ]}
+              >
                 Listening to your voice... Speak naturally (e.g. "I need a
                 mechanic in Madhapur")
               </Text>
             </View>
           )}
 
+          {voiceNotice && (
+            <View
+              style={[
+                styles.successToast,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(239, 68, 68, 0.2)"
+                    : "#FEE2E2",
+                },
+              ]}
+            >
+              <Ionicons
+                name="alert-circle"
+                size={18}
+                color={isDark ? "#FCA5A5" : "#DC2626"}
+              />
+              <Text
+                style={[
+                  styles.successToastText,
+                  { color: isDark ? "#FCA5A5" : "#B91C1C", flex: 1 },
+                ]}
+              >
+                {voiceNotice}
+              </Text>
+              <TouchableOpacity onPress={() => setVoiceNotice(null)}>
+                <Ionicons
+                  name="close"
+                  size={16}
+                  color={isDark ? "#FCA5A5" : "#DC2626"}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {actionSuccessMsg && (
-            <View style={styles.successToast}>
-              <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-              <Text style={styles.successToastText}>{actionSuccessMsg}</Text>
+            <View
+              style={[
+                styles.successToast,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(34, 197, 94, 0.2)"
+                    : "#DCFCE7",
+                },
+              ]}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={18}
+                color={isDark ? "#86EFAC" : "#16A34A"}
+              />
+              <Text
+                style={[
+                  styles.successToastText,
+                  { color: isDark ? "#86EFAC" : "#15803D" },
+                ]}
+              >
+                {actionSuccessMsg}
+              </Text>
             </View>
           )}
         </View>
@@ -283,7 +468,9 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 style={[
                   styles.matchedBanner,
                   {
-                    backgroundColor: matchedIntent.bg,
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.06)"
+                      : matchedIntent.bg,
                     borderColor: matchedIntent.color,
                   },
                 ]}
@@ -322,13 +509,27 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.intentHeadline}>
+                    <Text
+                      style={[
+                        styles.intentHeadline,
+                        { color: C.text || (isDark ? "#FFFFFF" : "#0F172A") },
+                      ]}
+                    >
                       {matchedIntent.headline}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={styles.intentExplanation}>
+                <Text
+                  style={[
+                    styles.intentExplanation,
+                    {
+                      color:
+                        C.sub ||
+                        (isDark ? "rgba(255,255,255,0.75)" : "#334155"),
+                    },
+                  ]}
+                >
                   {matchedIntent.explanation}
                 </Text>
 
@@ -339,7 +540,11 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                       key={idx}
                       style={[
                         styles.tagPill,
-                        { backgroundColor: "rgba(255,255,255,0.7)" },
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(255,255,255,0.12)"
+                            : "rgba(255,255,255,0.7)",
+                        },
                       ]}
                     >
                       <Ionicons
@@ -348,7 +553,12 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                         color={matchedIntent.color}
                       />
                       <Text
-                        style={[styles.tagText, { color: matchedIntent.color }]}
+                        style={[
+                          styles.tagText,
+                          {
+                            color: isDark ? "#F1F5F9" : matchedIntent.color,
+                          },
+                        ]}
                       >
                         {tag}
                       </Text>
@@ -400,12 +610,22 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                   <Text
                     style={[
                       styles.instantSectionTitle,
-                      { color: C.text || "#1E293B" },
+                      { color: C.text || (isDark ? "#FFFFFF" : "#1E293B") },
                     ]}
                   >
                     Direct Matches Found in Your Radius
                   </Text>
-                  <Text style={styles.instantCountBadge}>
+                  <Text
+                    style={[
+                      styles.instantCountBadge,
+                      {
+                        color:
+                          C.sub ||
+                          C.mute ||
+                          (isDark ? "rgba(255,255,255,0.5)" : "#64748B"),
+                      },
+                    ]}
+                  >
                     {matchedIntent.instantResults.length} Available
                   </Text>
                 </View>
@@ -416,8 +636,12 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     style={[
                       styles.resultCard,
                       {
-                        backgroundColor: C.card || "#FFFFFF",
-                        borderColor: C.border || "#E2E8F0",
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.04)"
+                          : C.card || "#FFFFFF",
+                        borderColor: isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : C.border || "#E2E8F0",
                       },
                     ]}
                   >
@@ -442,7 +666,10 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                           <Text
                             style={[
                               styles.resultTitle,
-                              { color: C.text || "#0F172A" },
+                              {
+                                color:
+                                  C.text || (isDark ? "#FFFFFF" : "#0F172A"),
+                              },
                             ]}
                             numberOfLines={1}
                           >
@@ -452,13 +679,21 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                             <View
                               style={[
                                 styles.resultBadge,
-                                { backgroundColor: matchedIntent.bg },
+                                {
+                                  backgroundColor: isDark
+                                    ? "rgba(255,255,255,0.12)"
+                                    : matchedIntent.bg,
+                                },
                               ]}
                             >
                               <Text
                                 style={[
                                   styles.resultBadgeText,
-                                  { color: matchedIntent.color },
+                                  {
+                                    color: isDark
+                                      ? "#F1F5F9"
+                                      : matchedIntent.color,
+                                  },
                                 ]}
                               >
                                 {item.badge}
@@ -469,7 +704,12 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                         <Text
                           style={[
                             styles.resultSubtitle,
-                            { color: C.mute || "#64748B" },
+                            {
+                              color:
+                                C.sub ||
+                                C.mute ||
+                                (isDark ? "rgba(255,255,255,0.5)" : "#64748B"),
+                            },
                           ]}
                         >
                           {item.subtitle}
@@ -480,13 +720,26 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     <Text
                       style={[
                         styles.resultDetail,
-                        { color: C.text || "#334155" },
+                        {
+                          color:
+                            C.sub ||
+                            (isDark ? "rgba(255,255,255,0.75)" : "#334155"),
+                        },
                       ]}
                     >
                       {item.detail}
                     </Text>
 
-                    <View style={styles.resultCardBottom}>
+                    <View
+                      style={[
+                        styles.resultCardBottom,
+                        {
+                          borderTopColor: isDark
+                            ? "rgba(255,255,255,0.08)"
+                            : C.border || "#F1F5F9",
+                        },
+                      ]}
+                    >
                       {item.price ? (
                         <Text
                           style={[
@@ -530,7 +783,11 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                         <TouchableOpacity
                           style={[
                             styles.viewDetailsBtn,
-                            { borderColor: C.border || "#CBD5E1" },
+                            {
+                              borderColor: isDark
+                                ? "rgba(255,255,255,0.15)"
+                                : C.border || "#CBD5E1",
+                            },
                           ]}
                           onPress={() =>
                             handleNavigateToMatch(matchedIntent.route)
@@ -539,7 +796,10 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                           <Text
                             style={[
                               styles.viewDetailsBtnText,
-                              { color: C.text || "#475569" },
+                              {
+                                color:
+                                  C.text || (isDark ? "#FFFFFF" : "#475569"),
+                              },
                             ]}
                           >
                             View Full ➔
@@ -559,7 +819,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 <Text
                   style={[
                     styles.suggestedTitle,
-                    { color: C.text || "#1E293B" },
+                    { color: C.text || (isDark ? "#FFFFFF" : "#1E293B") },
                   ]}
                 >
                   Try tapping common neighborhood needs:
@@ -573,8 +833,12 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     style={[
                       styles.promptCard,
                       {
-                        backgroundColor: C.card || "#FFFFFF",
-                        borderColor: C.border || "#E2E8F0",
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.04)"
+                          : C.card || "#FFFFFF",
+                        borderColor: isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : C.border || "#E2E8F0",
                       },
                     ]}
                     onPress={() => handleSelectPrompt(p)}
@@ -585,7 +849,11 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                       <View
                         style={[
                           styles.promptCategoryPill,
-                          { backgroundColor: p.bg },
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(255,255,255,0.12)"
+                              : p.bg,
+                          },
                         ]}
                       >
                         <Text
@@ -601,7 +869,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     <Text
                       style={[
                         styles.promptText,
-                        { color: C.text || "#1E293B" },
+                        { color: C.text || (isDark ? "#FFFFFF" : "#1E293B") },
                       ]}
                       numberOfLines={2}
                     >
@@ -628,8 +896,12 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 style={[
                   styles.howItWorksCard,
                   {
-                    backgroundColor: "#F8FAFC",
-                    borderColor: "#E2E8F0",
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.04)"
+                      : "#F8FAFC",
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : "#E2E8F0",
                   },
                 ]}
               >
@@ -639,11 +911,26 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     size={18}
                     color="#6366F1"
                   />
-                  <Text style={styles.howItWorksTitle}>
+                  <Text
+                    style={[
+                      styles.howItWorksTitle,
+                      { color: C.text || (isDark ? "#FFFFFF" : "#334155") },
+                    ]}
+                  >
                     How "I Need This" Works
                   </Text>
                 </View>
-                <Text style={styles.howItWorksBody}>
+                <Text
+                  style={[
+                    styles.howItWorksBody,
+                    {
+                      color:
+                        C.sub ||
+                        C.mute ||
+                        (isDark ? "rgba(255,255,255,0.65)" : "#64748B"),
+                    },
+                  ]}
+                >
                   JUNTO removes the barrier of choosing between DayMates, Local
                   Services, RideMate, Deals, HelpMe, and Roam. Simply describe
                   what you are looking for in everyday language, and JUNTO's

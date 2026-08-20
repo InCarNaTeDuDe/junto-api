@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
+import { socket } from "@/services/socket";
 
 interface ServicePro {
   id: string;
@@ -70,78 +72,7 @@ const CATEGORIES = [
   },
 ];
 
-const SERVICE_PROS: ServicePro[] = [
-  {
-    id: "p1",
-    name: "Ramesh Electric Works",
-    category: "Electrician",
-    categoryIcon: "flash",
-    rating: 4.9,
-    reviewsCount: 38,
-    experience: "7+ yrs exp",
-    distance: "0.8 km away",
-    rate: "From ₹150 visit",
-    verified: true,
-    avatarBg: "#EA580C",
-    phone: "+91 98480 12345",
-  },
-  {
-    id: "p2",
-    name: "Sri Balaji Plumbing Services",
-    category: "Plumber",
-    categoryIcon: "water",
-    rating: 4.8,
-    reviewsCount: 52,
-    experience: "5+ yrs exp",
-    distance: "1.2 km away",
-    rate: "From ₹199 visit",
-    verified: true,
-    avatarBg: "#0284C7",
-    phone: "+91 99887 65432",
-  },
-  {
-    id: "p3",
-    name: "CoolPoint AC Deep Clean & Gas",
-    category: "AC Repair",
-    categoryIcon: "snow",
-    rating: 4.9,
-    reviewsCount: 84,
-    experience: "8+ yrs exp",
-    distance: "1.5 km away",
-    rate: "From ₹399 service",
-    verified: true,
-    avatarBg: "#059669",
-    phone: "+91 97000 88990",
-  },
-  {
-    id: "p4",
-    name: "QuickFix Two-Wheeler Doorstep",
-    category: "Bike & Car",
-    categoryIcon: "construct",
-    rating: 4.7,
-    reviewsCount: 29,
-    experience: "4+ yrs exp",
-    distance: "2.1 km away",
-    rate: "From ₹250 puncher/oil",
-    verified: true,
-    avatarBg: "#9333EA",
-    phone: "+91 91234 56789",
-  },
-  {
-    id: "p5",
-    name: "SparkleClean Deep Cleaning",
-    category: "Home Clean",
-    categoryIcon: "sparkles",
-    rating: 4.9,
-    reviewsCount: 65,
-    experience: "6+ yrs exp",
-    distance: "2.4 km away",
-    rate: "From ₹499/room",
-    verified: true,
-    avatarBg: "#E11D48",
-    phone: "+91 98765 43210",
-  },
-];
+const SERVICE_PROS: ServicePro[] = [];
 
 const URGENCY_PRESETS = [
   "Immediate (30m)",
@@ -166,9 +97,33 @@ export default function ServicesScreen() {
 
   // 1-Click Post Need State
   const [postCategory, setPostCategory] = useState("Electrician");
-  const [urgency, setUrgency] = useState("Immediate (30m)");
+  const [serviceDate, setServiceDate] = useState(new Date());
+  const [serviceTime, setServiceTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [shortNote, setShortNote] = useState("");
   const [postSuccessModal, setPostSuccessModal] = useState(false);
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const formatTime = (t: Date) =>
+    t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const formattedAppointment = `${formatDate(serviceDate)} at ${formatTime(serviceTime)}`;
+
+  const onDateChange = (_: any, date?: Date) => {
+    if (Platform.OS !== "web") setShowDatePicker(false);
+    if (date) setServiceDate(date);
+  };
+
+  const onTimeChange = (_: any, time?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (time) setServiceTime(time);
+  };
 
   // Fetch real-time service providers
   const fetchServicePros = useCallback(async () => {
@@ -203,6 +158,22 @@ export default function ServicesScreen() {
 
   useEffect(() => {
     fetchServicePros();
+
+    const handleRealtimeService = () => {
+      fetchServicePros();
+    };
+
+    socket.on("service_pro_created", handleRealtimeService);
+    socket.on("service_pros_updated", handleRealtimeService);
+    socket.on("service_booking_created", handleRealtimeService);
+    socket.on("service_booking_updated", handleRealtimeService);
+
+    return () => {
+      socket.off("service_pro_created", handleRealtimeService);
+      socket.off("service_pros_updated", handleRealtimeService);
+      socket.off("service_booking_created", handleRealtimeService);
+      socket.off("service_booking_updated", handleRealtimeService);
+    };
   }, [fetchServicePros]);
 
   const { isListening, startListening } = useVoiceSpeech();
@@ -243,11 +214,12 @@ export default function ServicesScreen() {
     try {
       setIsSubmitting(true);
       await ApiService.post("/api/asknearby", {
-        title: `Need ${postCategory} (${urgency})`,
+        title: `Need ${postCategory} (${formattedAppointment})`,
         category: postCategory,
         description:
-          shortNote || `Urgent ${postCategory} needed in ${cityName}`,
-        urgency: urgency.includes("30m") ? "Immediate" : "Today",
+          shortNote ||
+          `Appointment requested for ${formattedAppointment} in ${cityName}`,
+        urgency: formattedAppointment,
         locationName: cityName,
       });
       setPostSuccessModal(true);
@@ -685,37 +657,141 @@ export default function ServicesScreen() {
               })}
             </View>
 
-            {/* Urgency */}
+            {/* Scheduled Appointment Date & Time Picker */}
             <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              When do you need it?
+              Scheduled Appointment Date & Time:
             </Text>
-            <View style={styles.urgencyRow}>
-              {URGENCY_PRESETS.map((u) => {
-                const active = urgency === u;
-                return (
-                  <TouchableOpacity
-                    key={u}
-                    onPress={() => setUrgency(u)}
+            <View style={styles.dateTimeRow}>
+              {/* Service Date Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowDatePicker(!showDatePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
                     style={[
-                      styles.urgencyPill,
-                      {
-                        backgroundColor: active ? "#9333EA" : cardBg,
-                        borderColor: active ? "#9333EA" : border,
-                      },
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#9333EA25" : "#F3E8FF" },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.urgencyText,
-                        { color: active ? "#FFF" : textPrimary },
-                      ]}
-                    >
-                      {u}
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color="#9333EA"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Visit Date
                     </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(serviceDate)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
+
+              {/* Service Time Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+                onPress={() => setShowTimePicker(!showTimePicker)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateTimeContent}>
+                  <View
+                    style={[
+                      styles.dateTimeIconCircle,
+                      { backgroundColor: isDark ? "#06B6D425" : "#ECFEFF" },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={18} color="#06B6D4" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
+                      Time Slot
+                    </Text>
+                    <Text
+                      style={[styles.dateTimeValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatTime(serviceTime)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-down" size={16} color={textMute} />
+              </TouchableOpacity>
             </View>
+
+            {/* Date Picker Modal / Inline Controls */}
+            {(showDatePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    📅 Select Preferred Date
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: "#9333EA", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={serviceDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
+
+            {/* Time Picker Modal / Inline Controls */}
+            {(showTimePicker || Platform.OS === "web") && (
+              <View
+                style={[
+                  styles.pickerBox,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.pickerBoxHeader}>
+                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
+                    ⏰ Select Preferred Time
+                  </Text>
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                      <Text style={{ color: "#9333EA", fontWeight: "700" }}>
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <DateTimePicker
+                  value={serviceTime}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              </View>
+            )}
 
             {/* Optional 1-line note with Voice Mic */}
             <View style={styles.labelWithVoiceRow}>
@@ -805,8 +881,8 @@ export default function ServicesScreen() {
             </Text>
             <Text style={[styles.modalDesc, { color: textMute }]}>
               {postSuccessModal
-                ? `Your request for ${postCategory} (${urgency}) was shared with 5 verified pros nearby. Expect a call shortly!`
-                : `${selectedPro?.name} has accepted your request. They will arrive at your location.`}
+                ? `Your request for ${postCategory} scheduled for ${formattedAppointment} was shared with 5 verified pros nearby. Expect a call shortly!`
+                : `${selectedPro?.name} has accepted your request for ${formattedAppointment}. They will arrive at your location.`}
             </Text>
 
             <TouchableOpacity
@@ -1106,6 +1182,62 @@ const styles = StyleSheet.create({
   urgencyText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 4,
+  },
+  dateTimeCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  dateTimeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  dateTimeIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateTimeLabel: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dateTimeValue: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  pickerBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  pickerBoxHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  pickerBoxTitle: {
+    fontSize: 13,
+    fontWeight: "700",
   },
   labelWithVoiceRow: {
     flexDirection: "row",

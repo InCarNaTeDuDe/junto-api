@@ -1,0 +1,12 @@
+export * from "./Base.repository";
+export * from "./Activity.repository";
+export * from "./Audit.repository";
+export * from "./Device.repository";
+// export * from "./Deals.repository";
+// export * from "./LocalServices.repository";
+export * from "./LoginHistory.repository";
+export * from "./Message.repository";
+export * from "./Notification.repository";
+export * from "./Rides.repository";
+export * from "./Ticket.repository";
+export * from "./User.repository";
