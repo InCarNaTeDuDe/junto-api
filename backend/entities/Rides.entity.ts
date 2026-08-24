@@ -26,12 +26,13 @@ export class Ride {
   @Index()
   @Column({
     type: "uuid",
+    nullable: true,
   })
   userId!: string;
 
   @ManyToOne(() => User, {
     nullable: false,
-    onDelete: "CASCADE",
+    onDelete: "SET NULL",
   })
   @JoinColumn({
     name: "userId",
