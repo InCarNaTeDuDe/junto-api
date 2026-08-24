@@ -149,7 +149,7 @@ export async function joinRide(
   }
 
   // Driver cannot join own ride
-  if (ride.driverId === user.id) {
+  if (ride.userId === user.id) {
     throw new Error("You cannot join your own ride.");
   }
 
@@ -187,7 +187,7 @@ export async function joinRide(
   if (io) {
     io.emit("ride_updated", updatedRide);
 
-    io.to(`user:${updatedRide.driverId}`).emit("ride_booked", {
+    io.to(`user:${updatedRide.userId}`).emit("ride_booked", {
       rideId: updatedRide.id,
       passengerName,
       seats: input.seatsRequested,
@@ -201,9 +201,9 @@ export async function joinRide(
   }
 
   // Push notification to driver
-  if (updatedRide.driverId) {
+  if (updatedRide.userId) {
     sendExpoPushNotification(
-      updatedRide.driverId,
+      updatedRide.userId,
       "🚗 Ride Booking Request",
       `${passengerName} booked ${input.seatsRequested} seat(s) for ${updatedRide.from} ➔ ${updatedRide.to}`,
       {
@@ -239,7 +239,7 @@ export async function updateRide(
   }
 
   // Only the driver can update the ride
-  if (ride.driverId !== user.id) {
+  if (ride.userId !== user.id) {
     throw new Error("Unauthorized to modify this ride");
   }
 
