@@ -6,12 +6,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { patchFetch } from "../utils/apiHelper";
 import { AuthProvider, useAuthContext } from "@/context/AuthContext";
 import { LocationProvider } from "@/context/LocationContext";
+import { useTheme } from "@/hooks/useTheme";
 import SpinnerLoader from "@/components/SpinnerLoader";
 
 patchFetch();
 
 function RootNavigator() {
   const { loading, isLoggedIn } = useAuthContext();
+  const { isDark } = useTheme();
   const segments = useSegments();
 
   if (loading) {
@@ -32,7 +34,7 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

@@ -7,27 +7,46 @@ const THEME_KEY = "themeMode";
 const LOCATION_KEY = "selectedLocation";
 
 async function saveItem(key: string, value: string) {
-  console.log("saving jwt");
-  if (Platform.OS === "web") {
-    localStorage.setItem(key, value);
-  } else {
-    await SecureStore.setItemAsync(key, value);
+  try {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
+        localStorage.setItem(key, value);
+      }
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  } catch (err) {
+    console.warn(`[secureStorage] Error saving key "${key}":`, err);
   }
 }
 
-async function getItem(key: string) {
-  if (Platform.OS === "web") {
-    return localStorage.getItem(key);
-  }
+async function getItem(key: string): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
+        return localStorage.getItem(key);
+      }
+      return null;
+    }
 
-  return await SecureStore.getItemAsync(key);
+    return await SecureStore.getItemAsync(key);
+  } catch (err) {
+    console.warn(`[secureStorage] Error getting key "${key}":`, err);
+    return null;
+  }
 }
 
 async function removeItem(key: string) {
-  if (Platform.OS === "web") {
-    localStorage.removeItem(key);
-  } else {
-    await SecureStore.deleteItemAsync(key);
+  try {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
+        localStorage.removeItem(key);
+      }
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
+  } catch (err) {
+    console.warn(`[secureStorage] Error removing key "${key}":`, err);
   }
 }
 

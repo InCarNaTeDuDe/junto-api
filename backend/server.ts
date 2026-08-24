@@ -173,50 +173,50 @@ async function startServer() {
   app.use(errorHandler);
 
   // Serve static files from dist or auto-export if missing
-  const distPath = path.join(process.cwd(), "dist");
-  let hasDist = fs.existsSync(path.join(distPath, "index.html"));
+  // const distPath = path.join(process.cwd(), "dist");
+  // let hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
-  if (!hasDist) {
-    console.log(
-      "No compiled static files found in dist/. Exporting web bundle...",
-    );
-    try {
-      const { execSync } = await import("child_process");
-      execSync(
-        "npx tsx generate_assets.js && npx expo export -p web --output-dir dist",
-        {
-          stdio: "inherit",
-        },
-      );
-      hasDist = fs.existsSync(path.join(distPath, "index.html"));
-    } catch (e: any) {
-      console.warn("Auto-exporting web bundle failed:", e?.message || e);
-    }
-  }
+  // if (!hasDist) {
+  //   console.log(
+  //     "No compiled static files found in dist/. Exporting web bundle...",
+  //   );
+  //   try {
+  //     const { execSync } = await import("child_process");
+  //     execSync(
+  //       "npx tsx generate_assets.js && npx expo export -p web --output-dir dist",
+  //       {
+  //         stdio: "inherit",
+  //       },
+  //     );
+  //     hasDist = fs.existsSync(path.join(distPath, "index.html"));
+  //   } catch (e: any) {
+  //     console.warn("Auto-exporting web bundle failed:", e?.message || e);
+  //   }
+  // }
 
-  console.log(
-    `Serving static files from compiled dist/ directory: ${distPath}`,
-  );
-  app.use(express.static(distPath));
-  app.get("*", (req, res) => {
-    const indexPath = path.join(distPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          console.error("Error serving index.html:", err);
-          if (!res.headersSent) {
-            res.status(500).send("Internal Server Error loading index.html");
-          }
-        }
-      });
-    } else {
-      res
-        .status(404)
-        .send(
-          "Application dist/index.html is missing. Run npm run build first.",
-        );
-    }
-  });
+  // console.log(
+  //   `Serving static files from compiled dist/ directory: ${distPath}`,
+  // );
+  // app.use(express.static(distPath));
+  // app.get("*", (req, res) => {
+  //   const indexPath = path.join(distPath, "index.html");
+  //   if (fs.existsSync(indexPath)) {
+  //     res.sendFile(indexPath, (err) => {
+  //       if (err) {
+  //         console.error("Error serving index.html:", err);
+  //         if (!res.headersSent) {
+  //           res.status(500).send("Internal Server Error loading index.html");
+  //         }
+  //       }
+  //     });
+  //   } else {
+  //     res
+  //       .status(404)
+  //       .send(
+  //         "Application dist/index.html is missing. Run npm run build first.",
+  //       );
+  //   }
+  // });
 
   // app.listen(PORT, "0.0.0.0", () => {
   //   console.log(`Server running on http://localhost:${PORT}`);

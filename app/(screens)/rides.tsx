@@ -22,6 +22,9 @@ import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 
+const CAR_ICON_IMG = require("@/assets/screens/purple_car_image.png");
+const BIKE_ICON_IMG = require("@/assets/screens/purple_bike_image.png");
+
 interface RideItem {
   id: string;
   driverName: string;
@@ -45,15 +48,7 @@ const PRESET_ROUTES = [
   { from: "Secunderabad", to: "Begumpet" },
 ];
 
-const TIME_PRESETS = [
-  "Now",
-  "In 15 mins",
-  "In 30 mins",
-  "5:30 PM",
-  "6:00 PM",
-  "Tomorrow 9 AM",
-];
-const SEAT_PRESETS = [1, 2, 3, 4];
+const SEAT_PRESETS = { car: [1, 2, 3, 4], bike: [1] };
 const PRICE_PRESETS = ["Free", "₹30", "₹50", "₹70", "₹100"];
 
 export default function RidesScreen() {
@@ -274,7 +269,7 @@ export default function RidesScreen() {
             {
               backgroundColor:
                 activeTab === "offer"
-                  ? "#10B981"
+                  ? "#7C3AED"
                   : isDark
                     ? "#1E293B"
                     : "#EDE9FE",
@@ -321,7 +316,7 @@ export default function RidesScreen() {
           <Ionicons
             name="search-outline"
             size={16}
-            color={activeTab === "find" ? "#8B5CF6" : textMute}
+            color={activeTab === "find" ? "#7C3AED" : textMute}
           />
           <Text
             style={[
@@ -360,7 +355,7 @@ export default function RidesScreen() {
           <Ionicons
             name="add-circle-outline"
             size={16}
-            color={activeTab === "offer" ? "#10B981" : textMute}
+            color={activeTab === "offer" ? "#7C3AED" : textMute}
           />
           <Text
             style={[
@@ -737,17 +732,30 @@ export default function RidesScreen() {
               style={[
                 styles.offerBanner,
                 {
-                  backgroundColor: isDark ? "#131C2E" : "#ECFDF5",
-                  borderColor: "#10B981",
+                  backgroundColor: isDark
+                    ? "rgba(124, 58, 237, 0.12)"
+                    : "#F5F3FF",
+                  borderColor: isDark ? "rgba(139, 92, 246, 0.35)" : "#DDD6FE",
                 },
               ]}
             >
-              <Ionicons name="flash" size={20} color="#10B981" />
+              <View
+                style={[
+                  styles.offerBannerIconWrap,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(139, 92, 246, 0.25)"
+                      : "#EDE9FE",
+                  },
+                ]}
+              >
+                <Ionicons name="flash" size={18} color="#7C3AED" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text
                   style={[
                     styles.offerBannerTitle,
-                    { color: isDark ? "#34D399" : "#065F46" },
+                    { color: isDark ? "#DDD6FE" : "#6D28D9" },
                   ]}
                 >
                   Post in 10 Seconds
@@ -755,7 +763,7 @@ export default function RidesScreen() {
                 <Text
                   style={[
                     styles.offerBannerSub,
-                    { color: isDark ? "rgba(255,255,255,0.7)" : "#047857" },
+                    { color: isDark ? "rgba(255,255,255,0.7)" : "#7C3AED" },
                   ]}
                 >
                   Tap popular routes below or type quickly. No long forms!
@@ -781,11 +789,14 @@ export default function RidesScreen() {
                     {
                       backgroundColor:
                         offerFrom === route.from && offerTo === route.to
-                          ? "#10B981"
+                          ? "#7C3AED"
                           : isDark
                             ? "#1E293B"
                             : "#FFFFFF",
-                      borderColor: border,
+                      borderColor:
+                        offerFrom === route.from && offerTo === route.to
+                          ? "#7C3AED"
+                          : border,
                     },
                   ]}
                 >
@@ -814,7 +825,7 @@ export default function RidesScreen() {
               ]}
             >
               <View style={styles.inputRow}>
-                <Ionicons name="radio-button-on" size={16} color="#10B981" />
+                <Ionicons name="radio-button-on" size={16} color="#7C3AED" />
                 <TextInput
                   value={offerFrom}
                   onChangeText={setOfferFrom}
@@ -827,7 +838,7 @@ export default function RidesScreen() {
                 style={[styles.inputDivider, { backgroundColor: border }]}
               />
               <View style={styles.inputRow}>
-                <Ionicons name="location" size={16} color="#EF4444" />
+                <Ionicons name="location" size={16} color="#EC4899" />
                 <TextInput
                   value={offerTo}
                   onChangeText={setOfferTo}
@@ -838,92 +849,159 @@ export default function RidesScreen() {
               </View>
             </View>
 
-            {/* Vehicle Type - Compact Rectangle Box with Large Left (Car) & Right (Bike) Icons */}
+            {/* Vehicle Type - Distinct Car / Bike Selection Cards */}
             <Text style={[styles.sectionLabel, { color: textPrimary }]}>
               Vehicle Type:
             </Text>
-            <View
-              style={[
-                styles.vehicleOfferBox,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
+            <View style={styles.vehicleTypeCardRow}>
+              {/* Car Card */}
               <TouchableOpacity
-                onPress={() => setOfferVehicle("car")}
+                onPress={() => {
+                  setOfferVehicle("car");
+                  if (selectedSeats === 1) setSelectedSeats(3);
+                }}
                 style={[
-                  styles.vehicleOfferItem,
-                  offerVehicle === "car" && {
-                    backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
-                    borderColor: "#8B5CF6",
+                  styles.vehicleTypeCard,
+                  {
+                    backgroundColor:
+                      offerVehicle === "car"
+                        ? isDark
+                          ? `${t.primary}26`
+                          : "#F5F3FF"
+                        : isDark
+                          ? "#151D2D"
+                          : cardBg,
+
+                    borderColor:
+                      offerVehicle === "car"
+                        ? t.primary
+                        : isDark
+                          ? "#263249"
+                          : border,
+
+                    borderWidth: offerVehicle === "car" ? 1.5 : 1,
                   },
                 ]}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons
-                  name="car"
-                  size={26}
-                  color={offerVehicle === "car" ? "#8B5CF6" : textMute}
+                <View style={styles.vehicleCardCheckContainer}>
+                  {offerVehicle === "car" ? (
+                    <View style={styles.vehicleSelectedBadge}>
+                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.vehicleUnselectedBadge,
+                        { borderColor: border },
+                      ]}
+                    />
+                  )}
+                </View>
+
+                <Image
+                  source={CAR_ICON_IMG}
+                  style={styles.vehicleCardImg}
+                  resizeMode="contain"
                 />
-                <View style={styles.vehicleOfferTextWrap}>
+
+                <View style={styles.vehicleCardInfo}>
                   <Text
                     style={[
-                      styles.vehicleOfferTitle,
+                      styles.vehicleCardTitle,
                       {
-                        color: offerVehicle === "car" ? "#8B5CF6" : textPrimary,
-                        fontWeight: offerVehicle === "car" ? "800" : "600",
+                        color:
+                          offerVehicle === "car"
+                            ? isDark
+                              ? "#DDD6FE"
+                              : "#6D28D9"
+                            : textPrimary,
                       },
                     ]}
                   >
                     Car
                   </Text>
                   <Text
-                    style={[styles.vehicleOfferSubtitle, { color: textMute }]}
+                    style={[styles.vehicleCardSub, { color: textMute }]}
+                    numberOfLines={1}
                   >
-                    Comfort / 4-Seater
+                    Comfort • AC • 4 Seats
                   </Text>
                 </View>
               </TouchableOpacity>
 
-              <View
-                style={[
-                  styles.vehicleOfferDivider,
-                  { backgroundColor: border },
-                ]}
-              />
-
+              {/* Bike Card */}
               <TouchableOpacity
-                onPress={() => setOfferVehicle("bike")}
+                onPress={() => {
+                  setOfferVehicle("bike");
+                  setSelectedSeats(1);
+                }}
                 style={[
-                  styles.vehicleOfferItem,
-                  offerVehicle === "bike" && {
-                    backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
-                    borderColor: "#8B5CF6",
+                  styles.vehicleTypeCard,
+                  {
+                    backgroundColor:
+                      offerVehicle === "bike"
+                        ? isDark
+                          ? `${t.primary}26`
+                          : "#F5F3FF"
+                        : isDark
+                          ? "#151D2D"
+                          : cardBg,
+
+                    borderColor:
+                      offerVehicle === "bike"
+                        ? t.primary
+                        : isDark
+                          ? "#263249"
+                          : border,
+
+                    borderWidth: offerVehicle === "bike" ? 1.5 : 1,
                   },
                 ]}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons
-                  name="bicycle"
-                  size={26}
-                  color={offerVehicle === "bike" ? "#8B5CF6" : textMute}
+                <View style={styles.vehicleCardCheckContainer}>
+                  {offerVehicle === "bike" ? (
+                    <View style={styles.vehicleSelectedBadge}>
+                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.vehicleUnselectedBadge,
+                        { borderColor: border },
+                      ]}
+                    />
+                  )}
+                </View>
+
+                <Image
+                  source={BIKE_ICON_IMG}
+                  style={styles.vehicleCardImg}
+                  resizeMode="contain"
                 />
-                <View style={styles.vehicleOfferTextWrap}>
+
+                <View style={styles.vehicleCardInfo}>
                   <Text
                     style={[
-                      styles.vehicleOfferTitle,
+                      styles.vehicleCardTitle,
                       {
                         color:
-                          offerVehicle === "bike" ? "#8B5CF6" : textPrimary,
-                        fontWeight: offerVehicle === "bike" ? "800" : "600",
+                          offerVehicle === "bike"
+                            ? isDark
+                              ? "#DDD6FE"
+                              : "#6D28D9"
+                            : textPrimary,
                       },
                     ]}
                   >
                     Bike
                   </Text>
                   <Text
-                    style={[styles.vehicleOfferSubtitle, { color: textMute }]}
+                    style={[styles.vehicleCardSub, { color: textMute }]}
+                    numberOfLines={1}
                   >
-                    Quick / 1-Seater
+                    Fast • Fuel Efficient • 1 Seat
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1069,10 +1147,10 @@ export default function RidesScreen() {
             <View style={styles.seatsPriceGrid}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                  Available Seats:
+                  Available Seats:{" "}
                 </Text>
                 <View style={styles.seatPillRow}>
-                  {SEAT_PRESETS.map((seat) => {
+                  {SEAT_PRESETS[offerVehicle]?.map((seat) => {
                     const active = selectedSeats === seat;
                     return (
                       <TouchableOpacity
@@ -1081,8 +1159,8 @@ export default function RidesScreen() {
                         style={[
                           styles.seatPill,
                           {
-                            backgroundColor: active ? "#10B981" : cardBg,
-                            borderColor: active ? "#10B981" : border,
+                            backgroundColor: active ? "#7C3AED" : cardBg,
+                            borderColor: active ? "#7C3AED" : border,
                           },
                         ]}
                       >
@@ -1114,8 +1192,8 @@ export default function RidesScreen() {
                         style={[
                           styles.pricePill,
                           {
-                            backgroundColor: active ? "#3B82F6" : cardBg,
-                            borderColor: active ? "#3B82F6" : border,
+                            backgroundColor: active ? "#7C3AED" : cardBg,
+                            borderColor: active ? "#7C3AED" : border,
                           },
                         ]}
                       >
@@ -1170,7 +1248,7 @@ export default function RidesScreen() {
             ]}
           >
             <View style={styles.modalSuccessIcon}>
-              <Ionicons name="checkmark" size={32} color="#10B981" />
+              <Ionicons name="checkmark" size={32} color="#7C3AED" />
             </View>
             <Text style={[styles.modalTitle, { color: textPrimary }]}>
               Seat Request Sent!
@@ -1189,7 +1267,7 @@ export default function RidesScreen() {
               <Text style={[styles.summaryRoute, { color: textPrimary }]}>
                 {bookingSuccessModal?.from} ➔ {bookingSuccessModal?.to}
               </Text>
-              <Text style={[styles.summaryTime, { color: "#8B5CF6" }]}>
+              <Text style={[styles.summaryTime, { color: "#7C3AED" }]}>
                 ⏰ {bookingSuccessModal?.time} • {bookingSuccessModal?.price}
               </Text>
             </View>
@@ -1478,6 +1556,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
+  offerBannerIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   offerBannerTitle: {
     fontSize: 13.5,
     fontWeight: "700",
@@ -1546,42 +1631,59 @@ const styles = StyleSheet.create({
   vehicleSegmentText: {
     fontSize: 12.5,
   },
-  vehicleOfferBox: {
+  vehicleTypeCardRow: {
     flexDirection: "row",
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 4,
-    alignItems: "center",
+    gap: 10,
   },
-  vehicleOfferItem: {
+  vehicleTypeCard: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    // paddingVertical: 10,
+    // paddingHorizontal: 10,
+    borderRadius: 16,
+    position: "relative",
+    minHeight: 72,
+  },
+  vehicleCardCheckContainer: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 2,
+  },
+  vehicleSelectedBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: "transparent",
-    gap: 10,
   },
-  vehicleOfferDivider: {
-    width: 1,
-    height: 32,
-    marginHorizontal: 2,
+  vehicleUnselectedBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
   },
-  vehicleOfferTextWrap: {
+  vehicleCardImg: {
+    width: 58,
+    height: 50,
+    borderRadius: 8,
+  },
+  vehicleCardInfo: {
+    flex: 1,
     justifyContent: "center",
+    paddingRight: 14,
   },
-  vehicleOfferTitle: {
-    fontSize: 13.5,
-    lineHeight: 16,
+  vehicleCardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
   },
-  vehicleOfferSubtitle: {
+  vehicleCardSub: {
     fontSize: 10,
+    fontWeight: "500",
     marginTop: 1,
   },
-
   dateTimeRow: {
     flexDirection: "row",
     gap: 10,
@@ -1672,16 +1774,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   publishBtn: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#7C3AED",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 13,
+    paddingVertical: 14,
     borderRadius: 16,
     gap: 8,
     marginTop: 8,
     ...Platform.select({
-      web: { boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)" },
+      web: { boxShadow: "0 4px 16px rgba(124, 58, 237, 0.35)" },
     }),
   },
   publishBtnText: {
@@ -1709,7 +1811,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: "rgba(124, 58, 237, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1742,7 +1844,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   modalDoneBtn: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#7C3AED",
     width: "100%",
     paddingVertical: 11,
     borderRadius: 12,

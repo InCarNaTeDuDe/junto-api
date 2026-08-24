@@ -32,6 +32,9 @@ import {
   getJwtToken,
   removeJwtToken,
   saveJwtToken,
+  getThemeMode,
+  saveThemeMode,
+  type ThemeMode,
 } from "@/utils/secureStorage";
 import {
   createContext,
@@ -77,7 +80,6 @@ type AuthContextValue = {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
 };
-type ThemeMode = "light" | "dark" | "system";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 console.log("---AuthContext module loaded---");
@@ -89,11 +91,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("light");
+
+  // Restore stored theme mode on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    async function restoreTheme() {
+      try {
+        const storedTheme = await getThemeMode();
+        if (isMounted && storedTheme) {
+          console.log("Restored stored theme mode:", storedTheme);
+          setThemeModeState(storedTheme);
+        }
+      } catch (err) {
+        console.warn("Failed to load stored theme mode:", err);
+      }
+    }
+    restoreTheme();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeModeState(mode);
+    saveThemeMode(mode).catch((err) => {
+      console.warn("Failed to persist theme mode to storage:", err);
+    });
+  }, []);
 
   const theme = useMemo(() => {
-    return themeMode === "dark" ? DarkTheme : LightTheme;
-  }, [themeMode]);
+    const isDark =
+      themeMode === "system" ? systemTheme === "dark" : themeMode === "dark";
+    return isDark ? DarkTheme : LightTheme;
+  }, [themeMode, systemTheme]);
 
   const login = useCallback(async (user: UserData, jwtToken: string) => {
     await saveJwtToken(jwtToken);

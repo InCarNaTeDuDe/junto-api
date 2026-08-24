@@ -37,7 +37,7 @@ function hexA(hex: string, a: number) {
 }
 
 export default function ProfileScreen() {
-  const { theme: t } = useTheme();
+  const { theme: t, mode: themeMode, setTheme } = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
 
   const { user, logout } = useAuthContext();
@@ -366,7 +366,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={["top","bottom"]}>
+    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
@@ -1434,6 +1434,75 @@ export default function ProfileScreen() {
               <Text style={s.helpTitle}>Change Current Location</Text>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
+
+            {/* Appearance & Theme Selector */}
+            <View
+              style={{
+                marginTop: verticalScale(20),
+                marginBottom: verticalScale(8),
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: moderateScale(12),
+                  fontWeight: "700",
+                  color: t.sub,
+                  marginBottom: verticalScale(10),
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Appearance & Theme
+              </Text>
+              <View style={{ flexDirection: "row", gap: scale(8) }}>
+                {(["light", "dark", "system"] as const).map((mode) => {
+                  const isSelected = themeMode === mode;
+                  return (
+                    <TouchableOpacity
+                      key={mode}
+                      onPress={() => setTheme(mode)}
+                      style={{
+                        flex: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: scale(6),
+                        paddingVertical: verticalScale(10),
+                        paddingHorizontal: scale(8),
+                        borderRadius: scale(10),
+                        backgroundColor: isSelected
+                          ? hexA(t.primary, 0.15)
+                          : t.cardSecondary,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? t.primary : t.border,
+                      }}
+                    >
+                      <Ionicons
+                        name={
+                          mode === "light"
+                            ? "sunny"
+                            : mode === "dark"
+                              ? "moon"
+                              : "phone-portrait-outline"
+                        }
+                        size={scale(16)}
+                        color={isSelected ? t.primary : t.sub}
+                      />
+                      <Text
+                        style={{
+                          fontSize: moderateScale(12),
+                          fontWeight: isSelected ? "700" : "500",
+                          color: isSelected ? t.primary : t.text,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {mode}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
             <View style={{ marginTop: verticalScale(32) }}>
               <TouchableOpacity

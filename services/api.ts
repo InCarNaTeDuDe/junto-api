@@ -15,7 +15,7 @@ import {
 } from "@/utils/secureStorage";
 import { Alert } from "react-native";
 
-const BASE_URL = "http://192.168.29.37:3000"; //Env.API_BASE_URL!;
+const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
 
 const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
 
