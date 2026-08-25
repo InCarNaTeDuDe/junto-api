@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import { signInWithGoogle } from "@/services/googleAuth";
 import { router } from "expo-router";
 import { ApiService } from "@/services/api";
 import { useStyles } from "@/hooks/useStyles";
-import { DarkTheme, Theme } from "@/theme";
+import { LightTheme, DarkTheme, Theme } from "@/theme";
 
 import { WalkingCoffeeMascot } from "@/components/WalkingCoffeeMascot";
 
@@ -173,7 +173,7 @@ const Trust = ({ icon, title, sub, s }: TrustProps) => (
 );
 
 export default function Login() {
-  const s = useStyles(createStyles);
+  const s = useMemo(() => createStyles(LightTheme), []);
 
   const { width } = useWindowDimensions();
   const wide = width >= 720;
@@ -199,26 +199,28 @@ export default function Login() {
           Platform.OS === "web" ? googleUser.credential : googleUser.idToken,
       });
 
-      const userObj =
-        Platform.OS === "web"
-          ? {
-              id: data.user.id,
-              name: data.user.name ?? "",
-              email: data.user.email,
-              avatar: data.user.avatar ?? "",
-              isVerified: true,
-              rating: 0,
-              walletBalance: 0,
-            }
-          : {
-              id: googleUser.user.id,
-              name: googleUser.user.name ?? "",
-              email: googleUser.user.email,
-              avatar: googleUser.user.photo ?? "",
-              isVerified: true,
-              rating: 0,
-              walletBalance: 0,
-            };
+      const userObj = {
+        id:
+          data?.user?.id ||
+          (Platform.OS === "web" ? data.user?.id : googleUser.user.id),
+        name:
+          data?.user?.name ||
+          (Platform.OS === "web" ? data.user?.name : googleUser.user?.name) ||
+          "",
+        email:
+          data?.user?.email ||
+          (Platform.OS === "web" ? data.user?.email : googleUser.user?.email) ||
+          "",
+        avatar:
+          data?.user?.avatar ||
+          (Platform.OS === "web"
+            ? data.user?.avatar
+            : googleUser.user?.photo) ||
+          "",
+        isVerified: true,
+        rating: data?.user?.rating ?? 5,
+        walletBalance: data?.user?.walletBalance ?? 0,
+      };
 
       login(userObj, data?.accessToken);
 
@@ -233,7 +235,7 @@ export default function Login() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: LightTheme.bg }}>
       <StatusBar barStyle="dark-content" />
       <View style={[StyleSheet.absoluteFill, s.bgGradient]} />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>

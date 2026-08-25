@@ -925,7 +925,7 @@ export default function RidesScreen() {
                     style={[styles.vehicleCardSub, { color: textMute }]}
                     numberOfLines={1}
                   >
-                    Comfort • AC • 4 Seats
+                    Comfort • AC • Multi-seater
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1147,35 +1147,105 @@ export default function RidesScreen() {
             <View style={styles.seatsPriceGrid}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                  Available Seats:{" "}
+                  Available Seats:
                 </Text>
-                <View style={styles.seatPillRow}>
-                  {SEAT_PRESETS[offerVehicle]?.map((seat) => {
-                    const active = selectedSeats === seat;
-                    return (
-                      <TouchableOpacity
-                        key={seat}
-                        onPress={() => setSelectedSeats(seat)}
+                {offerVehicle === "car" ? (
+                  <View
+                    style={[
+                      styles.seatStepperBox,
+                      { backgroundColor: cardBg, borderColor: border },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={() =>
+                        setSelectedSeats((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={selectedSeats <= 1}
+                      style={[
+                        styles.stepperBtn,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          borderColor: border,
+                          opacity: selectedSeats <= 1 ? 0.35 : 1,
+                        },
+                      ]}
+                      hitSlop={6}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={16}
+                        color={selectedSeats <= 1 ? textMute : textPrimary}
+                      />
+                    </TouchableOpacity>
+
+                    <View style={styles.stepperValueWrap}>
+                      <Text
                         style={[
-                          styles.seatPill,
-                          {
-                            backgroundColor: active ? "#7C3AED" : cardBg,
-                            borderColor: active ? "#7C3AED" : border,
-                          },
+                          styles.stepperValueText,
+                          { color: textPrimary },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.seatPillText,
-                            { color: active ? "#FFF" : textPrimary },
-                          ]}
-                        >
-                          {seat}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                        {selectedSeats}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.stepperValueSubText,
+                          { color: textMute },
+                        ]}
+                      >
+                        {selectedSeats === 1 ? "seat" : "seats"}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() =>
+                        setSelectedSeats((prev) => Math.min(8, prev + 1))
+                      }
+                      disabled={selectedSeats >= 8}
+                      style={[
+                        styles.stepperBtn,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          borderColor: border,
+                          opacity: selectedSeats >= 8 ? 0.35 : 1,
+                        },
+                      ]}
+                      hitSlop={6}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={16}
+                        color={selectedSeats >= 8 ? textMute : textPrimary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View
+                    style={[
+                      styles.seatStepperBox,
+                      { backgroundColor: cardBg, borderColor: border },
+                    ]}
+                  >
+                    <View style={styles.stepperValueWrap}>
+                      <Text
+                        style={[
+                          styles.stepperValueText,
+                          { color: textPrimary },
+                        ]}
+                      >
+                        1
+                      </Text>
+                      <Text
+                        style={[
+                          styles.stepperValueSubText,
+                          { color: textMute },
+                        ]}
+                      >
+                        seat
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <View style={{ flex: 1.2 }}>
@@ -1743,6 +1813,40 @@ const styles = StyleSheet.create({
   seatsPriceGrid: {
     flexDirection: "row",
     gap: 12,
+  },
+  seatStepperBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 38,
+    marginTop: 2,
+  },
+  stepperBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    flex: 1,
+  },
+  stepperValueText: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  stepperValueSubText: {
+    fontSize: 11.5,
+    fontWeight: "500",
   },
   seatPillRow: {
     flexDirection: "row",

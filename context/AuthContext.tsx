@@ -224,47 +224,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    console.log("Auth user changed:", user);
-    if (user?.id) {
-      connectSocket(user.id);
-      fetchNotificationsFromApi();
+    console.log("🔔 Push Debug: Auth user changed:", user?.id);
 
-      // Configure Expo Push Notifications
-      PushNotificationService.configureNotificationHandler();
-      PushNotificationService.registerForPushNotificationsAsync();
+    if (!user?.id) {
+      console.log("🔔 Push Debug: No user ID. Skipping push registration.");
+      return;
+    }
 
-      const unsubscribe = PushNotificationService.initPushNotificationListener(
-        (notification) => {
-          console.log("🔔 Global Push Notification Received:", notification);
-          addNotificationToStore({
-            id: notification.id,
-            title: notification.title,
-            message: notification.message || (notification as any).text || "",
-            type: notification.type,
-            timestamp: notification.timestamp || new Date().toISOString(),
-            read: false,
-            data: notification.data,
-          });
-        },
-      );
-      const unsubscribeExpo =
-        PushNotificationService.addExpoNotificationListeners(
-          (notif) => {
-            console.log("🔔 Expo Push Received:", notif.request.content);
-          },
-          (resp) => {
-            console.log(
-              "👆 Expo Push Clicked:",
-              resp.notification.request.content,
-            );
-          },
+    let mounted = true;
+
+    const initializePushNotifications = async () => {
+      try {
+        console.log(
+          "🔔 Push Debug: Starting push registration for user:",
+          user.id,
         );
 
-      return () => {
-        unsubscribe();
-        if (unsubscribeExpo) unsubscribeExpo();
-      };
-    }
+        PushNotificationService.configureNotificationHandler();
+
+        const pushToken =
+          await PushNotificationService.registerForPushNotificationsAsync();
+
+        if (!mounted) return;
+
+        console.log(
+          "🔔 Push Debug: Push registration finished:",
+          pushToken || "NO TOKEN",
+        );
+
+        if (pushToken) {
+          console.log("🔔 Push Debug: Token successfully sent to backend.");
+        } else {
+          console.log("🔔 Push Debug: No push token returned.");
+        }
+      } catch (error) {
+        console.error("🔔 Push Debug: Push registration failed:", error);
+      }
+    };
+
+    connectSocket(user.id);
+    fetchNotificationsFromApi();
+
+    initializePushNotifications();
+
+    const unsubscribe = PushNotificationService.initPushNotificationListener(
+      (notification) => {
+        console.log("🔔 Global Push Notification Received:", notification);
+
+        addNotificationToStore({
+          id: notification.id,
+          title: notification.title,
+          message: notification.message || (notification as any).text || "",
+          type: notification.type,
+          timestamp: notification.timestamp || new Date().toISOString(),
+          read: false,
+          data: notification.data,
+        });
+      },
+    );
+
+    const unsubscribeExpo =
+      PushNotificationService.addExpoNotificationListeners(
+        (notif) => {
+          console.log("🔔 Expo Push Received:", notif.request.content);
+        },
+        (resp) => {
+          console.log(
+            "👆 Expo Push Clicked:",
+            resp.notification.request.content,
+          );
+        },
+      );
+
+    return () => {
+      mounted = false;
+
+      unsubscribe();
+
+      if (unsubscribeExpo) {
+        unsubscribeExpo();
+      }
+    };
   }, [user?.id]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
