@@ -225,9 +225,7 @@ export const UniversalNeedBar: React.FC = () => {
             style={[
               styles.expandModalBtn,
               {
-                backgroundColor: isDark
-                  ? "rgba(99, 102, 241, 0.2)"
-                  : "#EEF2FF",
+                backgroundColor: isDark ? "rgba(99, 102, 241, 0.2)" : "#EEF2FF",
               },
             ]}
             onPress={() => setIsModalOpen(true)}
@@ -282,8 +280,7 @@ export const UniversalNeedBar: React.FC = () => {
             onChangeText={setQuery}
             placeholder={ROTATING_EXAMPLES[placeholderIdx]}
             placeholderTextColor={
-              C.placeholder ||
-              (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
+              C.placeholder || (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
             }
             style={[
               styles.input,
@@ -304,9 +301,7 @@ export const UniversalNeedBar: React.FC = () => {
               <Ionicons
                 name="close-circle"
                 size={17}
-                color={
-                  C.mute || (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")
-                }
+                color={C.mute || (isDark ? "rgba(255,255,255,0.4)" : "#94A3B8")}
               />
             </TouchableOpacity>
           )}
@@ -331,13 +326,7 @@ export const UniversalNeedBar: React.FC = () => {
               <Ionicons
                 name={isListening ? "mic" : "mic-outline"}
                 size={17}
-                color={
-                  isListening
-                    ? "#FFFFFF"
-                    : isDark
-                      ? "#A5B4FC"
-                      : "#6366F1"
-                }
+                color={isListening ? "#FFFFFF" : isDark ? "#A5B4FC" : "#6366F1"}
               />
             </Animated.View>
           </TouchableOpacity>
@@ -349,9 +338,7 @@ export const UniversalNeedBar: React.FC = () => {
             style={[
               styles.inlineListening,
               {
-                backgroundColor: isDark
-                  ? "rgba(239, 68, 68, 0.2)"
-                  : "#FEE2E2",
+                backgroundColor: isDark ? "rgba(239, 68, 68, 0.2)" : "#FEE2E2",
               },
             ]}
           >
@@ -362,7 +349,8 @@ export const UniversalNeedBar: React.FC = () => {
                 { color: isDark ? "#FCA5A5" : "#B91C1C" },
               ]}
             >
-              Listening... Speak your requirement (e.g. "I need a bike mechanic")
+              Listening... Speak your requirement (e.g. "I need a bike
+              mechanic")
             </Text>
           </View>
         )}
@@ -373,9 +361,7 @@ export const UniversalNeedBar: React.FC = () => {
             style={[
               styles.feedbackToast,
               {
-                backgroundColor: isDark
-                  ? "rgba(239, 68, 68, 0.2)"
-                  : "#FEE2E2",
+                backgroundColor: isDark ? "rgba(239, 68, 68, 0.2)" : "#FEE2E2",
                 marginTop: 8,
               },
             ]}
@@ -409,9 +395,7 @@ export const UniversalNeedBar: React.FC = () => {
             style={[
               styles.feedbackToast,
               {
-                backgroundColor: isDark
-                  ? "rgba(34, 197, 94, 0.2)"
-                  : "#DCFCE7",
+                backgroundColor: isDark ? "rgba(34, 197, 94, 0.2)" : "#DCFCE7",
               },
             ]}
           >
@@ -540,8 +524,7 @@ export const UniversalNeedBar: React.FC = () => {
                 styles.matchExplanation,
                 {
                   color:
-                    C.sub ||
-                    (isDark ? "rgba(255,255,255,0.75)" : "#334155"),
+                    C.sub || (isDark ? "rgba(255,255,255,0.75)" : "#334155"),
                 },
               ]}
             >
@@ -597,9 +580,7 @@ export const UniversalNeedBar: React.FC = () => {
                             style={[
                               styles.itemPillText,
                               {
-                                color: isDark
-                                  ? "#F1F5F9"
-                                  : matchedIntent.color,
+                                color: isDark ? "#F1F5F9" : matchedIntent.color,
                               },
                             ]}
                           >
@@ -743,7 +724,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
     paddingVertical: 4,
   },

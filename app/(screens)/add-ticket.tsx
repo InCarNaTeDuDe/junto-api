@@ -17,7 +17,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/hooks/useStyles";
 import { ApiService } from "@/services/api";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { JuntoScreenHeader } from "@/components/JuntoScreenHeader";
 
 // Hero banner (headline, subtext and trust pill are baked into the artwork)
 const HERO_IMAGE = require("@/assets/screens/sell-ticket-hero.png");
@@ -419,6 +423,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   from,
 }) => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark, primary, text, sub, placeholder } = theme;
 
@@ -516,15 +521,21 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   const handleHeaderBack = () => {
     if (onBack) {
       onBack();
-    } else if (router) {
-      router.replace("/(tabs)/create");
+    } else if (onClose) {
+      onClose();
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
     }
   };
 
   const handleHeaderClose = () => {
     if (onClose) {
       onClose();
-    } else if (router) {
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
       router.replace("/(tabs)");
     }
   };
@@ -534,9 +545,19 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
       style={styles.container}
       edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
     >
+      <JuntoScreenHeader
+        title="Sell Ticket"
+        subtitle="Swap or sell extra movie & event tickets"
+        showBack={true}
+        onBack={handleHeaderBack}
+        onClose={onClose ? handleHeaderClose : undefined}
+      />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Top Header */}

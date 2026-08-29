@@ -10,7 +10,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 
@@ -120,7 +123,8 @@ const LOCAL_HACKS = [
 
 export default function NewHereScreen() {
   const router = useRouter();
-  const { theme: t, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const { selectedLocation } = useLocation();
   const rawCity = selectedLocation?.name || "Hyderabad";
   const cityShort = rawCity.split(",")[0].trim();
@@ -130,7 +134,7 @@ export default function NewHereScreen() {
   );
   const [joinedGroup, setJoinedGroup] = useState(false);
 
-  const places = PLACES_GUIDE["hyderabad"] || PLACES_GUIDE["hyderabad"];
+  const places = PLACES_GUIDE["hyderabad"] || [];
 
   const bg = isDark ? "#0B0F19" : "#F8FAFC";
   const cardBg = isDark ? "#131C2E" : "#FFFFFF";
@@ -276,7 +280,10 @@ export default function NewHereScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollBody}
+        contentContainerStyle={[
+          styles.scrollBody,
+          { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "spots" && (

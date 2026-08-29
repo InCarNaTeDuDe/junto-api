@@ -17,7 +17,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { JuntoScreenHeader } from "@/components/JuntoScreenHeader";
 
 /**
  * Hero illustration with baked-in headline, subtext and trust pills.
@@ -562,7 +566,6 @@ const createStyles = (t: any) => {
   };
 };
 
-
 const DayMatesForm: React.FC<DayMatesFormProps> = ({
   colors: propColors,
   selectedLocation: propLocation = "Koramangala, Bengaluru",
@@ -572,6 +575,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   from,
 }) => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark, primary, text, sub } = theme;
 
@@ -584,6 +588,18 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
       : (currentLocation as any)?.name ||
         (currentLocation as any)?.address ||
         "Koramangala, Bengaluru";
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (onClose) {
+      onClose();
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
 
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem>(
     DAYMATE_ACTIVITIES[0],
@@ -707,9 +723,19 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
       style={styles.container}
       edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
     >
+      <JuntoScreenHeader
+        title="Day Mates"
+        subtitle="Find activity partners & buddies nearby"
+        showBack={true}
+        onBack={handleBack}
+        onClose={onClose}
+      />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

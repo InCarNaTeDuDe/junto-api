@@ -1,4 +1,3 @@
-import { useAuthContext } from "@/context/AuthContext";
 import { useLocation } from "@/context/LocationContext";
 import { CITIES } from "@/data/cities";
 import { useTheme } from "@/hooks/useTheme";
@@ -21,11 +20,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LocationSearch() {
-  const { theme: t, isDark } = useTheme();
+  const { theme: t } = useTheme();
 
   const s = useMemo(() => createStyles(t), [t]);
 
-  const { theme } = useAuthContext();
   const [search, setSearch] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
 
@@ -112,9 +110,9 @@ export default function LocationSearch() {
         }}
       >
         {locationLoading ? (
-          <ActivityIndicator size="small" color={theme.primary} />
+          <ActivityIndicator size="small" color={t.primary} />
         ) : (
-          <Ionicons name="locate" size={22} color={theme.primary} />
+          <Ionicons name="locate" size={22} color={t.primary} />
         )}
 
         <View style={{ marginLeft: 14, flex: 1 }}>
@@ -122,7 +120,7 @@ export default function LocationSearch() {
             style={{
               fontSize: 16,
               fontWeight: "600",
-              color: theme.text,
+              color: t.text,
             }}
           >
             {locationLoading
@@ -132,7 +130,7 @@ export default function LocationSearch() {
 
           <Text
             style={{
-              color: theme.sub,
+              color: t.sub,
               marginTop: 2,
             }}
           >
@@ -157,32 +155,32 @@ export default function LocationSearch() {
           flexDirection: "row",
           alignItems: "center",
 
-          backgroundColor: theme.inputBg,
+          backgroundColor: t.inputBg,
 
           borderWidth: 1,
-          borderColor: theme.inputBorder,
+          borderColor: t.inputBorder,
 
           borderRadius: 14,
 
           paddingHorizontal: 14,
         }}
       >
-        <Ionicons name="search" size={20} color={theme.icon} />
+        <Ionicons name="search" size={20} color={t.icon} />
 
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Search city"
-          placeholderTextColor={theme.placeholder}
+          placeholderTextColor={t.placeholder}
           autoFocus
-          selectionColor={theme.primary}
-          cursorColor={theme.primary}
+          selectionColor={t.primary}
+          cursorColor={t.primary}
           style={s.input_location}
         />
 
         {search.length > 0 && (
           <Pressable onPress={() => setSearch("")} hitSlop={8}>
-            <Ionicons name="close-circle" size={20} color={theme.mute} />
+            <Ionicons name="close-circle" size={20} color={t.mute} />
           </Pressable>
         )}
       </View>

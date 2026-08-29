@@ -8,755 +8,668 @@ import {
   ScrollView,
   Animated,
   Easing,
-  Alert,
   Platform,
+  useWindowDimensions,
+  Modal,
+  Share,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-import { ApiService } from "@/services/api";
-import { useLocation } from "@/context/LocationContext";
-import { useAuthContext } from "@/context/AuthContext";
-import { useTheme } from "@/hooks/useTheme";
 import { router } from "expo-router";
+import { useLocation } from "@/context/LocationContext";
+import { useTheme } from "@/hooks/useTheme";
+import { ApiService } from "@/services/api";
+import { PushNotificationService } from "@/services/notifications";
 
-import { SpinnerLoader } from "@/components/SpinnerLoader";
-
-type FilterCategory = "all" | "buddies" | "tickets" | "lost" | "events";
-
-interface RadarUserNode {
+interface Activity {
   id: string;
-  name: string;
-  avatar: string;
-  distance: string;
-  activityTag: string;
-  category: "buddies" | "tickets" | "lost" | "events";
-  status: "online" | "away";
-  topPct: string;
-  leftPct: string;
-  rawItem?: any;
-}
-
-interface ActivePostCard {
-  id: string;
-  categoryTag: string;
-  categoryType: "buddies" | "tickets" | "lost" | "events";
-  tagBg: string;
-  tagColor: string;
-  timeAgo: string;
   title: string;
-  subtitle: string;
-  location: string;
-  avatars: string[];
-  avatarText: string;
-  actionLabel: string;
-  rawItem?: any;
+  place: string;
+  user: string;
+  userAvatar?: string;
+  activityEmoji?: string;
+  category: string;
+  time: string;
+  count: number;
+  remainingSeats?: number;
+  desc?: string;
 }
 
-const DEFAULT_RADAR_NODES: RadarUserNode[] = [];
-const DEFAULT_ACTIVE_CARDS: ActivePostCard[] = [];
+interface RadarPin {
+  id: string;
+  cat: string;
+  title: string;
+  icon: string;
+  count: number;
+  top: string;
+  left: string;
+  place?: string;
+  user?: string;
+  userAvatar?: string;
+  desc?: string;
+}
+
+const CATEGORY_META: Record<string, { label: string; emoji: string }> = {
+  movies: { label: "Movies", emoji: "🎬" },
+  gym: { label: "Gym", emoji: "🏋️" },
+  coffee: { label: "Coffee", emoji: "☕" },
+  walking: { label: "Walking", emoji: "🚶" },
+  cricket: { label: "Cricket", emoji: "🏏" },
+  study: { label: "Study", emoji: "👥" },
+  cycling: { label: "Cycling", emoji: "🚲" },
+  photo: { label: "Photo", emoji: "📷" },
+  other: { label: "Activity", emoji: "✨" },
+};
+
+function getCategoryFromText(text: string): string {
+  const t = text.toLowerCase();
+  if (t.includes("movie") || t.includes("cinema") || t.includes("film"))
+    return "movies";
+  if (t.includes("gym") || t.includes("workout") || t.includes("fit"))
+    return "gym";
+  if (t.includes("coffee") || t.includes("cafe") || t.includes("food"))
+    return "coffee";
+  if (t.includes("walk") || t.includes("stroll")) return "walking";
+  if (t.includes("cricket") || t.includes("sport") || t.includes("match"))
+    return "cricket";
+  if (t.includes("study") || t.includes("read") || t.includes("work"))
+    return "study";
+  if (t.includes("cycl") || t.includes("bike") || t.includes("ride"))
+    return "cycling";
+  if (t.includes("photo") || t.includes("shoot")) return "photo";
+  return "other";
+}
 
 export default function ExploreScreen() {
-  const { user } = useAuthContext();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { isDark } = useTheme();
   const { selectedLocation } = useLocation();
-  const { theme: t, isDark } = useTheme();
+  const cityName = selectedLocation?.name?.split(",")[0]?.trim() || "Hyderabad";
 
-  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>("all");
-  const [radarNodes, setRadarNodes] = useState<RadarUserNode[]>([]);
-  const [activeCards, setActiveCards] = useState<ActivePostCard[]>([]);
-  const [selectedNode, setSelectedNode] = useState<RadarUserNode | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedAct, setSelectedAct] = useState<Activity | null>(null);
+  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>({});
 
-  // Radar animation sweep angle
+  // Radar continuous rotation animation
   const sweepAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.timing(sweepAnim, {
         toValue: 1,
-        duration: 4000,
+        duration: 3600,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
     ).start();
-  }, [sweepAnim]);
 
-  // Load backend items & merge dynamically
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.25,
+          duration: 1200,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [sweepAnim, pulseAnim]);
+
+  // Fetch real activities from API
   useEffect(() => {
     let isMounted = true;
-    const loadExploreData = async () => {
-      setIsLoading(true);
-      try {
-        const responsePins = (await ApiService.post(
-          "/api/activity/explore",
-        )) as any[];
-        const list = Array.isArray(responsePins) ? responsePins : [];
+    ApiService.post<{ userActivities?: any[] }>(
+      "/api/activity/activities-around",
+      {
+        locationName: selectedLocation?.name || cityName,
+        locationState: selectedLocation?.state || "Telangana",
+        latitude: selectedLocation?.latitude || 17.385,
+        longitude: selectedLocation?.longitude || 78.4867,
+      },
+    )
+      .then((res) => {
+        if (!isMounted) return;
+        const list = res?.userActivities || [];
+        const parsed: Activity[] = list.map((item: any, i: number) => {
+          const cat = getCategoryFromText(
+            `${item.type || ""} ${item.title || ""} ${item.category || ""}`,
+          );
+          const meta = CATEGORY_META[cat] || CATEGORY_META.other;
+          return {
+            id: String(item.id || `act-${i}`),
+            title: item.title || `${meta.label} Meetup`,
+            place: item.place || item.venue || cityName,
+            user: item.user || item.ownerName || "Junto Host",
+            userAvatar:
+              item.userAvatar ||
+              item.ownerAvatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || "Host")}&background=7C3AED&color=fff`,
+            activityEmoji: item.activityEmoji || meta.emoji,
+            category: cat,
+            time: item.createdAt
+              ? `${Math.max(1, Math.floor((Date.now() - new Date(item.createdAt).getTime()) / 60000))}m ago`
+              : `${(i + 1) * 5}m ago`,
+            count: item.remainingSeats
+              ? Math.max(1, (item.maxParticipants || 6) - item.remainingSeats)
+              : 2 + (i % 4),
+            remainingSeats: item.remainingSeats,
+            desc:
+              item.description ||
+              item.rightSub ||
+              `Looking for companions to join for ${meta.label} at ${item.place || cityName}.`,
+          };
+        });
+        setActivities(parsed);
+      })
+      .catch(() => {
+        if (isMounted) setActivities([]);
+      });
 
-        if (isMounted) {
-          // Map backend pins into radar nodes
-          const mappedNodes: RadarUserNode[] = list.map((item, idx) => {
-            const cat: FilterCategory =
-              item.type === "ticket"
-                ? "tickets"
-                : item.type === "lost"
-                  ? "lost"
-                  : "buddies";
-
-            // Positions arranged around radar circle
-            const positions = [
-              { top: "18%", left: "45%" },
-              { top: "36%", left: "15%" },
-              { top: "37%", left: "73%" },
-              { top: "56%", left: "16%" },
-              { top: "65%", left: "44%" },
-              { top: "57%", left: "73%" },
-            ];
-
-            const pos = positions[idx % positions.length];
-
-            return {
-              id: item.id || `api-node-${idx}`,
-              name: item.ownerName || "Junto User",
-              avatar:
-                item.ownerAvatar ||
-                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-              distance:
-                item.distance || `${(1.2 + (idx % 4) * 0.7).toFixed(1)} km`,
-              activityTag: item.title || "Buddy Plan",
-              category: cat,
-              status: idx % 2 === 0 ? "online" : "away",
-              topPct: pos.top,
-              leftPct: pos.left,
-              rawItem: item,
-            };
-          });
-
-          // Also map into cards for bottom horizontal scroll
-          const mappedCards: ActivePostCard[] = list.map((item, idx) => {
-            const isTicket = item.type === "ticket";
-            const isLost = item.type === "lost";
-
-            return {
-              id: item.id || `api-card-${idx}`,
-              categoryTag: isTicket
-                ? "Ticket for Sale"
-                : isLost
-                  ? "Lost & Found"
-                  : "Day Mate Plan",
-              categoryType: isTicket ? "tickets" : isLost ? "lost" : "buddies",
-              tagBg: isTicket
-                ? isDark
-                  ? "rgba(37, 99, 235, 0.25)"
-                  : "#DBEAFE"
-                : isLost
-                  ? isDark
-                    ? "rgba(16, 185, 129, 0.25)"
-                    : "#D1FAE5"
-                  : isDark
-                    ? "rgba(217, 119, 6, 0.25)"
-                    : "#FEF3C7",
-              tagColor: isTicket
-                ? isDark
-                  ? "#60A5FA"
-                  : "#1D4ED8"
-                : isLost
-                  ? isDark
-                    ? "#34D399"
-                    : "#047857"
-                  : isDark
-                    ? "#FBBF24"
-                    : "#B45309",
-              timeAgo: `${(idx + 1) * 12}m ago`,
-              title: item.title,
-              subtitle: item.venue || "Nearby location",
-              location: item.venue || "Koramangala, Bengaluru",
-              avatars: [
-                item.ownerAvatar ||
-                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
-              ],
-              avatarText: item.price ? item.price : "1 connected",
-              actionLabel: isTicket ? "View" : isLost ? "Details" : "Connect",
-              rawItem: item,
-            };
-          });
-
-          setRadarNodes(mappedNodes);
-          setActiveCards(mappedCards);
-        }
-      } catch (err) {
-        console.warn("Could not fetch explore pins:", err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadExploreData();
     return () => {
       isMounted = false;
     };
-  }, [isDark]);
+  }, [cityName, selectedLocation]);
 
-  // Filtered radar nodes and cards based on category select
-  const filteredNodes = useMemo(() => {
-    if (selectedFilter === "all") return radarNodes;
-    return radarNodes.filter((node) => node.category === selectedFilter);
-  }, [radarNodes, selectedFilter]);
+  // Small, compact top filter chips
+  const categoryChips = useMemo(() => {
+    return [
+      { id: "all", label: "All", emoji: "✨", count: 48 },
+      { id: "movies", label: "Movies", emoji: "🎬", count: 14 },
+      { id: "gym", label: "Gym", emoji: "🏋️", count: 3 },
+      { id: "coffee", label: "Coffee", emoji: "☕", count: 23 },
+      { id: "walking", label: "Walking", emoji: "🚶", count: 18 },
+      { id: "cricket", label: "Cricket", emoji: "🏏", count: 9 },
+      { id: "study", label: "Study", emoji: "👥", count: 6 },
+      { id: "cycling", label: "Cycling", emoji: "🚲", count: 5 },
+    ];
+  }, []);
 
-  const filteredCards = useMemo(() => {
-    if (selectedFilter === "all") return activeCards;
-    return activeCards.filter((card) => card.categoryType === selectedFilter);
-  }, [activeCards, selectedFilter]);
-
-  // Handle card press / chat connection
-  const handleItemPress = (
-    title: string,
-    ownerName: string,
-    id: string,
-    venue: string,
-    avatar: string,
-    price?: string,
-  ) => {
-    router.push({
-      pathname: "/(screens)/activity-chat",
-      params: {
-        activityId: id,
-        title: title || "Activity Plan",
-        user: ownerName || "Junto User",
-        userId: id || "act-1",
-        place: venue || "Nearby",
-        right: price || "Connect",
-        type: "EXPLORE ACTIVITY",
-        avatar:
-          avatar ||
-          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+  // Pins on Radar - specifically showing requested movie 14, gym 3 and radar spots
+  const radarPins: RadarPin[] = useMemo(() => {
+    return [
+      {
+        id: "pin-movie-14",
+        cat: "movies",
+        title: "Weekend Movie Screening & Discussion",
+        icon: "🎬",
+        count: 14,
+        top: "26%",
+        left: "20%",
+        place: `PVR Cinemas, ${cityName}`,
+        user: "Kavya S.",
+        userAvatar:
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        desc: "Watching the latest sci-fi release followed by a coffee chat. 14 people attending!",
       },
-    });
-  };
+      {
+        id: "pin-gym-3",
+        cat: "gym",
+        title: "Evening Workout & Strength Training",
+        icon: "🏋️",
+        count: 3,
+        top: "34%",
+        left: "74%",
+        place: `Cult.Fit / Gold's Gym, ${cityName}`,
+        user: "Rohit Verma",
+        userAvatar:
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+        desc: "Upper body and core session. Looking for 1-2 workout partners to push reps together.",
+      },
+      {
+        id: "pin-coffee-23",
+        cat: "coffee",
+        title: "Specialty Coffee & Chill Conversation",
+        icon: "☕",
+        count: 23,
+        top: "21%",
+        left: "58%",
+        place: `Roastery Coffee House, ${cityName}`,
+        user: "Ananya Rao",
+        userAvatar:
+          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+        desc: "Relaxed meetup for coffee lovers, founders, and creators in town.",
+      },
+      {
+        id: "pin-walking-18",
+        cat: "walking",
+        title: "Sunset Walk & Jogging Circle",
+        icon: "🚶",
+        count: 18,
+        top: "60%",
+        left: "14%",
+        place: `KBR Park Promenade, ${cityName}`,
+        user: "Vikram N.",
+        userAvatar:
+          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+        desc: "5km evening brisk walk and lake breeze. Casual pace open to all fitness levels.",
+      },
+      {
+        id: "pin-cricket-9",
+        cat: "cricket",
+        title: "Turf Box Cricket Match",
+        icon: "🏏",
+        count: 9,
+        top: "68%",
+        left: "64%",
+        place: `GameOn Sports Arena, ${cityName}`,
+        user: "Sameer Khan",
+        userAvatar:
+          "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80",
+        desc: "Short overs casual turf cricket. Need a few more players to balance 6v6 teams.",
+      },
+    ];
+  }, [cityName]);
 
-  // Interpolated rotation for radar sweep
-  const sweepSpin = sweepAnim.interpolate({
+  const spin = sweepAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
-  const locationNameDisplay =
-    selectedLocation?.name ||
-    selectedLocation?.city ||
-    "Koramangala, Bengaluru";
+  const bg = isDark ? "#0A0D14" : "#F8FAFC";
+  const cardBg = isDark ? "#121826" : "#FFFFFF";
+  const textMain = isDark ? "#FFFFFF" : "#0F172A";
+  const textSub = isDark ? "#94A3B8" : "#64748B";
+  const borderCol = isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0";
 
-  const userNameDisplay = user?.name ? user.name.split(" ")[0] : "Bharath";
+  const handleSelectPin = (pin: RadarPin) => {
+    // Check if real activity matches, else use rich pin object
+    const realMatch = activities.find((a) => a.category === pin.cat);
+    if (realMatch) {
+      setSelectedAct(realMatch);
+    } else {
+      setSelectedAct({
+        id: pin.id,
+        title: pin.title,
+        place: pin.place || cityName,
+        user: pin.user || "Junto Host",
+        userAvatar: pin.userAvatar,
+        activityEmoji: pin.icon,
+        category: pin.cat,
+        time: "Active now",
+        count: pin.count,
+        desc: pin.desc,
+      });
+    }
+  };
 
-  // Dynamic Theme Colors
-  const bgColor = isDark ? "#070414" : "#F8FAFC";
-  const headerTextColor = isDark ? "#FFFFFF" : "#0F172A";
-  const subTextColor = isDark ? "#CBD5E1" : "#475569";
-  const iconBtnBg = isDark ? "rgba(255, 255, 255, 0.08)" : "#FFFFFF";
-  const iconBtnBorder = isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0";
-  const iconColor = isDark ? "#FFFFFF" : "#7C3AED";
-
-  const bannerBg = isDark ? "rgba(24, 15, 48, 0.75)" : "#F3E8FF";
-  const bannerBorder = isDark ? "rgba(168, 85, 247, 0.25)" : "#DDD6FE";
-  const bannerTitleColor = isDark ? "#FFFFFF" : "#3B0764";
-  const bannerSubColor = isDark ? "#94A3B8" : "#6B21A8";
-
-  const pillBg = isDark ? "rgba(255, 255, 255, 0.06)" : "#FFFFFF";
-  const pillBorder = isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0";
-  const pillTextInact = isDark ? "#94A3B8" : "#64748B";
-
-  const stageBg = isDark ? "#0B0621" : "#F1F5F9";
-  const stageBorder = isDark ? "rgba(168, 85, 247, 0.18)" : "#E2E8F0";
-  const ringColor = isDark
-    ? "rgba(139, 92, 246, 0.2)"
-    : "rgba(139, 92, 246, 0.25)";
-
-  const overlayBg = isDark
-    ? "rgba(18, 12, 38, 0.85)"
-    : "rgba(255, 255, 255, 0.92)";
-  const overlayBorder = isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0";
-  const overlayText = isDark ? "#FFFFFF" : "#0F172A";
-
-  const nodeNameColor = isDark ? "#FFFFFF" : "#0F172A";
-  const nodeDistColor = isDark ? "#94A3B8" : "#64748B";
-  const nodeTagBg = isDark ? "rgba(49, 27, 94, 0.9)" : "#F3E8FF";
-  const nodeTagText = isDark ? "#C084FC" : "#7C3AED";
-
-  const cardBg = isDark ? "#110B29" : "#FFFFFF";
-  const cardBorder = isDark ? "rgba(255, 255, 255, 0.09)" : "#E2E8F0";
-  const cardTitleColor = isDark ? "#FFFFFF" : "#0F172A";
-  const cardSubColor = isDark ? "#94A3B8" : "#64748B";
-
-  const coneColor = isDark
-    ? "rgba(168, 85, 247, 0.35)"
-    : "rgba(139, 92, 246, 0.32)";
+  const handleJoin = async (act: Activity) => {
+    setJoinedMap((prev) => ({ ...prev, [act.id]: !prev[act.id] }));
+    if (!joinedMap[act.id]) {
+      try {
+        await PushNotificationService.joinActivityAndNotifyOwner(act.id);
+      } catch {}
+    }
+  };
 
   return (
     <SafeAreaView
-      style={[s.container, { backgroundColor: bgColor }]}
-      edges={["top", "bottom"]}
+      style={[s.container, { backgroundColor: bg }]}
+      edges={["top"]}
     >
-      {/* 1. TOP HEADER BAR */}
-      {/* <View style={[s.headerBar, { backgroundColor: bgColor }]}>
-        <View style={s.headerLeft}>
-          <Text style={[s.greetingText, { color: headerTextColor }]}>
-            Good evening, {userNameDisplay} 👋
-          </Text>
-          <TouchableOpacity
-            style={s.locationPickerRow}
-            onPress={() => router.push("/(screens)/location-search")}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="location" size={14} color="#A855F7" />
-            <Text
-              style={[s.locationText, { color: subTextColor }]}
-              numberOfLines={1}
-            >
-              {locationNameDisplay}
-            </Text>
-            <Ionicons name="chevron-down" size={14} color={subTextColor} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={s.headerActions}>
-          <TouchableOpacity
-            style={[
-              s.iconButton,
-              { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
-            ]}
-            onPress={() => router.push("/(screens)/location-search")}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="search-outline" size={18} color={iconColor} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              s.iconButton,
-              { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
-            ]}
-            onPress={() => router.push("/(screens)/ask-nearby")}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="options-outline" size={18} color={iconColor} />
-          </TouchableOpacity>
-        </View>
-      </View> */}
-
-      <ScrollView
-        style={s.scrollContainer}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 2. RADAR ACTIVE BANNER CARD */}
-        <View
-          style={[
-            s.radarBannerCard,
-            { backgroundColor: bannerBg, borderColor: bannerBorder },
-          ]}
+      {/* 1. CLEAN COMPACT HEADER */}
+      <View style={s.topHeader}>
+        <TouchableOpacity
+          style={s.citySelector}
+          activeOpacity={0.7}
+          onPress={() => router.push("/(screens)/location-search")}
         >
-          <View style={s.radarIconCircle}>
-            <Ionicons name="compass-outline" size={20} color="#C084FC" />
-          </View>
+          <Text style={[s.exploreTitle, { color: textMain }]}>
+            Explore <Text style={{ color: "#7C3AED" }}>{cityName}</Text>
+          </Text>
+          <Ionicons name="chevron-down" size={16} color="#7C3AED" />
+        </TouchableOpacity>
+        <Text style={[s.exploreSubtitle, { color: textSub }]}>
+          People & activities happening in your city
+        </Text>
+      </View>
 
-          <View style={s.radarBannerTexts}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <Text style={[s.radarBannerTitle, { color: bannerTitleColor }]}>
-                Radar active
-              </Text>
-              <View style={s.activeDot} />
-            </View>
-            <Text style={[s.radarBannerSubtext, { color: bannerSubColor }]}>
-              Showing people within 5 km of your location
-            </Text>
-          </View>
-
-          {/* Radar target animated element */}
-          <View style={s.radarBannerGraphic}>
-            <View style={s.miniRadarRing1} />
-            <View style={s.miniRadarRing2} />
-            <View style={s.miniRadarCenterDot} />
-          </View>
-        </View>
-
-        {/* 3. CATEGORY FILTER PILLS */}
+      {/* 2. SMALL, SLEEK COMPACT CHIPS */}
+      <View style={s.chipContainer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={s.filterScrollView}
-          contentContainerStyle={s.filterRow}
+          contentContainerStyle={s.chipList}
         >
-          <TouchableOpacity
-            style={[
-              s.filterPill,
-              { backgroundColor: pillBg, borderColor: pillBorder },
-              selectedFilter === "all" && s.filterPillActive,
-            ]}
-            onPress={() => setSelectedFilter("all")}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="apps"
-              size={14}
-              color={selectedFilter === "all" ? "#FFFFFF" : pillTextInact}
-            />
-            <Text
-              style={[
-                s.filterPillText,
-                { color: pillTextInact },
-                selectedFilter === "all" && s.filterPillTextActive,
-              ]}
-            >
-              All
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              s.filterPill,
-              { backgroundColor: pillBg, borderColor: pillBorder },
-              selectedFilter === "buddies" && s.filterPillActive,
-            ]}
-            onPress={() => setSelectedFilter("buddies")}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="people"
-              size={14}
-              color={selectedFilter === "buddies" ? "#FFFFFF" : pillTextInact}
-            />
-            <Text
-              style={[
-                s.filterPillText,
-                { color: pillTextInact },
-                selectedFilter === "buddies" && s.filterPillTextActive,
-              ]}
-            >
-              Buddies
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              s.filterPill,
-              { backgroundColor: pillBg, borderColor: pillBorder },
-              selectedFilter === "tickets" && s.filterPillActive,
-            ]}
-            onPress={() => setSelectedFilter("tickets")}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="ticket"
-              size={14}
-              color={selectedFilter === "tickets" ? "#FFFFFF" : pillTextInact}
-            />
-            <Text
-              style={[
-                s.filterPillText,
-                { color: pillTextInact },
-                selectedFilter === "tickets" && s.filterPillTextActive,
-              ]}
-            >
-              Tickets
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              s.filterPill,
-              { backgroundColor: pillBg, borderColor: pillBorder },
-              selectedFilter === "lost" && s.filterPillActive,
-            ]}
-            onPress={() => setSelectedFilter("lost")}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="briefcase"
-              size={14}
-              color={selectedFilter === "lost" ? "#FFFFFF" : pillTextInact}
-            />
-            <Text
-              style={[
-                s.filterPillText,
-                { color: pillTextInact },
-                selectedFilter === "lost" && s.filterPillTextActive,
-              ]}
-            >
-              Lost & Found
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              s.filterPill,
-              { backgroundColor: pillBg, borderColor: pillBorder },
-              selectedFilter === "events" && s.filterPillActive,
-            ]}
-            onPress={() => setSelectedFilter("events")}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="calendar"
-              size={14}
-              color={selectedFilter === "events" ? "#FFFFFF" : pillTextInact}
-            />
-            <Text
-              style={[
-                s.filterPillText,
-                { color: pillTextInact },
-                selectedFilter === "events" && s.filterPillTextActive,
-              ]}
-            >
-              Events
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* 4. CENTRAL RADAR DISPLAY AREA */}
-        <View
-          style={[
-            s.radarStageContainer,
-            { backgroundColor: stageBg, borderColor: stageBorder },
-          ]}
-        >
-          {/* Circular Concentric Rings */}
-          <View style={[s.radarRingOuter, { borderColor: ringColor }]} />
-          <View style={[s.radarRingMiddle, { borderColor: ringColor }]} />
-          <View style={[s.radarRingInner, { borderColor: ringColor }]} />
-
-          {/* Rotating Radar Sweep Beam (THIN CONE SHAPE) */}
-          <Animated.View
-            style={[
-              s.radarSweepContainer,
-              { transform: [{ rotate: sweepSpin }] },
-            ]}
-          >
-            <View style={[s.radarSweepCone, { borderTopColor: coneColor }]} />
-          </Animated.View>
-
-          {/* Glowing Center Pin (User Location) */}
-          <View style={s.centerPinWrapper}>
-            <View style={s.centerPinGlow} />
-            <View style={s.centerPinDot}>
-              <Ionicons name="location" size={16} color="#FFFFFF" />
-            </View>
-          </View>
-
-          {/* Top-Right Around You Overlay Pill */}
-          <View
-            style={[
-              s.aroundYouOverlay,
-              { backgroundColor: overlayBg, borderColor: overlayBorder },
-            ]}
-          >
-            <Ionicons name="people" size={13} color="#C084FC" />
-            <Text style={[s.aroundYouText, { color: overlayText }]}>
-              {filteredNodes.length * 2} around you
-            </Text>
-          </View>
-
-          {/* Bottom-Right Re-center Target Floating Button */}
-          <TouchableOpacity
-            style={[
-              s.recenterButton,
-              { backgroundColor: overlayBg, borderColor: overlayBorder },
-            ]}
-            onPress={() =>
-              Alert.alert(
-                "Radar Updated",
-                "Scanned 5km radius around your location.",
-              )
-            }
-            activeOpacity={0.8}
-          >
-            <Ionicons name="navigate-circle" size={22} color="#C084FC" />
-          </TouchableOpacity>
-
-          {/* Render User Radar Nodes */}
-          {filteredNodes.map((node) => {
+          {categoryChips.map((c) => {
+            const isSelected = selectedCategory === c.id;
             return (
               <TouchableOpacity
-                key={node.id}
+                key={c.id}
                 style={[
-                  s.radarNodeItem,
-                  { top: node.topPct as any, left: node.leftPct as any },
+                  s.smallChip,
+                  {
+                    backgroundColor: isSelected
+                      ? isDark
+                        ? "rgba(124, 58, 237, 0.22)"
+                        : "#EDE9FE"
+                      : cardBg,
+                    borderColor: isSelected ? "#7C3AED" : borderCol,
+                  },
                 ]}
-                onPress={() => {
-                  setSelectedNode(node);
-                  handleItemPress(
-                    node.activityTag,
-                    node.name,
-                    node.id,
-                    "Nearby",
-                    node.avatar,
-                  );
-                }}
-                activeOpacity={0.85}
+                onPress={() => setSelectedCategory(c.id)}
+                activeOpacity={0.75}
               >
-                <View style={s.avatarWrapper}>
-                  <Image
-                    source={{ uri: node.avatar }}
-                    style={s.nodeAvatar as any}
-                  />
-                  <View
-                    style={[
-                      s.statusDotBadge,
-                      { borderColor: stageBg },
-                      node.status === "online" ? s.statusOnline : s.statusAway,
-                    ]}
-                  />
-                </View>
-
-                <Text style={[s.nodeName, { color: nodeNameColor }]}>
-                  {node.name}
-                </Text>
-                <Text style={[s.nodeDistance, { color: nodeDistColor }]}>
-                  {node.distance}
-                </Text>
-
-                <View
-                  style={[s.activityTagPill, { backgroundColor: nodeTagBg }]}
+                <Text style={s.chipEmoji}>{c.emoji}</Text>
+                <Text
+                  style={[
+                    s.chipLabel,
+                    {
+                      color: isSelected ? "#7C3AED" : textMain,
+                      fontWeight: isSelected ? "700" : "500",
+                    },
+                  ]}
                 >
-                  <Text style={[s.activityTagText, { color: nodeTagText }]}>
-                    {node.activityTag}
+                  {c.label}
+                </Text>
+                <View
+                  style={[
+                    s.chipBadge,
+                    {
+                      backgroundColor: isSelected
+                        ? "#7C3AED"
+                        : isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : "#F1F5F9",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.chipBadgeText,
+                      { color: isSelected ? "#FFFFFF" : textSub },
+                    ]}
+                  >
+                    {c.count}
                   </Text>
                 </View>
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
+      </View>
 
-        {/* 5. "ACTIVE AROUND YOU" BOTTOM SECTION */}
-        <View style={s.activeSectionHeader}>
-          <Text style={[s.activeSectionTitle, { color: headerTextColor }]}>
-            Active around you
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/ask-nearby")}
-            activeOpacity={0.7}
+      {/* 3. RADAR SCANNER ONLY (PARTICIPANTS WINDOW IS HIDDEN BY DEFAULT) */}
+      <View style={s.radarSection}>
+        <View style={s.radarMapBg}>
+          {/* Outer Ambient Glow Ring */}
+          <View style={s.ringAmbient} />
+
+          {/* Concentric Scanner Rings with glowing border */}
+          <View style={s.ring4} />
+          <View style={s.ring3} />
+          <View style={s.ring2} />
+          <View style={s.ring1} />
+
+          {/* Crosshairs */}
+          <View style={s.crosshairV} />
+          <View style={s.crosshairH} />
+
+          {/* Darker/Thicker Purple Scanner Sweep Wing */}
+          <Animated.View
+            style={[s.sweepWrapper, { transform: [{ rotate: spin }] }]}
           >
-            <Text style={s.seeAllText}>See all →</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={s.sweepConeThick} />
+            <View style={s.sweepLeadingEdge} />
+          </Animated.View>
 
-        {/* Horizontal Cards List */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.cardsScrollView}
-          contentContainerStyle={s.cardsRow}
-        >
-          {filteredCards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={[
-                s.cardItem,
-                { backgroundColor: cardBg, borderColor: cardBorder },
-              ]}
-              onPress={() =>
-                handleItemPress(
-                  card.title,
-                  "User",
-                  card.id,
-                  card.location,
-                  card.avatars[0],
-                )
-              }
-              activeOpacity={0.88}
-            >
-              {/* Card Header: Tag & Time */}
-              <View style={s.cardTopRow}>
-                <View
-                  style={[s.categoryTagPill, { backgroundColor: card.tagBg }]}
-                >
-                  <Text style={[s.categoryTagText, { color: card.tagColor }]}>
-                    {card.categoryTag}
-                  </Text>
-                </View>
-                <Text style={s.timeAgoText}>{card.timeAgo}</Text>
-              </View>
+          {/* Premium Glowing Center Location Pin */}
+          <Animated.View
+            style={[s.centerPulseHalo, { transform: [{ scale: pulseAnim }] }]}
+          />
+          <View style={s.centerPinOuter}>
+            <View style={s.centerPinInner}>
+              <Ionicons name="location-sharp" size={17} color="#FFFFFF" />
+            </View>
+          </View>
 
-              {/* Card Title & Subtitle */}
-              <Text
-                style={[s.cardTitle, { color: cardTitleColor }]}
-                numberOfLines={1}
-              >
-                {card.title}
-              </Text>
-              <Text
-                style={[s.cardSubtitle, { color: cardSubColor }]}
-                numberOfLines={1}
-              >
-                {card.subtitle}
-              </Text>
-
-              {/* Card Location */}
-              <View style={s.cardLocationRow}>
-                <Ionicons
-                  name="location-outline"
-                  size={12}
-                  color={cardSubColor}
-                />
-                <Text
-                  style={[s.cardLocationText, { color: cardSubColor }]}
-                  numberOfLines={1}
-                >
-                  {card.location}
-                </Text>
-              </View>
-
-              {/* Card Footer: Joined Avatars & Action Button */}
-              <View
+          {/* Radar Activity Pins (Movie 14, Gym 3, Coffee 23, etc.) */}
+          {radarPins.map((pin) => {
+            const matchesFilter =
+              selectedCategory === "all" || selectedCategory === pin.cat;
+            return (
+              <TouchableOpacity
+                key={pin.id}
                 style={[
-                  s.cardFooterRow,
-                  {
-                    borderColor: isDark
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "#F1F5F9",
+                  s.radarNode,
+                  { top: pin.top as any, left: pin.left as any },
+                  !matchesFilter && {
+                    opacity: 0.22,
+                    transform: [{ scale: 0.85 }],
                   },
                 ]}
+                onPress={() => {
+                  setSelectedCategory(pin.cat);
+                  handleSelectPin(pin);
+                }}
+                activeOpacity={0.85}
               >
-                <View style={s.avatarsStackRow}>
-                  <View style={s.avatarsContainer}>
-                    {card.avatars.map((av, idx) => (
-                      <Image
-                        key={idx}
-                        source={{ uri: av }}
-                        style={[
-                          s.stackedAvatar as any,
-                          {
-                            marginLeft: idx > 0 ? -8 : 0,
-                            zIndex: 10 - idx,
-                            borderColor: cardBg,
-                          },
-                        ]}
-                      />
-                    ))}
+                <View
+                  style={[
+                    s.nodePill,
+                    { backgroundColor: isDark ? "#1E2433" : "#FFFFFF" },
+                  ]}
+                >
+                  <Text style={s.nodeEmoji}>{pin.icon}</Text>
+                  <View style={s.nodeCountBadge}>
+                    <Text style={s.nodeCountText}>{pin.count}</Text>
                   </View>
-                  <Text style={s.avatarTextCount}>{card.avatarText}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* 4. SLEEK & PROPORTIONATE ACTIVITY MODAL WHEN SELECTED */}
+      {selectedAct && (
+        <Modal
+          animationType="slide"
+          transparent
+          visible={!!selectedAct}
+          onRequestClose={() => setSelectedAct(null)}
+        >
+          <View style={s.overlayBackdrop}>
+            <TouchableOpacity
+              style={s.backdropDismiss}
+              activeOpacity={1}
+              onPress={() => setSelectedAct(null)}
+            />
+
+            {/* Compact, Beautiful Bottom Card */}
+            <View
+              style={[
+                s.bottomCard,
+                {
+                  backgroundColor: cardBg,
+                  borderColor: borderCol,
+                  paddingBottom: Math.max(insets.bottom, 16) + 12,
+                },
+              ]}
+            >
+              {/* Top Handle / Close Row */}
+              <View style={s.cardTopRow}>
+                <View style={s.categoryTag}>
+                  <Text style={{ fontSize: 13 }}>
+                    {selectedAct.activityEmoji}
+                  </Text>
+                  <Text style={s.categoryTagText}>
+                    {selectedAct.category.toUpperCase()}
+                  </Text>
                 </View>
 
                 <TouchableOpacity
-                  style={s.cardActionButton}
-                  onPress={() =>
-                    handleItemPress(
-                      card.title,
-                      "User",
-                      card.id,
-                      card.location,
-                      card.avatars[0],
-                    )
-                  }
-                  activeOpacity={0.8}
+                  style={[
+                    s.circleCloseBtn,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : "#F1F5F9",
+                    },
+                  ]}
+                  onPress={() => setSelectedAct(null)}
+                  hitSlop={8}
                 >
-                  <Text style={s.cardActionText}>{card.actionLabel}</Text>
+                  <Ionicons name="close" size={16} color={textMain} />
                 </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </ScrollView>
+
+              {/* Title & Location */}
+              <Text
+                style={[s.cardTitle, { color: textMain }]}
+                numberOfLines={2}
+              >
+                {selectedAct.title}
+              </Text>
+
+              <View style={s.locRow}>
+                <Ionicons name="location" size={14} color="#7C3AED" />
+                <Text style={[s.locText, { color: textSub }]} numberOfLines={1}>
+                  {selectedAct.place}
+                </Text>
+                <Text style={{ color: textSub, marginHorizontal: 4 }}>•</Text>
+                <Text style={[s.locText, { color: textSub }]}>
+                  {selectedAct.time}
+                </Text>
+              </View>
+
+              {/* Host & Count Info */}
+              <View
+                style={[
+                  s.hostStrip,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.03)"
+                      : "#F8FAFC",
+                    borderColor: borderCol,
+                  },
+                ]}
+              >
+                <Image
+                  source={{
+                    uri:
+                      selectedAct.userAvatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedAct.user)}&background=7C3AED&color=fff`,
+                  }}
+                  style={s.hostPic}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.hostNameText, { color: textMain }]}>
+                    {selectedAct.user}
+                  </Text>
+                  <Text style={[s.hostSubText, { color: textSub }]}>
+                    Host • Community Member
+                  </Text>
+                </View>
+                <View style={s.attendeeBadge}>
+                  <Ionicons name="people" size={13} color="#7C3AED" />
+                  <Text style={s.attendeeBadgeText}>
+                    {selectedAct.count} going
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description */}
+              {selectedAct.desc ? (
+                <Text
+                  style={[s.cardDesc, { color: textSub }]}
+                  numberOfLines={2}
+                >
+                  {selectedAct.desc}
+                </Text>
+              ) : null}
+
+              {/* Action Buttons */}
+              <View style={s.actionRow}>
+                <TouchableOpacity
+                  style={[s.iconActionBtn, { borderColor: borderCol }]}
+                  onPress={() =>
+                    Share.share({
+                      message: `Join ${selectedAct.title} at ${selectedAct.place}`,
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="share-social-outline"
+                    size={18}
+                    color={textMain}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    s.mainJoinBtn,
+                    joinedMap[selectedAct.id] && { backgroundColor: "#10B981" },
+                  ]}
+                  onPress={() => handleJoin(selectedAct)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name={
+                      joinedMap[selectedAct.id]
+                        ? "checkmark-circle"
+                        : "add-circle"
+                    }
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                  <Text style={s.mainJoinBtnText}>
+                    {joinedMap[selectedAct.id]
+                      ? "Joined Activity"
+                      : "Join Activity"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    s.iconActionBtn,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(124, 58, 237, 0.16)"
+                        : "#EDE9FE",
+                      borderColor: "transparent",
+                    },
+                  ]}
+                  onPress={() => {
+                    const act = selectedAct;
+                    setSelectedAct(null);
+                    router.push({
+                      pathname: "/(screens)/activity-chat",
+                      params: {
+                        activityId: act.id,
+                        title: act.title,
+                        user: act.user,
+                        place: act.place,
+                        type: "EXPLORE ACTIVITY",
+                        avatar: act.userAvatar,
+                      },
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses"
+                    size={18}
+                    color="#7C3AED"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -764,7 +677,7 @@ export default function ExploreScreen() {
 const shadow = Platform.select({
   ios: {
     shadowColor: "#000",
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
   },
@@ -773,382 +686,276 @@ const shadow = Platform.select({
 });
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  topHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 6,
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: verticalScale(30),
-  },
+  citySelector: { flexDirection: "row", alignItems: "center", gap: 3 },
+  exploreTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
+  exploreSubtitle: { fontSize: 11.5, marginTop: 1, fontWeight: "500" },
 
-  /* 2. Radar Banner Card */
-  radarBannerCard: {
-    marginHorizontal: scale(16),
-    marginTop: verticalScale(4),
-    marginBottom: verticalScale(14),
-    padding: scale(14),
-    borderRadius: scale(20),
-    borderWidth: 1,
+  /* Small Category Chips */
+  chipContainer: { marginVertical: 4 },
+  chipList: { paddingHorizontal: 16, gap: 6, alignItems: "center" },
+  smallChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: scale(12),
-  },
-  radarIconCircle: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    backgroundColor: "rgba(124, 58, 237, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.3)",
+    gap: 4,
+    height: 28,
   },
-  radarBannerTexts: {
-    flex: 1,
+  chipEmoji: { fontSize: 11 },
+  chipLabel: { fontSize: 11 },
+  chipBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 10,
+    marginLeft: 1,
   },
-  radarBannerTitle: {
-    fontSize: moderateScale(14),
-    fontWeight: "800",
-  },
-  activeDot: {
-    width: scale(7),
-    height: scale(7),
-    borderRadius: scale(3.5),
-    backgroundColor: "#22C55E",
-  },
-  radarBannerSubtext: {
-    fontSize: moderateScale(10.5),
-    marginTop: verticalScale(2),
-  },
-  radarBannerGraphic: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(22),
-    backgroundColor: "rgba(124, 58, 237, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  miniRadarRing1: {
+  chipBadgeText: { fontSize: 9.5, fontWeight: "700" },
+
+  /* Radar Section */
+  radarSection: { flex: 1, position: "relative" },
+  radarMapBg: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  ringAmbient: {
     position: "absolute",
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.35)",
+    width: 380,
+    height: 380,
+    borderRadius: 190,
+    backgroundColor: "rgba(124, 58, 237, 0.03)",
   },
-  miniRadarRing2: {
+  ring1: {
     position: "absolute",
-    width: scale(22),
-    height: scale(22),
-    borderRadius: scale(11),
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.5)",
+    borderColor: "rgba(139, 92, 246, 0.28)",
   },
-  miniRadarCenterDot: {
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
-    backgroundColor: "#A855F7",
+  ring2: {
+    position: "absolute",
+    width: 174,
+    height: 174,
+    borderRadius: 87,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.22)",
+  },
+  ring3: {
+    position: "absolute",
+    width: 264,
+    height: 264,
+    borderRadius: 132,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.18)",
+  },
+  ring4: {
+    position: "absolute",
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.14)",
   },
 
-  /* 3. Category Filter Pills */
-  filterScrollView: {
-    marginBottom: verticalScale(14),
+  crosshairV: {
+    position: "absolute",
+    width: 1,
+    height: 350,
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
   },
-  filterRow: {
-    paddingHorizontal: scale(16),
-    gap: scale(8),
-  },
-  filterPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(6),
-    paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(8),
-    borderRadius: scale(20),
-    borderWidth: 1,
-  },
-  filterPillActive: {
-    backgroundColor: "#7C3AED",
-    borderColor: "#A855F7",
-  },
-  filterPillText: {
-    fontSize: moderateScale(11.5),
-    fontWeight: "700",
-  },
-  filterPillTextActive: {
-    color: "#FFFFFF",
+  crosshairH: {
+    position: "absolute",
+    height: 1,
+    width: 350,
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
   },
 
-  /* 4. Radar Stage Canvas Area */
-  radarStageContainer: {
-    marginHorizontal: scale(16),
-    height: verticalScale(320),
-    borderRadius: scale(28),
-    borderWidth: 1,
-    position: "relative",
-    overflow: "hidden",
+  /* Thick Dark Radar Wing */
+  sweepWrapper: {
+    position: "absolute",
+    width: 350,
+    height: 350,
     alignItems: "center",
     justifyContent: "center",
   },
-  radarRingOuter: {
-    position: "absolute",
-    width: scale(270),
-    height: scale(270),
-    borderRadius: scale(135),
-    borderWidth: 1,
-  },
-  radarRingMiddle: {
-    position: "absolute",
-    width: scale(180),
-    height: scale(180),
-    borderRadius: scale(90),
-    borderWidth: 1,
-  },
-  radarRingInner: {
-    position: "absolute",
-    width: scale(90),
-    height: scale(90),
-    borderRadius: scale(45),
-    borderWidth: 1,
-  },
-  radarSweepContainer: {
-    position: "absolute",
-    width: scale(270),
-    height: scale(270),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radarSweepCone: {
+  sweepConeThick: {
     position: "absolute",
     top: 0,
-    left: scale(135) - scale(20),
+    left: 125,
     width: 0,
     height: 0,
-    borderLeftWidth: scale(20),
-    borderRightWidth: scale(20),
-    borderTopWidth: scale(135),
+    borderLeftWidth: 50,
+    borderRightWidth: 50,
+    borderTopWidth: 175,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
+    borderTopColor: "rgba(124, 58, 237, 0.38)",
   },
-  centerPinWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  centerPinGlow: {
+  sweepLeadingEdge: {
     position: "absolute",
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(24),
-    backgroundColor: "rgba(139, 92, 246, 0.35)",
+    top: 0,
+    left: 174,
+    width: 2,
+    height: 175,
+    backgroundColor: "rgba(167, 139, 250, 0.8)",
   },
-  centerPinDot: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
-    backgroundColor: "#8B5CF6",
-    alignItems: "center",
-    justifyContent: "center",
+
+  /* Enhanced Middle Pin */
+  centerPulseHalo: {
+    position: "absolute",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(124, 58, 237, 0.25)",
+  },
+  centerPinOuter: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#1E153A",
     borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  aroundYouOverlay: {
-    position: "absolute",
-    top: scale(14),
-    right: scale(14),
-    flexDirection: "row",
+    borderColor: "#A78BFA",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: scale(10),
-    paddingVertical: verticalScale(5),
-    borderRadius: scale(16),
-    borderWidth: 1,
+    justifyContent: "center",
+    ...shadow,
   },
-  aroundYouText: {
-    fontSize: moderateScale(10.5),
-    fontWeight: "700",
-  },
-  recenterButton: {
-    position: "absolute",
-    bottom: scale(14),
-    right: scale(14),
-    width: scale(38),
-    height: scale(38),
-    borderRadius: scale(19),
-    borderWidth: 1,
+  centerPinInner: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
   },
 
   /* Radar Nodes */
-  radarNodeItem: {
+  radarNode: {
     position: "absolute",
-    alignItems: "center",
-    transform: [{ translateX: scale(-24) }, { translateY: scale(-24) }],
-    zIndex: 20,
-  },
-  avatarWrapper: {
-    position: "relative",
-  },
-  nodeAvatar: {
-    width: scale(38),
-    height: scale(38),
-    borderRadius: scale(19),
-    borderWidth: 2,
-    borderColor: "#8B5CF6",
-  },
-  statusDotBadge: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: scale(10),
-    height: scale(10),
-    borderRadius: scale(5),
-    borderWidth: 1.5,
-  },
-  statusOnline: {
-    backgroundColor: "#22C55E",
-  },
-  statusAway: {
-    backgroundColor: "#F59E0B",
-  },
-  nodeName: {
-    fontSize: moderateScale(10),
-    fontWeight: "800",
-    marginTop: verticalScale(2),
-  },
-  nodeDistance: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "600",
-  },
-  activityTagPill: {
-    marginTop: verticalScale(2),
-    paddingHorizontal: scale(7),
-    paddingVertical: verticalScale(2),
-    borderRadius: scale(8),
-    borderWidth: 0.5,
-    borderColor: "rgba(168, 85, 247, 0.4)",
-  },
-  activityTagText: {
-    fontSize: moderateScale(8.5),
-    fontWeight: "700",
-  },
-
-  /* 5. Active Around You Section */
-  activeSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: scale(18),
-    marginTop: verticalScale(20),
-    marginBottom: verticalScale(12),
+    zIndex: 15,
   },
-  activeSectionTitle: {
-    fontSize: moderateScale(15),
-    fontWeight: "800",
+  nodePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 6,
+    paddingRight: 3,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: "rgba(139, 92, 246, 0.35)",
+    gap: 4,
+    ...shadow,
   },
-  seeAllText: {
-    fontSize: moderateScale(12),
-    fontWeight: "700",
-    color: "#C084FC",
+  nodeEmoji: { fontSize: 13 },
+  nodeCountBadge: {
+    backgroundColor: "#7C3AED",
+    paddingHorizontal: 4.5,
+    paddingVertical: 1,
+    borderRadius: 7,
   },
-  cardsScrollView: {
-    paddingLeft: scale(16),
+  nodeCountText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800" },
+
+  /* Bottom Card Modal */
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    justifyContent: "flex-end",
   },
-  cardsRow: {
-    paddingRight: scale(32),
-    gap: scale(12),
-  },
-  cardItem: {
-    width: scale(220),
-    borderRadius: scale(20),
+  backdropDismiss: { flex: 1 },
+  bottomCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
-    padding: scale(14),
-    justifyContent: "space-between",
+    borderBottomWidth: 0,
+    paddingHorizontal: 18,
+    paddingTop: 16,
     ...shadow,
   },
   cardTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: verticalScale(8),
+    marginBottom: 10,
   },
-  categoryTagPill: {
-    paddingHorizontal: scale(8),
-    paddingVertical: verticalScale(3),
-    borderRadius: scale(10),
-  },
-  categoryTagText: {
-    fontSize: moderateScale(9.5),
-    fontWeight: "800",
-  },
-  timeAgoText: {
-    fontSize: moderateScale(9.5),
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  cardTitle: {
-    fontSize: moderateScale(14),
-    fontWeight: "800",
-  },
-  cardSubtitle: {
-    fontSize: moderateScale(10.5),
-    marginTop: verticalScale(2),
-  },
-  cardLocationRow: {
+  categoryTag: {
     flexDirection: "row",
     alignItems: "center",
-    gap: scale(4),
-    marginTop: verticalScale(8),
-    marginBottom: verticalScale(12),
+    gap: 5,
+    backgroundColor: "rgba(124, 58, 237, 0.14)",
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
   },
-  cardLocationText: {
-    fontSize: moderateScale(10),
-    fontWeight: "500",
-    flex: 1,
+  categoryTagText: { color: "#7C3AED", fontSize: 10.5, fontWeight: "800" },
+  circleCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  cardFooterRow: {
+  cardTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  locRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    paddingTop: verticalScale(10),
+    marginTop: 4,
+    marginBottom: 12,
   },
-  avatarsStackRow: {
+  locText: { fontSize: 12, fontWeight: "500" },
+  hostStrip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: scale(6),
-  },
-  avatarsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  stackedAvatar: {
-    width: scale(22),
-    height: scale(22),
-    borderRadius: scale(11),
-    borderWidth: 1.5,
-  },
-  avatarTextCount: {
-    fontSize: moderateScale(9.5),
-    color: "#CBD5E1",
-    fontWeight: "600",
-  },
-  cardActionButton: {
-    paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(6),
-    borderRadius: scale(12),
-    backgroundColor: "rgba(124, 58, 237, 0.25)",
+    padding: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.4)",
+    gap: 10,
+    marginBottom: 10,
   },
-  cardActionText: {
-    fontSize: moderateScale(10.5),
-    fontWeight: "800",
-    color: "#C084FC",
+  hostPic: { width: 34, height: 34, borderRadius: 17 },
+  hostNameText: { fontSize: 12.5, fontWeight: "700" },
+  hostSubText: { fontSize: 10.5, marginTop: 1 },
+  attendeeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(124, 58, 237, 0.12)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
+  attendeeBadgeText: { fontSize: 11, fontWeight: "700", color: "#7C3AED" },
+  cardDesc: { fontSize: 12, lineHeight: 17, marginBottom: 14 },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  iconActionBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mainJoinBtn: {
+    flex: 1,
+    height: 42,
+    backgroundColor: "#7C3AED",
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    ...shadow,
+  },
+  mainJoinBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
 });

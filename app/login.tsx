@@ -247,16 +247,16 @@ export default function Login() {
             {/* Brand */}
             <View style={[s.brandRow, { paddingHorizontal: pad }]}>
               <View style={s.logo}>
-                {/* <Ionicons name="people" size={26} color="#fff" /> */}
-                <Image
-                  source={require("@/assets/icon.png")}
+                <Ionicons name="people" size={26} color="#fff" />
+                {/* <Image
+                  source={require("@/assets/icon_48x48.png")}
                   style={{
                     width: 60,
                     height: 54,
                     borderRadius: 16,
                   }}
                   resizeMode="contain"
-                />
+                /> */}
               </View>
               <View style={{ marginLeft: 12, flexShrink: 1 }}>
                 <Text style={s.brand}>JUNTO</Text>

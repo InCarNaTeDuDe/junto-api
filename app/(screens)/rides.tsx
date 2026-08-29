@@ -15,7 +15,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
@@ -53,6 +56,7 @@ const PRICE_PRESETS = ["Free", "₹30", "₹50", "₹70", "₹100"];
 
 export default function RidesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { theme: t, isDark } = useTheme();
   const { selectedLocation } = useLocation();
   const cityName = selectedLocation?.name || "Hyderabad";
@@ -64,7 +68,7 @@ export default function RidesScreen() {
   const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isPublishing] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Fetch real-time rides from backend
   const fetchRides = async () => {
@@ -153,7 +157,6 @@ export default function RidesScreen() {
   };
 
   const handlePublishRide = async () => {
-    debugger;
     if (!offerFrom.trim() || !offerTo.trim()) {
       Alert.alert(
         "Missing Route",
@@ -163,7 +166,7 @@ export default function RidesScreen() {
     }
 
     try {
-      // setIsPublishing(true);
+      setIsPublishing(true);
 
       const res = await ApiService.post<{
         success: boolean;
@@ -194,7 +197,7 @@ export default function RidesScreen() {
     } catch (err: any) {
       Alert.alert("Notice", err?.message || "Unable to publish ride.");
     } finally {
-      // setIsPublishing(false);
+      setIsPublishing(false);
     }
   };
 
@@ -377,7 +380,10 @@ export default function RidesScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollBody}
+        contentContainerStyle={[
+          styles.scrollBody,
+          { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

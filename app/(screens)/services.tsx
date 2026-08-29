@@ -14,7 +14,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
@@ -74,16 +77,10 @@ const CATEGORIES = [
 
 const SERVICE_PROS: ServicePro[] = [];
 
-const URGENCY_PRESETS = [
-  "Immediate (30m)",
-  "Today Evening",
-  "Tomorrow",
-  "This Weekend",
-];
-
 export default function ServicesScreen() {
   const router = useRouter();
-  const { theme: t, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const { selectedLocation } = useLocation();
   const cityName = selectedLocation?.name || "Hyderabad";
 
@@ -382,7 +379,10 @@ export default function ServicesScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollBody}
+        contentContainerStyle={[
+          styles.scrollBody,
+          { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

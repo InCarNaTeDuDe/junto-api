@@ -9,17 +9,18 @@ import {
   Modal,
   TextInput,
   StyleSheet,
-  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles } from "@/hooks/useStyles";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { PushNotificationService } from "@/services/notifications";
-
-const { width } = Dimensions.get("window");
+import { JuntoScreenHeader } from "@/components/JuntoScreenHeader";
 
 export interface AskNearbyFormProps {
   from?: "create" | "activity-chat" | "activity-details";
@@ -538,6 +539,7 @@ export default function AskNearbyScreen({
   onClose,
 }: AskNearbyFormProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const theme = useStyles((t: any) => createStyles(propColors || t));
   const { styles, isDark, primary, text, sub, placeholder } = theme;
 
@@ -559,15 +561,21 @@ export default function AskNearbyScreen({
   const handleHeaderBack = () => {
     if (onBack) {
       onBack();
-    } else if (router) {
-      router.replace("/(tabs)/create");
+    } else if (onClose) {
+      onClose();
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
     }
   };
 
   const handleHeaderClose = () => {
     if (onClose) {
       onClose();
-    } else if (router) {
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
       router.replace("/(tabs)");
     }
   };
@@ -613,9 +621,19 @@ export default function AskNearbyScreen({
       style={styles.container}
       edges={from === "create" ? ["bottom"] : ["top", "bottom"]}
     >
+      <JuntoScreenHeader
+        title="Ask Nearby"
+        subtitle="Broadcast help request to people nearby"
+        showBack={true}
+        onBack={handleHeaderBack}
+        onClose={onClose ? handleHeaderClose : undefined}
+      />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 12 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Top Header if back action exists */}
@@ -876,7 +894,12 @@ export default function AskNearbyScreen({
       </ScrollView>
 
       {/* Bottom Floating Post Request Bar */}
-      <View style={styles.bottomBar}>
+      <View
+        style={[
+          styles.bottomBar,
+          { marginBottom: Math.max(insets.bottom, 12) + 6 },
+        ]}
+      >
         <View
           style={{
             flex: 1,
