@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Modal,
   Platform,
   useWindowDimensions,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -31,6 +33,381 @@ interface FeatureItem {
   route?: string;
   query?: string;
 }
+
+// Micro-animated icon component for Paytm-style lively UI
+interface AnimatedFeatureIconProps {
+  featureId: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  size: number;
+  color: string;
+  index?: number;
+}
+
+const AnimatedFeatureIcon: React.FC<AnimatedFeatureIconProps> = ({
+  featureId,
+  icon,
+  size,
+  color,
+  index = 0,
+}) => {
+  const animValue = useRef(new Animated.Value(0)).current;
+  const secondaryAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Stagger start time slightly based on index so icons oscillate out of phase (organic feel)
+    const delay = (index % 5) * 180;
+    let mainLoop: Animated.CompositeAnimation | null = null;
+    let secLoop: Animated.CompositeAnimation | null = null;
+
+    const timer = setTimeout(() => {
+      if (featureId === "ridemate" || icon === "car") {
+        // Car moving / cruising oscillation: horizontal drift + subtle engine suspension vibration
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 1200,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -1,
+              duration: 1200,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 0,
+              duration: 800,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+
+        secLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(secondaryAnim, {
+              toValue: 1,
+              duration: 250,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            Animated.timing(secondaryAnim, {
+              toValue: 0,
+              duration: 250,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      } else if (
+        featureId === "roam" ||
+        icon === "location" ||
+        icon === "location-sharp"
+      ) {
+        // Location Pin: smooth floating bounce & gentle squish/tilt
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 1000,
+              easing: Easing.bezier(0.33, 1, 0.68, 1),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -0.4,
+              duration: 800,
+              easing: Easing.bezier(0.32, 0, 0.67, 0),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 0,
+              duration: 400,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      } else if (
+        featureId === "ineedthis" ||
+        featureId === "hostevent" ||
+        icon === "sparkles"
+      ) {
+        // Sparkles: pulse & twinkle rotation
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -1,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      } else if (featureId === "helpme" || icon === "heart") {
+        // Heartbeat pulse rhythm
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 180,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 0.2,
+              duration: 140,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 1.15,
+              duration: 200,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 0,
+              duration: 350,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.delay(1200),
+          ]),
+        );
+      } else if (
+        featureId === "ticketswap" ||
+        featureId === "deals" ||
+        icon === "ticket" ||
+        icon === "pricetag"
+      ) {
+        // Tag / Ticket gentle pendulum swing
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 1100,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -1,
+              duration: 1100,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      } else if (featureId === "services" || icon === "construct") {
+        // Services wrench / tool oscillation tap
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 700,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -0.6,
+              duration: 600,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: 0,
+              duration: 500,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.delay(800),
+          ]),
+        );
+      } else if (featureId === "newhere" || icon === "compass") {
+        // Compass needle magnetic wobbling
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 1300,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -1,
+              duration: 1300,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      } else {
+        // Default gentle organic sway / float for other features
+        mainLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(animValue, {
+              toValue: 1,
+              duration: 1400,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(animValue, {
+              toValue: -1,
+              duration: 1400,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+      }
+
+      mainLoop.start();
+      if (secLoop) secLoop.start();
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      if (mainLoop) mainLoop.stop();
+      if (secLoop) secLoop.stop();
+    };
+  }, [animValue, secondaryAnim, featureId, icon, index]);
+
+  // Build animated transform styles based on feature personality
+  const getAnimatedStyle = () => {
+    if (featureId === "ridemate" || icon === "car") {
+      const translateX = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: [-3.5, 0, 3.5],
+      });
+      const translateY = secondaryAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -1],
+      });
+      const rotate = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: ["-2.5deg", "0deg", "2.5deg"],
+      });
+      return {
+        transform: [{ translateX }, { translateY }, { rotate }],
+      };
+    }
+
+    if (
+      featureId === "roam" ||
+      icon === "location" ||
+      icon === "location-sharp"
+    ) {
+      const translateY = animValue.interpolate({
+        inputRange: [-0.4, 0, 1],
+        outputRange: [1, 0, -4],
+      });
+      const scale = animValue.interpolate({
+        inputRange: [-0.4, 0, 1],
+        outputRange: [0.95, 1, 1.08],
+      });
+      const rotate = animValue.interpolate({
+        inputRange: [-0.4, 0, 1],
+        outputRange: ["-3deg", "0deg", "3deg"],
+      });
+      return {
+        transform: [{ translateY }, { scale }, { rotate }],
+      };
+    }
+
+    if (
+      featureId === "ineedthis" ||
+      featureId === "hostevent" ||
+      icon === "sparkles"
+    ) {
+      const scale = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: [0.92, 1, 1.15],
+      });
+      const rotate = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: ["-8deg", "0deg", "8deg"],
+      });
+      return {
+        transform: [{ scale }, { rotate }],
+      };
+    }
+
+    if (featureId === "helpme" || icon === "heart") {
+      const scale = animValue.interpolate({
+        inputRange: [0, 0.2, 1, 1.15],
+        outputRange: [1, 1.04, 1.18, 1.22],
+      });
+      return {
+        transform: [{ scale }],
+      };
+    }
+
+    if (
+      featureId === "ticketswap" ||
+      featureId === "deals" ||
+      icon === "ticket" ||
+      icon === "pricetag"
+    ) {
+      const rotate = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: ["-7deg", "0deg", "7deg"],
+      });
+      const translateY = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: [-1, 0, -1],
+      });
+      return {
+        transform: [{ rotate }, { translateY }],
+      };
+    }
+
+    if (featureId === "services" || icon === "construct") {
+      const rotate = animValue.interpolate({
+        inputRange: [-0.6, 0, 1],
+        outputRange: ["-8deg", "0deg", "7deg"],
+      });
+      return {
+        transform: [{ rotate }],
+      };
+    }
+
+    if (featureId === "newhere" || icon === "compass") {
+      const rotate = animValue.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: ["-14deg", "0deg", "14deg"],
+      });
+      return {
+        transform: [{ rotate }],
+      };
+    }
+
+    // Default gentle float & tilt
+    const translateY = animValue.interpolate({
+      inputRange: [-1, 0, 1],
+      outputRange: [-1.5, 0, 1.5],
+    });
+    const rotate = animValue.interpolate({
+      inputRange: [-1, 0, 1],
+      outputRange: ["-3deg", "0deg", "3deg"],
+    });
+    return {
+      transform: [{ translateY }, { rotate }],
+    };
+  };
+
+  return (
+    <Animated.View style={getAnimatedStyle()}>
+      <Ionicons name={icon} size={size} color={color} />
+    </Animated.View>
+  );
+};
 
 const ALL_FEATURES: FeatureItem[] = [
   {
@@ -309,7 +686,7 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {ROW_FEATURES.map((item) => {
+        {ROW_FEATURES.map((item, idx) => {
           const circleBg = isDark ? `${item.color}25` : item.bg;
 
           return (
@@ -327,7 +704,13 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
                   },
                 ]}
               >
-                <Ionicons name={item.icon} size={22} color={item.color} />
+                <AnimatedFeatureIcon
+                  featureId={item.id}
+                  icon={item.icon}
+                  size={22}
+                  color={item.color}
+                  index={idx}
+                />
               </View>
               <Text
                 style={[
@@ -453,7 +836,7 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.featureGrid}
             >
-              {filteredFeatures.map((f) => {
+              {filteredFeatures.map((f, idx) => {
                 const iconBg = isDark ? `${f.color}25` : f.bg;
                 const cBg = isDark ? "#131C2E" : "#FFFFFF";
 
@@ -477,7 +860,13 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
                           { backgroundColor: iconBg },
                         ]}
                       >
-                        <Ionicons name={f.icon} size={20} color={f.color} />
+                        <AnimatedFeatureIcon
+                          featureId={f.id}
+                          icon={f.icon}
+                          size={20}
+                          color={f.color}
+                          index={idx}
+                        />
                       </View>
                       {f.badge && (
                         <View

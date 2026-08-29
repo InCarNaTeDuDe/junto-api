@@ -96,6 +96,12 @@ export async function popularActivitiesAround(locationFilter?: {
       const base = {
         id: a.id,
         title: a.title,
+        description: a.description || "",
+        category: a.category,
+        cost: Number(a.cost) || 0,
+        maxParticipants: a.maxParticipants || 4,
+        remainingSeats: a.remainingSeats ?? a.maxParticipants ?? 2,
+        participantIds: a.participantIds || [],
         place: `${a.locationName || ""}${a.locationState ? `, ${a.locationState}` : ""}`,
         user: a.organizer?.name || "Junto User",
         userAvatar: a.organizer?.avatar,
@@ -180,7 +186,18 @@ export async function popularActivitiesAround(locationFilter?: {
           };
 
         default:
-          return null;
+          return {
+            ...base,
+            type: a.category || "DAY_MATES",
+            typeColor: "#7C3AED",
+            right: `${a.remainingSeats || a.maxParticipants || 2} Spots`,
+            rightColor: "#7C3AED",
+            rightSub: a.description || "Active meetup",
+            rightSubColor: "#7C3AED",
+            thumbBg: "#1F2937",
+            thumbIcon: "people",
+            thumbIconColor: "#7C3AED",
+          };
       }
     })
     .filter(Boolean);

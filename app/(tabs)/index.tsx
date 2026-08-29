@@ -14,6 +14,8 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Animated,
+  Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -630,6 +632,36 @@ export default function Home() {
   const [userActs, setUserActs] = useState<any[]>([]);
   const [loadingActs, setLoadingActs] = useState(true);
 
+  // Smooth floating location pin oscillation
+  const headerPinAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(headerPinAnim, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.bezier(0.33, 1, 0.68, 1),
+          useNativeDriver: true,
+        }),
+        Animated.timing(headerPinAnim, {
+          toValue: -0.4,
+          duration: 900,
+          easing: Easing.bezier(0.32, 0, 0.67, 0),
+          useNativeDriver: true,
+        }),
+        Animated.timing(headerPinAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [headerPinAnim]);
+
   const loadActivities = React.useCallback(async () => {
     setLoadingActs(true);
     try {
@@ -852,7 +884,32 @@ export default function Home() {
                     alignSelf: "flex-start",
                   }}
                 >
-                  <Ionicons name="location" size={20} color={theme.primary} />
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          translateY: headerPinAnim.interpolate({
+                            inputRange: [-0.4, 0, 1],
+                            outputRange: [1, 0, -3.5],
+                          }),
+                        },
+                        {
+                          scale: headerPinAnim.interpolate({
+                            inputRange: [-0.4, 0, 1],
+                            outputRange: [0.95, 1, 1.08],
+                          }),
+                        },
+                        {
+                          rotate: headerPinAnim.interpolate({
+                            inputRange: [-0.4, 0, 1],
+                            outputRange: ["-3deg", "0deg", "3deg"],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <Ionicons name="location" size={20} color={theme.primary} />
+                  </Animated.View>
 
                   <Text
                     style={[

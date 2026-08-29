@@ -194,16 +194,17 @@ export default function CreateScreen() {
           description="Choose an option to get started"
           onClose={close}
         />
-      ) : (
-        <ActivityHeader
-          title={OPTIONS.find((o) => o.id === selected)?.title || ""}
-          description={
-            OPTIONS.find((o) => o.id === selected)?.description || ""
-          }
-          onBack={back}
-          onClose={close}
-        />
-      )}
+      ) : // (
+      //   <ActivityHeader
+      //     title={OPTIONS.find((o) => o.id === selected)?.title || ""}
+      //     description={
+      //       OPTIONS.find((o) => o.id === selected)?.description || ""
+      //     }
+      //     onBack={back}
+      //     onClose={close}
+      //   />
+      // )
+      null}
 
       {/* Body */}
       {!selected ? (
