@@ -707,7 +707,7 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
                 <AnimatedFeatureIcon
                   featureId={item.id}
                   icon={item.icon}
-                  size={22}
+                  size={25}
                   color={item.color}
                   index={idx}
                 />

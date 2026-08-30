@@ -30,6 +30,7 @@ import Svg, {
   Path,
   Defs,
   LinearGradient,
+  RadialGradient,
   Stop,
   Line,
   Circle,
@@ -226,13 +227,14 @@ export default function ExploreScreen() {
   // Radar Scanner & Ripple Animations
   const sweepAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rippleAnim = useRef(new Animated.Value(0)).current;
+  const rippleAnim1 = useRef(new Animated.Value(0)).current;
+  const rippleAnim2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const sweep = Animated.loop(
       Animated.timing(sweepAnim, {
         toValue: 1,
-        duration: 4000,
+        duration: 3800,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -240,38 +242,51 @@ export default function ExploreScreen() {
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.15,
-          duration: 1400,
+          toValue: 1.18,
+          duration: 1200,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1400,
+          duration: 1200,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
         }),
       ]),
     );
-    const ripple = Animated.loop(
-      Animated.timing(rippleAnim, {
+    const ripple1 = Animated.loop(
+      Animated.timing(rippleAnim1, {
         toValue: 1,
-        duration: 2500,
+        duration: 2800,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     );
+    const ripple2 = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1400),
+        Animated.timing(rippleAnim2, {
+          toValue: 1,
+          duration: 2800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
 
     sweep.start();
     pulse.start();
-    ripple.start();
+    ripple1.start();
+    ripple2.start();
 
     return () => {
       sweep.stop();
       pulse.stop();
-      ripple.stop();
+      ripple1.stop();
+      ripple2.stop();
     };
-  }, [sweepAnim, pulseAnim, rippleAnim]);
+  }, [sweepAnim, pulseAnim, rippleAnim1, rippleAnim2]);
 
   // Fetch real activities from backend
   const fetchRealActivities = useCallback(
@@ -413,34 +428,51 @@ export default function ExploreScreen() {
   const radarRadius = radarSize / 2;
   const orbitRadius = radarRadius * 0.74;
 
-  // Sleek Narrow Radar Cone (36 degrees) with exact circular curvature
-  const sweepAngleDeg = 36;
-  const sweepArcPath = useMemo(() => {
-    const startRad = ((-90 - sweepAngleDeg) * Math.PI) / 180;
-    const endRad = (-90 * Math.PI) / 180;
-    const x1 = radarRadius + radarRadius * Math.cos(startRad);
-    const y1 = radarRadius + radarRadius * Math.sin(startRad);
-    const x2 = radarRadius + radarRadius * Math.cos(endRad);
-    const y2 = radarRadius + radarRadius * Math.sin(endRad);
-    return `M ${radarRadius} ${radarRadius} L ${x1} ${y1} A ${radarRadius} ${radarRadius} 0 0 1 ${x2} ${y2} Z`;
-  }, [radarRadius, sweepAngleDeg]);
+  // Sleek Thin Radar Cone (20 degrees) with distinct line edges on both sides
+  const sweepAngleDeg = 20;
+  const { sweepArcPath, trailingX, trailingY, leadingX, leadingY } =
+    useMemo(() => {
+      const startRad = ((-90 - sweepAngleDeg) * Math.PI) / 180;
+      const endRad = (-90 * Math.PI) / 180;
+      const r = radarRadius - 2;
+      const x1 = radarRadius + r * Math.cos(startRad);
+      const y1 = radarRadius + r * Math.sin(startRad);
+      const x2 = radarRadius + r * Math.cos(endRad);
+      const y2 = radarRadius + r * Math.sin(endRad);
+      const path = `M ${radarRadius} ${radarRadius} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
+      return {
+        sweepArcPath: path,
+        trailingX: x1,
+        trailingY: y1,
+        leadingX: x2,
+        leadingY: y2,
+      };
+    }, [radarRadius, sweepAngleDeg]);
 
   const spin = sweepAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
-  const rippleScale = rippleAnim.interpolate({
+  const rippleScale1 = rippleAnim1.interpolate({
     inputRange: [0, 1],
     outputRange: [0.14, 1.02],
   });
-  const rippleOpacity = rippleAnim.interpolate({
+  const rippleOpacity1 = rippleAnim1.interpolate({
+    inputRange: [0, 0.08, 0.7, 1],
+    outputRange: [0.95, 0.9, 0.45, 0],
+  });
+  const rippleScale2 = rippleAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.14, 1.02],
+  });
+  const rippleOpacity2 = rippleAnim2.interpolate({
     inputRange: [0, 0.08, 0.7, 1],
     outputRange: [0.95, 0.9, 0.45, 0],
   });
 
   // Theme colors
   const bg = isDark ? "#090212" : "#FBFBFE";
-  const radarBg = isDark ? "rgba(30, 14, 52, 0.45)" : "#F5F3FF";
+  const radarBg = isDark ? "rgba(22, 10, 42, 0.6)" : "#F5F3FF";
   const cardBg = isDark ? "#160D27" : "#FFFFFF";
   const userCardBg = isDark ? "#1C1330" : "#FFFFFF";
   const textMain = isDark ? "#FFFFFF" : "#1E1B4B";
@@ -538,10 +570,14 @@ export default function ExploreScreen() {
                 height: radarSize,
                 borderRadius: radarRadius,
                 backgroundColor: radarBg,
+                borderColor: isDark
+                  ? "rgba(167, 139, 250, 0.25)"
+                  : "rgba(124, 58, 237, 0.2)",
+                borderWidth: 1,
               },
             ]}
           >
-            {/* Single Strong Continuous Expanding Ripple Wave */}
+            {/* Dual Continuous Expanding Ripple Waves */}
             <Animated.View
               pointerEvents="none"
               style={[
@@ -552,15 +588,32 @@ export default function ExploreScreen() {
                   borderRadius: radarRadius,
                   borderColor: isDark ? "#A78BFA" : "#7C3AED",
                   backgroundColor: isDark
-                    ? "rgba(139, 92, 246, 0.12)"
-                    : "rgba(124, 58, 237, 0.08)",
-                  transform: [{ scale: rippleScale }],
-                  opacity: rippleOpacity,
+                    ? "rgba(139, 92, 246, 0.08)"
+                    : "rgba(124, 58, 237, 0.05)",
+                  transform: [{ scale: rippleScale1 }],
+                  opacity: rippleOpacity1,
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.rippleWave,
+                {
+                  width: radarSize,
+                  height: radarSize,
+                  borderRadius: radarRadius,
+                  borderColor: isDark ? "#C084FC" : "#8B5CF6",
+                  backgroundColor: isDark
+                    ? "rgba(168, 85, 247, 0.08)"
+                    : "rgba(139, 92, 246, 0.05)",
+                  transform: [{ scale: rippleScale2 }],
+                  opacity: rippleOpacity2,
                 },
               ]}
             />
 
-            {/* High-Precision SVG Concentric Rings & Crosshair Grid */}
+            {/* SVG Concentric Rings & Crosshair Grid */}
             <Svg
               width={radarSize}
               height={radarSize}
@@ -568,86 +621,126 @@ export default function ExploreScreen() {
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             >
+              <Defs>
+                <RadialGradient
+                  id="radarBackdropGlow"
+                  cx="50%"
+                  cy="50%"
+                  rx="50%"
+                  ry="50%"
+                >
+                  <Stop
+                    offset="0%"
+                    stopColor={isDark ? "#8B5CF6" : "#A855F7"}
+                    stopOpacity={isDark ? 0.18 : 0.1}
+                  />
+                  <Stop
+                    offset="65%"
+                    stopColor={isDark ? "#7C3AED" : "#C084FC"}
+                    stopOpacity={isDark ? 0.06 : 0.03}
+                  />
+                  <Stop
+                    offset="100%"
+                    stopColor={isDark ? "#090212" : "#F5F3FF"}
+                    stopOpacity={0}
+                  />
+                </RadialGradient>
+              </Defs>
+
+              {/* Ambient radial glow inside radar */}
               <Circle
                 cx={radarRadius}
                 cy={radarRadius}
-                r={radarRadius - 1.5}
+                r={radarRadius - 1}
+                fill="url(#radarBackdropGlow)"
+              />
+
+              {/* Outer Edge Ring */}
+              <Circle
+                cx={radarRadius}
+                cy={radarRadius}
+                r={radarRadius - 2}
                 stroke={
                   isDark
-                    ? "rgba(167, 139, 250, 0.3)"
-                    : "rgba(139, 92, 246, 0.25)"
+                    ? "rgba(167, 139, 250, 0.4)"
+                    : "rgba(124, 58, 237, 0.35)"
                 }
                 strokeWidth={1.5}
                 fill="none"
               />
+              {/* Activity Orbit Ring */}
               <Circle
                 cx={radarRadius}
                 cy={radarRadius}
                 r={orbitRadius}
                 stroke={
                   isDark
-                    ? "rgba(167, 139, 250, 0.38)"
-                    : "rgba(139, 92, 246, 0.3)"
+                    ? "rgba(192, 132, 252, 0.45)"
+                    : "rgba(124, 58, 237, 0.38)"
                 }
-                strokeWidth={1.2}
+                strokeWidth={1.5}
                 strokeDasharray="6 6"
                 fill="none"
               />
+              {/* Mid Zone Ring */}
               <Circle
                 cx={radarRadius}
                 cy={radarRadius}
-                r={radarRadius * 0.48}
+                r={radarRadius * 0.5}
                 stroke={
                   isDark
-                    ? "rgba(167, 139, 250, 0.32)"
-                    : "rgba(139, 92, 246, 0.25)"
+                    ? "rgba(167, 139, 250, 0.35)"
+                    : "rgba(124, 58, 237, 0.25)"
                 }
-                strokeWidth={1}
+                strokeWidth={1.2}
                 strokeDasharray="4 5"
                 fill="none"
               />
+              {/* Inner Core Zone Ring */}
               <Circle
                 cx={radarRadius}
                 cy={radarRadius}
-                r={radarRadius * 0.24}
+                r={radarRadius * 0.26}
                 stroke={
                   isDark
                     ? "rgba(167, 139, 250, 0.3)"
-                    : "rgba(139, 92, 246, 0.22)"
+                    : "rgba(124, 58, 237, 0.22)"
                 }
                 strokeWidth={1}
                 strokeDasharray="3 4"
                 fill="none"
               />
+
+              {/* Crosshair Horizontal & Vertical Lines */}
               <Line
-                x1={0}
+                x1={10}
                 y1={radarRadius}
-                x2={radarSize}
+                x2={radarSize - 10}
                 y2={radarRadius}
                 stroke={
                   isDark
-                    ? "rgba(167, 139, 250, 0.2)"
-                    : "rgba(139, 92, 246, 0.16)"
+                    ? "rgba(167, 139, 250, 0.28)"
+                    : "rgba(124, 58, 237, 0.2)"
                 }
                 strokeWidth={1}
-                strokeDasharray="4 8"
+                strokeDasharray="5 7"
               />
               <Line
                 x1={radarRadius}
-                y1={0}
+                y1={10}
                 x2={radarRadius}
-                y2={radarSize}
+                y2={radarSize - 10}
                 stroke={
                   isDark
-                    ? "rgba(167, 139, 250, 0.2)"
-                    : "rgba(139, 92, 246, 0.16)"
+                    ? "rgba(167, 139, 250, 0.28)"
+                    : "rgba(124, 58, 237, 0.2)"
                 }
                 strokeWidth={1}
-                strokeDasharray="4 8"
+                strokeDasharray="5 7"
               />
             </Svg>
 
-            {/* Sleek Narrow Rotating Radar Scanner Sector */}
+            {/* Sleek Thin Rotating Radar Scanner Sector with Dual Line Edges */}
             <Animated.View
               pointerEvents="none"
               style={[
@@ -674,44 +767,74 @@ export default function ExploreScreen() {
                   >
                     <Stop offset="0%" stopColor="#7C3AED" stopOpacity={0} />
                     <Stop
-                      offset="40%"
+                      offset="30%"
                       stopColor="#8B5CF6"
-                      stopOpacity={isDark ? 0.08 : 0.05}
+                      stopOpacity={isDark ? 0.08 : 0.04}
                     />
                     <Stop
-                      offset="75%"
+                      offset="70%"
                       stopColor="#A855F7"
-                      stopOpacity={isDark ? 0.28 : 0.22}
+                      stopOpacity={isDark ? 0.3 : 0.22}
                     />
                     <Stop
                       offset="100%"
                       stopColor="#D8B4FE"
-                      stopOpacity={isDark ? 0.65 : 0.52}
+                      stopOpacity={isDark ? 0.68 : 0.52}
                     />
                   </LinearGradient>
                   <LinearGradient
-                    id="beamLineGradient"
+                    id="beamLeadingGradient"
                     x1="0%"
                     y1="100%"
                     x2="0%"
                     y2="0%"
                   >
-                    <Stop offset="0%" stopColor="#7C3AED" stopOpacity={0.2} />
-                    <Stop offset="60%" stopColor="#A855F7" stopOpacity={0.8} />
-                    <Stop offset="100%" stopColor="#E9D5FF" stopOpacity={1} />
+                    <Stop offset="0%" stopColor="#7C3AED" stopOpacity={0.3} />
+                    <Stop offset="50%" stopColor="#A855F7" stopOpacity={0.9} />
+                    <Stop offset="100%" stopColor="#FAF5FF" stopOpacity={1} />
+                  </LinearGradient>
+                  <LinearGradient
+                    id="beamTrailingGradient"
+                    x1="0%"
+                    y1="100%"
+                    x2="0%"
+                    y2="0%"
+                  >
+                    <Stop offset="0%" stopColor="#6D28D9" stopOpacity={0.2} />
+                    <Stop offset="50%" stopColor="#9333EA" stopOpacity={0.7} />
+                    <Stop
+                      offset="100%"
+                      stopColor="#C084FC"
+                      stopOpacity={0.95}
+                    />
                   </LinearGradient>
                 </Defs>
+                {/* Thin illuminated cone fan */}
                 <Path d={sweepArcPath} fill="url(#radarSweepGradient)" />
+                {/* Trailing Line Edge */}
                 <Line
                   x1={radarRadius}
                   y1={radarRadius}
-                  x2={radarRadius}
-                  y2={0}
-                  stroke="url(#beamLineGradient)"
-                  strokeWidth={2.5}
+                  x2={trailingX}
+                  y2={trailingY}
+                  stroke="url(#beamTrailingGradient)"
+                  strokeWidth={1.8}
                   strokeLinecap="round"
                 />
-                <Circle cx={radarRadius} cy={2} r={3.5} fill="#FAF5FF" />
+                {/* Leading Line Edge */}
+                <Line
+                  x1={radarRadius}
+                  y1={radarRadius}
+                  x2={leadingX}
+                  y2={leadingY}
+                  stroke="url(#beamLeadingGradient)"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                />
+                {/* Trailing edge tip marker */}
+                <Circle cx={trailingX} cy={trailingY} r={2.2} fill="#C084FC" />
+                {/* Leading edge tip laser point */}
+                <Circle cx={leadingX} cy={leadingY} r={3.2} fill="#FAF5FF" />
               </Svg>
             </Animated.View>
 

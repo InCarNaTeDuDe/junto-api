@@ -939,7 +939,7 @@ export default function Home() {
         <UniversalNeedBar />
 
         {/* Search */}
-        <View style={s.searchRow}>
+        {/* <View style={s.searchRow}>
           <View style={s.search}>
             <Ionicons name="search" size={moderateScale(18)} color={C.mute} />
             <TextInput
@@ -1004,7 +1004,7 @@ export default function Home() {
             </Text>
             {hasActiveFilters && <View style={s.filterBadgeDot} />}
           </Pressable>
-        </View>
+        </View> */}
 
         {/* Quick Features Row */}
         <QuickFeatures

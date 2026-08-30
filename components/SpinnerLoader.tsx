@@ -11,8 +11,6 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { useStyles } from "@/hooks/useStyles";
 
-const JUNTO_LOGO = require("@/assets/icon.png");
-
 /** Icons placed evenly around the orbit */
 const ORBIT_ICONS = ["👥", "🎒", "💬", "☕", "📍", "🎟️"];
 
@@ -177,7 +175,7 @@ export function JuntoOrbit({
       {/* Static center logo with rotating label */}
       <View style={s.center} pointerEvents="none">
         <Image
-          source={JUNTO_LOGO}
+          source={require("@/assets/icon-maskable-512.png")}
           style={{
             width: logoSize,
             height: logoSize,

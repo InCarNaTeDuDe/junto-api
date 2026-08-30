@@ -55,7 +55,11 @@ export async function sendExpoPushNotification(
       return false;
     }
 
-    const pushToken = user.pushToken;
+    const pushToken = user.pushToken.trim();
+    if (!pushToken) {
+      return false;
+    }
+
     const payload = [
       {
         to: pushToken,
@@ -65,6 +69,7 @@ export async function sendExpoPushNotification(
         data: data,
         priority: "high",
         channelId: "default",
+        _displayInForeground: true,
       },
     ];
 
@@ -105,31 +110,100 @@ export async function broadcastExpoPushNotification(
 ) {
   try {
     const userRepo = AppDataSource.getRepository(User);
+    const notificationRepo = AppDataSource.getRepository(Notification);
     const users = await userRepo.find();
 
-    const validUsers = users.filter((u) => {
-      if (!u.pushToken) return false;
-      if (excludeUserId && u.id === excludeUserId) return false;
-      return true;
+    console.log(
+      `📢 [Broadcast Pipeline] Total users in DB: ${users.length}. Exclude ID: ${excludeUserId || "none"}`,
+    );
+
+    // Target all other users (or all users if no exclusion)
+    const targetUsers = users.filter((u) => {
+      if (!excludeUserId) return true;
+      return String(u.id).toLowerCase() !== String(excludeUserId).toLowerCase();
     });
 
-    if (validUsers.length === 0) {
-      console.log("ℹ️ No registered push tokens found to broadcast to.");
+    console.log(
+      `📢 [Broadcast Pipeline] Target recipient users count: ${targetUsers.length}`,
+    );
+
+    // 1. Create In-App Notification records & emit real-time WebSocket events for all target users
+    for (const targetUser of targetUsers) {
+      try {
+        const notif = notificationRepo.create({
+          userId: targetUser.id,
+          title,
+          message,
+          type: data.type || "activity",
+          read: false,
+        });
+        await notificationRepo.save(notif);
+
+        // Real-time socket emission to user's individual room
+        if (io) {
+          io.to(`user:${targetUser.id}`).emit("push_notification", {
+            id: notif.id,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type,
+            read: false,
+            timestamp: notif.timestamp || new Date().toISOString(),
+            data,
+          });
+        }
+      } catch (dbNotifErr) {
+        console.warn(
+          `⚠️ Failed to create in-app notification record for user ${targetUser.id}:`,
+          dbNotifErr,
+        );
+      }
+    }
+
+    // 2. Global socket broadcast for live feeds
+    if (io) {
+      if (data.type === "ask_nearby") {
+        io.emit("asknearby_created", { title, message, data });
+      } else {
+        io.emit("activity_created", { title, message, data });
+      }
+    }
+
+    // 3. Filter users who have registered mobile Expo Push Tokens
+    const usersWithTokens = targetUsers.filter((u) => {
+      const token = u.pushToken?.trim();
+      return (
+        !!token &&
+        (token.startsWith("ExponentPushToken[") ||
+          token.startsWith("ExpoPushToken[") ||
+          token.length > 10)
+      );
+    });
+
+    if (usersWithTokens.length === 0) {
+      console.log(
+        "ℹ️ [Broadcast Pipeline] No registered mobile Expo push tokens found among recipient users. (In-app notifications & socket events dispatched).",
+      );
       return;
     }
 
-    const messages = validUsers.map((u) => ({
-      to: u.pushToken,
+    const messages = usersWithTokens.map((u) => ({
+      to: u.pushToken!.trim(),
       sound: "default",
       title: title,
       body: message,
       data: data,
       priority: "high",
       channelId: "default",
+      _displayInForeground: true,
     }));
 
     console.log(
-      `📢 Broadcasting Expo Mobile Push Notification to ${validUsers.length} users...`,
+      `🚀 [Broadcast Pipeline] Dispatching Expo Mobile Push Notifications to ${usersWithTokens.length} devices...`,
+      usersWithTokens.map((u) => ({
+        name: u.name,
+        email: u.email,
+        token: u.pushToken,
+      })),
     );
 
     for (let i = 0; i < messages.length; i += 100) {
@@ -146,13 +220,13 @@ export async function broadcastExpoPushNotification(
 
       const result = await response.json();
       console.log(
-        "📲 Broadcast Expo Push API Response Chunk:",
+        "📲 [Broadcast Pipeline] Expo Push API Server Response:",
         JSON.stringify(result),
       );
     }
   } catch (err: any) {
     console.error(
-      "❌ Failed to broadcast Expo push notification:",
+      "❌ [Broadcast Pipeline] Failed to broadcast Expo push notification:",
       err?.message || err,
     );
   }

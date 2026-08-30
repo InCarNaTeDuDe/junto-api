@@ -246,18 +246,11 @@ export default function Login() {
           <View style={{ width: "100%", maxWidth: 560, alignSelf: "center" }}>
             {/* Brand */}
             <View style={[s.brandRow, { paddingHorizontal: pad }]}>
-              <View style={s.logo}>
-                <Ionicons name="people" size={26} color="#fff" />
-                {/* <Image
-                  source={require("@/assets/icon_48x48.png")}
-                  style={{
-                    width: 60,
-                    height: 54,
-                    borderRadius: 16,
-                  }}
-                  resizeMode="contain"
-                /> */}
-              </View>
+              <Image
+                source={require("@/assets/icon-maskable-512.png")}
+                style={{ width: 54, height: 54, borderRadius: 14 }}
+                resizeMode="contain"
+              />
               <View style={{ marginLeft: 12, flexShrink: 1 }}>
                 <Text style={s.brand}>JUNTO</Text>
                 <Text style={s.tag}>Let's do life together 💜</Text>

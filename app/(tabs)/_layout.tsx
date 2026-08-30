@@ -18,7 +18,18 @@ export default function TabsLayout() {
 
   const { theme } = useAuthContext();
 
-  const isCreateScreen = pathname?.includes("create");
+  const isHideTabScreen =
+    pathname?.includes("create") ||
+    pathname?.includes("rides") ||
+    pathname?.includes("ask-nearby") ||
+    pathname?.includes("services") ||
+    pathname?.includes("deals") ||
+    pathname?.includes("add-daymate") ||
+    pathname?.includes("new-here") ||
+    pathname?.includes("add-ticket") ||
+    pathname?.includes("location-search") ||
+    pathname?.includes("activity-chat") ||
+    pathname?.includes("(screens)");
 
   const [serverUnreadCount, setServerUnreadCount] = React.useState<number>(0);
 
@@ -48,7 +59,7 @@ export default function TabsLayout() {
           screenOptions={{
             headerShown: false,
             tabBarStyle: {
-              display: isCreateScreen ? "none" : "flex",
+              display: isHideTabScreen ? "none" : "flex",
               height: 54 + Math.max(insets.bottom, 10),
               backgroundColor: theme.bg2 || theme.bg || "#FFFFFF",
               borderTopWidth: 1,

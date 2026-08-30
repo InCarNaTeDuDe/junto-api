@@ -6,9 +6,15 @@ import {
 import { AppDataSource } from "../db/data-source";
 import { User } from "../entities/User.entity";
 import { activityRepository } from "../repositories/Activity.repository";
+import { notificationRepository } from "../repositories/Notification.repository";
 import { listDeals } from "../deals/deals.service";
 import { listRides } from "../rides/rides.service";
 import { listServicePros } from "../localservices/localservices.service";
+import {
+  sendExpoPushNotification,
+  broadcastExpoPushNotification,
+} from "../notifications/notifications.service";
+import { io } from "../socket/socket";
 
 export async function createActivity(
   body: CreateActivityRequest,
@@ -26,7 +32,7 @@ export async function createActivity(
     );
   }
 
-  return activityRepository.create({
+  const activity = await activityRepository.create({
     organizerId: organizer.id,
 
     title: body.activity,
@@ -48,8 +54,57 @@ export async function createActivity(
     remainingSeats: body.matesNeeded,
 
     participantIds: [],
-    tags: [],
+    tags: [body.activity, "DAY_MATES"],
   });
+
+  // 1. Send confirmation in-app notification & push to Organizer
+  const orgTitle = `Activity Created! 🚀`;
+  const orgMsg = `Your activity "${activity.title}" is live in ${activity.locationName}.`;
+
+  notificationRepository
+    .createNotification({
+      userId: organizer.id,
+      title: orgTitle,
+      message: orgMsg,
+      type: "activity",
+    })
+    .catch((e) => console.error("Error creating organizer notif record:", e));
+
+  if (io) {
+    io.to(`user:${organizer.id}`).emit("push_notification", {
+      title: orgTitle,
+      message: orgMsg,
+      type: "activity",
+      activityId: activity.id,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  sendExpoPushNotification(organizer.id, orgTitle, orgMsg, {
+    type: "activity",
+    activityId: activity.id,
+  }).catch((e) => console.error("Error sending push to organizer:", e));
+
+  // 2. Broadcast push notification and in-app notifications to ALL other users in the database
+  const emoji = body.activityEmoji || "✨";
+  const broadcastTitle = `${emoji} New Activity Nearby: ${body.activity}`;
+  const broadcastMsg = `${organizer.name || "A neighbor"} in ${activity.locationName} is looking for ${body.matesNeeded || "mates"} to join!`;
+
+  broadcastExpoPushNotification(
+    broadcastTitle,
+    broadcastMsg,
+    {
+      type: "activity",
+      activityId: activity.id,
+      title: activity.title,
+      locationName: activity.locationName,
+      organizerId: organizer.id,
+      organizerName: organizer.name,
+    },
+    organizer.id, // exclude the creator from the broadcast
+  ).catch((e) => console.error("Error broadcasting activity push:", e));
+
+  return activity;
 }
 
 export async function popularActivitiesAround(locationFilter?: {
@@ -288,7 +343,7 @@ export async function addTicketForSale(
   organizer: User,
 ) {
   try {
-    return await activityRepository.create({
+    const activity = await activityRepository.create({
       organizerId: organizer.id,
 
       title: body.movieName,
@@ -303,7 +358,7 @@ export async function addTicketForSale(
       remainingSeats: body.quantity,
 
       participantIds: [],
-      tags: [],
+      tags: ["MOVIES", body.movieName, "TICKET_SALE"],
 
       locationName: body.locationName,
       locationState: body.locationState,
@@ -311,6 +366,56 @@ export async function addTicketForSale(
       longitude: body.longitude,
       isAutoDetected: body.isAutoDetected ?? false,
     });
+
+    // 1. Confirm to organizer
+    const orgTitle = `Ticket Listed for Sale! 🎟️`;
+    const orgMsg = `Your ${body.quantity} ticket(s) for "${body.movieName}" are listed in ${body.locationName}.`;
+    notificationRepository
+      .createNotification({
+        userId: organizer.id,
+        title: orgTitle,
+        message: orgMsg,
+        type: "ticket",
+      })
+      .catch((e) => console.error("Error creating ticket notif record:", e));
+
+    if (io) {
+      io.to(`user:${organizer.id}`).emit("push_notification", {
+        title: orgTitle,
+        message: orgMsg,
+        type: "ticket",
+        activityId: activity.id,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    sendExpoPushNotification(organizer.id, orgTitle, orgMsg, {
+      type: "ticket",
+      activityId: activity.id,
+    }).catch((e) =>
+      console.error("Error sending ticket push to organizer:", e),
+    );
+
+    // 2. Broadcast to all users in database
+    const broadcastTitle = `🎟️ Movie Ticket for Sale: ${body.movieName}`;
+    const broadcastMsg = `${organizer.name || "A neighbor"} has ${body.quantity} ticket(s) available for ₹${body.sellingPrice} in ${body.locationName}.`;
+
+    broadcastExpoPushNotification(
+      broadcastTitle,
+      broadcastMsg,
+      {
+        type: "ticket",
+        activityId: activity.id,
+        title: body.movieName,
+        cost: body.sellingPrice,
+        locationName: body.locationName,
+        organizerId: organizer.id,
+        organizerName: organizer.name,
+      },
+      organizer.id,
+    ).catch((e) => console.error("Error broadcasting ticket push:", e));
+
+    return activity;
   } catch (error) {
     throw error;
   }

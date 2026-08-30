@@ -11,6 +11,10 @@ import {
   Animated,
   Pressable,
 } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
@@ -46,6 +50,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
 }) => {
   const router = useRouter();
   const { theme: C, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [query, setQuery] = useState(initialQuery);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -193,7 +198,8 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View
+      <SafeAreaView
+        edges={["top", "bottom"]}
         style={[
           styles.container,
           { backgroundColor: C.bg || (isDark ? "#0B0714" : "#FFFFFF") },
@@ -205,32 +211,60 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
             styles.header,
             {
               borderBottomColor:
-                C.border ||
-                (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"),
+                C.border || (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"),
             },
           ]}
         >
           <View style={styles.headerTitleRow}>
             <View
-              style={[
-                styles.badgeWrapper,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(99, 102, 241, 0.2)"
-                    : "#EEF2FF",
-                },
-              ]}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+              }}
             >
-              <Text style={styles.badgeIcon}>🎯</Text>
-              <Text
+              <TouchableOpacity
+                onPress={onClose}
                 style={[
-                  styles.badgeText,
-                  { color: isDark ? "#A5B4FC" : "#6366F1" },
+                  styles.closeBtn,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : C.cardSecondary || "#F1F5F9",
+                  },
+                ]}
+                accessibilityLabel="Go back"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={20}
+                  color={C.text || (isDark ? "#FFFFFF" : "#1E293B")}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.badgeWrapper,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(99, 102, 241, 0.2)"
+                      : "#EEF2FF",
+                  },
                 ]}
               >
-                Universal Intent Router
-              </Text>
+                <Text style={styles.badgeIcon}>🎯</Text>
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: isDark ? "#A5B4FC" : "#6366F1" },
+                  ]}
+                >
+                  Universal Intent Router
+                </Text>
+              </View>
             </View>
+
             <TouchableOpacity
               onPress={onClose}
               style={[
@@ -242,6 +276,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 },
               ]}
               accessibilityLabel="Close"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons
                 name="close"
@@ -313,8 +348,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
               onChangeText={setQuery}
               placeholder={ROTATING_EXAMPLES[placeholderIndex]}
               placeholderTextColor={
-                C.placeholder ||
-                (isDark ? "rgba(255,255,255,0.38)" : "#94A3B8")
+                C.placeholder || (isDark ? "rgba(255,255,255,0.38)" : "#94A3B8")
               }
               autoCapitalize="none"
               returnKeyType="search"
@@ -456,7 +490,10 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
         {/* Scrollable body */}
         <ScrollView
           style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -899,9 +936,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                     backgroundColor: isDark
                       ? "rgba(255,255,255,0.04)"
                       : "#F8FAFC",
-                    borderColor: isDark
-                      ? "rgba(255,255,255,0.08)"
-                      : "#E2E8F0",
+                    borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
                   },
                 ]}
               >
@@ -941,7 +976,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
             </View>
           )}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -949,7 +984,6 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "ios" ? 44 : 20,
   },
   header: {
     paddingHorizontal: 16,

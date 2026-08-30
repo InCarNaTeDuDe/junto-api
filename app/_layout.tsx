@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Stack, Redirect, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { AuthProvider, useAuthContext } from "@/context/AuthContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { useTheme } from "@/hooks/useTheme";
 import SpinnerLoader from "@/components/SpinnerLoader";
+import { PushNotificationService } from "@/services/notifications";
 
 patchFetch();
 
@@ -15,6 +16,29 @@ function RootNavigator() {
   const { loading, isLoggedIn } = useAuthContext();
   const { isDark } = useTheme();
   const segments = useSegments();
+
+  // Initialize push notifications when user is logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      PushNotificationService.configureNotificationHandler();
+      PushNotificationService.registerForPushNotificationsAsync().catch(
+        (err) => {
+          console.warn("Auto-register push notification failed:", err);
+        },
+      );
+      const unsubscribeSocket =
+        PushNotificationService.initPushNotificationListener((notif) => {
+          console.log("🔔 In-App real-time push notification received:", notif);
+        });
+      const unsubscribeExpo =
+        PushNotificationService.addExpoNotificationListeners();
+
+      return () => {
+        unsubscribeSocket?.();
+        unsubscribeExpo?.();
+      };
+    }
+  }, [isLoggedIn]);
 
   if (loading) {
     return <SpinnerLoader message="Junto never makes you alone" />;
@@ -40,6 +64,7 @@ function RootNavigator() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(screens)" />
       </Stack>
     </>
   );
