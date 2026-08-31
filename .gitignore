@@ -17,4 +17,9 @@ android/
 ios/
 .vscode/
 *.jks
+
+# firebase account project file
 google-services.json
+
+# this is firebase service account file
+junto-push-notif-7a42766db076.json 
