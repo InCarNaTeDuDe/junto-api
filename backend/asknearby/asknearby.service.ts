@@ -70,7 +70,7 @@ export async function createAskNearby(
   const broadcastTitle = `🆘 New Request Nearby: ${body.category || "Help Needed"}`;
   const broadcastMsg = `${organizer.name || "A neighbor"} in ${request.locationName} posted a request: "${request.title}".`;
 
-  broadcastExpoPushNotification(
+  await broadcastExpoPushNotification(
     broadcastTitle,
     broadcastMsg,
     {
@@ -81,7 +81,7 @@ export async function createAskNearby(
       organizerId: organizer.id,
     },
     organizer.id, // exclude organizer from broadcast
-  ).catch((e) => console.error("Error broadcasting push:", e));
+  );
 
   return request;
 }

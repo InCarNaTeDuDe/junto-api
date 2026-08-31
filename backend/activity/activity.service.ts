@@ -90,7 +90,7 @@ export async function createActivity(
   const broadcastTitle = `${emoji} New Activity Nearby: ${body.activity}`;
   const broadcastMsg = `${organizer.name || "A neighbor"} in ${activity.locationName} is looking for ${body.matesNeeded || "mates"} to join!`;
 
-  broadcastExpoPushNotification(
+  await broadcastExpoPushNotification(
     broadcastTitle,
     broadcastMsg,
     {
@@ -101,8 +101,8 @@ export async function createActivity(
       organizerId: organizer.id,
       organizerName: organizer.name,
     },
-    organizer.id, // exclude the creator from the broadcast
-  ).catch((e) => console.error("Error broadcasting activity push:", e));
+    organizer.id,
+  );
 
   return activity;
 }

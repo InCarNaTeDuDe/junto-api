@@ -111,24 +111,103 @@ export async function broadcastExpoPushNotification(
   try {
     const userRepo = AppDataSource.getRepository(User);
     const notificationRepo = AppDataSource.getRepository(Notification);
-    const users = await userRepo.find();
 
-    console.log(
-      `📢 [Broadcast Pipeline] Total users in DB: ${users.length}. Exclude ID: ${excludeUserId || "none"}`,
-    );
+    console.log("==============================================");
+    console.log("📢 BROADCAST PUSH STARTED");
+    console.log("📢 Title:", title);
+    console.log("📢 Message:", message);
+    console.log("📢 Exclude user:", excludeUserId || "NONE");
+    console.log("==============================================");
 
-    // Target all other users (or all users if no exclusion)
-    const targetUsers = users.filter((u) => {
-      if (!excludeUserId) return true;
-      return String(u.id).toLowerCase() !== String(excludeUserId).toLowerCase();
+    // ============================================================
+    // 1. GET USERS WITH REGISTERED EXPO PUSH TOKENS
+    // ============================================================
+
+    const query = userRepo
+      .createQueryBuilder("user")
+      .where("user.pushToken IS NOT NULL")
+      .andWhere("TRIM(user.pushToken) <> ''");
+
+    // Exclude the person who created the activity
+    if (excludeUserId) {
+      query.andWhere("user.id != :excludeUserId", {
+        excludeUserId,
+      });
+    }
+
+    const targetUsers = await query.getMany();
+
+    console.log(`📢 Users with non-empty push tokens: ${targetUsers.length}`);
+
+    if (targetUsers.length === 0) {
+      console.log("ℹ️ No users with registered push tokens found.");
+
+      return {
+        success: true,
+        recipients: 0,
+        sent: 0,
+        failed: 0,
+      };
+    }
+
+    // ============================================================
+    // 2. VALIDATE EXPO TOKENS
+    // ============================================================
+
+    const usersWithTokens = targetUsers.filter((user) => {
+      const token = user.pushToken?.trim();
+
+      if (!token) {
+        return false;
+      }
+
+      const isExpoToken =
+        token.startsWith("ExponentPushToken[") ||
+        token.startsWith("ExpoPushToken[");
+
+      if (!isExpoToken) {
+        console.warn(
+          `⚠️ Invalid/non-Expo push token for user ${user.id}: ${token}`,
+        );
+      }
+
+      return isExpoToken;
     });
 
     console.log(
-      `📢 [Broadcast Pipeline] Target recipient users count: ${targetUsers.length}`,
+      `📢 Valid Expo push token recipients: ${usersWithTokens.length}`,
     );
 
-    // 1. Create In-App Notification records & emit real-time WebSocket events for all target users
-    for (const targetUser of targetUsers) {
+    // ============================================================
+    // 3. PRINT EXACT RECIPIENTS
+    // ============================================================
+
+    console.log(
+      "📢 Push recipients:",
+      usersWithTokens.map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token: user.pushToken,
+      })),
+    );
+
+    if (usersWithTokens.length === 0) {
+      console.log("ℹ️ No valid Expo push tokens found.");
+
+      return {
+        success: true,
+        recipients: 0,
+        sent: 0,
+        failed: 0,
+      };
+    }
+
+    // ============================================================
+    // 4. CREATE IN-APP NOTIFICATIONS
+    // ============================================================
+
+    for (const targetUser of usersWithTokens) {
       try {
         const notif = notificationRepo.create({
           userId: targetUser.id,
@@ -137,9 +216,13 @@ export async function broadcastExpoPushNotification(
           type: data.type || "activity",
           read: false,
         });
+
         await notificationRepo.save(notif);
 
-        // Real-time socket emission to user's individual room
+        // ========================================================
+        // REAL-TIME SOCKET NOTIFICATION
+        // ========================================================
+
         if (io) {
           io.to(`user:${targetUser.id}`).emit("push_notification", {
             id: notif.id,
@@ -150,88 +233,196 @@ export async function broadcastExpoPushNotification(
             timestamp: notif.timestamp || new Date().toISOString(),
             data,
           });
+
+          console.log(
+            `📡 Socket notification emitted to user ${targetUser.id}`,
+          );
         }
-      } catch (dbNotifErr) {
-        console.warn(
-          `⚠️ Failed to create in-app notification record for user ${targetUser.id}:`,
-          dbNotifErr,
+      } catch (error) {
+        console.error(
+          `❌ Failed creating in-app notification for user ${targetUser.id}:`,
+          error,
         );
       }
     }
 
-    // 2. Global socket broadcast for live feeds
+    // ============================================================
+    // 5. GLOBAL SOCKET EVENT
+    // ============================================================
+
     if (io) {
       if (data.type === "ask_nearby") {
-        io.emit("asknearby_created", { title, message, data });
+        io.emit("asknearby_created", {
+          title,
+          message,
+          data,
+        });
       } else {
-        io.emit("activity_created", { title, message, data });
+        io.emit("activity_created", {
+          title,
+          message,
+          data,
+        });
       }
+
+      console.log("📡 Global socket event emitted");
     }
 
-    // 3. Filter users who have registered mobile Expo Push Tokens
-    const usersWithTokens = targetUsers.filter((u) => {
-      const token = u.pushToken?.trim();
-      return (
-        !!token &&
-        (token.startsWith("ExponentPushToken[") ||
-          token.startsWith("ExpoPushToken[") ||
-          token.length > 10)
-      );
-    });
+    // ============================================================
+    // 6. CREATE EXPO PUSH MESSAGES
+    // ============================================================
 
-    if (usersWithTokens.length === 0) {
-      console.log(
-        "ℹ️ [Broadcast Pipeline] No registered mobile Expo push tokens found among recipient users. (In-app notifications & socket events dispatched).",
-      );
-      return;
-    }
-
-    const messages = usersWithTokens.map((u) => ({
-      to: u.pushToken!.trim(),
+    const messages = usersWithTokens.map((user) => ({
+      to: user.pushToken!.trim(),
       sound: "default",
-      title: title,
+      title,
       body: message,
-      data: data,
+      data,
       priority: "high",
       channelId: "default",
-      _displayInForeground: true,
     }));
 
-    console.log(
-      `🚀 [Broadcast Pipeline] Dispatching Expo Mobile Push Notifications to ${usersWithTokens.length} devices...`,
-      usersWithTokens.map((u) => ({
-        name: u.name,
-        email: u.email,
-        token: u.pushToken,
-      })),
-    );
+    // ============================================================
+    // 7. SEND IN BATCHES OF 100
+    // ============================================================
 
-    for (let i = 0; i < messages.length; i += 100) {
-      const chunk = messages.slice(i, i + 100);
+    let totalSent = 0;
+    let totalFailed = 0;
+
+    for (let i = 0; i < usersWithTokens.length; i += 100) {
+      const userChunk = usersWithTokens.slice(i, i + 100);
+
+      const messageChunk = messages.slice(i, i + 100);
+
+      console.log(`🚀 Sending Expo push batch ${Math.floor(i / 100) + 1}`);
+
+      console.log(`📦 Batch size: ${messageChunk.length}`);
+
+      // ========================================================
+      // EXPO API REQUEST
+      // ========================================================
+
       const response = await fetch("https://exp.host/--/api/v2/push/send", {
         method: "POST",
+
         headers: {
           Accept: "application/json",
           "Accept-Encoding": "gzip, deflate",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(chunk),
+
+        body: JSON.stringify(messageChunk),
       });
 
+      // ========================================================
+      // HTTP ERROR
+      // ========================================================
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        console.error(`❌ Expo API HTTP error ${response.status}:`, errorText);
+
+        totalFailed += userChunk.length;
+
+        continue;
+      }
+
+      // ========================================================
+      // EXPO RESPONSE
+      // ========================================================
+
       const result = await response.json();
+
       console.log(
-        "📲 [Broadcast Pipeline] Expo Push API Server Response:",
-        JSON.stringify(result),
+        "📲 Expo Push API Response:",
+        JSON.stringify(result, null, 2),
       );
+
+      // ========================================================
+      // CHECK INDIVIDUAL EXPO TICKETS
+      // ========================================================
+
+      if (Array.isArray(result?.data)) {
+        result.data.forEach((ticket: any, index: number) => {
+          const user = userChunk[index];
+
+          if (!user) {
+            return;
+          }
+
+          if (ticket?.status === "ok") {
+            totalSent++;
+
+            console.log(`✅ Expo accepted push for ${user.name} (${user.id})`);
+          } else {
+            totalFailed++;
+
+            console.error(
+              `❌ Expo rejected push for ${user.name} (${user.id})`,
+              {
+                token: user.pushToken,
+                ticket,
+              },
+            );
+
+            // --------------------------------------------------
+            // IMPORTANT:
+            // DeviceNotRegistered means this token should
+            // eventually be removed from the database.
+            // --------------------------------------------------
+
+            if (ticket?.details?.error === "DeviceNotRegistered") {
+              console.warn(
+                `🗑️ Device is no longer registered for ${user.name}`,
+              );
+
+              // We intentionally do NOT delete it automatically
+              // here yet. We can add token cleanup separately.
+            }
+          }
+        });
+      } else {
+        console.warn(
+          "⚠️ Expo response did not contain expected data array:",
+          result,
+        );
+
+        totalFailed += userChunk.length;
+      }
     }
+
+    // ============================================================
+    // 8. FINAL RESULT
+    // ============================================================
+
+    console.log("==============================================");
+    console.log("📢 BROADCAST PUSH FINISHED");
+    console.log("📢 Recipients:", usersWithTokens.length);
+    console.log("📢 Expo accepted:", totalSent);
+    console.log("📢 Expo failed:", totalFailed);
+    console.log("==============================================");
+
+    return {
+      success: true,
+      recipients: usersWithTokens.length,
+      sent: totalSent,
+      failed: totalFailed,
+    };
   } catch (err: any) {
-    console.error(
-      "❌ [Broadcast Pipeline] Failed to broadcast Expo push notification:",
-      err?.message || err,
-    );
+    console.error("❌ [Broadcast Pipeline] Failed:", err?.message || err);
+
+    console.error(err);
+
+    return {
+      success: false,
+      recipients: 0,
+      sent: 0,
+      failed: 0,
+      error: err?.message || String(err),
+    };
   }
 }
-
 export async function getUserNotifications(user: User) {
   const notificationRepo = AppDataSource.getRepository(Notification);
   const notifications = await notificationRepo.find({
