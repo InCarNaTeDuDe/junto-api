@@ -11,11 +11,13 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import {
   useStore,
   Post,
   Chat,
   Message,
+  AppNotification,
   fetchNotificationsFromApi,
 } from "../hooks/useStore";
 import { useTheme } from "../hooks/useTheme";
@@ -695,12 +697,54 @@ function formatRelativeTime(ts: string | Date | number): string {
 
 /* SCREEN 5: NOTIFICATIONS SCREEN OVERLAY */
 function NotificationsOverlay({ onClose }: { onClose: () => void }) {
-  const { state } = useStore();
+  const { state, setActivePostId } = useStore();
   const { isDark } = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     fetchNotificationsFromApi();
   }, []);
+
+  const handleNotificationPress = (notif: AppNotification) => {
+    notif.read = true;
+    onClose();
+
+    if (notif.data?.route) {
+      router.push(notif.data.route);
+      return;
+    }
+
+    const text =
+      `${notif.title || ""} ${notif.message || ""} ${notif.content || ""}`.toLowerCase();
+    const matchedPost = state.posts.find(
+      (p) =>
+        p.id === notif.data?.postId ||
+        text.includes(p.title.toLowerCase()) ||
+        p.title.toLowerCase().includes(text.slice(0, 15)),
+    );
+
+    if (matchedPost) {
+      setActivePostId(matchedPost.id);
+    } else if (
+      notif.type === "message" ||
+      text.includes("message") ||
+      text.includes("chat")
+    ) {
+      router.push("/(tabs)/chats");
+    } else if (text.includes("ride") || text.includes("carpool")) {
+      router.push("/(screens)/rides");
+    } else if (
+      text.includes("lost") ||
+      text.includes("found") ||
+      text.includes("wallet")
+    ) {
+      router.push("/(screens)/ask-nearby");
+    } else if (text.includes("deal") || text.includes("discount")) {
+      router.push("/(screens)/deals");
+    } else {
+      router.push("/(tabs)/explore");
+    }
+  };
 
   const notifications = state.notifications || [];
 
@@ -807,8 +851,9 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
                 const relTime = formatRelativeTime(notif.timestamp);
 
                 return (
-                  <View
+                  <Pressable
                     key={notif.id}
+                    onPress={() => handleNotificationPress(notif)}
                     style={[
                       styles.notifCard,
                       !notif.read
@@ -878,7 +923,7 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
 
                     {/* Unread dot indicator */}
                     {!notif.read && <View style={styles.notifUnreadDot} />}
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>

@@ -578,16 +578,6 @@ const ROW_FEATURES: FeatureItem[] = [
     query: "ride",
   },
   {
-    id: "roam",
-    name: "Roam",
-    subtitle: "I'm in a new place",
-    icon: "location",
-    color: "#059669",
-    bg: "#D1FAE5",
-    route: "/(screens)/location-search",
-    query: "roam",
-  },
-  {
     id: "services",
     name: "Services",
     subtitle: "Find experts",
@@ -616,6 +606,16 @@ const ROW_FEATURES: FeatureItem[] = [
     bg: "#FEF3C7",
     route: "/(screens)/deals",
     query: "deals",
+  },
+  {
+    id: "roam",
+    name: "Roam",
+    subtitle: "I'm in a new place",
+    icon: "location",
+    color: "#059669",
+    bg: "#D1FAE5",
+    route: "/(screens)/location-search",
+    query: "roam",
   },
   {
     id: "all",
