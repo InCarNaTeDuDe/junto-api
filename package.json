@@ -8,7 +8,7 @@
     "ui": "npx expo start --dev-client --clear",
     "metro": "node --env-file=.env.example ./node_modules/expo/bin/cli start --clear",
     "backend": "node --inspect -r ts-node/register -r dotenv/config backend/server.ts",
-    "backend2": "bash -c 'source ./config.sh && TS_NODE_PROJECT=backend/tsconfig.json node --inspect -r ts-node/register backend/server.ts'",
+    "backend2": "APP_VARIANT=prod bash -c 'source ./config.sh && TS_NODE_PROJECT=backend/tsconfig.json node --inspect -r ts-node/register backend/server.ts'",
     "dev": "osascript -e 'tell application \"Terminal\" to do script \"cd \\\"'$PWD'\\\" && npm run metro\"' && npm run backend",
     "dev:local": "node --env-file=.env.example ./node_modules/.bin/tsx backend/server.ts",
     "dev:fsServer": "node --env-file=.env.local ./node_modules/.bin/tsx backend/server.ts & node --env-file=.env.local ./node_modules/expo/bin/cli start",

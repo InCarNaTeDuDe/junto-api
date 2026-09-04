@@ -399,7 +399,7 @@ const AnimatedFeatureIcon: React.FC<AnimatedFeatureIconProps> = ({
     });
     return {
       transform: [{ translateY }, { rotate }],
-    };
+    } as any;
   };
 
   return (
@@ -647,11 +647,10 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
       return;
     }
 
-    if (onSelectFeature) {
-      onSelectFeature(item.id, item.query);
-    }
     if (item.route) {
       router.push(item.route as any);
+    } else if (onSelectFeature) {
+      onSelectFeature(item.id, item.query);
     }
   };
 
@@ -661,11 +660,10 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
       setShowNeedModal(true);
       return;
     }
-    if (onSelectFeature) {
-      onSelectFeature(item.id, item.query);
-    }
     if (item.route) {
       router.push(item.route as any);
+    } else if (onSelectFeature) {
+      onSelectFeature(item.id, item.query);
     }
   };
 

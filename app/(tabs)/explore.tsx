@@ -552,14 +552,6 @@ export default function ExploreScreen() {
       <ScrollView
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchRealActivities(true)}
-            colors={["#7C3AED"]}
-            tintColor="#7C3AED"
-          />
-        }
       >
         <View style={s.radarWrapper}>
           <View
@@ -1401,13 +1393,13 @@ const s = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingBottom: 24,
+    paddingBottom: 0,
   },
   radarWrapper: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 10,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 4,
   },
   radarContainer: {
     position: "relative",

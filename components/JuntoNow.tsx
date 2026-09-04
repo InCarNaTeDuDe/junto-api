@@ -115,11 +115,10 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
       onItemPress(item);
       return;
     }
-    if (onFilter && item.query) {
-      onFilter(item.query);
-    }
     if (item.route) {
       router.push(item.route as any);
+    } else if (onFilter && item.query) {
+      onFilter(item.query);
     }
   };
 

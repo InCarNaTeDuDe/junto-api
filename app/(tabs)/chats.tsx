@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Platform,
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
@@ -42,108 +41,6 @@ interface Thread {
   place?: string;
   participantId?: string | null;
 }
-
-const DEFAULT_THREADS: Thread[] = [
-  {
-    id: "thread-1",
-    name: "Ananya R.",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-    category: "DAY MATES",
-    contextTitle: "Morning Walk",
-    lastMessage: "Hey! Are we still on for the walk tomorrow?",
-    lastTime: "8:45 PM",
-    unreadCount: 2,
-    isOnline: true,
-    activityEmoji: "🏃‍♀️",
-    place: "Bandstand, Bandra",
-  },
-  {
-    id: "thread-2",
-    name: "Rohan S.",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-    category: "TICKET SWAP",
-    contextTitle: "PVR Forum Mall",
-    lastMessage: "Thanks! Ticket confirmed ✅",
-    lastTime: "7:32 PM",
-    unreadCount: 1,
-    isOnline: true,
-    activityEmoji: "🎟️",
-    place: "Koramangala, Bengaluru",
-  },
-  {
-    id: "thread-3",
-    name: "Neha P.",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
-    category: "DAY MATES",
-    contextTitle: "Coffee Buddy",
-    lastMessage: "That café looks perfect, see you there! ☕",
-    lastTime: "6:15 PM",
-    unreadCount: 1,
-    isOnline: true,
-    activityEmoji: "☕",
-    place: "Third Wave Coffee, Indiranagar",
-  },
-  {
-    id: "thread-4",
-    name: "Hyderabad Movie Lovers 🎬",
-    avatar:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150",
-    category: "GROUP",
-    contextTitle: "12 members",
-    lastMessage: "Karan: Anyone up for a late night show?",
-    lastTime: "5:40 PM",
-    unreadCount: 3,
-    isOnline: false,
-    isGroup: true,
-    activityEmoji: "🎬",
-    place: "AMB Cinemas, Gachibowli",
-  },
-  {
-    id: "thread-5",
-    name: "Amit P.",
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
-    category: "LOST & FOUND",
-    contextTitle: "Lost Wallet",
-    lastMessage: "Really appreciate your help! 🙏",
-    lastTime: "4:12 PM",
-    unreadCount: 1,
-    isOnline: true,
-    activityEmoji: "👛",
-    place: "Metro Station, HSR Layout",
-  },
-  {
-    id: "thread-6",
-    name: "Karan M.",
-    avatar:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-    category: "TICKET SWAP",
-    contextTitle: "Diljit Concert",
-    lastMessage: "Let me know if you get another ticket",
-    lastTime: "Yesterday",
-    unreadCount: 0,
-    isOnline: false,
-    activityEmoji: "🎟️",
-    place: "JLN Stadium",
-  },
-  {
-    id: "thread-7",
-    name: "Priya K.",
-    avatar:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150",
-    category: "DAY MATES",
-    contextTitle: "Badminton",
-    lastMessage: "Cool! Will bring my racket.",
-    lastTime: "Yesterday",
-    unreadCount: 0,
-    isOnline: false,
-    activityEmoji: "🏸",
-    place: "Playo Arena, Bellandur",
-  },
-];
 
 export default function ChatsScreen() {
   const router = useRouter();
@@ -386,7 +283,7 @@ export default function ChatsScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={s.safeArea} edges={["top"]}>
       <View style={s.container}>
         {/* ================= HEADER ================= */}
         {/* <Header/> */}
@@ -817,7 +714,7 @@ const createStyles = (t: any, isDark: boolean) =>
     listContent: {
       paddingHorizontal: scale(18),
       paddingTop: verticalScale(6),
-      paddingBottom: verticalScale(32),
+      paddingBottom: verticalScale(4),
     },
     chatCard: {
       flexDirection: "row",

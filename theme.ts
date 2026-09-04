@@ -191,7 +191,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "View Rides",
     colorKey: "ride",
     route: "/(screens)/rides",
-    query: "ride",
   },
   {
     id: "help",
@@ -201,7 +200,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "Get Help",
     colorKey: "help",
     route: "/(screens)/ask-nearby",
-    query: "help",
   },
   {
     id: "service",
@@ -211,7 +209,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "Find Service",
     colorKey: "service",
     route: "/(screens)/services",
-    query: "service",
   },
   {
     id: "something",
@@ -221,7 +218,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "See Deals",
     colorKey: "deals",
     route: "/(screens)/deals",
-    query: "deals",
   },
   {
     id: "company",
@@ -231,7 +227,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "Find People",
     colorKey: "company",
     route: "/(screens)/add-daymate",
-    query: "mates",
   },
   {
     id: "new_here",
@@ -241,7 +236,6 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     btn: "Explore Now",
     colorKey: "new_here",
     route: "/(screens)/new-here",
-    query: "explore",
   },
 ];
 

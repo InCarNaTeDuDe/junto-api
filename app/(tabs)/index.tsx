@@ -822,13 +822,13 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <StatusBar
         barStyle={themeMode === "light" ? "dark-content" : "light-content"}
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: verticalScale(32) }}
+        contentContainerStyle={{ paddingBottom: verticalScale(4) }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1007,22 +1007,12 @@ export default function Home() {
         </View> */}
 
         {/* Quick Features Row */}
-        <QuickFeatures
-          isDark={themeMode === "dark"}
-          onSelectFeature={(id, kw) => {
-            if (kw && kw !== "all") {
-              setQ(kw);
-            } else if (kw === "all") {
-              setQ("");
-            }
-          }}
-        />
+        <QuickFeatures isDark={themeMode === "dark"} />
 
         {/* JUNTO Now Section */}
         <JuntoNow
           isDark={themeMode === "dark"}
           cityName={selectedLocation?.name}
-          onFilter={(kw) => setQ(kw)}
         />
 
         {/* Hero cards (commented out to reduce vertical space) */}

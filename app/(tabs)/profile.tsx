@@ -366,7 +366,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={s.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
@@ -393,18 +393,6 @@ export default function ProfileScreen() {
               activeOpacity={0.7}
             >
               <Ionicons name="share-outline" size={scale(17)} color={t.text} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.topIconButton}
-              onPress={() => setActiveModal("settings")}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="settings-outline"
-                size={scale(17)}
-                color={t.text}
-              />
             </TouchableOpacity>
           </View>
 
@@ -577,10 +565,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View> */}
 
-        {/* 4. "MY SPACE" SECTION */}
+        {/* 4. SIMPLE MAIN MENU */}
         <View style={s.sectionContainer}>
-          <Text style={s.sectionHeaderTitle}>My Space</Text>
-
           <View style={s.menuListCard}>
             {/* My Activities */}
             <TouchableOpacity
@@ -594,34 +580,16 @@ export default function ProfileScreen() {
                   { backgroundColor: hexA(t.primary, 0.15) },
                 ]}
               >
-                <Ionicons name="person" size={scale(16)} color={t.primary} />
+                <Ionicons
+                  name="calendar-outline"
+                  size={scale(16)}
+                  color={t.primary}
+                />
               </View>
               <View style={s.menuTextCol}>
                 <Text style={s.menuItemTitle}>My Activities</Text>
                 <Text style={s.menuItemSub}>
-                  Manage your day mates, events & more
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
-            </TouchableOpacity>
-
-            <View style={s.menuItemSeparator} />
-
-            {/* Saved */}
-            <TouchableOpacity
-              style={s.menuItemRow}
-              onPress={() => setActiveModal("saved")}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[s.menuIconBg, { backgroundColor: hexA(t.error, 0.15) }]}
-              >
-                <Ionicons name="heart" size={scale(16)} color={t.error} />
-              </View>
-              <View style={s.menuTextCol}>
-                <Text style={s.menuItemTitle}>Saved</Text>
-                <Text style={s.menuItemSub}>
-                  Activities, people and places you saved
+                  Manage your activities, events & daymates
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
@@ -638,12 +606,16 @@ export default function ProfileScreen() {
               <View
                 style={[s.menuIconBg, { backgroundColor: hexA(t.info, 0.15) }]}
               >
-                <Ionicons name="ticket" size={scale(16)} color={t.info} />
+                <Ionicons
+                  name="ticket-outline"
+                  size={scale(16)}
+                  color={t.info}
+                />
               </View>
               <View style={s.menuTextCol}>
                 <Text style={s.menuItemTitle}>My Tickets</Text>
                 <Text style={s.menuItemSub}>
-                  Tickets you're selling or interested in
+                  Tickets you're swapping or selling
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
@@ -651,82 +623,36 @@ export default function ProfileScreen() {
 
             <View style={s.menuItemSeparator} />
 
-            {/* Chats */}
+            {/* Saved */}
             <TouchableOpacity
               style={s.menuItemRow}
-              onPress={() => router.push("/(tabs)/chats")}
+              onPress={() => setActiveModal("saved")}
               activeOpacity={0.7}
             >
               <View
-                style={[
-                  s.menuIconBg,
-                  { backgroundColor: hexA(t.success, 0.15) },
-                ]}
+                style={[s.menuIconBg, { backgroundColor: hexA(t.error, 0.15) }]}
               >
                 <Ionicons
-                  name="chatbubble-ellipses"
+                  name="heart-outline"
                   size={scale(16)}
-                  color={t.success}
+                  color={t.error}
                 />
               </View>
               <View style={s.menuTextCol}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: scale(6),
-                  }}
-                >
-                  <Text style={s.menuItemTitle}>Chats</Text>
-                  {unreadChatsCount > 0 && (
-                    <View style={s.badgePill}>
-                      <Text style={s.badgePillText}>{unreadChatsCount}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={s.menuItemSub}>Your conversations</Text>
+                <Text style={s.menuItemTitle}>Saved</Text>
+                <Text style={s.menuItemSub}>
+                  Activities, people and places you saved
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
 
             <View style={s.menuItemSeparator} />
 
-            {/* Notifications */}
+            {/* Settings (Moved from top-right directly to main menu) */}
             <TouchableOpacity
               style={s.menuItemRow}
-              onPress={() => setShowNotifications(true)}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  s.menuIconBg,
-                  { backgroundColor: hexA(t.warning, 0.15) },
-                ]}
-              >
-                <Ionicons
-                  name="notifications"
-                  size={scale(16)}
-                  color={t.warning}
-                />
-              </View>
-              <View style={s.menuTextCol}>
-                <Text style={s.menuItemTitle}>Notifications</Text>
-                <Text style={s.menuItemSub}>Stay updated with activities</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 5. "ACCOUNT & MORE" SECTION */}
-        <View style={s.sectionContainer}>
-          <Text style={s.sectionHeaderTitle}>Account & More</Text>
-
-          <View style={s.menuListCard}>
-            {/* Edit Profile */}
-            <TouchableOpacity
-              style={s.menuItemRow}
-              onPress={() => setActiveModal("edit")}
+              onPress={() => setActiveModal("settings")}
               activeOpacity={0.7}
             >
               <View
@@ -736,15 +662,15 @@ export default function ProfileScreen() {
                 ]}
               >
                 <Ionicons
-                  name="person-circle-outline"
+                  name="settings-outline"
                   size={scale(17)}
                   color={t.primary}
                 />
               </View>
               <View style={s.menuTextCol}>
-                <Text style={s.menuItemTitle}>Edit Profile</Text>
+                <Text style={s.menuItemTitle}>Settings</Text>
                 <Text style={s.menuItemSub}>
-                  Update your info and preferences
+                  Preferences, theme and account settings
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
@@ -808,46 +734,28 @@ export default function ProfileScreen() {
 
             <View style={s.menuItemSeparator} />
 
-            {/* Invite Friends */}
+            {/* Sign Out */}
             <TouchableOpacity
               style={s.menuItemRow}
-              onPress={() => setActiveModal("invite")}
+              onPress={logout}
               activeOpacity={0.7}
             >
               <View
-                style={[
-                  s.menuIconBg,
-                  { backgroundColor: hexA(t.primary, 0.15) },
-                ]}
+                style={[s.menuIconBg, { backgroundColor: hexA(t.error, 0.12) }]}
               >
                 <Ionicons
-                  name="gift-outline"
+                  name="log-out-outline"
                   size={scale(17)}
-                  color={t.primary}
+                  color={t.error}
                 />
               </View>
               <View style={s.menuTextCol}>
-                <Text style={s.menuItemTitle}>Invite Friends</Text>
-                <Text style={s.menuItemSub}>
-                  Invite friends and earn rewards
+                <Text style={[s.menuItemTitle, { color: t.error }]}>
+                  Sign Out
                 </Text>
+                <Text style={s.menuItemSub}>Log out of your account</Text>
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: scale(6),
-                }}
-              >
-                <View style={s.rewardTagPill}>
-                  <Text style={s.rewardTagText}>Earn ₹100</Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={scale(16)}
-                  color={t.sub}
-                />
-              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1636,7 +1544,7 @@ const createStyles = (t: Theme) =>
       backgroundColor: t.bg,
     },
     scrollContent: {
-      paddingBottom: verticalScale(30),
+      paddingBottom: 0,
     },
 
     /* 1. TOP HEADER SECTION */

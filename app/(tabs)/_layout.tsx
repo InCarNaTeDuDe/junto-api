@@ -69,16 +69,14 @@ export default function TabsLayout() {
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.06,
               shadowRadius: 4,
-              paddingTop: 6,
+              // paddingTop: 6,
               paddingBottom: Math.max(insets.bottom, 8),
             },
             tabBarActiveTintColor: theme.primary || "#A855F7",
             tabBarInactiveTintColor: theme.mute || "#8B94A7",
             tabBarLabelStyle: {
               fontSize: 11,
-              fontWeight: "600",
-              marginTop: 2,
-            },
+              fontWeight: "600",            },
           }}
         >
           {/* Home */}
