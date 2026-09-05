@@ -11,6 +11,8 @@ export class NotificationRepository {
     title: string;
     message: string;
     type?: string;
+    activityId?: string;
+    data?: any;
   }) {
     const notif = this.repo.create({
       userId: data.userId,
@@ -18,6 +20,15 @@ export class NotificationRepository {
       message: data.message,
       type: data.type || "activity",
       read: false,
+      activityId:
+        data.activityId ||
+        data.data?.activityId ||
+        data.data?.requestId ||
+        data.data?.postId ||
+        (data.type === "activity" || data.type === "ask_nearby"
+          ? data.data?.id
+          : undefined),
+      dataJson: data.data ? JSON.stringify(data.data) : undefined,
     });
 
     return this.repo.save(notif);
@@ -29,6 +40,8 @@ export class NotificationRepository {
       title: string;
       message: string;
       type?: string;
+      activityId?: string;
+      data?: any;
     }[],
   ) {
     if (!users.length) return [];
@@ -40,6 +53,15 @@ export class NotificationRepository {
         message: data.message,
         type: data.type || "activity",
         read: false,
+        activityId:
+          data.activityId ||
+          data.data?.activityId ||
+          data.data?.requestId ||
+          data.data?.postId ||
+          (data.type === "activity" || data.type === "ask_nearby"
+            ? data.data?.id
+            : undefined),
+        dataJson: data.data ? JSON.stringify(data.data) : undefined,
       })),
     );
 

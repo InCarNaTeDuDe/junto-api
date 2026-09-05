@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { activityRepository } from "../repositories/Activity.repository";
 
 import {
   addTicketForSale,
@@ -83,6 +84,25 @@ export async function getJuntoNowStatsHandler(
       success: true,
       stats,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getActivityById(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+    const activity = await activityRepository.findById(id);
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Activity not found" });
+    }
+    return res.status(200).json({ success: true, activity });
   } catch (error) {
     next(error);
   }

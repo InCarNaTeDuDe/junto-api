@@ -7,6 +7,7 @@ import {
   fetchActivitiesByLoc,
   postTicket,
   getJuntoNowStatsHandler,
+  getActivityById,
 } from "./activity.controller";
 import { CreateActivitySchema } from "./activity.schema";
 import { authenticate } from "../middleware/authenticate";
@@ -14,6 +15,7 @@ import { authenticate } from "../middleware/authenticate";
 const router = Router();
 
 router.get("/junto-now-stats", authenticate, getJuntoNowStatsHandler);
+router.get("/:id", getActivityById);
 router.post("/", authenticate, validate(CreateActivitySchema), create);
 router.post("/activities-around", authenticate, fetchActivitiesByLoc);
 

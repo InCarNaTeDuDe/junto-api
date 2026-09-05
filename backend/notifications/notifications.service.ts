@@ -1,5 +1,7 @@
+import { In, ILike } from "typeorm";
 import { AppDataSource } from "../db/data-source";
 import { Notification } from "../entities/Notification.entity";
+import { Activity, ActivityCategory } from "../entities/Activity.entity";
 import { User } from "../entities/User.entity";
 import { io } from "../socket/socket";
 
@@ -209,12 +211,20 @@ export async function broadcastExpoPushNotification(
 
     for (const targetUser of usersWithTokens) {
       try {
+        const resolvedActId =
+          data.activityId || data.requestId || data.postId || (data as any).id;
+
         const notif = notificationRepo.create({
           userId: targetUser.id,
           title,
           message,
           type: data.type || "activity",
           read: false,
+          activityId: resolvedActId,
+          dataJson: JSON.stringify({
+            ...data,
+            activityId: resolvedActId || data.activityId,
+          }),
         });
 
         await notificationRepo.save(notif);
@@ -231,7 +241,11 @@ export async function broadcastExpoPushNotification(
             type: notif.type,
             read: false,
             timestamp: notif.timestamp || new Date().toISOString(),
-            data,
+            activityId: resolvedActId,
+            data: {
+              ...data,
+              activityId: resolvedActId,
+            },
           });
 
           console.log(
@@ -431,14 +445,404 @@ export async function getUserNotifications(user: User) {
     take: 50,
   });
 
-  return notifications.map((n) => ({
-    id: n.id,
-    title: n.title,
-    message: n.message,
-    type: n.type,
-    read: n.read,
-    timestamp: n.timestamp,
-  }));
+  if (!notifications.length) {
+    return [];
+  }
+
+  const activityRepo = AppDataSource.getRepository(Activity);
+  const userRepo = AppDataSource.getRepository(User);
+
+  const parsedDataList: {
+    n: Notification;
+    parsedData: any;
+    actId?: string;
+    extractedTitle?: string;
+    extractedUser?: string;
+    extractedPlace?: string;
+    knownUserId?: string;
+  }[] = [];
+
+  const activityIdsToFetch = new Set<string>();
+  const userIdsToFetch = new Set<string>();
+  const userNamesToFind = new Set<string>();
+  const titlesToFind = new Set<string>();
+
+  for (const n of notifications) {
+    let parsedData: any = undefined;
+    if (n.dataJson) {
+      try {
+        parsedData = JSON.parse(n.dataJson);
+      } catch (e) {}
+    }
+
+    const actId =
+      n.activityId ||
+      parsedData?.activityId ||
+      parsedData?.requestId ||
+      parsedData?.postId ||
+      (n.type === "activity" || n.type === "ask_nearby"
+        ? parsedData?.id
+        : undefined);
+
+    if (actId && typeof actId === "string") {
+      activityIdsToFetch.add(actId);
+    }
+
+    // Extract potential title inside quotes: e.g. "Lost Wallet: Need Help"
+    const quoteMatch = n.message?.match(/"([^"]+)"/);
+    const extractedTitle = quoteMatch ? quoteMatch[1].trim() : undefined;
+    if (extractedTitle) {
+      titlesToFind.add(extractedTitle);
+    }
+
+    // Extract user and place from message pattern:
+    // "Ramanamma in Hyderabad posted a request: ..." or "Ramanamma in Hyderabad is looking for..."
+    const userLocMatch =
+      n.message?.match(
+        /^(.+?)\s+in\s+(.+?)\s+(?:posted a request|is looking for)/i,
+      ) || n.message?.match(/^(.+?)\s+(?:posted a request|is looking for)/i);
+
+    let extractedUser = userLocMatch ? userLocMatch[1].trim() : undefined;
+    if (extractedUser && extractedUser.toLowerCase() === "a neighbor") {
+      extractedUser = undefined;
+    }
+    const extractedPlace =
+      userLocMatch && userLocMatch[2] ? userLocMatch[2].trim() : undefined;
+
+    if (extractedUser) {
+      userNamesToFind.add(extractedUser);
+    }
+
+    const knownUserId =
+      parsedData?.userId || parsedData?.organizerId || undefined;
+
+    if (knownUserId) {
+      userIdsToFetch.add(knownUserId);
+    }
+
+    if (
+      parsedData?.user &&
+      parsedData.user !== "Neighbor" &&
+      parsedData.user !== "A neighbor"
+    ) {
+      userNamesToFind.add(parsedData.user);
+    }
+    if (
+      parsedData?.organizerName &&
+      parsedData.organizerName !== "Neighbor" &&
+      parsedData.organizerName !== "A neighbor"
+    ) {
+      userNamesToFind.add(parsedData.organizerName);
+    }
+
+    parsedDataList.push({
+      n,
+      parsedData,
+      actId,
+      extractedTitle,
+      extractedUser,
+      extractedPlace,
+      knownUserId,
+    });
+  }
+
+  const activityMap = new Map<string, Activity>();
+  const userMap = new Map<string, User>(); // key: id or `name:<lowercase-name>`
+
+  if (AppDataSource.isInitialized) {
+    try {
+      // 1. Fetch activities by known IDs
+      if (activityIdsToFetch.size > 0) {
+        const foundActs = await activityRepo.find({
+          where: { id: In([...activityIdsToFetch]) },
+          relations: { organizer: true },
+        });
+        for (const act of foundActs) {
+          activityMap.set(act.id, act);
+          if (act.title) {
+            activityMap.set(`title:${act.title.toLowerCase()}`, act);
+          }
+          if (act.organizer) {
+            userMap.set(act.organizer.id, act.organizer);
+            if (act.organizer.name) {
+              userMap.set(
+                `name:${act.organizer.name.toLowerCase()}`,
+                act.organizer,
+              );
+            }
+          }
+          if (act.organizerId) {
+            userIdsToFetch.add(act.organizerId);
+          }
+        }
+      }
+
+      // 2. Fetch activities by extracted titles
+      for (const title of titlesToFind) {
+        if (!activityMap.has(`title:${title.toLowerCase()}`)) {
+          const act = await activityRepo.findOne({
+            where: [{ title }, { title: ILike(`%${title}%`) }],
+            relations: { organizer: true },
+            order: { createdAt: "DESC" },
+          });
+          if (act) {
+            activityMap.set(act.id, act);
+            activityMap.set(`title:${title.toLowerCase()}`, act);
+            if (act.title) {
+              activityMap.set(`title:${act.title.toLowerCase()}`, act);
+            }
+            if (act.organizer) {
+              userMap.set(act.organizer.id, act.organizer);
+              if (act.organizer.name) {
+                userMap.set(
+                  `name:${act.organizer.name.toLowerCase()}`,
+                  act.organizer,
+                );
+              }
+            }
+            if (act.organizerId) {
+              userIdsToFetch.add(act.organizerId);
+            }
+          }
+        }
+      }
+
+      // 3. Fetch users by known user IDs
+      if (userIdsToFetch.size > 0) {
+        const foundUsers = await userRepo.find({
+          where: { id: In([...userIdsToFetch]) },
+        });
+        for (const u of foundUsers) {
+          userMap.set(u.id, u);
+          if (u.name) {
+            userMap.set(`name:${u.name.toLowerCase()}`, u);
+          }
+        }
+      }
+
+      // 4. Fetch users by names (e.g. "Ramanamma")
+      for (const name of userNamesToFind) {
+        const nameKey = `name:${name.toLowerCase()}`;
+        if (!userMap.has(nameKey)) {
+          const u = await userRepo.findOne({
+            where: [{ name }, { name: ILike(name) }, { userHandle: name }],
+          });
+          if (u) {
+            userMap.set(u.id, u);
+            userMap.set(nameKey, u);
+            if (u.name) {
+              userMap.set(`name:${u.name.toLowerCase()}`, u);
+            }
+          }
+        }
+      }
+
+      // 5. Connect any activities linked to users found
+      for (const item of parsedDataList) {
+        let act = item.actId ? activityMap.get(item.actId) : undefined;
+        if (!act && item.extractedTitle) {
+          act = activityMap.get(`title:${item.extractedTitle.toLowerCase()}`);
+        }
+        if (!act && item.extractedUser) {
+          const u = userMap.get(`name:${item.extractedUser.toLowerCase()}`);
+          if (u) {
+            act = await activityRepo.findOne({
+              where: { organizerId: u.id },
+              relations: { organizer: true },
+              order: { createdAt: "DESC" },
+            });
+            if (act) {
+              activityMap.set(act.id, act);
+              if (item.extractedTitle) {
+                activityMap.set(
+                  `title:${item.extractedTitle.toLowerCase()}`,
+                  act,
+                );
+              }
+              if (act.title) {
+                activityMap.set(`title:${act.title.toLowerCase()}`, act);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch activities/users for notifications:", err);
+    }
+  }
+
+  return parsedDataList.map(
+    ({
+      n,
+      parsedData,
+      actId,
+      extractedTitle,
+      extractedUser,
+      extractedPlace,
+      knownUserId,
+    }) => {
+      let act = actId ? activityMap.get(actId) : undefined;
+      if (!act && extractedTitle) {
+        act = activityMap.get(`title:${extractedTitle.toLowerCase()}`);
+      }
+      if (!act && extractedUser) {
+        const u = userMap.get(`name:${extractedUser.toLowerCase()}`);
+        if (u) {
+          for (const a of activityMap.values()) {
+            if (a.organizerId === u.id) {
+              act = a;
+              break;
+            }
+          }
+        }
+      }
+
+      const activityId =
+        act?.id || actId || parsedData?.activityId || n.activityId || undefined;
+
+      // Resolve user from linked Activity or User table
+      let matchedUser: User | undefined = undefined;
+      if (act?.organizer && (act.organizer.name || act.organizer.avatar)) {
+        matchedUser = act.organizer;
+      } else if (act?.organizerId) {
+        matchedUser = userMap.get(act.organizerId);
+      }
+      if (!matchedUser && knownUserId) {
+        matchedUser = userMap.get(knownUserId);
+      }
+      if (
+        !matchedUser &&
+        (extractedUser || parsedData?.user || parsedData?.organizerName)
+      ) {
+        const targetName = (
+          extractedUser ||
+          parsedData?.user ||
+          parsedData?.organizerName ||
+          ""
+        ).toLowerCase();
+        matchedUser = userMap.get(`name:${targetName}`);
+      }
+
+      const organizerName =
+        matchedUser?.name ||
+        act?.organizer?.name ||
+        (parsedData?.user &&
+        parsedData.user !== "Neighbor" &&
+        parsedData.user !== "A neighbor"
+          ? parsedData.user
+          : undefined) ||
+        (parsedData?.organizerName &&
+        parsedData.organizerName !== "Neighbor" &&
+        parsedData.organizerName !== "A neighbor"
+          ? parsedData.organizerName
+          : undefined) ||
+        extractedUser ||
+        "Neighbor";
+
+      const organizerId =
+        matchedUser?.id ||
+        act?.organizerId ||
+        act?.organizer?.id ||
+        parsedData?.userId ||
+        parsedData?.organizerId ||
+        undefined;
+
+      const avatar =
+        matchedUser?.avatar ||
+        act?.organizer?.avatar ||
+        (parsedData?.avatar &&
+        !parsedData.avatar.includes("images.unsplash.com")
+          ? parsedData.avatar
+          : undefined) ||
+        (matchedUser ? undefined : parsedData?.avatar) ||
+        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+
+      const place =
+        parsedData?.place ||
+        parsedData?.locationName ||
+        (act
+          ? act.locationState
+            ? `${act.locationName}, ${act.locationState}`
+            : act.locationName
+          : extractedPlace || "Nearby");
+
+      const title =
+        parsedData?.title ||
+        act?.title ||
+        extractedTitle ||
+        n.title ||
+        "Activity";
+
+      const right =
+        parsedData?.right ||
+        parsedData?.urgency ||
+        act?.tags?.[1] ||
+        (act?.cost ? `₹${act.cost}` : undefined) ||
+        (act?.category === ActivityCategory.ASK_NEARBY ||
+        n.type === "ask_nearby"
+          ? "Urgent"
+          : "Nearby");
+
+      const category =
+        act?.category === ActivityCategory.ASK_NEARBY || n.type === "ask_nearby"
+          ? "ASK NEARBY"
+          : act?.category === ActivityCategory.DAY_MATES
+            ? "DAY MATES"
+            : parsedData?.category || act?.category || "ASK NEARBY";
+
+      const type =
+        parsedData?.type ||
+        (act?.category === ActivityCategory.ASK_NEARBY ||
+        n.type === "ask_nearby"
+          ? "ASK NEARBY"
+          : act?.category === ActivityCategory.DAY_MATES
+            ? "DAY MATES"
+            : act?.category || n.type || "ASK NEARBY");
+
+      const enrichedData = {
+        ...(parsedData || {}),
+        activityId,
+        title,
+        user: organizerName,
+        userId: organizerId,
+        organizerId,
+        place,
+        right,
+        type,
+        category,
+        avatar,
+      };
+
+      // Persist the updated activityId & dataJson in the database so it is permanently cached
+      if ((!n.activityId && activityId) || (!n.dataJson && enrichedData)) {
+        notificationRepo
+          .update(n.id, {
+            activityId: activityId || n.activityId,
+            dataJson: JSON.stringify(enrichedData),
+          })
+          .catch(() => {});
+      }
+
+      return {
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        read: n.read,
+        timestamp: n.timestamp,
+        activityId,
+        user: organizerName,
+        userId: organizerId,
+        organizerId,
+        place,
+        right,
+        type_detail: type,
+        category,
+        avatar,
+        data: enrichedData,
+      };
+    },
+  );
 }
 
 export async function markNotificationAsRead(id: string, user: User) {
@@ -476,6 +880,8 @@ export async function sendPushNotification(
     message,
     type,
     read: false,
+    activityId: data.activityId || (data as any).id,
+    dataJson: data ? JSON.stringify(data) : undefined,
   });
 
   await notificationRepo.save(notification);
@@ -488,6 +894,7 @@ export async function sendPushNotification(
     type: notification.type,
     read: notification.read,
     timestamp: notification.timestamp,
+    activityId: data.activityId || (data as any).id,
     data,
   };
 

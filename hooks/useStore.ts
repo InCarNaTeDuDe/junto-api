@@ -60,6 +60,14 @@ export interface AppNotification {
   content?: string;
   timestamp: string | Date;
   read: boolean;
+  activityId?: string;
+  user?: string;
+  userId?: string;
+  organizerId?: string;
+  place?: string;
+  right?: string;
+  category?: string;
+  avatar?: string;
   data?: any;
 }
 
@@ -241,6 +249,15 @@ const initialNotifications: AppNotification[] = [
     content: "New message about Avengers: Endgame – 2 Tickets",
     timestamp: "1m ago",
     read: false,
+    activityId: "post-1",
+    data: {
+      activityId: "post-1",
+      postId: "post-1",
+      title: "Avengers: Endgame – 2 Tickets",
+      category: "MOVIE TICKETS",
+      user: "Rohan S.",
+      place: "PVR Cinemas, Mumbai",
+    },
   },
   {
     id: "n-2",
@@ -253,6 +270,14 @@ const initialNotifications: AppNotification[] = [
     content: 'Accepted your request to join "Morning Walk Buddy"',
     timestamp: "5m ago",
     read: false,
+    activityId: "act-morning-walk",
+    data: {
+      activityId: "act-morning-walk",
+      title: "Morning Walk Buddy",
+      category: "DAY MATES",
+      user: "Ananya R.",
+      place: "Bandra Reclamation, Mumbai",
+    },
   },
   {
     id: "n-3",
@@ -265,6 +290,15 @@ const initialNotifications: AppNotification[] = [
     content: 'Liked your post "Black Wallet Found near Dadar Station".',
     timestamp: "15m ago",
     read: true,
+    activityId: "post-3",
+    data: {
+      activityId: "post-3",
+      postId: "post-3",
+      title: "Black Wallet Found near Dadar Station",
+      category: "Lost & Found",
+      user: "Neha P.",
+      place: "Dadar Station, Mumbai",
+    },
   },
   {
     id: "n-4",
@@ -277,6 +311,14 @@ const initialNotifications: AppNotification[] = [
     content: "Sent you a message.",
     timestamp: "1h ago",
     read: true,
+    activityId: "act-weekend-coffee",
+    data: {
+      activityId: "act-weekend-coffee",
+      title: "Coffee & Tech Discussions",
+      category: "DAY MATES",
+      user: "Karan M.",
+      place: "Starbucks, Bandra",
+    },
   },
   {
     id: "n-5",
@@ -289,6 +331,15 @@ const initialNotifications: AppNotification[] = [
     content: 'Liked your post "iPhone 13 - Blue Lost near Juhu Beach".',
     timestamp: "2h ago",
     read: true,
+    activityId: "post-4",
+    data: {
+      activityId: "post-4",
+      postId: "post-4",
+      title: "iPhone 13 - Blue Lost near Juhu Beach",
+      category: "Lost & Found",
+      user: "Amit P.",
+      place: "Juhu Beach, Mumbai",
+    },
   },
 ];
 
@@ -325,6 +376,7 @@ function updateListeners() {
 export function addNotificationToStore(
   notif: Partial<AppNotification> & { title?: string; message?: string },
 ) {
+  const data = notif.data || {};
   const newNotif: AppNotification = {
     id: notif.id || `n-${Date.now()}`,
     title: notif.title || "Notification",
@@ -334,6 +386,30 @@ export function addNotificationToStore(
     read: notif.read ?? false,
     actor: notif.actor,
     content: notif.content || notif.message,
+    activityId: notif.activityId || (notif as any).data?.activityId,
+    user:
+      notif.user ||
+      (notif as any).data?.user ||
+      (notif as any).data?.organizerName,
+    userId:
+      notif.userId ||
+      (notif as any).data?.userId ||
+      (notif as any).data?.organizerId,
+    organizerId:
+      notif.organizerId ||
+      (notif as any).data?.organizerId ||
+      (notif as any).data?.userId,
+    place:
+      notif.place ||
+      (notif as any).data?.place ||
+      (notif as any).data?.locationName,
+    right:
+      notif.right || (notif as any).data?.right || (notif as any).data?.urgency,
+    category:
+      notif.category ||
+      (notif as any).data?.category ||
+      (notif as any).data?.type,
+    avatar: notif.avatar || (notif as any).data?.avatar || notif.actor?.avatar,
     data: notif.data,
   };
 
@@ -358,6 +434,16 @@ export async function fetchNotificationsFromApi() {
         type: n.type,
         read: n.read,
         timestamp: n.timestamp,
+        activityId: n.activityId || n.data?.activityId,
+        user: n.user || n.data?.user || n.data?.organizerName,
+        userId: n.userId || n.data?.userId || n.data?.organizerId,
+        organizerId: n.organizerId || n.data?.organizerId || n.data?.userId,
+        place: n.place || n.data?.place || n.data?.locationName,
+        right: n.right || n.data?.right || n.data?.urgency,
+        category: n.category || n.data?.category || n.data?.type,
+        avatar: n.avatar || n.data?.avatar,
+        data:
+          n.data || (n.activityId ? { activityId: n.activityId } : undefined),
       }));
 
       // Preserve local un-synced ones if any
@@ -366,8 +452,7 @@ export async function fetchNotificationsFromApi() {
         (n) => !existingIds.has(n.id),
       );
 
-      // state.notifications = [...localOnly, ...fetched];
-      state.notifications = [...fetched];
+      state.notifications = [...fetched, ...localOnly];
       updateListeners();
     }
   } catch (e) {

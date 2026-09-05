@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect } from "react";
-import { Stack, Redirect, useSegments } from "expo-router";
+import { Stack, Redirect, useSegments, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -9,6 +9,7 @@ import { LocationProvider } from "@/context/LocationContext";
 import { useTheme } from "@/hooks/useTheme";
 import SpinnerLoader from "@/components/SpinnerLoader";
 import { PushNotificationService } from "@/services/notifications";
+import { addNotificationToStore } from "@/hooks/useStore";
 
 patchFetch();
 
@@ -27,11 +28,77 @@ function RootNavigator() {
         },
       );
       const unsubscribeSocket =
-        PushNotificationService.initPushNotificationListener((notif) => {
+        PushNotificationService.initPushNotificationListener((notif: any) => {
           console.log("🔔 In-App real-time push notification received:", notif);
+          const data = notif.data || {};
+          addNotificationToStore({
+            id: notif.id || `notif-${Date.now()}`,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type || "activity",
+            timestamp: notif.timestamp || new Date().toISOString(),
+            read: false,
+            activityId: notif.activityId || data.activityId,
+            user: notif.user || data.user || data.organizerName,
+            userId: notif.userId || data.userId || data.organizerId,
+            organizerId: notif.organizerId || data.organizerId || data.userId,
+            place: notif.place || data.place || data.locationName,
+            right: notif.right || data.right || data.urgency,
+            category: notif.category || data.category,
+            avatar: notif.avatar || data.avatar,
+            data: notif.data || { activityId: notif.activityId },
+          });
         });
       const unsubscribeExpo =
-        PushNotificationService.addExpoNotificationListeners();
+        PushNotificationService.addExpoNotificationListeners(
+          (notification) => {
+            const data: any = notification.request.content.data;
+            if (data) {
+              addNotificationToStore({
+                id: notification.request.identifier,
+                title: notification.request.content.title || "Notification",
+                message: notification.request.content.body || "",
+                type: data.type || "activity",
+                timestamp: new Date().toISOString(),
+                read: false,
+                activityId: data.activityId || data.id,
+                user: data.user || data.organizerName,
+                userId: data.userId || data.organizerId,
+                organizerId: data.organizerId || data.userId,
+                place: data.place || data.locationName,
+                right: data.right || data.urgency,
+                category: data.category || data.type,
+                avatar: data.avatar,
+                data,
+              });
+            }
+          },
+          (response) => {
+            const data: any = response.notification.request.content.data;
+            const activityId = data?.activityId || data?.id;
+            if (activityId) {
+              router.push({
+                pathname: "/(screens)/activity-chat",
+                params: {
+                  activityId,
+                  title: data.title,
+                  user: data.user || data.organizerName,
+                  userId: data.userId || data.organizerId,
+                  organizerId: data.organizerId || data.userId,
+                  place: data.place || data.locationName,
+                  right:
+                    data.right ||
+                    data.urgency ||
+                    (data.cost ? `₹${data.cost}` : undefined) ||
+                    "Urgent",
+                  type: data.type || data.category || "ASK NEARBY",
+                  category: data.category || data.type || "ASK NEARBY",
+                  avatar: data.avatar,
+                },
+              });
+            }
+          },
+        );
 
       return () => {
         unsubscribeSocket?.();

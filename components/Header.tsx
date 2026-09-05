@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/useTheme";
+import { useStore } from "../hooks/useStore";
 
 interface UserType {
   id: string;
@@ -26,6 +27,7 @@ const AnimatedView = Animated.View as any;
 export default function Header() {
   const insets = useSafeAreaInsets();
   const { isDark, toggleTheme } = useTheme();
+  const { setShowNotifications } = useStore();
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -228,7 +230,7 @@ export default function Header() {
 
         {/* Inbox Button */}
         <Pressable
-          onPress={() => router.push("/(tabs)/alerts")}
+          onPress={() => setShowNotifications(true)}
           style={[
             styles.inboxBtn,
             {

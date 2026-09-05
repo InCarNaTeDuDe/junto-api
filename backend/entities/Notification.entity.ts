@@ -41,6 +41,18 @@ export class Notification {
   })
   read!: boolean;
 
+  @Column({
+    type: "varchar",
+    nullable: true,
+  })
+  activityId?: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+  })
+  dataJson?: string;
+
   @CreateDateColumn({
     type: "timestamp",
   })

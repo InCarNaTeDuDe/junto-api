@@ -50,27 +50,56 @@ export default function ActivityChatScreen() {
   const { theme: t, isDark } = useTheme();
   const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
-  const organizerId = params.organizerId || params.userId;
+  const chatId = params.activityId || params.id;
+  const [activityDetail, setActivityDetail] = useState<any>(null);
+
+  useEffect(() => {
+    if (!chatId) return;
+    ApiService.get<any>(`/api/activity/${chatId}`)
+      .then((res) => {
+        if (res?.success && res.activity) {
+          setActivityDetail(res.activity);
+        }
+      })
+      .catch((err) => {
+        // Safe fallback if not found in db or is mock
+      });
+  }, [chatId]);
+
+  const organizerId =
+    params.organizerId ||
+    params.userId ||
+    activityDetail?.organizerId ||
+    activityDetail?.organizer?.id;
 
   const isOwnActivity =
     (user?.id && organizerId === user.id) ||
     ((user?.name &&
-      params.user &&
-      params.user.toLowerCase().trim() ===
+      (params.user || activityDetail?.organizer?.name) &&
+      (params.user || activityDetail?.organizer?.name).toLowerCase().trim() ===
         user.name.toLowerCase().trim()) as boolean);
 
   const rawUserParam =
-    params.partner || params.user || user?.name || "Ananya R.";
+    params.partner ||
+    params.user ||
+    activityDetail?.organizer?.name ||
+    (isOwnActivity ? "You (Host)" : "Activity Host");
   const partnerName = rawUserParam;
 
-  const contextTitle = params.title || "Morning Walk / Jogging Partner";
-  const activityType = params.type || params.category || "DAY MATES";
-  const activityPlace = params.place || "Bandra Reclamation, Mumbai";
-  const rightDetail = params.right || "1.1 km away";
+  const contextTitle =
+    params.title || activityDetail?.title || "Activity Details";
+  const activityType =
+    params.type || params.category || activityDetail?.category || "DAY MATES";
+  const activityPlace =
+    params.place || activityDetail?.locationName || "Local Area";
+  const rightDetail =
+    params.right ||
+    (activityDetail?.cost ? `₹${activityDetail.cost}` : "Nearby");
 
   const activityEmoji =
     params.activityEmoji ||
     params.emoji ||
+    activityDetail?.activityEmoji ||
     (contextTitle.toLowerCase().includes("phone")
       ? "📱"
       : contextTitle.toLowerCase().includes("wallet")
@@ -80,12 +109,17 @@ export default function ActivityChatScreen() {
           ? "🎟️"
           : contextTitle.toLowerCase().includes("coffee")
             ? "☕"
-            : contextTitle.toLowerCase().includes("walk") ||
-                contextTitle.toLowerCase().includes("jog")
-              ? "🏃‍♂️"
-              : "🙋‍♂️");
+            : contextTitle.toLowerCase().includes("badminton")
+              ? "🏸"
+              : contextTitle.toLowerCase().includes("cricket")
+                ? "🏏"
+                : contextTitle.toLowerCase().includes("walk") ||
+                    contextTitle.toLowerCase().includes("jog")
+                  ? "🏃‍♂️"
+                  : "🙋‍♂️");
   const partnerAvatar =
     params.avatar ||
+    activityDetail?.organizer?.avatar ||
     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150";
   const myAvatar =
     user?.avatar ||
@@ -96,8 +130,6 @@ export default function ActivityChatScreen() {
   const [typingUserName, setTypingUserName] = useState<string>("");
   const typingTimeoutRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  const chatId = params.activityId || params.id;
 
   const [chatsLoading, setChatsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);

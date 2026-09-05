@@ -41,12 +41,31 @@ export async function createAskNearby(
   const notifTitle = `Ask Nearby Broadcasted! 📢`;
   const notifMsg = `Your request "${request.title}" was posted to DayMates nearby in ${request.locationName}.`;
 
+  const placeStr = request.locationState
+    ? `${request.locationName}, ${request.locationState}`
+    : request.locationName;
+
+  const notifDetails = {
+    activityId: request.id,
+    title: request.title,
+    user: organizer.name,
+    userId: organizer.id,
+    organizerId: organizer.id,
+    place: placeStr,
+    right: body.urgency || "Urgent",
+    type: "ASK NEARBY",
+    category: "ASK NEARBY",
+    avatar: organizer.avatar,
+  };
+
   // Create push notification entry
   const notification = await notificationRepository.createNotification({
     userId: organizer.id,
     title: notifTitle,
     message: notifMsg,
     type: "ask_nearby",
+    activityId: request.id,
+    data: notifDetails,
   });
 
   if (io) {
@@ -55,13 +74,17 @@ export async function createAskNearby(
       title: notification.title,
       message: notification.message,
       type: "ask_nearby",
+      activityId: request.id,
       requestId: request.id,
       timestamp: new Date().toISOString(),
+      ...notifDetails,
+      data: notifDetails,
     });
   }
 
   // Dispatch mobile push notification to organizer
   sendExpoPushNotification(organizer.id, notifTitle, notifMsg, {
+    ...notifDetails,
     type: "ask_nearby",
     requestId: request.id,
   }).catch((e) => console.error("Error sending push to organizer:", e));
@@ -74,10 +97,11 @@ export async function createAskNearby(
     broadcastTitle,
     broadcastMsg,
     {
+      ...notifDetails,
       type: "ask_nearby",
       requestId: request.id,
-      category: body.category,
-      urgency: body.urgency,
+      category: "ASK NEARBY",
+      urgency: body.urgency || "Urgent",
       organizerId: organizer.id,
     },
     organizer.id, // exclude organizer from broadcast
@@ -272,12 +296,43 @@ export async function broadcastAskNearby(
     return { recipients: 0 };
   }
 
+  let organizer = activity.organizer;
+  if ((!organizer || !organizer.avatar) && activity.organizerId) {
+    const fetched = await userRepository.findById(activity.organizerId);
+    if (fetched) {
+      organizer = fetched;
+    }
+  }
+
+  const placeStr = activity.locationState
+    ? `${activity.locationName}, ${activity.locationState}`
+    : activity.locationName;
+
+  const notifDetails = {
+    activityId: activity.id,
+    title: activity.title,
+    user: organizer?.name || activity.organizer?.name || "Neighbor",
+    userId: activity.organizerId || activity.organizer?.id,
+    organizerId: activity.organizerId || activity.organizer?.id,
+    place: placeStr,
+    right: activity.tags?.[1] || "Urgent",
+    type: "ASK NEARBY",
+    category: "ASK NEARBY",
+    avatar:
+      organizer?.avatar ||
+      activity.organizer?.avatar ||
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    ...(data || {}),
+  };
+
   const notifications = await notificationRepository.createNotifications(
     users.map((user) => ({
       userId: user.id,
       title,
       message,
       type: "ask_nearby",
+      activityId: activity.id,
+      data: notifDetails,
     })),
   );
 
@@ -286,7 +341,7 @@ export async function broadcastAskNearby(
     activity.id,
     title,
     message,
-    data,
+    notifDetails,
   );
 
   return {

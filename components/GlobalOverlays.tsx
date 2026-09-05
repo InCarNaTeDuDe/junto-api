@@ -709,11 +709,93 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
     notif.read = true;
     onClose();
 
+    // 1. If explicit activityId exists in notif or notif.data
+    const activityId =
+      notif.activityId ||
+      notif.data?.activityId ||
+      notif.data?.requestId ||
+      notif.data?.postId ||
+      (notif.type === "activity" ||
+      notif.type === "ask_nearby" ||
+      notif.type === "ticket"
+        ? notif.data?.id || notif.id
+        : undefined);
+
+    if (activityId) {
+      const title =
+        notif.data?.title || notif.title || notif.content || "Activity Details";
+      const user =
+        notif.user ||
+        notif.data?.user ||
+        notif.data?.organizerName ||
+        notif.actor?.name ||
+        "Neighbor";
+      const userId =
+        notif.userId ||
+        notif.data?.userId ||
+        notif.organizerId ||
+        notif.data?.organizerId ||
+        "";
+      const organizerId =
+        notif.organizerId ||
+        notif.data?.organizerId ||
+        notif.userId ||
+        notif.data?.userId ||
+        "";
+      const place =
+        notif.place ||
+        notif.data?.place ||
+        notif.data?.locationName ||
+        "Nearby";
+      const right =
+        notif.right ||
+        notif.data?.right ||
+        notif.data?.urgency ||
+        (notif.data?.cost ? `₹${notif.data.cost}` : undefined) ||
+        (notif.type === "ask_nearby" || notif.data?.category === "ASK NEARBY"
+          ? "Urgent"
+          : "Nearby");
+      const type =
+        notif.data?.type ||
+        (notif.type === "ask_nearby"
+          ? "ASK NEARBY"
+          : notif.type === "activity"
+            ? "DAY MATES"
+            : notif.category || notif.type || "ASK NEARBY");
+      const category =
+        notif.category ||
+        notif.data?.category ||
+        (type === "ASK NEARBY" ? "ASK NEARBY" : type);
+      const avatar =
+        notif.avatar ||
+        notif.data?.avatar ||
+        notif.actor?.avatar ||
+        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+
+      router.push({
+        pathname: "/(screens)/activity-chat",
+        params: {
+          activityId,
+          title,
+          user,
+          userId,
+          organizerId,
+          place,
+          right,
+          type,
+          category,
+          avatar,
+        },
+      });
+      return;
+    }
+
     if (notif.data?.route) {
       router.push(notif.data.route);
       return;
     }
 
+    // 2. Check if it matches a post in state.posts
     const text =
       `${notif.title || ""} ${notif.message || ""} ${notif.content || ""}`.toLowerCase();
     const matchedPost = state.posts.find(
@@ -724,7 +806,59 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
     );
 
     if (matchedPost) {
-      setActivePostId(matchedPost.id);
+      router.push({
+        pathname: "/(screens)/activity-chat",
+        params: {
+          activityId: matchedPost.id,
+          title: matchedPost.title,
+          user: matchedPost.host?.name || "Neighbor",
+          userId: (matchedPost.host as any)?.id || "",
+          organizerId: (matchedPost.host as any)?.id || "",
+          place: matchedPost.location || "Nearby",
+          right: matchedPost.price || "Nearby",
+          type: matchedPost.category || "DAY MATES",
+          category: matchedPost.category || "DAY MATES",
+          avatar:
+            matchedPost.host?.avatar ||
+            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        },
+      });
+      return;
+    }
+
+    // 3. Fallbacks for activity types
+    if (
+      notif.type === "activity" ||
+      notif.type === "ask_nearby" ||
+      notif.type === "join_request" ||
+      notif.type === "ticket"
+    ) {
+      router.push({
+        pathname: "/(screens)/activity-chat",
+        params: {
+          activityId: notif.id,
+          title: notif.title || notif.content || "Activity",
+          user: notif.user || notif.actor?.name || "Neighbor",
+          userId: notif.userId || notif.organizerId || "",
+          organizerId: notif.organizerId || notif.userId || "",
+          place: notif.place || "Nearby",
+          right:
+            notif.right || (notif.type === "ask_nearby" ? "Urgent" : "Nearby"),
+          type:
+            notif.type === "ask_nearby"
+              ? "ASK NEARBY"
+              : notif.type || "ASK NEARBY",
+          category:
+            notif.category ||
+            (notif.type === "ask_nearby"
+              ? "ASK NEARBY"
+              : notif.type || "ASK NEARBY"),
+          avatar:
+            notif.avatar ||
+            notif.actor?.avatar ||
+            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        },
+      });
     } else if (
       notif.type === "message" ||
       text.includes("message") ||
@@ -733,12 +867,6 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
       router.push("/(tabs)/chats");
     } else if (text.includes("ride") || text.includes("carpool")) {
       router.push("/(screens)/rides");
-    } else if (
-      text.includes("lost") ||
-      text.includes("found") ||
-      text.includes("wallet")
-    ) {
-      router.push("/(screens)/ask-nearby");
     } else if (text.includes("deal") || text.includes("discount")) {
       router.push("/(screens)/deals");
     } else {

@@ -65,7 +65,7 @@ export default function FloatingChip({
       {
         rotate: `${offset.value / 20}deg`,
       },
-    ],
+    ] as any,
   }));
 
   return (

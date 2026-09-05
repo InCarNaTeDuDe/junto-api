@@ -61,12 +61,32 @@ export async function createActivity(
   const orgTitle = `Activity Created! 🚀`;
   const orgMsg = `Your activity "${activity.title}" is live in ${activity.locationName}.`;
 
+  const placeStr = activity.locationState
+    ? `${activity.locationName}, ${activity.locationState}`
+    : activity.locationName;
+
+  const notifDetails = {
+    activityId: activity.id,
+    title: activity.title,
+    user: organizer.name,
+    userId: organizer.id,
+    organizerId: organizer.id,
+    place: placeStr,
+    right: activity.cost ? `₹${activity.cost}` : "Nearby",
+    type: activity.category || "DAY MATES",
+    category: activity.category || "DAY MATES",
+    avatar: organizer.avatar,
+    activityEmoji: activity.activityEmoji,
+  };
+
   notificationRepository
     .createNotification({
       userId: organizer.id,
       title: orgTitle,
       message: orgMsg,
       type: "activity",
+      activityId: activity.id,
+      data: notifDetails,
     })
     .catch((e) => console.error("Error creating organizer notif record:", e));
 
@@ -77,10 +97,13 @@ export async function createActivity(
       type: "activity",
       activityId: activity.id,
       timestamp: new Date().toISOString(),
+      ...notifDetails,
+      data: notifDetails,
     });
   }
 
   sendExpoPushNotification(organizer.id, orgTitle, orgMsg, {
+    ...notifDetails,
     type: "activity",
     activityId: activity.id,
   }).catch((e) => console.error("Error sending push to organizer:", e));
@@ -94,12 +117,9 @@ export async function createActivity(
     broadcastTitle,
     broadcastMsg,
     {
+      ...notifDetails,
       type: "activity",
       activityId: activity.id,
-      title: activity.title,
-      locationName: activity.locationName,
-      organizerId: organizer.id,
-      organizerName: organizer.name,
     },
     organizer.id,
   );
@@ -376,6 +396,14 @@ export async function addTicketForSale(
         title: orgTitle,
         message: orgMsg,
         type: "ticket",
+        activityId: activity.id,
+        data: {
+          activityId: activity.id,
+          title: body.movieName,
+          cost: body.sellingPrice,
+          locationName: body.locationName,
+          category: "MOVIES",
+        },
       })
       .catch((e) => console.error("Error creating ticket notif record:", e));
 
@@ -386,6 +414,13 @@ export async function addTicketForSale(
         type: "ticket",
         activityId: activity.id,
         timestamp: new Date().toISOString(),
+        data: {
+          activityId: activity.id,
+          title: body.movieName,
+          cost: body.sellingPrice,
+          locationName: body.locationName,
+          category: "MOVIES",
+        },
       });
     }
 
