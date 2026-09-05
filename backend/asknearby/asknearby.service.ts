@@ -14,6 +14,46 @@ import {
 } from "../notifications/notifications.service";
 import { userRepository } from "../repositories/User.repository";
 
+const DEFAULT_AVATAR =
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  blood: "❤️",
+  "blood donation": "❤️",
+  wallet: "👜",
+  "lost wallet": "👜",
+  keys: "🔑",
+  "lost keys": "🔑",
+  bag: "💼",
+  "lost bag": "💼",
+  vehicle: "🚗",
+  "vehicle help": "🚗",
+  phone: "📱",
+  "lost phone": "📱",
+  medicine: "💊",
+};
+
+const getEmojiForCategory = (cat: string) =>
+  CATEGORY_EMOJIS[cat?.toLowerCase()] || "🆘";
+
+const mapAskNearbyResponse = (req: any) => ({
+  id: req.id,
+  title: req.title,
+  description: req.description,
+  category: req.tags?.[0] || "General",
+  urgency: req.tags?.[1] || "Urgent",
+  locationName: req.locationName,
+  locationState: req.locationState,
+  latitude: req.latitude,
+  longitude: req.longitude,
+  organizerId: req.organizerId,
+  organizerName: req.organizer?.name || "Neighbor",
+  organizerAvatar: req.organizer?.avatar || DEFAULT_AVATAR,
+  createdAt: req.createdAt,
+  tags: req.tags || [],
+  participantIds: req.participantIds || [],
+});
+
 export async function createAskNearby(
   body: CreateAskNearbyRequest,
   organizer: User,
@@ -40,7 +80,6 @@ export async function createAskNearby(
 
   const notifTitle = `Ask Nearby Broadcasted! 📢`;
   const notifMsg = `Your request "${request.title}" was posted to DayMates nearby in ${request.locationName}.`;
-
   const placeStr = request.locationState
     ? `${request.locationName}, ${request.locationState}`
     : request.locationName;
@@ -58,7 +97,6 @@ export async function createAskNearby(
     avatar: organizer.avatar,
   };
 
-  // Create push notification entry
   const notification = await notificationRepository.createNotification({
     userId: organizer.id,
     title: notifTitle,
@@ -82,20 +120,15 @@ export async function createAskNearby(
     });
   }
 
-  // Dispatch mobile push notification to organizer
   sendExpoPushNotification(organizer.id, notifTitle, notifMsg, {
     ...notifDetails,
     type: "ask_nearby",
     requestId: request.id,
   }).catch((e) => console.error("Error sending push to organizer:", e));
 
-  // Broadcast Mobile Push Notification to all nearby DayMates users!
-  const broadcastTitle = `🆘 New Request Nearby: ${body.category || "Help Needed"}`;
-  const broadcastMsg = `${organizer.name || "A neighbor"} in ${request.locationName} posted a request: "${request.title}".`;
-
   await broadcastExpoPushNotification(
-    broadcastTitle,
-    broadcastMsg,
+    `🆘 New Request Nearby: ${body.category || "Help Needed"}`,
+    `${organizer.name || "A neighbor"} in ${request.locationName} posted a request: "${request.title}".`,
     {
       ...notifDetails,
       type: "ask_nearby",
@@ -104,62 +137,22 @@ export async function createAskNearby(
       urgency: body.urgency || "Urgent",
       organizerId: organizer.id,
     },
-    organizer.id, // exclude organizer from broadcast
+    organizer.id,
   );
 
   return request;
 }
 
-export async function listAskNearbyRequests(query: QueryAskNearbyRequest) {
-  const requests = await activityRepository.findAll();
-  const askNearbyRequests = requests.filter(
-    (req) => req.category === ActivityCategory.ASK_NEARBY,
-  );
-
-  return askNearbyRequests.map((req) => ({
-    id: req.id,
-    title: req.title,
-    description: req.description,
-    category: req.tags?.[0] || "General",
-    urgency: req.tags?.[1] || "Urgent",
-    locationName: req.locationName,
-    locationState: req.locationState,
-    latitude: req.latitude,
-    longitude: req.longitude,
-    organizerId: req.organizerId,
-    organizerName: req.organizer?.name || "Neighbor",
-    organizerAvatar:
-      req.organizer?.avatar ||
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    createdAt: req.createdAt,
-    tags: req.tags || [],
-  }));
+export async function listAskNearbyRequests(_query?: QueryAskNearbyRequest) {
+  const requests = await activityRepository.findAll({
+    category: ActivityCategory.ASK_NEARBY,
+  });
+  return requests.map(mapAskNearbyResponse);
 }
 
 export async function getAskNearbyById(id: string) {
   const req = await activityRepository.findById(id);
-
-  if (!req) return null;
-
-  return {
-    id: req.id,
-    title: req.title,
-    description: req.description,
-    category: req.tags?.[0] || "General",
-    urgency: req.tags?.[1] || "Urgent",
-    locationName: req.locationName,
-    locationState: req.locationState,
-    latitude: req.latitude,
-    longitude: req.longitude,
-    organizerId: req.organizerId,
-    organizerName: req.organizer?.name || "Neighbor",
-    organizerAvatar:
-      req.organizer?.avatar ||
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    createdAt: req.createdAt,
-    tags: req.tags || [],
-    participantIds: req.participantIds || [],
-  };
+  return req ? mapAskNearbyResponse(req) : null;
 }
 
 export async function respondToAskNearby(
@@ -168,23 +161,16 @@ export async function respondToAskNearby(
   body: RespondAskNearbyRequest,
 ) {
   const request = await activityRepository.findById(id);
+  if (!request) throw new Error("AskNearby request not found");
 
-  if (!request) {
-    throw new Error("AskNearby request not found");
-  }
-
-  // Add helper to participants
-  const participants = new Set(request.participantIds || []);
-  participants.add(helper.id);
-  request.participantIds = Array.from(participants);
-  await activityRepository.update(id, {
-    participantIds: request.participantIds,
-  });
+  const participants = Array.from(
+    new Set([...(request.participantIds || []), helper.id]),
+  );
+  await activityRepository.update(id, { participantIds: participants });
 
   const notifTitle = `Someone is helping! 🆘`;
   const notifMsg = `${helper.name || "A neighbor nearby"} offered help on your request "${request.title}"! ${body.message ? `Note: "${body.message}"` : ""}`;
 
-  // Send push notification record to database
   const notification = await notificationRepository.createNotification({
     userId: request.organizerId,
     title: notifTitle,
@@ -192,7 +178,6 @@ export async function respondToAskNearby(
     type: "ask_nearby",
   });
 
-  // Real-time Push Notification socket event to organizer
   if (io) {
     io.to(`user:${request.organizerId}`).emit("push_notification", {
       id: notification.id,
@@ -206,7 +191,6 @@ export async function respondToAskNearby(
     });
   }
 
-  // Send Expo Mobile Push Notification to request organizer
   sendExpoPushNotification(request.organizerId, notifTitle, notifMsg, {
     type: "ask_nearby",
     requestId: request.id,
@@ -224,49 +208,14 @@ export async function respondToAskNearby(
 
 export async function resolveAskNearby(id: string, organizer: User) {
   const request = await activityRepository.findById(id);
-
-  if (!request) {
-    throw new Error("AskNearby request not found");
-  }
-
-  if (request.organizerId !== organizer.id) {
+  if (!request) throw new Error("AskNearby request not found");
+  if (request.organizerId !== organizer.id)
     throw new Error("Unauthorized to resolve this request");
-  }
 
   await activityRepository.update(id, { remainingSeats: 0 });
-
-  return {
-    success: true,
-    message: "Request marked as resolved.",
-  };
+  return { success: true, message: "Request marked as resolved." };
 }
 
-function getEmojiForCategory(category: string): string {
-  switch (category?.toLowerCase()) {
-    case "blood donation":
-    case "blood":
-      return "❤️";
-    case "lost wallet":
-    case "wallet":
-      return "👜";
-    case "lost keys":
-    case "keys":
-      return "🔑";
-    case "lost bag":
-    case "bag":
-      return "💼";
-    case "vehicle help":
-    case "vehicle":
-      return "🚗";
-    case "lost phone":
-    case "phone":
-      return "📱";
-    case "medicine":
-      return "💊";
-    default:
-      return "🆘";
-  }
-}
 export async function broadcastAskNearby(
   activityId: string,
   title: string,
@@ -274,40 +223,27 @@ export async function broadcastAskNearby(
   data: Record<string, any> = {},
 ) {
   const activity = await activityRepository.findById(activityId);
-
-  if (!activity) {
-    throw new Error("Ask Nearby activity not found");
-  }
-
-  if (activity.category !== ActivityCategory.ASK_NEARBY) {
+  if (!activity) throw new Error("Ask Nearby activity not found");
+  if (activity.category !== ActivityCategory.ASK_NEARBY)
     throw new Error("Activity is not an Ask Nearby activity");
-  }
-
-  if (activity.latitude == null || activity.longitude == null) {
+  if (activity.latitude == null || activity.longitude == null)
     throw new Error("Ask Nearby activity has no location");
-  }
 
   const users = await userRepository.findUsersByLatLong(
     Number(activity.latitude),
     Number(activity.longitude),
   );
-
-  if (!users.length) {
-    return { recipients: 0 };
-  }
+  if (!users.length) return { recipients: 0 };
 
   let organizer = activity.organizer;
   if ((!organizer || !organizer.avatar) && activity.organizerId) {
     const fetched = await userRepository.findById(activity.organizerId);
-    if (fetched) {
-      organizer = fetched;
-    }
+    if (fetched) organizer = fetched;
   }
 
   const placeStr = activity.locationState
     ? `${activity.locationName}, ${activity.locationState}`
     : activity.locationName;
-
   const notifDetails = {
     activityId: activity.id,
     title: activity.title,
@@ -318,16 +254,13 @@ export async function broadcastAskNearby(
     right: activity.tags?.[1] || "Urgent",
     type: "ASK NEARBY",
     category: "ASK NEARBY",
-    avatar:
-      organizer?.avatar ||
-      activity.organizer?.avatar ||
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    avatar: organizer?.avatar || activity.organizer?.avatar || DEFAULT_AVATAR,
     ...(data || {}),
   };
 
-  const notifications = await notificationRepository.createNotifications(
-    users.map((user) => ({
-      userId: user.id,
+  await notificationRepository.createNotifications(
+    users.map((u) => ({
+      userId: u.id,
       title,
       message,
       type: "ask_nearby",
@@ -336,46 +269,20 @@ export async function broadcastAskNearby(
     })),
   );
 
-  await sendAskNearbyPushNotifications(
-    users,
-    activity.id,
-    title,
-    message,
-    notifDetails,
-  );
-
-  return {
-    recipients: users.length,
-  };
-}
-
-async function sendAskNearbyPushNotifications(
-  users: User[],
-  activityId: string,
-  title: string,
-  message: string,
-  data: Record<string, any> = {},
-) {
-  const BATCH_SIZE = 50;
-
-  for (let i = 0; i < users.length; i += BATCH_SIZE) {
-    const batch = users.slice(i, i + BATCH_SIZE);
-
+  // Send push notifications in parallel chunks
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < users.length; i += CHUNK_SIZE) {
+    const chunk = users.slice(i, i + CHUNK_SIZE);
     await Promise.allSettled(
-      batch.map((user) =>
-        sendExpoPushNotification(user.id, title, message, {
-          ...data,
+      chunk.map((u) =>
+        sendExpoPushNotification(u.id, title, message, {
+          ...notifDetails,
           type: "ask_nearby",
-          activityId,
+          activityId: activity.id,
         }),
       ),
     );
-
-    console.log(
-      `📢 Ask Nearby push batch sent: ${Math.min(
-        i + BATCH_SIZE,
-        users.length,
-      )}/${users.length}`,
-    );
   }
+
+  return { recipients: users.length };
 }

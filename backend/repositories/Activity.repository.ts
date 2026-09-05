@@ -25,9 +25,10 @@ export class ActivityRepository {
     return this.repo.delete(id);
   }
 
-  async findAll() {
+  async findAll(where?: any) {
     if (!AppDataSource.isInitialized) return [];
     return this.repo.find({
+      ...(where ? { where } : {}),
       relations: { organizer: true },
       order: { createdAt: "DESC" },
     });

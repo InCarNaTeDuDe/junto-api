@@ -145,17 +145,22 @@ export async function getUserProfile(currentUser: any) {
         ? currentUser
         : currentUser?.id || currentUser?.sub || "";
 
-    const dbUser = await userRepository.findById(userId);
+    const [dbUser, directTicketsCount] = await Promise.all([
+      userRepository.findById(userId),
+      ticketRepository.countUserTickets(userId),
+    ]);
+
     const user = {
       ...(typeof currentUser === "object" ? currentUser : {}),
       ...(dbUser || {}),
     };
 
-    const userActivities = await activityRepository.findUserActivities(
-      userId,
-      user.email,
-      user.name,
-    );
+    const userActivities =
+      (await activityRepository.findUserActivities(
+        userId,
+        user.email,
+        user.name,
+      )) || [];
 
     const activitiesGrouped: Record<string, any[]> = {
       ASK_NEARBY: [],
@@ -163,30 +168,26 @@ export async function getUserProfile(currentUser: any) {
       DAY_MATES: [],
     };
 
-    for (const act of userActivities || []) {
+    for (const act of userActivities) {
       const cat = String(act.category || "").toUpperCase();
-      if (cat.includes("MOVIE") || cat.includes("TICKET")) {
-        activitiesGrouped.MOVIES.push(act);
-      } else if (
-        cat.includes("ASK") ||
-        cat.includes("NEARBY") ||
-        cat.includes("LOST")
-      ) {
-        activitiesGrouped.ASK_NEARBY.push(act);
-      } else if (cat.includes("DAY") || cat.includes("MATE")) {
-        activitiesGrouped.DAY_MATES.push(act);
-      } else {
-        (activitiesGrouped[cat] ||= []).push(act);
-      }
+      const key =
+        cat.includes("MOVIE") || cat.includes("TICKET")
+          ? "MOVIES"
+          : cat.includes("ASK") ||
+              cat.includes("NEARBY") ||
+              cat.includes("LOST")
+            ? "ASK_NEARBY"
+            : cat.includes("DAY") || cat.includes("MATE")
+              ? "DAY_MATES"
+              : cat;
+      (activitiesGrouped[key] ||= []).push(act);
     }
-
-    const directTicketsCount = await ticketRepository.countUserTickets(userId);
 
     return {
       ...user,
       userHandle: user.userHandle,
       createdActivitiesCount: userActivities.length,
-      ticketsCount: activitiesGrouped.MOVIES.length + directTicketsCount,
+      ticketsCount: activitiesGrouped.MOVIES.length + (directTicketsCount || 0),
       activities: activitiesGrouped,
     };
   } catch (error) {

@@ -13,46 +13,34 @@ import { rideRepository, RideRecord } from "../repositories/Rides.repository";
  * List rides
  */
 export async function listRides(query: QueryRideInput): Promise<RideRecord[]> {
-  let rides = await rideRepository.findAll();
+  const rides = await rideRepository.findAll();
+  const search = query.search?.toLowerCase();
+  const from = query.from?.toLowerCase();
+  const to = query.to?.toLowerCase();
+  const vehicleType =
+    query.vehicleType && query.vehicleType !== "all" ? query.vehicleType : null;
+  const availableOnly = query.availableOnly === "true";
 
-  // Vehicle filter
-  if (query.vehicleType && query.vehicleType !== "all") {
-    rides = rides.filter((ride) => ride.vehicleType === query.vehicleType);
+  if (!search && !from && !to && !vehicleType && !availableOnly) {
+    return rides;
   }
 
-  // Search
-  if (query.search) {
-    const term = query.search.toLowerCase();
-
-    rides = rides.filter(
-      (ride) =>
-        ride.from.toLowerCase().includes(term) ||
-        ride.to.toLowerCase().includes(term) ||
-        ride.driverName.toLowerCase().includes(term) ||
-        !!ride.notes?.toLowerCase().includes(term),
-    );
-  }
-
-  // From filter
-  if (query.from) {
-    const term = query.from.toLowerCase();
-
-    rides = rides.filter((ride) => ride.from.toLowerCase().includes(term));
-  }
-
-  // To filter
-  if (query.to) {
-    const term = query.to.toLowerCase();
-
-    rides = rides.filter((ride) => ride.to.toLowerCase().includes(term));
-  }
-
-  // Available seats only
-  if (query.availableOnly === "true") {
-    rides = rides.filter((ride) => ride.seatsLeft > 0);
-  }
-
-  return rides;
+  return rides.filter((ride) => {
+    if (vehicleType && ride.vehicleType !== vehicleType) return false;
+    if (availableOnly && ride.seatsLeft <= 0) return false;
+    if (from && !ride.from.toLowerCase().includes(from)) return false;
+    if (to && !ride.to.toLowerCase().includes(to)) return false;
+    if (
+      search &&
+      !ride.from.toLowerCase().includes(search) &&
+      !ride.to.toLowerCase().includes(search) &&
+      !ride.driverName.toLowerCase().includes(search) &&
+      !ride.notes?.toLowerCase().includes(search)
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 /**

@@ -127,6 +127,61 @@ export async function createActivity(
   return activity;
 }
 
+const CATEGORY_STYLES: Record<string, (a: any) => any> = {
+  [ActivityCategory.MOVIES]: (a) => ({
+    typeColor: "#A855F7",
+    right: `${a.remainingSeats} Ticket${a.remainingSeats > 1 ? "s" : ""}`,
+    rightSub: `₹${a.cost} each`,
+    rightSubColor: "#A855F7",
+    thumbBg: "#3B1F5E",
+    thumbIcon: "film",
+    thumbIconColor: "#C084FC",
+  }),
+  [ActivityCategory.DAY_MATES]: (a) => ({
+    typeColor: "#EA580C",
+    right: `${a.remainingSeats} Mates`,
+    rightColor: "#F59E0B",
+    rightSub: `${a.maxParticipants} Needed`,
+    rightSubColor: "#A855F7",
+    thumbBg: "#1E3A2E",
+    thumbIcon: "people",
+    thumbIconColor: "#4ADE80",
+  }),
+  [ActivityCategory.SPORTS]: (a) => ({
+    typeColor: "#22C55E",
+    right: `${a.remainingSeats} Spots`,
+    rightColor: "#22C55E",
+    rightSub: a.description,
+    rightSubColor: "#22C55E",
+    thumbBg: "#123524",
+    thumbIcon: "football",
+    thumbIconColor: "#4ADE80",
+  }),
+  [ActivityCategory.FOOD]: (a) => ({
+    typeColor: "#F97316",
+    right: `${a.remainingSeats} Seats`,
+    rightColor: "#F97316",
+    rightSub: a.description,
+    rightSubColor: "#F97316",
+    thumbBg: "#3A1F10",
+    thumbIcon: "restaurant",
+    thumbIconColor: "#FDBA74",
+  }),
+  [ActivityCategory.ASK_NEARBY]: (a) => ({
+    typeColor: "#14B8A6",
+    activityEmoji: a.activityEmoji || "🙋‍♂️",
+    right: a.tags?.[1] || "Ask Nearby",
+    rightColor: "#14B8A6",
+    rightSub: (a.description || "Neighbor Request")
+      .replace(/[\r\n]+/g, " ")
+      .trim(),
+    rightSubColor: "#14B8A6",
+    thumbBg: "#1F2937",
+    thumbIcon: "help-circle",
+    thumbIconColor: "#14B8A6",
+  }),
+};
+
 export async function popularActivitiesAround(locationFilter?: {
   latitude?: number | string;
   longitude?: number | string;
@@ -141,14 +196,12 @@ export async function popularActivitiesAround(locationFilter?: {
   const radius = Number(locationFilter?.radiusKm) || 50;
   const name = locationFilter?.locationName?.trim().toLowerCase();
   const state = locationFilter?.locationState?.trim().toLowerCase();
-
   const hasGeo = Number.isFinite(lat) && Number.isFinite(lng);
 
   const activities = hasGeo
     ? all.filter((a) => {
         const aLat = Number(a.latitude);
         const aLng = Number(a.longitude);
-
         return (
           Number.isFinite(aLat) &&
           Number.isFinite(aLng) &&
@@ -159,123 +212,51 @@ export async function popularActivitiesAround(locationFilter?: {
       ? all.filter((a) => {
           const aName = a.locationName?.trim().toLowerCase() || "";
           const aState = a.locationState?.trim().toLowerCase() || "";
-
           return (
             (name && aName.includes(name)) || (state && aState.includes(state))
           );
         })
       : all;
 
-  return activities
-    .map((a) => {
-      const base = {
-        id: a.id,
-        title: a.title,
-        description: a.description || "",
-        category: a.category,
-        cost: Number(a.cost) || 0,
-        maxParticipants: a.maxParticipants || 4,
-        remainingSeats: a.remainingSeats ?? a.maxParticipants ?? 2,
-        participantIds: a.participantIds || [],
-        place: `${a.locationName || ""}${a.locationState ? `, ${a.locationState}` : ""}`,
-        user: a.organizer?.name || "Junto User",
-        userAvatar: a.organizer?.avatar,
-        organizerId: a.organizerId,
-        activityEmoji: a.activityEmoji,
-        createdAt: a.createdAt || a.datetime,
-        latitude: a.latitude,
-        longitude: a.longitude,
-      };
+  return activities.map((a) => {
+    const base = {
+      id: a.id,
+      title: a.title,
+      description: a.description || "",
+      category: a.category,
+      cost: Number(a.cost) || 0,
+      maxParticipants: a.maxParticipants || 4,
+      remainingSeats: a.remainingSeats ?? a.maxParticipants ?? 2,
+      participantIds: a.participantIds || [],
+      place: `${a.locationName || ""}${a.locationState ? `, ${a.locationState}` : ""}`,
+      user: a.organizer?.name || "Junto User",
+      userAvatar: a.organizer?.avatar,
+      organizerId: a.organizerId,
+      activityEmoji: a.activityEmoji,
+      createdAt: a.createdAt || a.datetime,
+      latitude: a.latitude,
+      longitude: a.longitude,
+    };
 
-      switch (a.category) {
-        case ActivityCategory.MOVIES:
-          return {
-            ...base,
-            type: a.category,
-            typeColor: "#A855F7",
-            right: `${a.remainingSeats} Ticket${a.remainingSeats > 1 ? "s" : ""}`,
-            rightSub: `₹${a.cost} each`,
-            rightSubColor: "#A855F7",
-            thumbBg: "#3B1F5E",
-            thumbIcon: "film",
-            thumbIconColor: "#C084FC",
-          };
+    const styleFn =
+      CATEGORY_STYLES[a.category] ||
+      ((act: any) => ({
+        typeColor: "#7C3AED",
+        right: `${act.remainingSeats || act.maxParticipants || 2} Spots`,
+        rightColor: "#7C3AED",
+        rightSub: act.description || "Active meetup",
+        rightSubColor: "#7C3AED",
+        thumbBg: "#1F2937",
+        thumbIcon: "people",
+        thumbIconColor: "#7C3AED",
+      }));
 
-        case ActivityCategory.DAY_MATES:
-          return {
-            ...base,
-            type: a.category,
-            typeColor: "#EA580C",
-            right: `${a.remainingSeats} Mates`,
-            rightColor: "#F59E0B",
-            rightSub: `${a.maxParticipants} Needed`,
-            rightSubColor: "#A855F7",
-            thumbBg: "#1E3A2E",
-            thumbIcon: "people",
-            thumbIconColor: "#4ADE80",
-          };
-
-        case ActivityCategory.SPORTS:
-          return {
-            ...base,
-            type: a.category,
-            typeColor: "#22C55E",
-            right: `${a.remainingSeats} Spots`,
-            rightColor: "#22C55E",
-            rightSub: a.description,
-            rightSubColor: "#22C55E",
-            thumbBg: "#123524",
-            thumbIcon: "football",
-            thumbIconColor: "#4ADE80",
-          };
-
-        case ActivityCategory.FOOD:
-          return {
-            ...base,
-            type: a.category,
-            typeColor: "#F97316",
-            right: `${a.remainingSeats} Seats`,
-            rightColor: "#F97316",
-            rightSub: a.description,
-            rightSubColor: "#F97316",
-            thumbBg: "#3A1F10",
-            thumbIcon: "restaurant",
-            thumbIconColor: "#FDBA74",
-          };
-
-        case ActivityCategory.ASK_NEARBY:
-          return {
-            ...base,
-            type: a.category,
-            typeColor: "#14B8A6",
-            activityEmoji: a.activityEmoji || "🙋‍♂️",
-            right: a.tags?.[1] || "Ask Nearby",
-            rightColor: "#14B8A6",
-            rightSub: (a.description || "Neighbor Request")
-              .replace(/[\r\n]+/g, " ")
-              .trim(),
-            rightSubColor: "#14B8A6",
-            thumbBg: "#1F2937",
-            thumbIcon: "help-circle",
-            thumbIconColor: "#14B8A6",
-          };
-
-        default:
-          return {
-            ...base,
-            type: a.category || "DAY_MATES",
-            typeColor: "#7C3AED",
-            right: `${a.remainingSeats || a.maxParticipants || 2} Spots`,
-            rightColor: "#7C3AED",
-            rightSub: a.description || "Active meetup",
-            rightSubColor: "#7C3AED",
-            thumbBg: "#1F2937",
-            thumbIcon: "people",
-            thumbIconColor: "#7C3AED",
-          };
-      }
-    })
-    .filter(Boolean);
+    return {
+      ...base,
+      type: a.category || "DAY_MATES",
+      ...styleFn(a),
+    };
+  });
 }
 function calculateDistanceInKm(
   lat1: number,
@@ -458,23 +439,29 @@ export async function addTicketForSale(
 
 export async function getJuntoNowStats(locationName?: string) {
   try {
-    const rides = await listRides({ vehicleType: "all" });
-    const deals = await listDeals({ category: "All" });
-    const pros = await listServicePros({ category: "all" });
-    const allActs = await activityRepository.findAll();
+    const [rides, deals, pros, allActs] = await Promise.all([
+      listRides({ vehicleType: "all" }),
+      listDeals({ category: "All" }),
+      listServicePros({ category: "all" }),
+      activityRepository.findAll(),
+    ]);
 
-    const helpCount = allActs.filter(
-      (a) => a.category === ActivityCategory.ASK_NEARBY,
-    ).length;
-    const companyCount = allActs.filter(
-      (a) => a.category === ActivityCategory.DAY_MATES,
-    ).length;
-    const newHereCount = allActs.filter(
-      (a) =>
+    let helpCount = 0;
+    let companyCount = 0;
+    let newHereCount = 0;
+
+    for (const a of allActs) {
+      if (a.category === ActivityCategory.ASK_NEARBY) helpCount++;
+      else if (a.category === ActivityCategory.DAY_MATES) companyCount++;
+
+      if (
         a.category === ActivityCategory.SPORTS ||
         a.category === ActivityCategory.FOOD ||
-        a.category === ActivityCategory.DAY_MATES,
-    ).length;
+        a.category === ActivityCategory.DAY_MATES
+      ) {
+        newHereCount++;
+      }
+    }
 
     return {
       ridesCount: rides.length,
@@ -484,7 +471,7 @@ export async function getJuntoNowStats(locationName?: string) {
       companyCount,
       newHereCount,
     };
-  } catch (err) {
+  } catch {
     return {
       ridesCount: 0,
       dealsCount: 0,
