@@ -1,23 +1,18 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { Ticket } from "../entities/Ticket.entity";
 
-export class TicketRepository {
-  private get repo() {
-    return AppDataSource.getRepository(Ticket);
+export class TicketRepository extends BaseRepository<Ticket> {
+  constructor() {
+    super(Ticket);
   }
 
   async countUserTickets(sellerId: string): Promise<number> {
-    if (!AppDataSource.isInitialized) return 0;
-    return this.repo.count({ where: { sellerId } });
-  }
-
-  async create(data: Partial<Ticket>) {
-    const ticket = this.repo.create(data);
-    return this.repo.save(ticket);
+    if (!this.isConnected) return 0;
+    return this.count({ where: { sellerId } });
   }
 
   async findBySellerId(sellerId: string) {
-    return this.repo.find({
+    return this.find({
       where: { sellerId },
       relations: { seller: true },
       order: { createdAt: "DESC" },
@@ -25,7 +20,7 @@ export class TicketRepository {
   }
 
   async findById(id: string) {
-    return this.repo.findOne({
+    return this.findOne({
       where: { id },
       relations: { seller: true },
     });

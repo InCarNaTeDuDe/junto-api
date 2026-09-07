@@ -1,28 +1,22 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { User } from "../entities/User.entity";
 
-export class UserRepository {
-  private get repo() {
-    return AppDataSource.getRepository(User);
+export class UserRepository extends BaseRepository<User> {
+  constructor() {
+    super(User);
   }
 
   async findByEmail(email: string) {
-    if (!AppDataSource.isInitialized) return null;
+    if (!this.isConnected) return null;
     return this.repo.findOne({ where: { email } });
   }
 
-  async findById(id: string) {
-    if (!AppDataSource.isInitialized) return null;
-    return this.repo.findOne({ where: { id } });
-  }
-
   async createUser(data: Partial<User>) {
-    const user = this.repo.create(data);
-    return this.repo.save(user);
+    return this.create(data);
   }
 
   async updateUser(id: string, data: Partial<User>) {
-    await this.repo.update({ id }, data);
+    await this.update(id, data);
     return this.findById(id);
   }
 
@@ -53,6 +47,7 @@ export class UserRepository {
   }
 
   async findUsersByLatLong(latitude: number, longitude: number) {
+    if (!this.isConnected) return [];
     return this.repo
       .createQueryBuilder("user")
       .where("user.latitude = :latitude", { latitude })
@@ -61,13 +56,10 @@ export class UserRepository {
   }
 
   async updateLocation(userId: string, latitude: number, longitude: number) {
-    return this.repo.update(
-      { id: userId },
-      {
-        latitude,
-        longitude,
-      },
-    );
+    return this.update(userId, {
+      latitude,
+      longitude,
+    });
   }
 }
 

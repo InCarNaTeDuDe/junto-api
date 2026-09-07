@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
+import Svg, { Path, Defs, LinearGradient, Stop, G } from "react-native-svg";
 import { useTheme } from "@/hooks/useTheme";
 import { useStyles } from "@/hooks/useStyles";
 
@@ -19,6 +20,22 @@ const ROTATING_MESSAGES = [
   "Looking for Ticket Deals...",
   "Checking Lost & Found...",
   "Discovering Nearby...",
+];
+
+/** 12 ultra-vibrant continuous rainbow colors spanning the entire spectrum */
+const SPECTRUM_COLORS = [
+  "#00F2FE", // Electric Cyan
+  "#0EA5E9", // Vivid Sky Blue
+  "#3B82F6", // Cobalt Blue
+  "#6366F1", // Indigo
+  "#8B5CF6", // Royal Violet
+  "#A855F7", // Junto Purple
+  "#D946EF", // Fuchsia / Magenta
+  "#EC4899", // Hot Pink
+  "#F43F5E", // Rose Red
+  "#FF5722", // Vibrant Coral / Flame
+  "#F59E0B", // Golden Amber
+  "#10B981", // Emerald Mint Green
 ];
 
 export interface JuntoOrbitProps {
@@ -44,7 +61,18 @@ export function JuntoOrbit({
   const s = useStyles(createStyles);
   const { theme: t } = useTheme();
 
+  // Generate a unique instance ID for SVG gradient defs to avoid Web DOM ID collisions
+  const autoId = useId();
+  const instanceId = useMemo(
+    () => autoId.replace(/[^a-zA-Z0-9]/g, "") || "orbit_ring",
+    [autoId],
+  );
+
+  // Bubble orbit animation
   const spin = useRef(new Animated.Value(0)).current;
+
+  // Dedicated infinite rotating line animation
+  const lineSpin = useRef(new Animated.Value(0)).current;
 
   // Center label rotation state & animation
   const labelList = useMemo(() => {
@@ -71,6 +99,20 @@ export function JuntoOrbit({
     loop.start();
     return () => loop.stop();
   }, [spin, duration]);
+
+  // Infinite smooth rotation for the colorful line
+  useEffect(() => {
+    const lineLoop = Animated.loop(
+      Animated.timing(lineSpin, {
+        toValue: 1,
+        duration: 9000, // 9s continuous infinite rotation of the colorful spectrum
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    lineLoop.start();
+    return () => lineLoop.stop();
+  }, [lineSpin]);
 
   useEffect(() => {
     if (labelList.length <= 1) return;
@@ -102,9 +144,46 @@ export function JuntoOrbit({
     outputRange: reverse ? ["0deg", "360deg"] : ["0deg", "-360deg"],
   });
 
+  const lineRotate = lineSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: reverse ? ["360deg", "0deg"] : ["0deg", "360deg"],
+  });
+
   const logoSize = dimension * 0.28;
   const bubbleSize = dimension * 0.16;
   const radius = dimension / 2 - bubbleSize / 2 - 2;
+  const centerCoord = dimension / 2;
+
+  // Build 12 seamless circular arc segments with gradient coordinates
+  const segments = useMemo(() => {
+    const numSegs = SPECTRUM_COLORS.length;
+    const segAngle = (Math.PI * 2) / numSegs;
+
+    return SPECTRUM_COLORS.map((color, i) => {
+      const nextColor = SPECTRUM_COLORS[(i + 1) % numSegs];
+      // Slight overlap (0.015 rad ~ 0.85 deg) to eliminate sub-pixel gaps between arcs
+      const startA = i * segAngle - 0.015;
+      const endA = (i + 1) * segAngle + 0.015;
+
+      const x1 = centerCoord + radius * Math.cos(startA);
+      const y1 = centerCoord + radius * Math.sin(startA);
+      const x2 = centerCoord + radius * Math.cos(endA);
+      const y2 = centerCoord + radius * Math.sin(endA);
+
+      const d = `M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2}`;
+
+      return {
+        id: `seg_${instanceId}_${i}`,
+        d,
+        x1,
+        y1,
+        x2,
+        y2,
+        colorStart: color,
+        colorEnd: nextColor,
+      };
+    });
+  }, [centerCoord, radius, instanceId]);
 
   const positions = useMemo(
     () =>
@@ -121,19 +200,93 @@ export function JuntoOrbit({
 
   return (
     <View style={[s.wrapper, { width: dimension, height: dimension }]}>
-      {/* Outer guide ring */}
-      <View
+      {/* Dynamic Colorful Rotating Orbit Line */}
+      <Animated.View
         style={[
-          s.ring,
+          s.orbit,
           {
-            width: dimension - bubbleSize,
-            height: dimension - bubbleSize,
-            borderRadius: (dimension - bubbleSize) / 2,
+            width: dimension,
+            height: dimension,
+            transform: [{ rotate: lineRotate }],
           },
         ]}
-      />
+        pointerEvents="none"
+      >
+        <Svg
+          width={dimension}
+          height={dimension}
+          viewBox={`0 0 ${dimension} ${dimension}`}
+        >
+          <Defs>
+            {segments.map((seg) => (
+              <LinearGradient
+                key={`grad_${seg.id}`}
+                id={`grad_${seg.id}`}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0%" stopColor={seg.colorStart} stopOpacity={1} />
+                <Stop offset="100%" stopColor={seg.colorEnd} stopOpacity={1} />
+              </LinearGradient>
+            ))}
+            {segments.map((seg) => (
+              <LinearGradient
+                key={`glow_${seg.id}`}
+                id={`glow_${seg.id}`}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop
+                  offset="0%"
+                  stopColor={seg.colorStart}
+                  stopOpacity={0.45}
+                />
+                <Stop
+                  offset="100%"
+                  stopColor={seg.colorEnd}
+                  stopOpacity={0.45}
+                />
+              </LinearGradient>
+            ))}
+          </Defs>
 
-      {/* Inner guide ring */}
+          {/* Luminous Neon Glow Halo under the line */}
+          <G opacity={0.5}>
+            {segments.map((seg) => (
+              <Path
+                key={`glow_path_${seg.id}`}
+                d={seg.d}
+                stroke={`url(#glow_${seg.id})`}
+                strokeWidth={5.5}
+                strokeLinecap="round"
+                fill="none"
+              />
+            ))}
+          </G>
+
+          {/* Crisp, ultra-vibrant colorful rotating line */}
+          <G>
+            {segments.map((seg) => (
+              <Path
+                key={`core_path_${seg.id}`}
+                d={seg.d}
+                stroke={`url(#grad_${seg.id})`}
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                fill="none"
+              />
+            ))}
+          </G>
+        </Svg>
+      </Animated.View>
+
+      {/* Inner guide ring with subtle accent */}
       <View
         style={[
           s.innerRing,
@@ -145,7 +298,7 @@ export function JuntoOrbit({
         ]}
       />
 
-      {/* Rotating orbit ring */}
+      {/* Rotating orbit ring with floating bubbles */}
       <Animated.View
         style={[
           s.orbit,

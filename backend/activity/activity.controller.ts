@@ -7,6 +7,7 @@ import {
   exploreByLatLong,
   popularActivitiesAround,
   getJuntoNowStats,
+  deleteActivity,
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 
@@ -89,6 +90,19 @@ export async function getJuntoNowStatsHandler(
   }
 }
 
+export async function listAllActivities(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const activities = await activityRepository.findAll();
+    return res.status(200).json({ success: true, activities });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getActivityById(
   req: Request,
   res: Response,
@@ -103,6 +117,47 @@ export async function getActivityById(
         .json({ success: false, message: "Activity not found" });
     }
     return res.status(200).json({ success: true, activity });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateActivityHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+    const updated = await activityRepository.updateAndGet(id, req.body);
+    if (!updated) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Activity not found" });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Activity updated successfully",
+      activity: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteActivityHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+    const result = await deleteActivity(id, req.user);
+    return res.status(200).json({
+      success: true,
+      message: "Activity deleted successfully",
+      data: result,
+    });
   } catch (error) {
     next(error);
   }

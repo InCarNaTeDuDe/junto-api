@@ -68,6 +68,62 @@ export default function ProfileScreen() {
   // Realtime backend API user state fetched from /api/me
   const [apiUser, setApiUser] = useState<any>(null);
 
+  // Soft-delete confirmation state
+  const [activityToDelete, setActivityToDelete] = useState<any>(null);
+  const [isDeletingActivity, setIsDeletingActivity] = useState(false);
+
+  const handleDeleteActivityClick = (act: any) => {
+    setActivityToDelete(act);
+  };
+
+  const handleConfirmDeleteActivity = async () => {
+    if (!activityToDelete) return;
+    const targetId = activityToDelete.id;
+    setIsDeletingActivity(true);
+
+    try {
+      // 1. Call backend API to soft delete in DB (sets isDeleted: 1)
+      await ApiService.delete(`/api/activity/${targetId}`);
+    } catch (err) {
+      console.log("Activity soft-deleted via API or offline fallback:", err);
+    }
+
+    // 2. Remove from local store
+    deletePost(targetId);
+
+    // 3. Remove from apiUser activities list so UI updates instantly
+    if (apiUser?.activities) {
+      setApiUser((prev: any) => {
+        if (!prev) return prev;
+        let updatedActs = { ...prev.activities };
+        if (Array.isArray(updatedActs)) {
+          updatedActs = updatedActs.filter((a: any) => a.id !== targetId);
+        } else if (typeof updatedActs === "object") {
+          const nextMap: Record<string, any[]> = {};
+          for (const [k, v] of Object.entries(updatedActs)) {
+            if (Array.isArray(v)) {
+              nextMap[k] = v.filter((a: any) => a.id !== targetId);
+            } else {
+              nextMap[k] = v as any;
+            }
+          }
+          updatedActs = nextMap;
+        }
+        return {
+          ...prev,
+          createdActivitiesCount: Math.max(
+            0,
+            (prev.createdActivitiesCount || 1) - 1,
+          ),
+          activities: updatedActs,
+        };
+      });
+    }
+
+    setIsDeletingActivity(false);
+    setActivityToDelete(null);
+  };
+
   React.useEffect(() => {
     let isMounted = true;
     async function fetchMe() {
@@ -215,6 +271,12 @@ export default function ProfileScreen() {
         rawList = Object.values(apiUser.activities).flat();
       }
 
+      // Filter out soft-deleted items
+      rawList = rawList.filter(
+        (act: any) =>
+          !act.isDeleted || act.isDeleted === 0 || Number(act.isDeleted) === 0,
+      );
+
       if (rawList.length > 0) {
         return rawList.map((act: any) => ({
           id: act.id,
@@ -256,6 +318,12 @@ export default function ProfileScreen() {
         );
       }
     }
+
+    // Filter out soft-deleted items
+    apiTickets = apiTickets.filter(
+      (act: any) =>
+        !act.isDeleted || act.isDeleted === 0 || Number(act.isDeleted) === 0,
+    );
 
     const mappedApiTickets = apiTickets.map((act: any) => ({
       id: act.id,
@@ -925,7 +993,7 @@ export default function ProfileScreen() {
                         style={s.deleteBtn}
                         onPress={(e) => {
                           e.stopPropagation();
-                          deletePost(post.id);
+                          handleDeleteActivityClick(post);
                         }}
                       >
                         <Ionicons
@@ -940,6 +1008,78 @@ export default function ProfileScreen() {
               ))
             )}
           </ScrollView>
+
+          {/* Delete Confirmation Overlay inside Activities modal */}
+          <Modal
+            visible={!!activityToDelete}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+              if (!isDeletingActivity) {
+                setActivityToDelete(null);
+              }
+            }}
+          >
+            <View style={s.confirmModalOverlay}>
+              <View style={s.confirmModalCard}>
+                {/* Icon */}
+                <View style={s.confirmIconCircle}>
+                  <Ionicons
+                    name="trash-outline"
+                    size={scale(25)}
+                    color={t.error}
+                  />
+                </View>
+
+                {/* Title */}
+                <Text style={s.confirmModalTitle}>Delete Activity</Text>
+
+                {/* Message */}
+                <Text style={s.confirmModalMessage}>
+                  Are you sure you want to delete this activity?
+                </Text>
+
+                {/* Activity preview */}
+                {activityToDelete?.title ? (
+                  <View style={s.confirmPreviewBox}>
+                    <Text style={s.confirmPreviewTitle} numberOfLines={1}>
+                      {activityToDelete.title}
+                    </Text>
+
+                    {activityToDelete.category ? (
+                      <Text style={s.confirmPreviewSub} numberOfLines={1}>
+                        {activityToDelete.category}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Buttons */}
+                <View style={s.confirmActionButtonsRow}>
+                  <TouchableOpacity
+                    style={s.confirmCancelBtn}
+                    onPress={() => setActivityToDelete(null)}
+                    disabled={isDeletingActivity}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.confirmCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={s.confirmDeleteBtn}
+                    onPress={handleConfirmDeleteActivity}
+                    disabled={isDeletingActivity}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.confirmDeleteBtnText}>
+                      {isDeletingActivity ? "Deleting..." : "Yes, Delete"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </Modal>
 
@@ -1016,7 +1156,7 @@ export default function ProfileScreen() {
                         style={s.deleteBtn}
                         onPress={(e) => {
                           e.stopPropagation();
-                          deletePost(ticket.id);
+                          handleDeleteActivityClick(ticket);
                         }}
                       >
                         <Ionicons
@@ -1031,6 +1171,57 @@ export default function ProfileScreen() {
               ))
             )}
           </ScrollView>
+
+          {/* Delete Confirmation Overlay inside Tickets modal */}
+          {activityToDelete && (
+            <View style={[StyleSheet.absoluteFill, s.confirmModalOverlay]}>
+              <View style={s.confirmModalCard}>
+                <View style={s.confirmIconCircle}>
+                  <Ionicons
+                    name="trash-outline"
+                    size={scale(26)}
+                    color={t.error}
+                  />
+                </View>
+                <Text style={s.confirmModalTitle}>Delete Activity</Text>
+                <Text style={s.confirmModalMessage}>
+                  Are you sure to delete this activity?
+                </Text>
+                {activityToDelete?.title ? (
+                  <View style={s.confirmPreviewBox}>
+                    <Text style={s.confirmPreviewTitle} numberOfLines={1}>
+                      {activityToDelete.title}
+                    </Text>
+                    {activityToDelete.category ? (
+                      <Text style={s.confirmPreviewSub}>
+                        {activityToDelete.category}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                <View style={s.confirmActionButtonsRow}>
+                  <TouchableOpacity
+                    style={s.confirmCancelBtn}
+                    onPress={() => setActivityToDelete(null)}
+                    disabled={isDeletingActivity}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.confirmCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.confirmDeleteBtn}
+                    onPress={handleConfirmDeleteActivity}
+                    disabled={isDeletingActivity}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.confirmDeleteBtnText}>
+                      {isDeletingActivity ? "Deleting..." : "Yes, Delete"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
         </SafeAreaView>
       </Modal>
 
@@ -2165,5 +2356,163 @@ const createStyles = (t: Theme) =>
       color: t.white,
       fontSize: moderateScale(13),
       fontWeight: "900",
+    },
+
+    /* DELETE CONFIRMATION MODAL */
+
+    confirmModalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.72)",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: scale(18),
+    },
+
+    confirmModalCard: {
+      width: "100%",
+      maxWidth: scale(360),
+
+      // IMPORTANT: do NOT use t.card here if t.card has transparency
+      backgroundColor: t.bg,
+
+      borderRadius: scale(22),
+
+      borderWidth: 1,
+      borderColor: t.border,
+
+      paddingHorizontal: scale(18),
+      paddingVertical: verticalScale(18),
+
+      alignItems: "center",
+
+      elevation: 24,
+
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 0.4,
+      shadowRadius: 20,
+    },
+
+    confirmIconCircle: {
+      width: scale(52),
+      height: scale(52),
+      borderRadius: scale(26),
+
+      backgroundColor: hexA(t.error, 0.12),
+
+      alignItems: "center",
+      justifyContent: "center",
+
+      borderWidth: 1,
+      borderColor: hexA(t.error, 0.3),
+
+      marginBottom: verticalScale(10),
+    },
+
+    confirmModalTitle: {
+      fontSize: moderateScale(18),
+      fontWeight: "800",
+      color: t.text,
+
+      textAlign: "center",
+
+      marginBottom: verticalScale(5),
+    },
+
+    confirmModalMessage: {
+      fontSize: moderateScale(13),
+      lineHeight: moderateScale(18),
+
+      color: t.sub,
+
+      textAlign: "center",
+
+      marginBottom: verticalScale(13),
+
+      paddingHorizontal: scale(4),
+    },
+
+    confirmPreviewBox: {
+      width: "100%",
+
+      backgroundColor: t.bg,
+
+      borderRadius: scale(12),
+      borderWidth: 1,
+      borderColor: t.border,
+
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(9),
+
+      marginBottom: verticalScale(14),
+    },
+
+    confirmPreviewTitle: {
+      fontSize: moderateScale(13),
+      fontWeight: "700",
+
+      color: t.text,
+
+      textAlign: "left",
+    },
+
+    confirmPreviewSub: {
+      fontSize: moderateScale(11),
+
+      color: t.sub,
+
+      marginTop: verticalScale(2),
+    },
+
+    confirmActionButtonsRow: {
+      flexDirection: "row",
+
+      width: "100%",
+
+      gap: scale(10),
+    },
+
+    confirmCancelBtn: {
+      flex: 1,
+
+      minHeight: verticalScale(46),
+
+      borderRadius: scale(13),
+
+      backgroundColor: t.bg,
+
+      borderWidth: 1,
+      borderColor: t.border,
+
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    confirmCancelBtnText: {
+      fontSize: moderateScale(14),
+      fontWeight: "700",
+      color: t.text,
+    },
+
+    confirmDeleteBtn: {
+      flex: 1,
+
+      minHeight: verticalScale(46),
+
+      borderRadius: scale(13),
+
+      backgroundColor: t.error,
+
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    confirmDeleteBtnText: {
+      fontSize: moderateScale(14),
+      fontWeight: "800",
+      color: t.white,
     },
   });

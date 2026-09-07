@@ -67,7 +67,7 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
     requestPermission,
     startListening,
     stopListening,
-  } = useVoiceSpeech();
+  } = useVoiceSpeech("need-this-modal");
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const inputRef = useRef<TextInput>(null);

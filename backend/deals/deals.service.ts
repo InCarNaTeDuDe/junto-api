@@ -9,6 +9,7 @@ import { io } from "../socket/socket";
 export interface DealRecord {
   id: string;
   sellerId: string;
+  userId?: string;
   title: string;
   category:
     | "Cycles"
@@ -91,6 +92,7 @@ export async function createDeal(
   const newDeal: DealRecord = {
     id: `deal-${Date.now()}`,
     sellerId: user?.id || `seller_${Date.now()}`,
+    userId: user?.id || `seller_${Date.now()}`,
     title: input.title,
     category: input.category,
     price: input.price,

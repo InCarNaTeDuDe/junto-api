@@ -24,12 +24,15 @@ import { useLocation } from "@/context/LocationContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import { useAuthContext } from "@/context/AuthContext";
 
 const CAR_ICON_IMG = require("@/assets/screens/purple_car_image.png");
 const BIKE_ICON_IMG = require("@/assets/screens/purple_bike_image.png");
 
 interface RideItem {
   id: string;
+  userId?: string;
+  driverId?: string;
   driverName: string;
   driverRating: number;
   driverAvatar: string;
@@ -59,6 +62,7 @@ export default function RidesScreen() {
   const insets = useSafeAreaInsets();
   const { theme: t, isDark } = useTheme();
   const { selectedLocation } = useLocation();
+  const { user } = useAuthContext();
   const cityName = selectedLocation?.name || "Hyderabad";
 
   const [activeTab, setActiveTab] = useState<"find" | "offer">("find");
@@ -69,6 +73,39 @@ export default function RidesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  const checkIsRideOwner = useCallback(
+    (ride: RideItem) => {
+      if (!ride) return false;
+      const currentUserId = user?.id;
+      const currentUserName = user?.name?.trim().toLowerCase();
+      const rideDriverName = ride.driverName?.trim().toLowerCase();
+
+      if (
+        currentUserId &&
+        (ride.userId === currentUserId || ride.driverId === currentUserId)
+      ) {
+        return true;
+      }
+      if (
+        currentUserName &&
+        rideDriverName &&
+        currentUserName === rideDriverName
+      ) {
+        return true;
+      }
+      if (
+        rideDriverName === "you" ||
+        rideDriverName === "you (host)" ||
+        rideDriverName === "you (driver)" ||
+        rideDriverName?.includes("(you)")
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [user?.id, user?.name],
+  );
 
   // Fetch real-time rides from backend
   const fetchRides = async () => {
@@ -143,7 +180,7 @@ export default function RidesScreen() {
     useState<RideItem | null>(null);
 
   // Voice speech
-  const { isListening, startListening } = useVoiceSpeech();
+  const { isListening, startListening } = useVoiceSpeech("rides-search");
 
   const handleSelectPresetRoute = (route: { from: string; to: string }) => {
     setOfferFrom(route.from);
@@ -183,7 +220,13 @@ export default function RidesScreen() {
       });
 
       if (res?.success && res.data) {
-        setRidesList((prev) => [res.data, ...prev]);
+        const newRide: RideItem = {
+          ...res.data,
+          userId: res.data.userId || user?.id,
+          driverId: res.data.driverId || user?.id,
+          driverName: res.data.driverName || user?.name || "You (Driver)",
+        };
+        setRidesList((prev) => [newRide, ...prev]);
       }
 
       setOfferFrom("");
@@ -202,6 +245,10 @@ export default function RidesScreen() {
   };
 
   const handleBookRide = async (ride: RideItem) => {
+    if (checkIsRideOwner(ride)) {
+      Alert.alert("Notice", "You cannot request a seat on your own ride.");
+      return;
+    }
     try {
       await ApiService.post(`/api/rides/${ride.id}/join`, {
         seatsRequested: 1,
@@ -537,198 +584,250 @@ export default function RidesScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              filteredRides.map((ride) => (
-                <View
-                  key={ride.id}
-                  style={[
-                    styles.rideCard,
-                    { backgroundColor: cardBg, borderColor: border },
-                  ]}
-                >
-                  {/* Driver Header */}
-                  <View style={styles.cardDriverRow}>
-                    <View style={styles.driverInfo}>
-                      <View style={styles.avatarCircle}>
-                        <Image
-                          source={{ uri: ride.driverAvatar }}
-                          style={styles.avatarImage}
+              filteredRides.map((ride) => {
+                const isRideOwner = checkIsRideOwner(ride);
+                return (
+                  <View
+                    key={ride.id}
+                    style={[
+                      styles.rideCard,
+                      { backgroundColor: cardBg, borderColor: border },
+                    ]}
+                  >
+                    {/* Driver Header */}
+                    <View style={styles.cardDriverRow}>
+                      <View style={styles.driverInfo}>
+                        <View style={styles.avatarCircle}>
+                          <Image
+                            source={{ uri: ride.driverAvatar }}
+                            style={styles.avatarImage}
+                          />
+                        </View>
+
+                        <View>
+                          <View style={styles.driverNameRow}>
+                            <Text
+                              style={[
+                                styles.driverName,
+                                { color: textPrimary },
+                              ]}
+                            >
+                              {ride.driverName}
+                            </Text>
+
+                            {ride.verified && (
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={14}
+                                color="#10B981"
+                              />
+                            )}
+                          </View>
+
+                          <View style={styles.ratingRow}>
+                            <Ionicons name="star" size={12} color="#F59E0B" />
+
+                            <Text
+                              style={[styles.ratingText, { color: textMute }]}
+                            >
+                              {ride.driverRating}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.priceWrap}>
+                        <Text style={[styles.priceTag, { color: "#10B981" }]}>
+                          {ride.price}
+                        </Text>
+
+                        <Text style={[styles.priceSub, { color: textMute }]}>
+                          per seat
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Route Timeline */}
+                    <View style={styles.routeContainer}>
+                      <View style={styles.routeDotsCol}>
+                        <View
+                          style={[
+                            styles.dotCircle,
+                            { backgroundColor: "#10B981" },
+                          ]}
+                        />
+
+                        <View
+                          style={[styles.dotLine, { backgroundColor: border }]}
+                        />
+
+                        <View
+                          style={[
+                            styles.dotCircle,
+                            { backgroundColor: "#EF4444" },
+                          ]}
                         />
                       </View>
 
-                      <View>
-                        <View style={styles.driverNameRow}>
+                      <View style={styles.routeTextCol}>
+                        <View>
                           <Text
-                            style={[styles.driverName, { color: textPrimary }]}
+                            style={[styles.locationLabel, { color: textMute }]}
                           >
-                            {ride.driverName}
+                            FROM
                           </Text>
 
-                          {ride.verified && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={14}
-                              color="#10B981"
-                            />
-                          )}
+                          <Text
+                            style={[
+                              styles.locationName,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {ride.from}
+                          </Text>
                         </View>
 
-                        <View style={styles.ratingRow}>
-                          <Ionicons name="star" size={12} color="#F59E0B" />
+                        <View style={{ marginTop: 10 }}>
+                          <Text
+                            style={[styles.locationLabel, { color: textMute }]}
+                          >
+                            TO
+                          </Text>
 
                           <Text
-                            style={[styles.ratingText, { color: textMute }]}
+                            style={[
+                              styles.locationName,
+                              { color: textPrimary },
+                            ]}
                           >
-                            {ride.driverRating}
+                            {ride.to}
                           </Text>
                         </View>
                       </View>
                     </View>
 
-                    <View style={styles.priceWrap}>
-                      <Text style={[styles.priceTag, { color: "#10B981" }]}>
-                        {ride.price}
-                      </Text>
-
-                      <Text style={[styles.priceSub, { color: textMute }]}>
-                        per seat
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Route Timeline */}
-                  <View style={styles.routeContainer}>
-                    <View style={styles.routeDotsCol}>
+                    {/* Ride Meta Badge row */}
+                    <View style={styles.metaRow}>
                       <View
                         style={[
-                          styles.dotCircle,
-                          { backgroundColor: "#10B981" },
+                          styles.metaBadge,
+                          {
+                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          },
                         ]}
-                      />
-
-                      <View
-                        style={[styles.dotLine, { backgroundColor: border }]}
-                      />
-
-                      <View
-                        style={[
-                          styles.dotCircle,
-                          { backgroundColor: "#EF4444" },
-                        ]}
-                      />
-                    </View>
-
-                    <View style={styles.routeTextCol}>
-                      <View>
-                        <Text
-                          style={[styles.locationLabel, { color: textMute }]}
-                        >
-                          FROM
-                        </Text>
+                      >
+                        <Ionicons
+                          name={ride.vehicleType === "car" ? "car" : "bicycle"}
+                          size={13}
+                          color="#8B5CF6"
+                        />
 
                         <Text
-                          style={[styles.locationName, { color: textPrimary }]}
+                          style={[styles.metaBadgeText, { color: textPrimary }]}
                         >
-                          {ride.from}
+                          {ride.vehicleType === "car" ? "Car" : "Bike"}
                         </Text>
                       </View>
 
-                      <View style={{ marginTop: 10 }}>
-                        <Text
-                          style={[styles.locationLabel, { color: textMute }]}
-                        >
-                          TO
-                        </Text>
+                      <View
+                        style={[
+                          styles.metaBadge,
+                          {
+                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={13}
+                          color="#F59E0B"
+                        />
 
                         <Text
-                          style={[styles.locationName, { color: textPrimary }]}
+                          style={[styles.metaBadgeText, { color: textPrimary }]}
                         >
-                          {ride.to}
+                          {ride.time}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.metaBadge,
+                          {
+                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="person-outline"
+                          size={13}
+                          color="#10B981"
+                        />
+
+                        <Text
+                          style={[styles.metaBadgeText, { color: textPrimary }]}
+                        >
+                          {ride.seatsLeft} seat
+                          {ride.seatsLeft > 1 ? "s" : ""} left
                         </Text>
                       </View>
                     </View>
+
+                    {ride.notes && (
+                      <Text style={[styles.notesText, { color: textMute }]}>
+                        💬 {ride.notes}
+                      </Text>
+                    )}
+
+                    {/* Action Button: Post Owner CANNOT see "Request Seat" button */}
+                    {isRideOwner ? (
+                      <View
+                        style={[
+                          styles.bookBtn,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(124, 58, 237, 0.12)"
+                              : "#F5F3FF",
+                            borderColor: isDark
+                              ? "rgba(139, 92, 246, 0.35)"
+                              : "#DDD6FE",
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="shield-checkmark"
+                          size={15}
+                          color="#7C3AED"
+                        />
+
+                        <Text
+                          style={[
+                            styles.bookBtnText,
+                            { color: "#7C3AED", fontWeight: "700" },
+                          ]}
+                        >
+                          Your Ride (Driver)
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.bookBtn}
+                        onPress={() => handleBookRide(ride)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name="paper-plane"
+                          size={15}
+                          color="#FFFFFF"
+                        />
+
+                        <Text style={styles.bookBtnText}>Request Seat</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-
-                  {/* Ride Meta Badge row */}
-                  <View style={styles.metaRow}>
-                    <View
-                      style={[
-                        styles.metaBadge,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={ride.vehicleType === "car" ? "car" : "bicycle"}
-                        size={13}
-                        color="#8B5CF6"
-                      />
-
-                      <Text
-                        style={[styles.metaBadgeText, { color: textPrimary }]}
-                      >
-                        {ride.vehicleType === "car" ? "Car" : "Bike"}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.metaBadge,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                        },
-                      ]}
-                    >
-                      <Ionicons name="time-outline" size={13} color="#F59E0B" />
-
-                      <Text
-                        style={[styles.metaBadgeText, { color: textPrimary }]}
-                      >
-                        {ride.time}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.metaBadge,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name="person-outline"
-                        size={13}
-                        color="#10B981"
-                      />
-
-                      <Text
-                        style={[styles.metaBadgeText, { color: textPrimary }]}
-                      >
-                        {ride.seatsLeft} seat
-                        {ride.seatsLeft > 1 ? "s" : ""} left
-                      </Text>
-                    </View>
-                  </View>
-
-                  {ride.notes && (
-                    <Text style={[styles.notesText, { color: textMute }]}>
-                      💬 {ride.notes}
-                    </Text>
-                  )}
-
-                  {/* Action Button */}
-                  <TouchableOpacity
-                    style={styles.bookBtn}
-                    onPress={() => handleBookRide(ride)}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
-
-                    <Text style={styles.bookBtnText}>Request Seat</Text>
-                  </TouchableOpacity>
-                </View>
-              ))
+                );
+              })
             )}
           </>
         ) : (

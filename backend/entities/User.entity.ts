@@ -14,6 +14,7 @@ import { Activity } from "./Activity.entity";
 import { Ticket } from "./Ticket.entity";
 import { Notification } from "./Notification.entity";
 import { Message } from "./Message.entity";
+import { SupportChat } from "./SupportChat.entity";
 
 @Entity("users")
 export class User {
@@ -106,4 +107,7 @@ export class User {
 
   @OneToMany(() => Message, (message) => message.sender)
   messages!: Message[];
+
+  @OneToMany(() => SupportChat, (sc) => sc.user)
+  supportChats!: SupportChat[];
 }

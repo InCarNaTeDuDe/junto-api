@@ -356,7 +356,7 @@ export default function ExploreScreen() {
             cost: item.cost,
             latitude: item.latitude,
             longitude: item.longitude,
-            mutualFriends: Math.floor(Math.random() * 4) + 1,
+            // mutualFriends: Math.floor(Math.random() * 4) + 1,
           });
         });
 
@@ -1124,7 +1124,7 @@ export default function ExploreScreen() {
                         >
                           {act.place}
                         </Text>
-                        <View style={s.userMutualRow}>
+                        {/* <View style={s.userMutualRow}>
                           <Ionicons name="people" size={13} color={textSub} />
                           <Text
                             style={[s.userMutualText, { color: textSub }]}
@@ -1132,7 +1132,7 @@ export default function ExploreScreen() {
                           >
                             {act.mutualFriends} mutual friends • {act.title}
                           </Text>
-                        </View>
+                        </View> */}
                       </View>
                       <TouchableOpacity
                         style={[
@@ -1598,13 +1598,13 @@ const s = StyleSheet.create({
   },
   userTimeText: { fontSize: 11, marginLeft: 6 },
   userLocationText: { fontSize: 12, marginTop: 2, fontWeight: "500" },
-  userMutualRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  userMutualText: { fontSize: 11.5 },
+  // userMutualRow: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   gap: 4,
+  //   marginTop: 4,
+  // },
+  // userMutualText: { fontSize: 11.5 },
   userChatBtn: {
     width: 36,
     height: 36,

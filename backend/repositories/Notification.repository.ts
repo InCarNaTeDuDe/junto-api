@@ -1,4 +1,4 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { Notification } from "../entities/Notification.entity";
 
 export interface NotificationInput {
@@ -10,9 +10,9 @@ export interface NotificationInput {
   data?: any;
 }
 
-export class NotificationRepository {
-  private get repo() {
-    return AppDataSource.getRepository(Notification);
+export class NotificationRepository extends BaseRepository<Notification> {
+  constructor() {
+    super(Notification);
   }
 
   private toEntity(data: NotificationInput) {
@@ -35,18 +35,16 @@ export class NotificationRepository {
   }
 
   async createNotification(data: NotificationInput) {
-    const notif = this.repo.create(this.toEntity(data));
-    return this.repo.save(notif);
+    return this.create(this.toEntity(data));
   }
 
   async createNotifications(items: NotificationInput[]) {
     if (!items.length) return [];
-    const notifications = this.repo.create(items.map((i) => this.toEntity(i)));
-    return this.repo.save(notifications);
+    return this.addMany(items.map((i) => this.toEntity(i)));
   }
 
   async findByUserId(userId: string) {
-    return this.repo.find({
+    return this.find({
       where: { userId },
       order: { timestamp: "DESC" },
     });

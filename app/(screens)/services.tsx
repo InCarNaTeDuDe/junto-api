@@ -173,7 +173,7 @@ export default function ServicesScreen() {
     };
   }, [fetchServicePros]);
 
-  const { isListening, startListening } = useVoiceSpeech();
+  const { isListening, startListening } = useVoiceSpeech("services-search");
 
   const handleVoiceSearch = () => {
     startListening((text) => {

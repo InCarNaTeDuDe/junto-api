@@ -1,13 +1,13 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { Message } from "../entities/Message.entity";
 
-export class MessageRepository {
-  private get repo() {
-    return AppDataSource.getRepository(Message);
+export class MessageRepository extends BaseRepository<Message> {
+  constructor() {
+    super(Message);
   }
 
   async findByActivityId(activityId: string) {
-    return this.repo.find({
+    return this.find({
       where: {
         activityId,
       },
@@ -26,14 +26,13 @@ export class MessageRepository {
     participantId?: string | null;
     content: string;
   }) {
-    const msg = this.repo.create({
+    return this.create({
       activityId: data.activityId,
       senderId: data.senderId,
       participantId: data.participantId,
       content: data.content,
     });
-
-    return this.repo.save(msg);
   }
 }
+
 export const messageRepository = new MessageRepository();

@@ -23,7 +23,27 @@ export interface ParsedDealVoice {
   details: string;
 }
 
-export function useVoiceSpeech() {
+// Module-level active requester tracking to isolate mic listening states across components
+let activeRequesterId: string | null = null;
+const activeListeners = new Map<string, (listening: boolean) => void>();
+
+function setActiveRequester(id: string | null) {
+  if (activeRequesterId && activeRequesterId !== id) {
+    const notifyOld = activeListeners.get(activeRequesterId);
+    if (notifyOld) {
+      notifyOld(false);
+    }
+  }
+  activeRequesterId = id;
+}
+
+export function useVoiceSpeech(customId?: string) {
+  // Unique ID per hook instance so each component has independent mic state
+  const defaultId = useRef(
+    "mic_" + Math.random().toString(36).substring(2, 9),
+  ).current;
+  const instanceId = customId || defaultId;
+
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -38,6 +58,34 @@ export function useVoiceSpeech() {
     ((text: string, isFinal: boolean) => void) | null
   >(null);
   const onErrorCallbackRef = useRef<((errText: string) => void) | null>(null);
+
+  // Register instance in activeListeners and clean up on unmount
+  useEffect(() => {
+    activeListeners.set(instanceId, (listening: boolean) => {
+      setIsListening(listening);
+    });
+
+    return () => {
+      activeListeners.delete(instanceId);
+      if (activeRequesterId === instanceId) {
+        activeRequesterId = null;
+        try {
+          if (
+            ExpoSpeechRecognitionModule &&
+            typeof ExpoSpeechRecognitionModule.stop === "function"
+          ) {
+            ExpoSpeechRecognitionModule.stop();
+          }
+        } catch (e) {}
+
+        if (webRecognitionRef.current) {
+          try {
+            webRecognitionRef.current.stop();
+          } catch (e) {}
+        }
+      }
+    };
+  }, [instanceId]);
 
   // Check initial permissions & support
   useEffect(() => {
@@ -94,17 +142,27 @@ export function useVoiceSpeech() {
   }, []);
 
   // Listen to expo-speech-recognition events (Native & Web via expo-speech-recognition)
+  // CRITICAL: Only update state if THIS instance is the active requester
   useSpeechRecognitionEvent("start", () => {
-    setIsListening(true);
-    setError(null);
-    setPermissionStatus("granted");
+    if (activeRequesterId === instanceId) {
+      setIsListening(true);
+      setError(null);
+      setPermissionStatus("granted");
+    }
   });
 
   useSpeechRecognitionEvent("end", () => {
-    setIsListening(false);
+    if (activeRequesterId === instanceId) {
+      setIsListening(false);
+      activeRequesterId = null;
+    }
   });
 
   useSpeechRecognitionEvent("result", (event) => {
+    if (activeRequesterId !== instanceId) {
+      return;
+    }
+
     const spoken = event.results[0]?.transcript || "";
     const isFinal = Boolean(event.isFinal);
 
@@ -124,6 +182,10 @@ export function useVoiceSpeech() {
   });
 
   useSpeechRecognitionEvent("error", (event) => {
+    if (activeRequesterId !== instanceId) {
+      return;
+    }
+
     console.warn("ExpoSpeechRecognition error:", event.error, event.message);
     let userMsg = "Could not hear audio clearly. Please try speaking again.";
 
@@ -148,6 +210,7 @@ export function useVoiceSpeech() {
 
     setError(userMsg);
     setIsListening(false);
+    activeRequesterId = null;
     if (onErrorCallbackRef.current) {
       onErrorCallbackRef.current(userMsg);
     }
@@ -213,6 +276,9 @@ export function useVoiceSpeech() {
       onSpeechChange?: (text: string, isFinal: boolean) => void,
       onErrorCallback?: (errText: string) => void,
     ) => {
+      // Claim ownership of active speech recognition session
+      setActiveRequester(instanceId);
+
       setError(null);
       setTranscript("");
       setInterimTranscript("");
@@ -227,6 +293,7 @@ export function useVoiceSpeech() {
           const permMsg =
             "Microphone permission is required. Please grant microphone access to use voice search.";
           setError(permMsg);
+          setActiveRequester(null);
           if (onErrorCallback) onErrorCallback(permMsg);
           return;
         }
@@ -275,12 +342,16 @@ export function useVoiceSpeech() {
             recognition.lang = "en-IN";
 
             recognition.onstart = () => {
-              setIsListening(true);
-              setError(null);
-              setPermissionStatus("granted");
+              if (activeRequesterId === instanceId) {
+                setIsListening(true);
+                setError(null);
+                setPermissionStatus("granted");
+              }
             };
 
             recognition.onresult = (event: any) => {
+              if (activeRequesterId !== instanceId) return;
+
               let currentInterim = "";
               let currentFinal = "";
 
@@ -312,6 +383,8 @@ export function useVoiceSpeech() {
             };
 
             recognition.onerror = (event: any) => {
+              if (activeRequesterId !== instanceId) return;
+
               console.warn("Web Speech recognition error:", event.error);
               let errorMsg = "Could not hear audio clearly. Please try again.";
 
@@ -330,12 +403,16 @@ export function useVoiceSpeech() {
 
               setError(errorMsg);
               setIsListening(false);
+              activeRequesterId = null;
               if (onErrorCallbackRef.current)
                 onErrorCallbackRef.current(errorMsg);
             };
 
             recognition.onend = () => {
-              setIsListening(false);
+              if (activeRequesterId === instanceId) {
+                setIsListening(false);
+                activeRequesterId = null;
+              }
             };
 
             recognition.start();
@@ -348,31 +425,35 @@ export function useVoiceSpeech() {
 
       // If no native or browser speech engine is available
       setIsSupported(false);
+      setActiveRequester(null);
       const unsupportedMsg =
         "Speech recognition is not available on this device configuration. Please type or tap quick presets.";
       setError(unsupportedMsg);
       if (onErrorCallback) onErrorCallback(unsupportedMsg);
     },
-    [permissionStatus, requestPermission],
+    [instanceId, permissionStatus, requestPermission],
   );
 
   const stopListening = useCallback(async () => {
-    try {
-      if (
-        ExpoSpeechRecognitionModule &&
-        typeof ExpoSpeechRecognitionModule.stop === "function"
-      ) {
-        await ExpoSpeechRecognitionModule.stop();
-      }
-    } catch (e) {}
-
-    if (webRecognitionRef.current) {
+    if (activeRequesterId === instanceId) {
+      activeRequesterId = null;
       try {
-        webRecognitionRef.current.stop();
+        if (
+          ExpoSpeechRecognitionModule &&
+          typeof ExpoSpeechRecognitionModule.stop === "function"
+        ) {
+          await ExpoSpeechRecognitionModule.stop();
+        }
       } catch (e) {}
+
+      if (webRecognitionRef.current) {
+        try {
+          webRecognitionRef.current.stop();
+        } catch (e) {}
+      }
     }
     setIsListening(false);
-  }, []);
+  }, [instanceId]);
 
   return {
     isListening,

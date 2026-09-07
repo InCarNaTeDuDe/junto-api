@@ -1,21 +1,21 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { LoginHistory } from "../entities/LoginHistory.entity";
 
-export class LoginHistoryRepository {
-  private get repo() {
-    return AppDataSource.getRepository(LoginHistory);
+export class LoginHistoryRepository extends BaseRepository<LoginHistory> {
+  constructor() {
+    super(LoginHistory);
   }
 
-  async create(data: { userId: string; action: string; details: string }) {
-    const log = this.repo.create({
-      ...data,
-    });
-
-    return this.repo.save(log);
+  async createHistory(data: {
+    userId: string;
+    action: string;
+    details: string;
+  }) {
+    return this.create(data);
   }
 
   async findByUser(userId: string) {
-    return this.repo.find({
+    return this.find({
       where: { userId },
     });
   }

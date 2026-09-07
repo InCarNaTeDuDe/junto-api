@@ -1,22 +1,20 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { AuditLog } from "../entities/AuditLog.entity";
 
-export class AuditRepository {
-  private get repo() {
-    return AppDataSource.getRepository(AuditLog);
+export class AuditRepository extends BaseRepository<AuditLog> {
+  constructor() {
+    super(AuditLog);
   }
 
-  async create(data: { userId: string; action: string; details: string }) {
-    const log = this.repo.create({
+  async createLog(data: { userId: string; action: string; details: string }) {
+    return this.create({
       ...data,
       timestamp: new Date(),
     });
-
-    return this.repo.save(log);
   }
 
   async findByUser(userId: string) {
-    return this.repo.find({
+    return this.find({
       where: { userId },
       order: { timestamp: "DESC" },
     });

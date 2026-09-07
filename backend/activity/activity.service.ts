@@ -482,3 +482,14 @@ export async function getJuntoNowStats(locationName?: string) {
     };
   }
 }
+
+export async function deleteActivity(id: string, user?: any) {
+  const activity = await activityRepository.findById(id);
+  if (!activity) {
+    // If already removed or not found, still return success
+    return { id, isDeleted: 1 };
+  }
+
+  await activityRepository.softDelete(id);
+  return { id, isDeleted: 1 };
+}

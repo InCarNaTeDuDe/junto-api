@@ -103,3 +103,31 @@ export async function getSelectedLocation(): Promise<SelectedLocation | null> {
 export function removeSelectedLocation() {
   return removeItem(LOCATION_KEY);
 }
+
+/* ---------------- Support Chat ---------------- */
+// TODO: are we going to save in  secure storage not db ?
+export function saveSupportChatMessages(
+  userId: string | undefined,
+  messages: any[],
+) {
+  const key = `supportChat_${userId || "guest"}`;
+  return saveItem(key, JSON.stringify(messages));
+}
+
+export async function getSupportChatMessages(
+  userId: string | undefined,
+): Promise<any[] | null> {
+  const key = `supportChat_${userId || "guest"}`;
+  const data = await getItem(key);
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+export function removeSupportChatMessages(userId: string | undefined) {
+  const key = `supportChat_${userId || "guest"}`;
+  return removeItem(key);
+}

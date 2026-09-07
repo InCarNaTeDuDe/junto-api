@@ -10,3 +10,4 @@ export * from "./Notification.repository";
 export * from "./Rides.repository";
 export * from "./Ticket.repository";
 export * from "./User.repository";
+export * from "./SupportChat.repository";

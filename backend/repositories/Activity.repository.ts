@@ -1,45 +1,52 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { Activity } from "../entities/Activity.entity";
+import { FindManyOptions } from "typeorm";
 
-export class ActivityRepository {
-  private get repo() {
-    return AppDataSource.getRepository(Activity);
+export class ActivityRepository extends BaseRepository<Activity> {
+  constructor() {
+    super(Activity);
   }
 
   async countOrganizerActivities(organizerId: string): Promise<number> {
-    if (!AppDataSource.isInitialized) return 0;
-    return this.repo.count({ where: { organizerId } });
+    if (!this.isConnected) return 0;
+    return this.repo.count({ where: { organizerId, isDeleted: 0 } });
   }
 
-  async create(data: Partial<Activity>) {
-    const activity = this.repo.create(data);
-    return this.repo.save(activity);
-  }
-
-  async update(id: string, data: Partial<Activity>) {
-    await this.repo.update(id, data);
-    return this.findById(id);
-  }
-
-  async delete(id: string) {
-    return this.repo.delete(id);
-  }
-
-  async findAll(where?: any) {
-    if (!AppDataSource.isInitialized) return [];
+  /**
+   * Finds all active (non-deleted) activities with organizer relations.
+   */
+  async findAll(
+    options?: FindManyOptions<Activity> | any,
+  ): Promise<Activity[]> {
+    if (!this.isConnected) return [];
+    if (
+      options &&
+      typeof options === "object" &&
+      ("where" in options || "relations" in options || "order" in options)
+    ) {
+      return this.repo.find({
+        ...options,
+        where: options.where
+          ? { ...(options.where as any), isDeleted: 0 }
+          : { isDeleted: 0 },
+        relations: options.relations || { organizer: true },
+        order: options.order || { createdAt: "DESC" },
+      });
+    }
     return this.repo.find({
-      ...(where ? { where } : {}),
+      where: { ...(options || {}), isDeleted: 0 },
       relations: { organizer: true },
       order: { createdAt: "DESC" },
     });
   }
 
   async findByLocation(latitude: number, longitude: number) {
-    if (!AppDataSource.isInitialized) return [];
+    if (!this.isConnected) return [];
     return this.repo.find({
       where: {
         latitude,
         longitude,
+        isDeleted: 0,
       },
       select: {
         id: true,
@@ -61,6 +68,7 @@ export class ActivityRepository {
   }
 
   async findById(id: string) {
+    if (!this.isConnected) return null;
     return this.repo.findOne({
       where: { id },
       relations: { organizer: true },
@@ -75,14 +83,21 @@ export class ActivityRepository {
 
     if (!targetUserId && !userEmail && !userName) return [];
 
-    if (AppDataSource.isInitialized) {
+    if (this.isConnected) {
       try {
         const activities = await this.repo.find({
-          where: {
-            organizer: {
-              id: userId,
+          where: [
+            {
+              organizer: {
+                id: userId,
+              },
+              isDeleted: 0,
             },
-          },
+            {
+              organizerId: userId,
+              isDeleted: 0,
+            },
+          ],
           relations: {
             organizer: true,
           },
@@ -92,6 +107,9 @@ export class ActivityRepository {
         });
 
         return activities.filter((activity) => {
+          if (activity.isDeleted && Number(activity.isDeleted) === 1) {
+            return false;
+          }
           const orgId = activity.organizerId || activity.organizer?.id;
           const orgEmail = activity.organizer?.email;
           const orgName = activity.organizer?.name;

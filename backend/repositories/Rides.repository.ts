@@ -1,4 +1,4 @@
-import { AppDataSource } from "../db/data-source";
+import { BaseRepository } from "./Base.repository";
 import { Ride } from "../entities/Rides.entity";
 
 export interface RideRecord {
@@ -43,9 +43,9 @@ export interface RideRecord {
   updatedAt: string;
 }
 
-export class RideRepository {
-  private get repo() {
-    return AppDataSource.getRepository(Ride);
+export class RideRepository extends BaseRepository<Ride> {
+  constructor() {
+    super(Ride);
   }
 
   /**
@@ -164,7 +164,15 @@ export class RideRepository {
   /**
    * Find all active rides
    */
-  async findAll(): Promise<RideRecord[]> {
+  override async findAll<R = RideRecord>(options?: any): Promise<R[]> {
+    if (
+      options &&
+      typeof options === "object" &&
+      ("where" in options || "relations" in options || "order" in options)
+    ) {
+      const rides = await this.repo.find(options);
+      return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
+    }
     const rides = await this.repo.find({
       where: {
         status: "active",
@@ -174,24 +182,28 @@ export class RideRepository {
       },
     });
 
-    return rides.map((ride) => this.toRideRecord(ride));
+    return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
   }
 
   /**
    * Find ride by ID
    */
-  async findById(id: string): Promise<RideRecord | null> {
+  override async findById<R = RideRecord>(
+    id: string | number,
+    options?: any,
+  ): Promise<R | null> {
     const ride = await this.repo.findOne({
       where: {
-        id,
+        id: String(id),
       },
+      ...(options || {}),
     });
 
     if (!ride) {
       return null;
     }
 
-    return this.toRideRecord(ride);
+    return this.toRideRecord(ride) as unknown as R;
   }
 
   /**

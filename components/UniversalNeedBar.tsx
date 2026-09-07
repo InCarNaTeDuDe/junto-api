@@ -52,7 +52,7 @@ export const UniversalNeedBar: React.FC = () => {
     requestPermission,
     startListening,
     stopListening,
-  } = useVoiceSpeech();
+  } = useVoiceSpeech("universal-need-bar");
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 

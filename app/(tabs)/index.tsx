@@ -624,7 +624,7 @@ export default function Home() {
     isListening: isSearchListening,
     startListening: startSearchListening,
     stopListening: stopSearchListening,
-  } = useVoiceSpeech();
+  } = useVoiceSpeech("home-search");
 
   // hero card is ~55% of viewport on phone, capped on wide screens
   const { cardW: heroW, artH: heroArtHeight } = useHeroCardSize();

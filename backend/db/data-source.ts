@@ -12,6 +12,7 @@ import { Notification } from "../entities/Notification.entity";
 import { Ride } from "../entities/Rides.entity";
 import { LocalDeal } from "../entities/LocalDeals.entity";
 import { LocalService } from "../entities/LocalServices.entity";
+import { SupportChat } from "../entities/SupportChat.entity";
 
 // import { inMemoryStore } from "../db"; // <-- adjust path if needed
 
@@ -41,6 +42,7 @@ export const AppDataSource = new DataSource({
     Ride,
     LocalDeal,
     LocalService,
+    SupportChat,
   ],
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });

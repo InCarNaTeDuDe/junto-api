@@ -122,6 +122,13 @@ export class Activity {
   })
   isAutoDetected!: boolean;
 
+  @Index()
+  @Column({
+    type: "smallint",
+    default: 0,
+  })
+  isDeleted!: number;
+
   @OneToMany(() => Message, (message) => message.activity)
   messages!: Message[];
 }

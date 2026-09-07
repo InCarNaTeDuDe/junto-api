@@ -27,9 +27,12 @@ import {
 } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import { useAuthContext } from "@/context/AuthContext";
 
 interface DealItem {
   id: string;
+  sellerId?: string;
+  userId?: string;
   title: string;
   category:
     | "Cycles"
@@ -131,6 +134,7 @@ export default function LocalDealsScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { selectedLocation } = useLocation();
+  const { user } = useAuthContext();
   const cityName = selectedLocation?.name || "Hyderabad";
   const cityShort = cityName.split(",")[0].trim();
 
@@ -139,6 +143,39 @@ export default function LocalDealsScreen() {
   const [dealsList, setDealsList] = useState<DealItem[]>(INITIAL_DEALS);
   const [isLoading, setIsLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  const checkIsDealOwner = useCallback(
+    (deal: DealItem) => {
+      if (!deal) return false;
+      const currentUserId = user?.id;
+      const currentUserName = user?.name?.trim().toLowerCase();
+      const dealSellerName = deal.sellerName?.trim().toLowerCase();
+
+      if (
+        currentUserId &&
+        (deal.sellerId === currentUserId || deal.userId === currentUserId)
+      ) {
+        return true;
+      }
+      if (
+        currentUserName &&
+        dealSellerName &&
+        currentUserName === dealSellerName
+      ) {
+        return true;
+      }
+      if (
+        dealSellerName === "you" ||
+        dealSellerName === "you (host)" ||
+        dealSellerName === "you (seller)" ||
+        dealSellerName?.includes("(you)")
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [user?.id, user?.name],
+  );
 
   // Fetch real-time deals from backend
   const fetchDeals = useCallback(async () => {
@@ -150,6 +187,8 @@ export default function LocalDealsScreen() {
       if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped: DealItem[] = res.data.map((d) => ({
           id: d.id,
+          sellerId: d.sellerId || d.userId,
+          userId: d.userId || d.sellerId,
           title: d.title,
           category: d.category,
           price: d.price,
@@ -237,7 +276,7 @@ export default function LocalDealsScreen() {
     isSupported: voiceSupported,
     startListening,
     stopListening,
-  } = useVoiceSpeech();
+  } = useVoiceSpeech("deals-voice-sell");
 
   // Trigger speech parsing when transcript arrives
   useEffect(() => {
@@ -296,6 +335,8 @@ export default function LocalDealsScreen() {
       if (res?.success && res.data) {
         const created: DealItem = {
           id: res.data.id,
+          sellerId: res.data.sellerId || user?.id,
+          userId: res.data.userId || user?.id,
           title: res.data.title,
           category: res.data.category,
           price: res.data.price,
@@ -303,7 +344,7 @@ export default function LocalDealsScreen() {
           condition: res.data.condition,
           location: res.data.location,
           distance: res.data.distance,
-          sellerName: res.data.sellerName || "You (Host)",
+          sellerName: res.data.sellerName || user?.name || "You (Host)",
           sellerRating: 5.0,
           sellerPhone: res.data.sellerPhone,
           sellerAvatarBg: "#10B981",
@@ -317,13 +358,15 @@ export default function LocalDealsScreen() {
       } else {
         const newDeal: DealItem = {
           id: `deal-${Date.now()}`,
+          sellerId: user?.id,
+          userId: user?.id,
           title: voiceParsedData.title,
           category: voiceParsedData.category,
           price: voiceParsedData.price,
           condition: voiceParsedData.condition,
           location: `${voiceParsedData.location}, ${cityShort}`,
           distance: "0.4 km away (Nearby)",
-          sellerName: "You (Host)",
+          sellerName: user?.name ? `${user.name} (You)` : "You (Host)",
           sellerRating: 5.0,
           sellerPhone: "+91 98480 00000",
           sellerAvatarBg: "#10B981",
@@ -362,6 +405,11 @@ export default function LocalDealsScreen() {
 
   const handleSendOffer = async () => {
     if (selectedDealForAction) {
+      if (checkIsDealOwner(selectedDealForAction)) {
+        Alert.alert("Notice", "You are the seller of this listing.");
+        setSelectedDealForAction(null);
+        return;
+      }
       try {
         await ApiService.post(
           `/api/deals/${selectedDealForAction.id}/contact`,
@@ -615,180 +663,216 @@ export default function LocalDealsScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          filteredDeals.map((deal) => (
-            <View
-              key={deal.id}
-              style={[
-                styles.dealCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <View style={styles.dealTopSection}>
-                {/* Product Image */}
-                <Image
-                  source={{ uri: deal.image }}
-                  style={styles.dealImage}
-                  resizeMode="cover"
-                />
+          filteredDeals.map((deal) => {
+            const isDealOwner = checkIsDealOwner(deal);
+            return (
+              <View
+                key={deal.id}
+                style={[
+                  styles.dealCard,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
+              >
+                <View style={styles.dealTopSection}>
+                  {/* Product Image */}
+                  <Image
+                    source={{ uri: deal.image }}
+                    style={styles.dealImage}
+                    resizeMode="cover"
+                  />
 
-                {/* Info Right */}
-                <View style={styles.dealInfoWrap}>
-                  <View style={styles.badgeRow}>
-                    <View
-                      style={[
-                        styles.conditionBadge,
-                        {
-                          backgroundColor:
-                            deal.condition === "Brand New"
-                              ? "#DCFCE7"
-                              : deal.condition === "Like New"
-                                ? "#EDE9FE"
-                                : "#FEF3C7",
-                        },
-                      ]}
-                    >
-                      <Text
+                  {/* Info Right */}
+                  <View style={styles.dealInfoWrap}>
+                    <View style={styles.badgeRow}>
+                      <View
                         style={[
-                          styles.conditionText,
+                          styles.conditionBadge,
                           {
-                            color:
+                            backgroundColor:
                               deal.condition === "Brand New"
-                                ? "#15803D"
+                                ? "#DCFCE7"
                                 : deal.condition === "Like New"
-                                  ? "#6D28D9"
-                                  : "#B45309",
+                                  ? "#EDE9FE"
+                                  : "#FEF3C7",
                           },
                         ]}
                       >
-                        {deal.condition}
+                        <Text
+                          style={[
+                            styles.conditionText,
+                            {
+                              color:
+                                deal.condition === "Brand New"
+                                  ? "#15803D"
+                                  : deal.condition === "Like New"
+                                    ? "#6D28D9"
+                                    : "#B45309",
+                            },
+                          ]}
+                        >
+                          {deal.condition}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.postedTimeText, { color: textMute }]}
+                      >
+                        {deal.postedTime}
                       </Text>
                     </View>
-                    <Text style={[styles.postedTimeText, { color: textMute }]}>
-                      {deal.postedTime}
-                    </Text>
-                  </View>
 
-                  <Text
-                    style={[styles.dealTitle, { color: textPrimary }]}
-                    numberOfLines={2}
-                  >
-                    {deal.title}
-                  </Text>
-
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceMain}>{deal.price}</Text>
-                    {deal.originalPrice && (
-                      <Text style={[styles.priceOriginal, { color: textMute }]}>
-                        {deal.originalPrice}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={styles.locationMetaRow}>
-                    <Ionicons
-                      name="location-outline"
-                      size={12}
-                      color="#F59E0B"
-                    />
                     <Text
-                      style={[styles.locationText, { color: textMute }]}
-                      numberOfLines={1}
+                      style={[styles.dealTitle, { color: textPrimary }]}
+                      numberOfLines={2}
                     >
-                      {deal.location} • {deal.distance}
+                      {deal.title}
                     </Text>
-                  </View>
-                </View>
-              </View>
 
-              {/* Description */}
-              {deal.description ? (
-                <Text
-                  style={[styles.descText, { color: textMute }]}
-                  numberOfLines={2}
-                >
-                  {deal.description}
-                </Text>
-              ) : null}
-
-              {/* Seller & Action Buttons Footer */}
-              <View style={[styles.dealFooter, { borderTopColor: border }]}>
-                <View style={styles.sellerRow}>
-                  <View
-                    style={[
-                      styles.sellerAvatar,
-                      { backgroundColor: deal.sellerAvatarBg },
-                    ]}
-                  >
-                    <Text style={styles.sellerInitial}>
-                      {deal.sellerName.charAt(0)}
-                    </Text>
-                  </View>
-                  <View>
-                    <View style={styles.sellerNameWithBadge}>
-                      <Text style={[styles.sellerName, { color: textPrimary }]}>
-                        {deal.sellerName}
-                      </Text>
-                      {deal.verified && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={13}
-                          color="#10B981"
-                        />
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceMain}>{deal.price}</Text>
+                      {deal.originalPrice && (
+                        <Text
+                          style={[styles.priceOriginal, { color: textMute }]}
+                        >
+                          {deal.originalPrice}
+                        </Text>
                       )}
                     </View>
-                    <View style={styles.ratingInline}>
-                      <Ionicons name="star" size={11} color="#F59E0B" />
-                      <Text style={[styles.ratingVal, { color: textMute }]}>
-                        {deal.sellerRating.toFixed(1)}
+
+                    <View style={styles.locationMetaRow}>
+                      <Ionicons
+                        name="location-outline"
+                        size={12}
+                        color="#F59E0B"
+                      />
+                      <Text
+                        style={[styles.locationText, { color: textMute }]}
+                        numberOfLines={1}
+                      >
+                        {deal.location} • {deal.distance}
                       </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* 1-Tap Call & Make Offer Buttons */}
-                <View style={styles.actionBtnsRow}>
-                  <TouchableOpacity
-                    style={[styles.callBtn, { borderColor: "#10B981" }]}
-                    onPress={() =>
-                      Alert.alert(
-                        "Calling Seller",
-                        `Connecting to ${deal.sellerName} at ${deal.sellerPhone}...`,
-                      )
-                    }
+                {/* Description */}
+                {deal.description ? (
+                  <Text
+                    style={[styles.descText, { color: textMute }]}
+                    numberOfLines={2}
                   >
-                    <Ionicons name="call" size={13} color="#10B981" />
-                    <Text style={[styles.callBtnText, { color: "#10B981" }]}>
-                      Call
-                    </Text>
-                  </TouchableOpacity>
+                    {deal.description}
+                  </Text>
+                ) : null}
 
-                  <TouchableOpacity
-                    style={[styles.chatBtn, { borderColor: "#F59E0B" }]}
-                    onPress={() => router.push("/(tabs)/chats")}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses"
-                      size={13}
-                      color="#D97706"
-                    />
-                    <Text style={[styles.chatBtnText, { color: "#D97706" }]}>
-                      Chat
-                    </Text>
-                  </TouchableOpacity>
+                {/* Seller & Action Buttons Footer */}
+                <View style={[styles.dealFooter, { borderTopColor: border }]}>
+                  <View style={styles.sellerRow}>
+                    <View
+                      style={[
+                        styles.sellerAvatar,
+                        { backgroundColor: deal.sellerAvatarBg },
+                      ]}
+                    >
+                      <Text style={styles.sellerInitial}>
+                        {deal.sellerName.charAt(0)}
+                      </Text>
+                    </View>
+                    <View>
+                      <View style={styles.sellerNameWithBadge}>
+                        <Text
+                          style={[styles.sellerName, { color: textPrimary }]}
+                        >
+                          {deal.sellerName}
+                        </Text>
+                        {deal.verified && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={13}
+                            color="#10B981"
+                          />
+                        )}
+                      </View>
+                      <View style={styles.ratingInline}>
+                        <Ionicons name="star" size={11} color="#F59E0B" />
+                        <Text style={[styles.ratingVal, { color: textMute }]}>
+                          {deal.sellerRating.toFixed(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
 
-                  <TouchableOpacity
-                    style={styles.offerBtn}
-                    onPress={() => {
-                      setSelectedDealForAction(deal);
-                      setOfferPrice(deal.price);
-                    }}
-                  >
-                    <Text style={styles.offerBtnText}>⚡ Make Offer</Text>
-                  </TouchableOpacity>
+                  {/* Action Buttons: Post Owner CANNOT see buyer/request action buttons */}
+                  {isDealOwner ? (
+                    <View
+                      style={[
+                        styles.ownerBadge,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(16, 185, 129, 0.12)"
+                            : "#ECFDF5",
+                          borderColor: isDark
+                            ? "rgba(16, 185, 129, 0.35)"
+                            : "#A7F3D0",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={14}
+                        color="#10B981"
+                      />
+                      <Text style={styles.ownerBadgeText}>Your Listing</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.actionBtnsRow}>
+                      <TouchableOpacity
+                        style={[styles.callBtn, { borderColor: "#10B981" }]}
+                        onPress={() =>
+                          Alert.alert(
+                            "Calling Seller",
+                            `Connecting to ${deal.sellerName} at ${deal.sellerPhone}...`,
+                          )
+                        }
+                      >
+                        <Ionicons name="call" size={13} color="#10B981" />
+                        <Text
+                          style={[styles.callBtnText, { color: "#10B981" }]}
+                        >
+                          Call
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.chatBtn, { borderColor: "#F59E0B" }]}
+                        onPress={() => router.push("/(tabs)/chats")}
+                      >
+                        <Ionicons
+                          name="chatbubble-ellipses"
+                          size={13}
+                          color="#D97706"
+                        />
+                        <Text
+                          style={[styles.chatBtnText, { color: "#D97706" }]}
+                        >
+                          Chat
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.offerBtn}
+                        onPress={() => {
+                          setSelectedDealForAction(deal);
+                          setOfferPrice(deal.price);
+                        }}
+                      >
+                        <Text style={styles.offerBtnText}>⚡ Make Offer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -1588,6 +1672,20 @@ const styles = StyleSheet.create({
   },
   ratingVal: {
     fontSize: 11,
+  },
+  ownerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  ownerBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#10B981",
   },
   actionBtnsRow: {
     flexDirection: "row",
