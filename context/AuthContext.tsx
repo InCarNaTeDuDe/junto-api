@@ -65,6 +65,7 @@ export interface UserData {
   rating: number;
   walletBalance: number;
   jwtToken: string;
+  userHandle: string;
 }
 
 type AuthContextValue = {

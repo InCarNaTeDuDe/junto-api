@@ -174,7 +174,7 @@ export default function ProfileScreen() {
 
   // Settings toggles
   const [pushNotifs, setPushNotifs] = useState(true);
-  const [emailNotifs, setEmailNotifs] = useState(false);
+  // const [emailNotifs, setEmailNotifs] = useState(false);
   const [privateProfile, setPrivateProfile] = useState(false);
   const [twoFactor, setTwoFactor] = useState(true);
 
@@ -184,27 +184,6 @@ export default function ProfileScreen() {
     selectedLocation?.city ||
     state.currentUser?.location ||
     "Koramangala, Bengaluru";
-
-  const rawHandle =
-    apiUser?.userHandle ||
-    (user as any)?.userHandle ||
-    (state.currentUser as any)?.userHandle ||
-    apiUser?.handle ||
-    (user as any)?.handle;
-
-  const userHandle = rawHandle
-    ? rawHandle.startsWith("@")
-      ? rawHandle
-      : `@${rawHandle}`
-    : `@${(
-        apiUser?.name ||
-        user?.name ||
-        state.currentUser?.name ||
-        user?.email?.split("@")[0] ||
-        "user"
-      )
-        .toLowerCase()
-        .replace(/\s+/g, "_")}`;
 
   const userBio =
     apiUser?.bio ||
@@ -495,7 +474,7 @@ export default function ProfileScreen() {
               </View>
 
               {/* Handle */}
-              <Text style={s.handleText}>{userHandle}</Text>
+              <Text style={s.handleText}>{user?.userHandle || ""}</Text>
 
               {/* Location Row */}
               <View style={s.locationRow}>
