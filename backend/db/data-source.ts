@@ -14,8 +14,6 @@ import { LocalDeal } from "../entities/LocalDeals.entity";
 import { LocalService } from "../entities/LocalServices.entity";
 import { SupportChat } from "../entities/SupportChat.entity";
 
-// import { inMemoryStore } from "../db"; // <-- adjust path if needed
-
 export let isConnectedToPostgres = false;
 
 export const AppDataSource = new DataSource({
@@ -68,41 +66,8 @@ export async function initializeDatabase() {
     isConnectedToPostgres = true;
 
     console.log("TypeORM: Successfully connected to PostgreSQL.");
-
-    // const userRepo = AppDataSource.getRepository(User);
-
-    // if ((await userRepo.count()) === 0) {
-    //   console.log("TypeORM: Seeding initial mock data...");
-
-    //   await userRepo.save(inMemoryStore.users);
-
-    //   await AppDataSource.getRepository(Activity).save(
-    //     inMemoryStore.activities,
-    //   );
-
-    //   await AppDataSource.getRepository(Ticket).save(inMemoryStore.tickets);
-
-    //   await AppDataSource.getRepository(Message).save(inMemoryStore.messages);
-
-    //   await AppDataSource.getRepository(Notification).save(
-    //     inMemoryStore.notifications,
-    //   );
-
-    //   await AppDataSource.getRepository(DeviceSession).save(
-    //     inMemoryStore.devices,
-    //   );
-
-    //   await AppDataSource.getRepository(LoginHistory).save(
-    //     inMemoryStore.loginHistories,
-    //   );
-
-    //   await AppDataSource.getRepository(AuditLog).save(inMemoryStore.auditLogs);
-    // }
   } catch (err) {
-    console.error(
-      "TypeORM: Failed to connect. Falling back to in-memory database.",
-      err,
-    );
+    console.error("TypeORM: Failed to connect..", err);
 
     isConnectedToPostgres = false;
   }

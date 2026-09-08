@@ -1,4 +1,5 @@
 import { User } from "../entities/User.entity";
+import { LocalService } from "../entities/LocalServices.entity";
 import {
   CreateServiceProInput,
   QueryServicesInput,
@@ -7,6 +8,7 @@ import {
 } from "./localservices.schema";
 import { io } from "../socket/socket";
 import { sendExpoPushNotification } from "../notifications/notifications.service";
+import { localServicesRepository } from "../repositories/LocalServices.repository";
 
 export interface ServiceProRecord {
   id: string;
@@ -43,12 +45,13 @@ export interface ServiceBookingRecord {
   updatedAt: string;
 }
 
-let serviceProsStore: ServiceProRecord[] = [];
-
 let bookingsStore: ServiceBookingRecord[] = [];
 
-export async function listServicePros(query: QueryServicesInput) {
-  let result = [...serviceProsStore];
+export async function listServicePros(
+  query: QueryServicesInput,
+): Promise<ServiceProRecord[]> {
+  const dbRecords = await localServicesRepository.findAllServices();
+  let result = dbRecords.map((item) => localServicesRepository.toRecord(item));
 
   if (query.category && query.category !== "all") {
     const catLower = query.category.toLowerCase();
@@ -86,36 +89,49 @@ export async function listServicePros(query: QueryServicesInput) {
 export async function getServiceProById(
   id: string,
 ): Promise<ServiceProRecord | null> {
-  return serviceProsStore.find((p) => p.id === id) || null;
+  const entity = await localServicesRepository.findById(id);
+  return entity ? localServicesRepository.toRecord(entity) : null;
 }
 
 export async function createServicePro(
   input: CreateServiceProInput,
   user?: User | any,
 ): Promise<ServiceProRecord> {
-  const newPro: ServiceProRecord = {
-    id: `pro_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    name: input.name,
+  // Parse numeric price from rate string if available (e.g. "From ₹150 visit" -> 150)
+  const priceMatch = (input.rate || "").match(/\d+/);
+  const numericPrice = priceMatch ? parseFloat(priceMatch[0]) : undefined;
+
+  // Insert into DB entity (local_services table via LocalServicesRepository)
+  const savedEntity = await localServicesRepository.createService({
+    providerId: user?.id || undefined,
+    title: input.name,
     category: input.category,
+    description:
+      input.description || `Expert ${input.category} doorstep service`,
+    price: numericPrice,
+    locationName: input.distance || "Near you",
+    latitude: input.latitude,
+    longitude: input.longitude,
+    phone: input.phone,
+    experience: input.experience || "3+ yrs exp",
+    rate: input.rate || "From ₹150 visit",
+    avatarBg: input.avatarBg || "#EA580C",
     categoryIcon: input.categoryIcon || "construct",
+    availableToday: input.availableToday ?? true,
+    verified: input.verified ?? true,
     rating: 5.0,
     reviewsCount: 1,
-    experience: input.experience || "3+ yrs exp",
-    distance: input.distance || "Near you",
-    rate: input.rate || "From ₹150 visit",
-    verified: input.verified ?? true,
-    avatarBg: input.avatarBg || "#EA580C",
-    phone: input.phone,
-    description: input.description,
-    availableToday: input.availableToday ?? true,
-    createdAt: new Date().toISOString(),
-  };
+  });
 
-  serviceProsStore.unshift(newPro);
+  const newPro = localServicesRepository.toRecord(savedEntity);
+  console.log(`[LocalServices] Saved technician into DB with ID: ${newPro.id}`);
 
   if (io) {
     io.emit("service_pro_created", newPro);
-    io.emit("service_pros_updated", serviceProsStore);
+    const allPros = (await localServicesRepository.findAllServices()).map((p) =>
+      localServicesRepository.toRecord(p),
+    );
+    io.emit("service_pros_updated", allPros);
   }
 
   return newPro;
@@ -126,7 +142,7 @@ export async function bookService(
   input: BookServiceInput,
   user?: User | any,
 ): Promise<ServiceBookingRecord> {
-  const pro = serviceProsStore.find((p) => p.id === serviceProId);
+  const pro = await getServiceProById(serviceProId);
   if (!pro) {
     throw new Error("Service provider not found");
   }

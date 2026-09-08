@@ -16,14 +16,15 @@ export class LocalService {
   id!: string;
 
   @Index()
-  @Column({ type: "uuid" })
-  providerId!: string;
+  @Column({ type: "uuid", nullable: true })
+  providerId?: string;
 
   @ManyToOne(() => User, {
     onDelete: "CASCADE",
+    nullable: true,
   })
   @JoinColumn({ name: "providerId" })
-  provider!: User;
+  provider?: User;
 
   @Column({ type: "varchar" })
   title!: string;
@@ -55,6 +56,33 @@ export class LocalService {
     nullable: true,
   })
   longitude?: number;
+
+  @Column({ type: "varchar", nullable: true })
+  phone?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  experience?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  rate?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  avatarBg?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  categoryIcon?: string;
+
+  @Column({ type: "boolean", default: true })
+  availableToday?: boolean;
+
+  @Column({ type: "boolean", default: true })
+  verified?: boolean;
+
+  @Column({ type: "decimal", precision: 3, scale: 1, default: 5.0 })
+  rating?: number;
+
+  @Column({ type: "int", default: 1 })
+  reviewsCount?: number;
 
   @CreateDateColumn()
   createdAt!: Date;

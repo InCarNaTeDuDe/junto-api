@@ -17,12 +17,12 @@ import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
-// Authenticated local services read endpoints
+// Local services read endpoints (accessible to guests and authenticated users)
 router.get("/", authenticate, listServiceProsHandler);
 router.get("/bookings", authenticate, listBookingsHandler);
 router.get("/:id", authenticate, getServiceProByIdHandler);
 
-// Create pro & booking endpoints
+// Create pro & booking endpoints (supports both authenticated users and guests)
 router.post(
   "/",
   authenticate,
