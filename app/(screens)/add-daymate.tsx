@@ -568,7 +568,6 @@ const createStyles = (t: any) => {
 
 const DayMatesForm: React.FC<DayMatesFormProps> = ({
   colors: propColors,
-  selectedLocation: propLocation = "Koramangala, Bengaluru",
   onSubmitSuccess,
   onBack,
   onClose,
@@ -580,14 +579,13 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   const { styles, isDark, primary, text, sub } = theme;
 
   const { selectedLocation: contextLocation } = useLocation();
-  const currentLocation =
-    propLocation || contextLocation || "Koramangala, Bengaluru";
+  console.log("hii", useLocation());
+
+  const currentLocation = `${contextLocation?.name}, ${contextLocation?.state}`;
   const currentLocationName =
     typeof currentLocation === "string"
       ? currentLocation
-      : (currentLocation as any)?.name ||
-        (currentLocation as any)?.address ||
-        "Koramangala, Bengaluru";
+      : (currentLocation as any)?.name || (currentLocation as any)?.address;
 
   const handleBack = () => {
     if (onBack) {
@@ -614,29 +612,6 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
   /* Modals */
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleTimeSelect = (id: string) => {
-    setSelectedTimeId(id);
-    const now = new Date();
-    if (id === "today") {
-      setMeetingDate(now);
-      setShowDatePicker(false);
-    } else if (id === "tomorrow") {
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setMeetingDate(tomorrow);
-      setShowDatePicker(false);
-    } else if (id === "weekend") {
-      const weekend = new Date(now);
-      const day = weekend.getDay();
-      const diff = day === 0 ? 0 : 6 - day;
-      weekend.setDate(weekend.getDate() + diff);
-      setMeetingDate(weekend);
-      setShowDatePicker(false);
-    } else if (id === "pick_date") {
-      setShowDatePicker(true);
-    }
-  };
 
   const onDateChange = (_: any, selectedDate?: Date) => {
     if (Platform.OS !== "web") setShowDatePicker(false);
@@ -697,11 +672,7 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
         type: "DAY_MATES",
       };
 
-      try {
-        await ApiService.post("/api/activity", payload);
-      } catch (e) {
-        console.log("failed to add day mate", e);
-      }
+      await ApiService.post("/api/activity", payload);
 
       const msg = `🎉 Great! Searching for ${matesNeeded} ${selectedActivity.label} nearby!`;
       if (typeof window !== "undefined" && window.alert) {

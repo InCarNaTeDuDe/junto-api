@@ -92,37 +92,38 @@ export async function createActivity(
 
   if (io) {
     io.to(`user:${organizer.id}`).emit("push_notification", {
-      title: orgTitle,
+      // title: orgTitle,
       message: orgMsg,
-      type: "activity",
-      activityId: activity.id,
+      // type: "activity",
+      // activityId: activity.id,
       timestamp: new Date().toISOString(),
       ...notifDetails,
       data: notifDetails,
     });
   }
 
-  sendExpoPushNotification(organizer.id, orgTitle, orgMsg, {
-    ...notifDetails,
-    type: "activity",
-    activityId: activity.id,
-  }).catch((e) => console.error("Error sending push to organizer:", e));
+  // sendExpoPushNotfication - is for sending to owner who posted
+  // sendExpoPushNotification(organizer.id, orgTitle, orgMsg, {
+  //   ...notifDetails,
+  //   type: "activity",
+  //   activityId: activity.id,
+  // }).catch((e) => console.error("Error sending push to organizer:", e));
 
   // 2. Broadcast push notification and in-app notifications to ALL other users in the database
-  const emoji = body.activityEmoji || "✨";
-  const broadcastTitle = `${emoji} New Activity Nearby: ${body.activity}`;
-  const broadcastMsg = `${organizer.name || "A neighbor"} in ${activity.locationName} is looking for ${body.matesNeeded || "mates"} to join!`;
+  // const emoji = body.activityEmoji || "✨";
+  // const broadcastTitle = `${emoji} New Activity Nearby: ${body.activity}`;
+  // const broadcastMsg = `${organizer.name || "A neighbor"} in ${activity.locationName} is looking for ${body.matesNeeded || "mates"} to join!`;
 
-  await broadcastExpoPushNotification(
-    broadcastTitle,
-    broadcastMsg,
-    {
-      ...notifDetails,
-      type: "activity",
-      activityId: activity.id,
-    },
-    organizer.id,
-  );
+  // await broadcastExpoPushNotification(
+  //   broadcastTitle,
+  //   broadcastMsg,
+  //   {
+  //     ...notifDetails,
+  //     type: "activity",
+  //     activityId: activity.id,
+  //   },
+  //   organizer.id,
+  // );
 
   return activity;
 }

@@ -573,7 +573,13 @@ const UserFeedRow = ({ item, s, C }) => {
         </View>
 
         <Text
-          style={[s.feedRight, { color: item.rightColor, textAlign: "right" }]}
+          style={[
+            s.feedRight,
+            {
+              color: item.rightColor || item.rightSubColor,
+              textAlign: "right",
+            },
+          ]}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
