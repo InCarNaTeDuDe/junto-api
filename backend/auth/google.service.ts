@@ -6,6 +6,8 @@ export interface GoogleUser {
   name: string;
   picture: string;
   emailVerified: boolean;
+  given_name: string;
+  family_name: string;
 }
 
 export async function verifyGoogleToken(idToken: string): Promise<GoogleUser> {
@@ -47,5 +49,7 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleUser> {
     name: payload.name ?? "",
     picture: payload.picture ?? "",
     emailVerified: payload.email_verified,
+    given_name: payload.given_name ?? "",
+    family_name: payload.family_name ?? "",
   };
 }

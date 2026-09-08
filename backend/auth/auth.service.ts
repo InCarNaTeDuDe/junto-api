@@ -10,7 +10,40 @@ import { generateAccessToken } from "./jwt.service";
 import { userRepository } from "../repositories/User.repository";
 import { activityRepository } from "../repositories/Activity.repository";
 import { ticketRepository } from "../repositories/Ticket.repository";
+import { Repository } from "typeorm";
 
+async function generateUniqueUserHandle(
+  givenName: string,
+  familyName: string,
+  userRepo: Repository<User>,
+): Promise<string> {
+  const baseHandle = `${givenName}${familyName}`
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
+
+  let userHandle = baseHandle;
+
+  const existing = await userRepo.findOne({
+    where: { userHandle },
+  });
+
+  if (!existing) {
+    return userHandle;
+  }
+
+  while (true) {
+    const suffix = Math.floor(1000 + Math.random() * 9000);
+    userHandle = `${baseHandle}${suffix}`;
+
+    const exists = await userRepo.findOne({
+      where: { userHandle },
+    });
+
+    if (!exists) {
+      return userHandle;
+    }
+  }
+}
 export async function loginWithGoogle(
   request: GoogleLoginSchema,
   ipAddress: string,
@@ -35,10 +68,11 @@ export async function loginWithGoogle(
       console.log("User from db", user);
 
       if (!user) {
-        const userHandle =
-          `${googleUser.name.split(" ")[0]}_${googleUser.email.split("@")[0]}`
-            .toLowerCase()
-            .replace(/[^a-z0-9_]/g, "");
+        const userHandle = await generateUniqueUserHandle(
+          googleUser.given_name,
+          googleUser.family_name ?? "",
+          userRepo,
+        );
 
         user = userRepo.create({
           email: googleUser.email,
