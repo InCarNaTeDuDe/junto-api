@@ -26,7 +26,7 @@ interface FeatureItem {
   subtitle: string;
   description?: string;
   badge?: string;
-  category?: "social" | "market" | "help" | "travel";
+  category?: "beauty" | "repairs" | "social" | "market" | "help" | "travel";
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   bg: string;
@@ -410,18 +410,67 @@ const AnimatedFeatureIcon: React.FC<AnimatedFeatureIconProps> = ({
 };
 
 const ALL_FEATURES: FeatureItem[] = [
+  // 💄 Dedicated GlamUp & Beauty (Separate from Fix & Repair!)
   {
-    id: "ineedthis",
-    name: "I Need This",
-    subtitle: "Universal AI Router",
+    id: "glamup",
+    name: "GlamUp ✨",
+    subtitle: "Doorstep salon & makeup",
     description:
-      "Don't decide menus. Type or speak what you need and JUNTO routes you automatically.",
-    badge: "AI 🎯",
-    category: "help",
+      "Certified bridal makeup artists, hair styling, facials, waxing, mehendi & nail art at your home.",
+    badge: "Doorstep",
+    category: "beauty",
     icon: "sparkles",
-    color: "#6366F1",
-    bg: "#EEF2FF",
+    color: "#EC4899",
+    bg: "#FDF2F8",
+    route: "/(screens)/glamup",
+    query: "glam",
   },
+
+  // 🔧 Fix & Home Services (Purely Technical, Maintenance & Domestic)
+  {
+    id: "services",
+    name: "Fix & Repair",
+    subtitle: "Electrician, plumber & AC",
+    description:
+      "Connect with verified local electricians, plumbers, AC technicians, refrigerator & washing machine mechanics.",
+    badge: "Technicians",
+    category: "repairs",
+    icon: "construct",
+    color: "#EA580C",
+    bg: "#FFF7ED",
+    route: "/(screens)/services?cluster=fix",
+    query: "service",
+  },
+  {
+    id: "homehelp",
+    name: "Home Help",
+    subtitle: "Cleaning, cooks, maids",
+    description:
+      "Book deep cleaning, cooks, temporary maids, movers & herbal pest control solutions.",
+    badge: "Home",
+    category: "repairs",
+    icon: "home",
+    color: "#10B981",
+    bg: "#ECFDF5",
+    route: "/(screens)/services?cluster=home",
+    query: "home",
+  },
+  {
+    id: "autohelp",
+    name: "Auto Help",
+    subtitle: "Puncture, battery & wash",
+    description:
+      "On-spot puncture repair, car wash, battery jumpstart & 24x7 roadside assistance.",
+    badge: "24x7",
+    category: "repairs",
+    icon: "car-sport",
+    color: "#2563EB",
+    bg: "#EFF6FF",
+    route: "/(screens)/services?cluster=auto",
+    query: "auto",
+  },
+
+  // 👥 DayMates & Social
   {
     id: "daymate",
     name: "DayMates",
@@ -431,11 +480,54 @@ const ALL_FEATURES: FeatureItem[] = [
     badge: "Popular",
     category: "social",
     icon: "people",
-    color: "#2563EB",
+    color: "#3B82F6",
     bg: "#EFF6FF",
     route: "/(screens)/add-daymate",
     query: "mates",
   },
+  {
+    id: "hostevent",
+    name: "Host an Event",
+    subtitle: "Create activities",
+    description:
+      "Organize turf games, pub crawls, board game nights, or social mixers.",
+    badge: "Create",
+    category: "social",
+    icon: "calendar",
+    color: "#9333EA",
+    bg: "#FAF5FF",
+    route: "/(tabs)/create",
+    query: "create",
+  },
+  {
+    id: "activitychats",
+    name: "Activity Chats",
+    subtitle: "Community rooms",
+    description:
+      "Join real-time discussions for your favorite local activities.",
+    category: "social",
+    icon: "chatbubbles",
+    color: "#0284C7",
+    bg: "#E0F2FE",
+    route: "/(tabs)/chats",
+    query: "chats",
+  },
+  {
+    id: "newhere",
+    name: "New to City?",
+    subtitle: "Guides & Community",
+    description:
+      "Essential local guides, top areas, meetup groups, and insider advice.",
+    badge: "Guide",
+    category: "social",
+    icon: "compass",
+    color: "#06B6D4",
+    bg: "#ECFEFF",
+    route: "/(screens)/new-here",
+    query: "new",
+  },
+
+  // 🎟️ Tickets & Deals
   {
     id: "ticketswap",
     name: "Ticket Swap",
@@ -445,25 +537,26 @@ const ALL_FEATURES: FeatureItem[] = [
     badge: "Hot",
     category: "market",
     icon: "ticket",
-    color: "#EA580C",
+    color: "#F97316",
     bg: "#FFF7ED",
     route: "/(screens)/add-ticket",
     query: "ticket",
   },
   {
-    id: "asknearby",
-    name: "Ask Nearby",
-    subtitle: "Local Q&A & Advice",
+    id: "deals",
+    name: "Local Deals",
+    subtitle: "Buy / Sell nearby",
     description:
-      "Ask locals about real-time crowds, entry fees, parking, or recommendations.",
-    badge: "Live",
-    category: "help",
-    icon: "megaphone",
-    color: "#E11D48",
-    bg: "#FFE4E6",
-    route: "/(screens)/ask-nearby",
-    query: "ask",
+      "Sell your cycle, mobile, electronics or furniture with 1-tap voice assist.",
+    category: "market",
+    icon: "pricetag",
+    color: "#F59E0B",
+    bg: "#FEF3C7",
+    route: "/(screens)/deals",
+    query: "deals",
   },
+
+  // 🚗 Travel & Exploration
   {
     id: "ridemate",
     name: "RideMate",
@@ -489,72 +582,33 @@ const ALL_FEATURES: FeatureItem[] = [
     route: "/(screens)/location-search",
     query: "roam",
   },
+
+  // 💬 Ask & Assist
   {
-    id: "services",
-    name: "Local Services",
-    subtitle: "Find local experts",
+    id: "ineedthis",
+    name: "I Need This",
+    subtitle: "Universal AI Router",
     description:
-      "Connect with verified local technicians, trainers, and service pros.",
-    category: "market",
-    icon: "construct",
-    color: "#CA8A04",
-    bg: "#FEFCE8",
-    route: "/(screens)/services",
-    query: "service",
-  },
-  {
-    id: "hostevent",
-    name: "Host an Event",
-    subtitle: "Create activities",
-    description:
-      "Organize turf games, pub crawls, board game nights, or social mixers.",
-    badge: "Create",
-    category: "social",
+      "Don't decide menus. Type or speak what you need and JUNTO routes you automatically.",
+    badge: "AI 🎯",
+    category: "help",
     icon: "sparkles",
-    color: "#9333EA",
-    bg: "#FAF5FF",
-    route: "/(tabs)/create",
-    query: "create",
+    color: "#6366F1",
+    bg: "#EEF2FF",
   },
   {
-    id: "deals",
-    name: "Local Deals",
-    subtitle: "Buy / Sell nearby",
+    id: "asknearby",
+    name: "Ask Nearby",
+    subtitle: "Local Q&A & Advice",
     description:
-      "Sell your cycle, mobile, electronics or furniture with 1-tap voice assist.",
-    category: "market",
-    icon: "pricetag",
-    color: "#F59E0B",
-    bg: "#FEF3C7",
-    route: "/(screens)/deals",
-    query: "deals",
-  },
-  {
-    id: "newhere",
-    name: "New to City?",
-    subtitle: "Guides & Community",
-    description:
-      "Essential local guides, top areas, meetup groups, and insider advice.",
-    badge: "Guide",
-    category: "social",
-    icon: "compass",
-    color: "#06B6D4",
-    bg: "#ECFEFF",
-    route: "/(screens)/new-here",
-    query: "new",
-  },
-  {
-    id: "activitychats",
-    name: "Activity Chats",
-    subtitle: "Community rooms",
-    description:
-      "Join real-time discussions for your favorite local activities.",
-    category: "social",
-    icon: "chatbubbles",
-    color: "#0284C7",
-    bg: "#E0F2FE",
-    route: "/(tabs)/chats",
-    query: "chats",
+      "Ask locals about real-time crowds, entry fees, parking, or recommendations.",
+    badge: "Live",
+    category: "help",
+    icon: "megaphone",
+    color: "#E11D48",
+    bg: "#FFE4E6",
+    route: "/(screens)/ask-nearby",
+    query: "ask",
   },
 ];
 
@@ -568,9 +622,59 @@ const ROW_FEATURES: FeatureItem[] = [
     bg: "#EEF2FF",
   },
   {
+    id: "glamup",
+    name: "GlamUp ✨",
+    subtitle: "Doorstep salon",
+    icon: "sparkles",
+    color: "#EC4899",
+    bg: "#FDF2F8",
+    route: "/(screens)/glamup",
+    query: "glam",
+  },
+  {
+    id: "services",
+    name: "Fix & Repair",
+    subtitle: "Electrician, AC",
+    icon: "construct",
+    color: "#EA580C",
+    bg: "#FFEDD5",
+    route: "/(screens)/services?cluster=fix",
+    query: "service",
+  },
+  {
+    id: "homehelp",
+    name: "Home Help",
+    subtitle: "Cleaning, cooks",
+    icon: "home",
+    color: "#10B981",
+    bg: "#ECFDF5",
+    route: "/(screens)/services?cluster=home",
+    query: "home",
+  },
+  {
+    id: "daymate",
+    name: "DayMates",
+    subtitle: "Meet buddies",
+    icon: "people",
+    color: "#3B82F6",
+    bg: "#EFF6FF",
+    route: "/(screens)/add-daymate",
+    query: "mates",
+  },
+  {
+    id: "ticketswap",
+    name: "Ticket Swap",
+    subtitle: "Buy / Sell",
+    icon: "ticket",
+    color: "#F97316",
+    bg: "#FFF7ED",
+    route: "/(screens)/add-ticket",
+    query: "ticket",
+  },
+  {
     id: "ridemate",
     name: "RideMate",
-    subtitle: "Share a ride",
+    subtitle: "Carpool rides",
     icon: "car",
     color: "#7C3AED",
     bg: "#EDE9FE",
@@ -578,49 +682,9 @@ const ROW_FEATURES: FeatureItem[] = [
     query: "ride",
   },
   {
-    id: "services",
-    name: "Services",
-    subtitle: "Find experts",
-    icon: "construct",
-    color: "#EA580C",
-    bg: "#FFEDD5",
-    route: "/(screens)/services",
-    query: "service",
-  },
-  {
-    id: "helpme",
-    name: "HelpMe",
-    subtitle: "Get help nearby",
-    icon: "heart",
-    color: "#E11D48",
-    bg: "#FFE4E6",
-    route: "/(screens)/ask-nearby",
-    query: "help",
-  },
-  {
-    id: "deals",
-    name: "Local Deals",
-    subtitle: "Buy / Sell nearby",
-    icon: "pricetag",
-    color: "#F59E0B",
-    bg: "#FEF3C7",
-    route: "/(screens)/deals",
-    query: "deals",
-  },
-  {
-    id: "roam",
-    name: "Roam",
-    subtitle: "I'm in a new place",
-    icon: "location",
-    color: "#059669",
-    bg: "#D1FAE5",
-    route: "/(screens)/location-search",
-    query: "roam",
-  },
-  {
     id: "all",
     name: "All",
-    subtitle: "View more",
+    subtitle: "Full menu",
     icon: "grid",
     color: "#2563EB",
     bg: "#E0F2FE",
@@ -776,57 +840,65 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
             </View>
 
             {/* Category filter tabs */}
-            <View style={styles.categoryTabs}>
-              {[
-                { id: "all", label: "All Features" },
-                { id: "social", label: "DayMates & Social" },
-                { id: "market", label: "Ticket Swap & Deals" },
-                { id: "help", label: "Ask & Help" },
-                { id: "travel", label: "Rides & Roam" },
-              ].map((tab) => {
-                const active = selectedCategory === tab.id;
-                return (
-                  <Pressable
-                    key={tab.id}
-                    onPress={() => setSelectedCategory(tab.id)}
-                    style={[
-                      styles.categoryTab,
-                      {
-                        backgroundColor: active
-                          ? isDark
-                            ? "#38BDF820"
-                            : "#EDE9FE"
-                          : isDark
-                            ? "#1E293B60"
-                            : "#F8FAFC",
-                        borderColor: active
-                          ? isDark
-                            ? "#38BDF8"
-                            : "#8B5CF6"
-                          : isDark
-                            ? "#334155"
-                            : "#E2E8F0",
-                      },
-                    ]}
-                  >
-                    <Text
+            <View style={styles.categoryTabsContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryTabsScroll}
+              >
+                {[
+                  { id: "all", label: "All Features", emoji: "⚡" },
+                  { id: "beauty", label: "GlamUp ✨", emoji: "💄" },
+                  { id: "repairs", label: "Fix & Home", emoji: "🔧" },
+                  { id: "social", label: "DayMates & Social", emoji: "👥" },
+                  { id: "market", label: "Tickets & Deals", emoji: "🎟️" },
+                  { id: "travel", label: "Rides & Roam", emoji: "🚗" },
+                  { id: "help", label: "Ask & Help", emoji: "💬" },
+                ].map((tab) => {
+                  const active = selectedCategory === tab.id;
+                  return (
+                    <Pressable
+                      key={tab.id}
+                      onPress={() => setSelectedCategory(tab.id)}
                       style={[
-                        styles.categoryTabText,
+                        styles.categoryTab,
                         {
-                          color: active
+                          backgroundColor: active
+                            ? isDark
+                              ? "#38BDF825"
+                              : "#EDE9FE"
+                            : isDark
+                              ? "#1E293B"
+                              : "#F8FAFC",
+                          borderColor: active
                             ? isDark
                               ? "#38BDF8"
-                              : "#7C3AED"
-                            : modalSub,
-                          fontWeight: active ? "700" : "500",
+                              : "#8B5CF6"
+                            : isDark
+                              ? "#334155"
+                              : "#E2E8F0",
                         },
                       ]}
                     >
-                      {tab.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                      <Text
+                        style={[
+                          styles.categoryTabText,
+                          {
+                            color: active
+                              ? isDark
+                                ? "#38BDF8"
+                                : "#7C3AED"
+                              : modalSub,
+                            fontWeight: active ? "700" : "500",
+                          },
+                        ]}
+                      >
+                        {tab.emoji} {tab.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
 
             {/* Features List */}
@@ -1004,6 +1076,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  categoryTabsContainer: {
+    marginBottom: 14,
+  },
+  categoryTabsScroll: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
   categoryTabs: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1012,13 +1093,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   categoryTab: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     borderWidth: 1,
   },
   categoryTabText: {
-    fontSize: 11.5,
+    fontSize: 12,
   },
   featureGrid: {
     flexDirection: "row",

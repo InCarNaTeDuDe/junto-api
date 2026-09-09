@@ -1,5 +1,4 @@
 import { User } from "../entities/User.entity";
-import { LocalService } from "../entities/LocalServices.entity";
 import {
   CreateServiceProInput,
   QueryServicesInput,
@@ -53,16 +52,156 @@ export async function listServicePros(
   const dbRecords = await localServicesRepository.findAllServices();
   let result = dbRecords.map((item) => localServicesRepository.toRecord(item));
 
+  const clusterParam = (query.cluster || "").toLowerCase().trim();
+  if (clusterParam && clusterParam !== "all") {
+    if (clusterParam === "fix" || clusterParam === "fix & repair") {
+      const fixCats = [
+        "electrician",
+        "plumber",
+        "carpenter",
+        "ac",
+        "washing",
+        "refrigerator",
+        "tv",
+        "motor",
+        "bike",
+        "car",
+      ];
+      result = result.filter((p) =>
+        fixCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    } else if (
+      clusterParam === "glam" ||
+      clusterParam === "glamup" ||
+      clusterParam === "beauty"
+    ) {
+      const glamCats = [
+        "makeup",
+        "bridal",
+        "party",
+        "eyebrow",
+        "threading",
+        "hair",
+        "facial",
+        "waxing",
+        "mehendi",
+        "saree",
+        "nail",
+        "beauty",
+      ];
+      result = result.filter(
+        (p) =>
+          glamCats.some((c) => p.category.toLowerCase().includes(c)) ||
+          (p.description && p.description.includes("GlamUp")),
+      );
+    } else if (clusterParam === "home" || clusterParam === "home help") {
+      const homeCats = [
+        "clean",
+        "cook",
+        "maid",
+        "moving",
+        "packing",
+        "pest",
+        "tiffin",
+      ];
+      result = result.filter((p) =>
+        homeCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    } else if (clusterParam === "auto" || clusterParam === "auto help") {
+      const autoCats = [
+        "bike",
+        "car",
+        "puncture",
+        "battery",
+        "wash",
+        "roadside",
+        "mechanic",
+      ];
+      result = result.filter((p) =>
+        autoCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    }
+  }
+
   if (query.category && query.category !== "all") {
-    const catLower = query.category.toLowerCase();
-    result = result.filter(
-      (p) =>
-        p.category.toLowerCase().includes(catLower) ||
-        (catLower === "ac" && p.category.toLowerCase().includes("ac")) ||
-        (catLower === "mechanic" &&
-          p.category.toLowerCase().includes("bike")) ||
-        (catLower === "cleaning" && p.category.toLowerCase().includes("clean")),
-    );
+    const catLower = query.category.toLowerCase().trim();
+    if (catLower === "fix" || catLower === "fix & repair") {
+      const fixCats = [
+        "electrician",
+        "plumber",
+        "carpenter",
+        "ac",
+        "washing",
+        "refrigerator",
+        "tv",
+        "motor",
+        "bike",
+        "car",
+      ];
+      result = result.filter((p) =>
+        fixCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    } else if (
+      catLower === "glam" ||
+      catLower === "glamup" ||
+      catLower === "beauty"
+    ) {
+      const glamCats = [
+        "makeup",
+        "bridal",
+        "party",
+        "eyebrow",
+        "threading",
+        "hair",
+        "facial",
+        "waxing",
+        "mehendi",
+        "saree",
+        "nail",
+        "beauty",
+      ];
+      result = result.filter(
+        (p) =>
+          glamCats.some((c) => p.category.toLowerCase().includes(c)) ||
+          (p.description && p.description.includes("GlamUp")),
+      );
+    } else if (catLower === "home" || catLower === "home help") {
+      const homeCats = [
+        "clean",
+        "cook",
+        "maid",
+        "moving",
+        "packing",
+        "pest",
+        "tiffin",
+      ];
+      result = result.filter((p) =>
+        homeCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    } else if (catLower === "auto" || catLower === "auto help") {
+      const autoCats = [
+        "bike",
+        "car",
+        "puncture",
+        "battery",
+        "wash",
+        "roadside",
+        "mechanic",
+      ];
+      result = result.filter((p) =>
+        autoCats.some((c) => p.category.toLowerCase().includes(c)),
+      );
+    } else {
+      result = result.filter(
+        (p) =>
+          p.category.toLowerCase().includes(catLower) ||
+          (catLower === "ac" && p.category.toLowerCase().includes("ac")) ||
+          (catLower === "mechanic" &&
+            p.category.toLowerCase().includes("bike")) ||
+          (catLower === "cleaning" &&
+            p.category.toLowerCase().includes("clean")),
+      );
+    }
   }
 
   if (query.search) {

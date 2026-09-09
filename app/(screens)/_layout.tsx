@@ -13,6 +13,7 @@ export default function ScreensLayout() {
       <Stack.Screen name="rides" options={{ headerShown: false }} />
       <Stack.Screen name="ask-nearby" options={{ headerShown: false }} />
       <Stack.Screen name="services" options={{ headerShown: false }} />
+      <Stack.Screen name="glamup" options={{ headerShown: false }} />
       <Stack.Screen name="deals" options={{ headerShown: false }} />
       <Stack.Screen name="add-daymate" options={{ headerShown: false }} />
       <Stack.Screen name="new-here" options={{ headerShown: false }} />

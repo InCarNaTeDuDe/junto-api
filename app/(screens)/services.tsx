@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -26,10 +26,35 @@ import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 
+export type ServiceClusterId = "all" | "fix" | "glam" | "home" | "auto";
+
+export interface ServiceClusterConfig {
+  id: ServiceClusterId;
+  name: string;
+  emoji: string;
+  tagline: string;
+  bannerTitle?: string;
+  bannerSub?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  badgeBg: string;
+  cardBgLight: string;
+  cardBgDark: string;
+}
+
+export interface ServiceCategoryConfig {
+  id: string;
+  name: string;
+  cluster: "fix" | "glam" | "home" | "auto";
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}
+
 export interface ServicePro {
   id: string;
   name: string;
   category: string;
+  cluster?: "fix" | "glam" | "home" | "auto";
   categoryIcon: keyof typeof Ionicons.glyphMap;
   rating: number;
   reviewsCount: number;
@@ -43,46 +68,326 @@ export interface ServicePro {
   availableToday?: boolean;
 }
 
-const CATEGORIES = [
-  { id: "all", name: "All", icon: "grid" as const, color: "#2563EB" },
+export const SERVICE_CLUSTERS: ServiceClusterConfig[] = [
+  {
+    id: "all",
+    name: "All Repairs",
+    emoji: "⚡",
+    tagline: "Browse all verified doorstep technicians & home helpers",
+    icon: "grid",
+    color: "#7C3AED",
+    badgeBg: "#EDE9FE",
+    cardBgLight: "#F5F3FF",
+    cardBgDark: "rgba(124, 58, 237, 0.15)",
+  },
+  {
+    id: "fix",
+    name: "Fix & Repair",
+    emoji: "🔧",
+    tagline: "Quick technician visits for home & appliances",
+    bannerTitle: "🔧 Fix & Repair",
+    bannerSub:
+      "Trusted local electricians, plumbers, AC & appliance mechanics at your doorstep.",
+    icon: "construct",
+    color: "#EA580C",
+    badgeBg: "#FFEDD5",
+    cardBgLight: "#FFF7ED",
+    cardBgDark: "rgba(234, 88, 12, 0.15)",
+  },
+  {
+    id: "home",
+    name: "Home Help",
+    emoji: "🧹",
+    tagline: "Domestic cleaning, cooking & shifting help",
+    bannerTitle: "🧹 Home Help",
+    bannerSub:
+      "Verified deep cleaning, temporary cooks, packers & pest control solutions.",
+    icon: "home",
+    color: "#10B981",
+    badgeBg: "#D1FAE5",
+    cardBgLight: "#ECFDF5",
+    cardBgDark: "rgba(16, 185, 129, 0.15)",
+  },
+  {
+    id: "auto",
+    name: "Auto Help",
+    emoji: "🚗",
+    tagline: "On-spot puncture, battery, wash & mechanics",
+    bannerTitle: "🚗 Auto Help",
+    bannerSub:
+      "24x7 doorstep vehicle care, mobile puncture fix, car wash & roadside help.",
+    icon: "car-sport",
+    color: "#2563EB",
+    badgeBg: "#DBEAFE",
+    cardBgLight: "#EFF6FF",
+    cardBgDark: "rgba(37, 99, 235, 0.15)",
+  },
+];
+
+export const SERVICE_CATEGORIES: ServiceCategoryConfig[] = [
+  // 🔧 Fix & Repair
   {
     id: "electrician",
     name: "Electrician",
-    icon: "flash" as const,
+    cluster: "fix",
+    icon: "flash",
     color: "#EA580C",
   },
-  { id: "plumber", name: "Plumber", icon: "water" as const, color: "#0284C7" },
-  { id: "ac", name: "AC Repair", icon: "snow" as const, color: "#059669" },
   {
-    id: "mechanic",
-    name: "Bike & Car",
-    icon: "construct" as const,
-    color: "#9333EA",
-  },
-  {
-    id: "cleaning",
-    name: "Home Clean",
-    icon: "sparkles" as const,
-    color: "#E11D48",
+    id: "plumber",
+    name: "Plumber",
+    cluster: "fix",
+    icon: "water",
+    color: "#0284C7",
   },
   {
     id: "carpenter",
     name: "Carpenter",
-    icon: "hammer" as const,
+    cluster: "fix",
+    icon: "hammer",
     color: "#D97706",
   },
   {
-    id: "tutor",
-    name: "Home Tutor",
-    icon: "school" as const,
+    id: "ac_repair",
+    name: "AC repair",
+    cluster: "fix",
+    icon: "snow",
+    color: "#059669",
+  },
+  {
+    id: "ac_cleaning",
+    name: "AC cleaning",
+    cluster: "fix",
+    icon: "sparkles",
+    color: "#10B981",
+  },
+  {
+    id: "washing_machine",
+    name: "Washing machine repair",
+    cluster: "fix",
+    icon: "sync",
     color: "#6366F1",
   },
   {
-    id: "painter",
-    name: "Painter",
-    icon: "color-palette" as const,
-    color: "#0D9488",
+    id: "refrigerator",
+    name: "Refrigerator repair",
+    cluster: "fix",
+    icon: "cube",
+    color: "#06B6D4",
   },
+  {
+    id: "tv_electronics",
+    name: "TV/electronics repair",
+    cluster: "fix",
+    icon: "tv",
+    color: "#8B5CF6",
+  },
+  {
+    id: "motor_repair",
+    name: "Motor repair",
+    cluster: "fix",
+    icon: "hardware-chip",
+    color: "#F59E0B",
+  },
+  {
+    id: "bike_repair",
+    name: "Bike repair",
+    cluster: "fix",
+    icon: "bicycle",
+    color: "#9333EA",
+  },
+  {
+    id: "car_repair",
+    name: "Car repair",
+    cluster: "fix",
+    icon: "car",
+    color: "#2563EB",
+  },
+
+  // 💄 Glam & Beauty (GlamUp ✨)
+  {
+    id: "makeup",
+    name: "Makeup",
+    cluster: "glam",
+    icon: "brush",
+    color: "#EC4899",
+  },
+  {
+    id: "bridal_makeup",
+    name: "Bridal makeup",
+    cluster: "glam",
+    icon: "rose",
+    color: "#F43F5E",
+  },
+  {
+    id: "party_makeup",
+    name: "Party makeup",
+    cluster: "glam",
+    icon: "sparkles",
+    color: "#D946EF",
+  },
+  {
+    id: "eyebrows",
+    name: "Eyebrows",
+    cluster: "glam",
+    icon: "eye",
+    color: "#A855F7",
+  },
+  {
+    id: "threading",
+    name: "Threading",
+    cluster: "glam",
+    icon: "cut",
+    color: "#E11D48",
+  },
+  {
+    id: "hair_styling",
+    name: "Hair styling",
+    cluster: "glam",
+    icon: "color-wand",
+    color: "#8B5CF6",
+  },
+  {
+    id: "facial",
+    name: "Facial",
+    cluster: "glam",
+    icon: "happy",
+    color: "#F472B6",
+  },
+  {
+    id: "waxing",
+    name: "Waxing",
+    cluster: "glam",
+    icon: "flame",
+    color: "#FB7185",
+  },
+  {
+    id: "mehendi",
+    name: "Mehendi",
+    cluster: "glam",
+    icon: "flower",
+    color: "#B45309",
+  },
+  {
+    id: "saree_draping",
+    name: "Saree draping",
+    cluster: "glam",
+    icon: "shirt",
+    color: "#9333EA",
+  },
+  {
+    id: "nails",
+    name: "Nails",
+    cluster: "glam",
+    icon: "hand-left",
+    color: "#DB2777",
+  },
+
+  // 🧹 Home Help
+  {
+    id: "cleaning",
+    name: "Cleaning",
+    cluster: "home",
+    icon: "sparkles",
+    color: "#10B981",
+  },
+  {
+    id: "deep_cleaning",
+    name: "Deep cleaning",
+    cluster: "home",
+    icon: "shield-checkmark",
+    color: "#059669",
+  },
+  {
+    id: "cooking",
+    name: "Cooking",
+    cluster: "home",
+    icon: "restaurant",
+    color: "#F59E0B",
+  },
+  {
+    id: "temporary_maid",
+    name: "Temporary maid",
+    cluster: "home",
+    icon: "people",
+    color: "#0284C7",
+  },
+  {
+    id: "moving_assistance",
+    name: "Moving assistance",
+    cluster: "home",
+    icon: "cube",
+    color: "#6366F1",
+  },
+  {
+    id: "packing_unpacking",
+    name: "Packing/unpacking",
+    cluster: "home",
+    icon: "file-tray-full",
+    color: "#8B5CF6",
+  },
+  {
+    id: "pest_control",
+    name: "Pest-control requests",
+    cluster: "home",
+    icon: "bug",
+    color: "#DC2626",
+  },
+
+  // 🚗 Auto Help
+  {
+    id: "auto_bike_repair",
+    name: "Bike repair",
+    cluster: "auto",
+    icon: "bicycle",
+    color: "#9333EA",
+  },
+  {
+    id: "auto_car_repair",
+    name: "Car repair",
+    cluster: "auto",
+    icon: "car",
+    color: "#2563EB",
+  },
+  {
+    id: "puncture",
+    name: "Puncture",
+    cluster: "auto",
+    icon: "disc",
+    color: "#EF4444",
+  },
+  {
+    id: "battery",
+    name: "Battery",
+    cluster: "auto",
+    icon: "battery-charging",
+    color: "#F59E0B",
+  },
+  {
+    id: "car_wash",
+    name: "Car wash",
+    cluster: "auto",
+    icon: "water",
+    color: "#06B6D4",
+  },
+  {
+    id: "roadside_assistance",
+    name: "Roadside assistance",
+    cluster: "auto",
+    icon: "warning",
+    color: "#DC2626",
+  },
+];
+
+const CATEGORIES = [
+  {
+    id: "all",
+    name: "All",
+    cluster: "all" as const,
+    icon: "grid" as const,
+    color: "#2563EB",
+  },
+  ...SERVICE_CATEGORIES,
 ];
 
 const EXPERIENCE_OPTIONS = [
@@ -100,10 +405,12 @@ const EXPERIENCE_OPTIONS = [
 ];
 
 const FALLBACK_SERVICE_PROS: ServicePro[] = [
+  // 🔧 Fix & Repair
   {
     id: "pro_suresh_elec",
     name: "Suresh Kumar",
     category: "Electrician",
+    cluster: "fix",
     categoryIcon: "flash",
     rating: 4.9,
     reviewsCount: 38,
@@ -121,6 +428,7 @@ const FALLBACK_SERVICE_PROS: ServicePro[] = [
     id: "pro_ramesh_plumb",
     name: "Ramesh Patel",
     category: "Plumber",
+    cluster: "fix",
     categoryIcon: "water",
     rating: 4.8,
     reviewsCount: 29,
@@ -137,7 +445,8 @@ const FALLBACK_SERVICE_PROS: ServicePro[] = [
   {
     id: "pro_abdul_ac",
     name: "Abdul AC Cooling Clinic",
-    category: "AC Repair",
+    category: "AC repair",
+    cluster: "fix",
     categoryIcon: "snow",
     rating: 4.9,
     reviewsCount: 46,
@@ -152,43 +461,28 @@ const FALLBACK_SERVICE_PROS: ServicePro[] = [
     availableToday: true,
   },
   {
-    id: "pro_rajesh_mech",
-    name: "Rajesh Auto Works",
-    category: "Bike & Car",
-    categoryIcon: "construct",
-    rating: 4.7,
-    reviewsCount: 21,
+    id: "pro_venkat_appl",
+    name: "Venkat Appliance Care",
+    category: "Washing machine repair",
+    cluster: "fix",
+    categoryIcon: "sync",
+    rating: 4.85,
+    reviewsCount: 34,
     experience: "7+ yrs exp",
-    distance: "2.0 km away",
-    rate: "From ₹200 visit",
+    distance: "1.6 km away",
+    rate: "From ₹249 visit",
     verified: true,
-    avatarBg: "#9333EA",
-    phone: "+91 98480 45678",
+    avatarBg: "#6366F1",
+    phone: "+91 98480 34567",
     description:
-      "On-spot puncture repair, battery jump start, general bike tuning & doorstep vehicle checkup.",
-    availableToday: true,
-  },
-  {
-    id: "pro_shine_clean",
-    name: "ShineBright Home Care",
-    category: "Home Clean",
-    categoryIcon: "sparkles",
-    rating: 4.9,
-    reviewsCount: 53,
-    experience: "4+ yrs exp",
-    distance: "1.8 km away",
-    rate: "From ₹499 visit",
-    verified: true,
-    avatarBg: "#E11D48",
-    phone: "+91 98480 87654",
-    description:
-      "Deep kitchen & bathroom scrubbing, sofa shampooing, full home sanitization & balcony cleaning.",
+      "Automatic front & top load washing machines, refrigerator compressor & inverter fixing.",
     availableToday: true,
   },
   {
     id: "pro_srinivas_carp",
     name: "Srinivas Wood Craft",
     category: "Carpenter",
+    cluster: "fix",
     categoryIcon: "hammer",
     rating: 4.8,
     reviewsCount: 24,
@@ -203,20 +497,169 @@ const FALLBACK_SERVICE_PROS: ServicePro[] = [
     availableToday: true,
   },
   {
-    id: "pro_priya_tutor",
-    name: "Priya Sharma",
-    category: "Home Tutor",
-    categoryIcon: "school",
-    rating: 5.0,
-    reviewsCount: 18,
+    id: "pro_sai_tv",
+    name: "Sri Sai Electronics & TV",
+    category: "TV/electronics repair",
+    cluster: "fix",
+    categoryIcon: "tv",
+    rating: 4.75,
+    reviewsCount: 22,
+    experience: "9+ yrs exp",
+    distance: "1.9 km away",
+    rate: "From ₹200 visit",
+    verified: true,
+    avatarBg: "#8B5CF6",
+    phone: "+91 98480 76543",
+    description:
+      "Smart 4K LED TV backlight, sound card, microwave oven & home electronics circuit repairs.",
+    availableToday: true,
+  },
+
+  // 🧹 Home Help
+  {
+    id: "pro_shine_clean",
+    name: "ShineBright Home Care",
+    category: "Deep cleaning",
+    cluster: "home",
+    categoryIcon: "shield-checkmark",
+    rating: 4.9,
+    reviewsCount: 53,
     experience: "4+ yrs exp",
-    distance: "1.0 km away",
-    rate: "From ₹350 / hr",
+    distance: "1.8 km away",
+    rate: "From ₹499 visit",
+    verified: true,
+    avatarBg: "#10B981",
+    phone: "+91 98480 87654",
+    description:
+      "Deep kitchen & bathroom scrubbing, sofa shampooing, full home sanitization & balcony cleaning.",
+    availableToday: true,
+  },
+  {
+    id: "pro_lakshmi_cook",
+    name: "Lakshmi Home Cook & Tiffin",
+    category: "Cooking",
+    cluster: "home",
+    categoryIcon: "restaurant",
+    rating: 4.85,
+    reviewsCount: 41,
+    experience: "8+ yrs exp",
+    distance: "0.7 km away",
+    rate: "From ₹300 / meal",
+    verified: true,
+    avatarBg: "#F59E0B",
+    phone: "+91 98480 33221",
+    description:
+      "Healthy North & South Indian home meals, daily tiffin service, temporary cook for family dinners.",
+    availableToday: true,
+  },
+  {
+    id: "pro_safeshield_pest",
+    name: "SafeShield Pest Solutions",
+    category: "Pest-control requests",
+    cluster: "home",
+    categoryIcon: "bug",
+    rating: 4.9,
+    reviewsCount: 39,
+    experience: "6+ yrs exp",
+    distance: "2.1 km away",
+    rate: "From ₹599 service",
+    verified: true,
+    avatarBg: "#DC2626",
+    phone: "+91 98480 11998",
+    description:
+      "100% odorless herbal cockroach gel treatment, termite control & anti-mosquito fogging.",
+    availableToday: true,
+  },
+  {
+    id: "pro_swift_movers",
+    name: "SwiftShift Packers & Helpers",
+    category: "Moving assistance",
+    cluster: "home",
+    categoryIcon: "cube",
+    rating: 4.8,
+    reviewsCount: 27,
+    experience: "5+ yrs exp",
+    distance: "2.5 km away",
+    rate: "From ₹799 service",
     verified: true,
     avatarBg: "#6366F1",
-    phone: "+91 98480 67890",
+    phone: "+91 98480 44882",
     description:
-      "CBSE & ICSE Math & Science tutor for grades 6 to 10. Individual attention & doubt clearing.",
+      "Careful household packing, unpacking, heavy furniture loading & apartment shifting assistance.",
+    availableToday: true,
+  },
+
+  // 🚗 Auto Help
+  {
+    id: "pro_rajesh_mech",
+    name: "Rajesh Auto Works",
+    category: "Bike repair",
+    cluster: "auto",
+    categoryIcon: "bicycle",
+    rating: 4.7,
+    reviewsCount: 21,
+    experience: "7+ yrs exp",
+    distance: "2.0 km away",
+    rate: "From ₹199 visit",
+    verified: true,
+    avatarBg: "#9333EA",
+    phone: "+91 98480 45678",
+    description:
+      "Doorstep bike servicing, engine oil change, brake calibration, spark plug & chain lubrication.",
+    availableToday: true,
+  },
+  {
+    id: "pro_quick_puncture",
+    name: "QuickFix Puncture & Battery",
+    category: "Puncture",
+    cluster: "auto",
+    categoryIcon: "disc",
+    rating: 4.9,
+    reviewsCount: 58,
+    experience: "5+ yrs exp",
+    distance: "0.6 km away",
+    rate: "From ₹120 on-spot",
+    verified: true,
+    avatarBg: "#EF4444",
+    phone: "+91 98480 55771",
+    description:
+      "24x7 mobile tubeless puncture repair, battery jumpstart & emergency air fill at your doorstep.",
+    availableToday: true,
+  },
+  {
+    id: "pro_hydro_wash",
+    name: "HydroShine Mobile Car Wash",
+    category: "Car wash",
+    cluster: "auto",
+    categoryIcon: "water",
+    rating: 4.85,
+    reviewsCount: 44,
+    experience: "4+ yrs exp",
+    distance: "1.3 km away",
+    rate: "From ₹349 wash",
+    verified: true,
+    avatarBg: "#06B6D4",
+    phone: "+91 98480 22663",
+    description:
+      "Eco-friendly doorstep foam wash, high-power interior vacuuming & tire gloss polish.",
+    availableToday: true,
+  },
+  {
+    id: "pro_roadside_speed",
+    name: "SpeedTrack 24x7 Roadside Help",
+    category: "Roadside assistance",
+    cluster: "auto",
+    categoryIcon: "warning",
+    rating: 4.9,
+    reviewsCount: 33,
+    experience: "8+ yrs exp",
+    distance: "1.5 km away",
+    rate: "From ₹299 assist",
+    verified: true,
+    avatarBg: "#2563EB",
+    phone: "+91 98480 99881",
+    description:
+      "24/7 on-call towing, emergency fuel drop, battery boost & minor breakdown roadside assistance.",
     availableToday: true,
   },
 ];
@@ -229,12 +672,37 @@ export default function ServicesScreen() {
   const { user } = useAuthContext();
   const cityName = selectedLocation?.name || "";
 
+  const params = useLocalSearchParams<{
+    cluster?: string;
+    category?: string;
+  }>();
+  const [selectedCluster, setSelectedCluster] =
+    useState<ServiceClusterId>("all");
+
   // Active Main Tab: "find" (Find Experts) or "enroll" (Enroll as Technician / Register as Pro)
   const [activeTab, setActiveTab] = useState<"find" | "enroll">("find");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [prosList, setProsList] = useState<ServicePro[]>(FALLBACK_SERVICE_PROS);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Sync cluster and category from URL query parameters
+  useEffect(() => {
+    if (params.cluster) {
+      const c = params.cluster.toLowerCase();
+      if (c === "glam" || c === "glamup" || c === "beauty") {
+        router.replace("/(screens)/glamup" as any);
+        return;
+      }
+      if (c === "fix" || c === "repair") setSelectedCluster("fix");
+      else if (c === "home") setSelectedCluster("home");
+      else if (c === "auto") setSelectedCluster("auto");
+      else setSelectedCluster("all");
+    }
+    if (params.category) {
+      setSelectedCategory(params.category);
+    }
+  }, [params.cluster, params.category, router]);
 
   // Direct Request to Technician Modal State
   const [requestTargetPro, setRequestTargetPro] = useState<ServicePro | null>(
@@ -279,6 +747,9 @@ export default function ServicesScreen() {
   const [enrollName, setEnrollName] = useState(
     user?.name ? `${user.name} Services` : "Suresh Technical Services",
   );
+  const [enrollCluster, setEnrollCluster] = useState<
+    "fix" | "glam" | "home" | "auto"
+  >("fix");
   const [enrollCategory, setEnrollCategory] = useState("Electrician");
   const [enrollPhone, setEnrollPhone] = useState("+91 98480 54321");
   const [enrollExperience, setEnrollExperience] = useState("5 yrs exp");
@@ -528,6 +999,7 @@ export default function ServicesScreen() {
       const payload = {
         name: nameToSubmit,
         category: enrollCategory,
+        cluster: enrollCluster,
         categoryIcon,
         avatarBg,
         experience: expToSubmit,
@@ -563,6 +1035,7 @@ export default function ServicesScreen() {
         id: `pro_${Date.now()}`,
         name: nameToSubmit,
         category: enrollCategory,
+        cluster: enrollCluster,
         categoryIcon,
         rating: 5.0,
         reviewsCount: 1,
@@ -612,16 +1085,37 @@ export default function ServicesScreen() {
 
   // Filtered Pros for Display
   const filteredPros = prosList.filter((pro) => {
-    const matchesCat =
-      selectedCategory === "all" ||
-      pro.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-      (selectedCategory === "ac" &&
-        pro.category.toLowerCase().includes("ac")) ||
-      (selectedCategory === "mechanic" &&
-        pro.category.toLowerCase().includes("bike")) ||
-      (selectedCategory === "cleaning" &&
-        pro.category.toLowerCase().includes("clean"));
+    // 1. Category Cluster match
+    let matchesCluster = true;
+    if (selectedCluster !== "all") {
+      if (pro.cluster) {
+        matchesCluster = pro.cluster === selectedCluster;
+      } else {
+        const found = SERVICE_CATEGORIES.find(
+          (c) =>
+            c.name.toLowerCase() === pro.category.toLowerCase() ||
+            c.id.toLowerCase() === pro.category.toLowerCase(),
+        );
+        matchesCluster = found?.cluster === selectedCluster;
+      }
+    }
 
+    // 2. Specific Sub-Category match
+    let matchesCat = true;
+    if (selectedCategory !== "all") {
+      const targetCat = SERVICE_CATEGORIES.find(
+        (c) => c.id === selectedCategory,
+      );
+      const targetName = targetCat
+        ? targetCat.name.toLowerCase()
+        : selectedCategory.toLowerCase();
+      matchesCat =
+        pro.category.toLowerCase().includes(targetName) ||
+        targetName.includes(pro.category.toLowerCase()) ||
+        pro.category.toLowerCase().includes(selectedCategory.toLowerCase());
+    }
+
+    // 3. Search text match
     const matchesSearch =
       !searchQuery.trim() ||
       pro.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -629,7 +1123,7 @@ export default function ServicesScreen() {
       (pro.description &&
         pro.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchesCat && matchesSearch;
+    return matchesCluster && matchesCat && matchesSearch;
   });
 
   const bg = isDark ? "#0B0F19" : "#F8FAFC";
@@ -664,12 +1158,38 @@ export default function ServicesScreen() {
         <View style={styles.headerTitleWrap}>
           <View style={styles.titleRow}>
             <Text style={[styles.headerTitle, { color: textPrimary }]}>
-              Local Services
+              {selectedCluster === "glam"
+                ? "GlamUp ✨"
+                : selectedCluster === "fix"
+                  ? "Fix & Repair"
+                  : selectedCluster === "home"
+                    ? "Home Help"
+                    : selectedCluster === "auto"
+                      ? "Auto Help"
+                      : "Fix, Glam & Help"}
             </Text>
-            <Text style={{ fontSize: 16 }}>🛠️</Text>
+            <Text style={{ fontSize: 16 }}>
+              {selectedCluster === "glam"
+                ? "💄"
+                : selectedCluster === "fix"
+                  ? "🔧"
+                  : selectedCluster === "home"
+                    ? "🧹"
+                    : selectedCluster === "auto"
+                      ? "🚗"
+                      : "⚡"}
+            </Text>
           </View>
           <Text style={[styles.headerSub, { color: textMute }]}>
-            Verified technicians in {cityName.split(",")[0]}
+            {selectedCluster === "glam"
+              ? "Beauty at your doorstep"
+              : selectedCluster === "fix"
+                ? "Doorstep appliance & fix specialists"
+                : selectedCluster === "home"
+                  ? "Cleaning, cooks & household help"
+                  : selectedCluster === "auto"
+                    ? "Doorstep puncture, wash & vehicle care"
+                    : `Verified doorstep specialists in ${cityName.split(",")[0] || "your city"}`}
           </Text>
         </View>
 
@@ -699,7 +1219,7 @@ export default function ServicesScreen() {
               { color: activeTab === "enroll" ? "#FFF" : "#9333EA" },
             ]}
           >
-            {activeTab === "find" ? "Join as Technician" : "Browse technicans"}
+            {activeTab === "find" ? "Join as Pro" : "Browse Pros"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -866,14 +1386,185 @@ export default function ServicesScreen() {
               )}
             </View>
 
-            {/* Category horizontal pills */}
+            {/* Dedicated GlamUp Banner for Doorstep Beauty & Salon */}
+            <TouchableOpacity
+              style={[
+                styles.glamBanner,
+                {
+                  backgroundColor: isDark ? "#240B28" : "#FDF2F8",
+                  borderColor: isDark ? "#48154D" : "#FCE7F3",
+                },
+              ]}
+              onPress={() => router.push("/(screens)/glamup" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.glamBannerLeft}>
+                <Text style={{ fontSize: 24 }}>💄</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.glamBannerTitleRow}>
+                    <Text
+                      style={[
+                        styles.glamBannerTitle,
+                        { color: isDark ? "#F472B6" : "#BE185D" },
+                      ]}
+                    >
+                      Looking for Doorstep Beauty & Salon?
+                    </Text>
+                    <View style={styles.glamSeparateBadge}>
+                      <Text style={styles.glamSeparateBadgeText}>
+                        GlamUp ✨
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.glamBannerSub,
+                      { color: isDark ? "rgba(255,255,255,0.7)" : "#9D174D" },
+                    ]}
+                  >
+                    Bridal makeup, hair styling, mehendi, nails & facials at
+                    home →
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color="#EC4899" />
+            </TouchableOpacity>
+
+            {/* 1. Category Cluster Selector */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.clusterScroll}
+            >
+              {SERVICE_CLUSTERS.map((cluster) => {
+                const isActive = selectedCluster === cluster.id;
+                return (
+                  <TouchableOpacity
+                    key={cluster.id}
+                    onPress={() => {
+                      setSelectedCluster(cluster.id);
+                      setSelectedCategory("all");
+                    }}
+                    style={[
+                      styles.clusterCard,
+                      {
+                        backgroundColor: isActive
+                          ? isDark
+                            ? cluster.cardBgDark
+                            : cluster.cardBgLight
+                          : isDark
+                            ? "#131C2E"
+                            : "#FFFFFF",
+                        borderColor: isActive ? cluster.color : border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.clusterHeaderRow}>
+                      <Text style={styles.clusterEmoji}>{cluster.emoji}</Text>
+                      {isActive && (
+                        <View
+                          style={[
+                            styles.clusterDot,
+                            { backgroundColor: cluster.color },
+                          ]}
+                        />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.clusterName,
+                        {
+                          color: isActive ? cluster.color : textPrimary,
+                          fontWeight: isActive ? "700" : "600",
+                        },
+                      ]}
+                    >
+                      {cluster.name}
+                    </Text>
+                    <Text
+                      style={[styles.clusterTagline, { color: textMute }]}
+                      numberOfLines={1}
+                    >
+                      {cluster.tagline}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Dedicated Highlight Banner for Selected Cluster */}
+            {selectedCluster !== "all" &&
+              (() => {
+                const clusterInfo = SERVICE_CLUSTERS.find(
+                  (c) => c.id === selectedCluster,
+                );
+                if (!clusterInfo) return null;
+                return (
+                  <View
+                    style={[
+                      styles.clusterBannerCard,
+                      {
+                        backgroundColor: isDark
+                          ? clusterInfo.cardBgDark
+                          : clusterInfo.cardBgLight,
+                        borderColor: clusterInfo.color + "40",
+                      },
+                    ]}
+                  >
+                    <View style={styles.clusterBannerLeft}>
+                      <Text style={styles.clusterBannerEmoji}>
+                        {clusterInfo.emoji}
+                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.clusterBannerTitle,
+                            { color: clusterInfo.color },
+                          ]}
+                        >
+                          {clusterInfo.bannerTitle || clusterInfo.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.clusterBannerSub,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {clusterInfo.bannerSub || clusterInfo.tagline}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
+
+            {/* Sub-Category horizontal pills */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.catScroll}
             >
-              {CATEGORIES.map((cat) => {
+              {(selectedCluster === "all"
+                ? CATEGORIES
+                : [
+                    {
+                      id: "all",
+                      name: `All ${SERVICE_CLUSTERS.find((c) => c.id === selectedCluster)?.name || ""}`,
+                      cluster: selectedCluster,
+                      icon: "grid" as const,
+                      color:
+                        SERVICE_CLUSTERS.find((c) => c.id === selectedCluster)
+                          ?.color || "#2563EB",
+                    },
+                    ...SERVICE_CATEGORIES.filter(
+                      (c) => c.cluster === selectedCluster,
+                    ),
+                  ]
+              ).map((cat) => {
                 const active = selectedCategory === cat.id;
+                const activeColor =
+                  SERVICE_CLUSTERS.find((c) => c.id === selectedCluster)
+                    ?.color || "#9333EA";
                 return (
                   <TouchableOpacity
                     key={cat.id}
@@ -883,25 +1574,25 @@ export default function ServicesScreen() {
                       {
                         backgroundColor: active
                           ? isDark
-                            ? "#9333EA30"
-                            : "#F3E8FF"
+                            ? `${activeColor}30`
+                            : `${activeColor}15`
                           : isDark
                             ? "#1E293B"
                             : "#FFFFFF",
-                        borderColor: active ? "#9333EA" : border,
+                        borderColor: active ? activeColor : border,
                       },
                     ]}
                   >
                     <Ionicons
                       name={cat.icon}
                       size={14}
-                      color={active ? "#9333EA" : textMute}
+                      color={active ? activeColor : textMute}
                     />
                     <Text
                       style={[
                         styles.catPillText,
                         {
-                          color: active ? "#9333EA" : textPrimary,
+                          color: active ? activeColor : textPrimary,
                           fontWeight: active ? "700" : "500",
                         },
                       ]}
@@ -985,7 +1676,7 @@ export default function ServicesScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.quickCatRow}
                 >
-                  {CATEGORIES.filter((c) => c.id !== "all").map((cat) => {
+                  {SERVICE_CATEGORIES.map((cat) => {
                     const sel = broadcastCategory === cat.name;
                     return (
                       <TouchableOpacity
@@ -1003,6 +1694,12 @@ export default function ServicesScreen() {
                           },
                         ]}
                       >
+                        <Ionicons
+                          name={cat.icon}
+                          size={12}
+                          color={sel ? "#FFF" : cat.color}
+                          style={{ marginRight: 4 }}
+                        />
                         <Text
                           style={{
                             color: sel ? "#FFF" : textPrimary,
@@ -1120,6 +1817,33 @@ export default function ServicesScreen() {
                       </View>
 
                       <View style={{ flex: 1 }}>
+                        {/* Cluster Badge */}
+                        {pro.cluster === "glam" ? (
+                          <View style={styles.proClusterBadgeGlam}>
+                            <Text style={styles.proClusterBadgeGlamText}>
+                              💄 GlamUp ✨ Specialist
+                            </Text>
+                          </View>
+                        ) : pro.cluster === "fix" ? (
+                          <View style={styles.proClusterBadgeFix}>
+                            <Text style={styles.proClusterBadgeFixText}>
+                              🔧 Fix & Repair
+                            </Text>
+                          </View>
+                        ) : pro.cluster === "home" ? (
+                          <View style={styles.proClusterBadgeHome}>
+                            <Text style={styles.proClusterBadgeHomeText}>
+                              🧹 Home Help
+                            </Text>
+                          </View>
+                        ) : pro.cluster === "auto" ? (
+                          <View style={styles.proClusterBadgeAuto}>
+                            <Text style={styles.proClusterBadgeAutoText}>
+                              🚗 Auto Help
+                            </Text>
+                          </View>
+                        ) : null}
+
                         <View style={styles.proNameRow}>
                           <Text
                             style={[styles.proName, { color: textPrimary }]}
@@ -1367,11 +2091,67 @@ export default function ServicesScreen() {
 
               {/* 2. Service Category Picker */}
               <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                Primary Trade / Category{" "}
+                Category Cluster <Text style={{ color: "#EF4444" }}>*</Text>
+              </Text>
+              <View style={styles.enrollClusterRow}>
+                {SERVICE_CLUSTERS.filter((c) => c.id !== "all").map(
+                  (cluster) => {
+                    const isSelected = enrollCluster === cluster.id;
+                    return (
+                      <TouchableOpacity
+                        key={cluster.id}
+                        onPress={() => {
+                          setEnrollCluster(cluster.id as any);
+                          const firstCat = SERVICE_CATEGORIES.find(
+                            (c) => c.cluster === cluster.id,
+                          );
+                          if (firstCat) setEnrollCategory(firstCat.name);
+                        }}
+                        style={[
+                          styles.enrollClusterChip,
+                          {
+                            backgroundColor: isSelected
+                              ? isDark
+                                ? cluster.cardBgDark
+                                : cluster.cardBgLight
+                              : isDark
+                                ? "#1E293B"
+                                : "#F8FAFC",
+                            borderColor: isSelected ? cluster.color : border,
+                          },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 13 }}>{cluster.emoji}</Text>
+                        <Text
+                          style={[
+                            styles.enrollClusterChipText,
+                            {
+                              color: isSelected ? cluster.color : textPrimary,
+                              fontWeight: isSelected ? "700" : "500",
+                            },
+                          ]}
+                        >
+                          {cluster.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  },
+                )}
+              </View>
+
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  { color: textPrimary, marginTop: 4 },
+                ]}
+              >
+                Specific Trade / Service Specialty{" "}
                 <Text style={{ color: "#EF4444" }}>*</Text>
               </Text>
               <View style={styles.enrollCatGrid}>
-                {CATEGORIES.filter((c) => c.id !== "all").map((cat) => {
+                {SERVICE_CATEGORIES.filter(
+                  (c) => c.cluster === enrollCluster,
+                ).map((cat) => {
                   const isSelected = enrollCategory === cat.name;
                   return (
                     <TouchableOpacity
@@ -3430,5 +4210,173 @@ const styles = StyleSheet.create({
   },
   dropdownOptionLabel: {
     fontSize: 13,
+  },
+  // Cluster Selector & Highlight Styles
+  clusterScroll: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  clusterCard: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    minWidth: 130,
+    gap: 4,
+  },
+  clusterHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  clusterEmoji: {
+    fontSize: 18,
+  },
+  clusterDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  clusterName: {
+    fontSize: 13,
+  },
+  clusterTagline: {
+    fontSize: 10.5,
+  },
+  clusterBannerCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginVertical: 2,
+  },
+  clusterBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  clusterBannerEmoji: {
+    fontSize: 24,
+  },
+  clusterBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+  clusterBannerSub: {
+    fontSize: 11,
+    marginTop: 1,
+    opacity: 0.85,
+  },
+  // Pro Cluster Badges
+  proClusterBadgeGlam: {
+    backgroundColor: "#FCE7F3",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  proClusterBadgeGlamText: {
+    color: "#BE185D",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  proClusterBadgeFix: {
+    backgroundColor: "#FFEDD5",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  proClusterBadgeFixText: {
+    color: "#C2410C",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  proClusterBadgeHome: {
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  proClusterBadgeHomeText: {
+    color: "#047857",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  proClusterBadgeAuto: {
+    backgroundColor: "#DBEAFE",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  proClusterBadgeAutoText: {
+    color: "#1D4ED8",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  // Tab 2 Cluster Chips
+  enrollClusterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  enrollClusterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  enrollClusterChipText: {
+    fontSize: 12,
+  },
+  glamBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  glamBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  glamBannerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  glamBannerTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  glamSeparateBadge: {
+    backgroundColor: "#EC4899",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  glamSeparateBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  glamBannerSub: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

@@ -12,8 +12,53 @@ import Svg, { Path, Defs, LinearGradient, Stop, G } from "react-native-svg";
 import { useTheme } from "@/hooks/useTheme";
 import { useStyles } from "@/hooks/useStyles";
 
-/** Icons placed evenly around the orbit */
-const ORBIT_ICONS = ["👥", "🎒", "💬", "☕", "📍", "🎟️"];
+/** Icons placed evenly around the orbit with dedicated theme colors for visible borders & attractive accents */
+const ORBIT_ICON_DETAILS = [
+  {
+    icon: "👥",
+    color: "#3B82F6",
+    lightBg: "#EFF6FF",
+    darkBg: "#0F172A",
+    label: "DayMates",
+  },
+  {
+    icon: "🎒",
+    color: "#F59E0B",
+    lightBg: "#FFFBEB",
+    darkBg: "#1F1600",
+    label: "Hangouts",
+  },
+  {
+    icon: "💬",
+    color: "#10B981",
+    lightBg: "#ECFDF5",
+    darkBg: "#061A14",
+    label: "Chats",
+  },
+  {
+    icon: "☕",
+    color: "#EC4899",
+    lightBg: "#FDF2F8",
+    darkBg: "#200818",
+    label: "Coffee",
+  },
+  {
+    icon: "📍",
+    color: "#8B5CF6",
+    lightBg: "#F5F3FF",
+    darkBg: "#160B2C",
+    label: "Nearby",
+  },
+  {
+    icon: "🎟️",
+    color: "#FF5722",
+    lightBg: "#FFF7ED",
+    darkBg: "#240E05",
+    label: "Tickets",
+  },
+];
+
+const ORBIT_ICONS = ORBIT_ICON_DETAILS.map((d) => d.icon);
 
 const ROTATING_MESSAGES = [
   "Finding Day Mates...",
@@ -59,7 +104,7 @@ export function JuntoOrbit({
   const { width } = useWindowDimensions();
   const dimension = size ?? Math.min(width - 48, 250);
   const s = useStyles(createStyles);
-  const { theme: t } = useTheme();
+  const { theme: t, isDark } = useTheme();
 
   // Generate a unique instance ID for SVG gradient defs to avoid Web DOM ID collisions
   const autoId = useId();
@@ -305,40 +350,86 @@ export function JuntoOrbit({
           { width: dimension, height: dimension, transform: [{ rotate }] },
         ]}
       >
-        {positions.map(({ icon, left, top }, i) => (
-          <Animated.View
-            key={`${icon}-${i}`}
-            style={[
-              s.bubble,
-              {
-                left,
-                top,
-                width: bubbleSize,
-                height: bubbleSize,
-                borderRadius: bubbleSize / 2,
-                transform: [{ rotate: counterRotate }],
-              },
-            ]}
-          >
-            <Text style={{ fontSize: bubbleSize * 0.5 }}>{icon}</Text>
-          </Animated.View>
-        ))}
+        {positions.map(({ icon, left, top }, i) => {
+          const detail = ORBIT_ICON_DETAILS[i % ORBIT_ICON_DETAILS.length];
+          const itemColor = detail?.color || "#A855F7";
+          const itemBg = isDark
+            ? detail?.darkBg || "#17122C"
+            : detail?.lightBg || "#FFFFFF";
+
+          return (
+            <Animated.View
+              key={`${icon}-${i}`}
+              style={[
+                s.bubble,
+                {
+                  left,
+                  top,
+                  width: bubbleSize,
+                  height: bubbleSize,
+                  borderRadius: bubbleSize / 2,
+                  borderWidth: 2.8,
+                  borderColor: itemColor,
+                  backgroundColor: itemBg,
+                  shadowColor: itemColor,
+                  shadowOpacity: isDark ? 0.75 : 0.45,
+                  shadowRadius: 9,
+                  shadowOffset: { width: 0, height: 3 },
+                  elevation: 8,
+                  transform: [{ rotate: counterRotate }],
+                },
+              ]}
+            >
+              {/* Inner concentric circular frame for striking depth and high-end finish */}
+              <View
+                style={{
+                  width: bubbleSize - 7,
+                  height: bubbleSize - 7,
+                  borderRadius: (bubbleSize - 7) / 2,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1.2,
+                  borderColor: isDark ? `${itemColor}60` : `${itemColor}40`,
+                  backgroundColor: isDark
+                    ? "rgba(0,0,0,0.3)"
+                    : "rgba(255,255,255,0.75)",
+                }}
+              >
+                <Text style={{ fontSize: bubbleSize * 0.46 }}>{icon}</Text>
+              </View>
+            </Animated.View>
+          );
+        })}
       </Animated.View>
 
-      {/* Static center logo with rotating label */}
+      {/* Static center logo with rotating label and visible glowing border */}
       <View style={s.center} pointerEvents="none">
-        <Image
-          source={require("@/assets/icon-maskable-512.png")}
-          style={{
-            width: logoSize,
-            height: logoSize,
-            borderRadius: logoSize * 0.24,
-          }}
-          resizeMode="contain"
-        />
-        <Animated.Text style={[s.label, { opacity: labelFade }]}>
-          {labelList[labelIndex]}
-        </Animated.Text>
+        <View
+          style={[
+            s.logoBadge,
+            {
+              width: logoSize + 8,
+              height: logoSize + 8,
+              borderRadius: (logoSize + 8) / 2,
+              borderColor: isDark
+                ? "rgba(168, 85, 247, 0.45)"
+                : "rgba(124, 58, 237, 0.35)",
+            },
+          ]}
+        >
+          <Image
+            source={require("@/assets/icon-maskable-512.png")}
+            style={{
+              width: logoSize,
+              height: logoSize,
+              borderRadius: logoSize * 0.24,
+            }}
+            resizeMode="contain"
+          />
+        </View>
+        <Animated.View style={[s.labelPill, { opacity: labelFade }]}>
+          <Text style={s.label}>{labelList[labelIndex]}</Text>
+        </Animated.View>
       </View>
     </View>
   );
@@ -439,14 +530,7 @@ const createStyles = (t: any) => {
       position: "absolute",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t?.card || (isDark ? "#1E1838" : "#FFFFFF"),
-      borderWidth: 1,
-      borderColor: t?.border || "rgba(255,255,255,0.1)",
-      shadowColor: t?.shadow || "#000000",
-      shadowOpacity: isDark ? 0.3 : 0.1,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 3,
+      overflow: "visible",
     },
     center: {
       position: "absolute",
@@ -454,8 +538,31 @@ const createStyles = (t: any) => {
       justifyContent: "center",
       zIndex: 10,
     },
+    logoBadge: {
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      backgroundColor: isDark ? "#120B24" : "#FFFFFF",
+      shadowColor: "#A855F7",
+      shadowOpacity: isDark ? 0.5 : 0.25,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 6,
+    },
+    labelPill: {
+      marginTop: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 12,
+      backgroundColor: isDark
+        ? "rgba(168, 85, 247, 0.16)"
+        : "rgba(124, 58, 237, 0.08)",
+      borderWidth: 1,
+      borderColor: isDark
+        ? "rgba(168, 85, 247, 0.35)"
+        : "rgba(124, 58, 237, 0.2)",
+    },
     label: {
-      marginTop: 4,
       fontSize: 10,
       fontWeight: "800",
       letterSpacing: 1.5,

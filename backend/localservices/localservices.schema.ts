@@ -7,6 +7,7 @@ export const CreateServiceProSchema = z.object({
     .min(2, "Service name/provider name is required")
     .max(100),
   category: z.string().trim().min(2).max(60),
+  cluster: z.enum(["fix", "glam", "home", "auto"]).optional(),
   categoryIcon: z.string().trim().optional().default("construct"),
   experience: z.string().trim().min(1).max(50).default("3+ yrs exp"),
   distance: z.string().trim().max(50).default("1.0 km away"),
@@ -22,6 +23,7 @@ export const CreateServiceProSchema = z.object({
 
 export const QueryServicesSchema = z.object({
   category: z.string().optional().default("all"),
+  cluster: z.string().optional(),
   search: z.string().optional(),
   verifiedOnly: z.enum(["true", "false"]).optional(),
   minRating: z.coerce.number().optional(),
