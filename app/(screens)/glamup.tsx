@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   scrollBody: {
-    padding: 16,
+    // padding: 16,
     gap: 14,
   },
   broadcastCard: {
@@ -1584,7 +1584,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   enrollBody: {
-    padding: 16,
+    // padding: 16,
     gap: 16,
   },
   enrollHero: {

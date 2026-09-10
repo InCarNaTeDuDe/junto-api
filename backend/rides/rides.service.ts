@@ -6,7 +6,10 @@ import {
   UpdateRideInput,
 } from "./rides.schema";
 import { io } from "../socket/socket";
-import { sendExpoPushNotification } from "../notifications/notifications.service";
+import {
+  sendPushNotification,
+  sendExpoPushNotification,
+} from "../notifications/notifications.service";
 import { rideRepository, RideRecord } from "../repositories/Rides.repository";
 
 /**
@@ -81,7 +84,10 @@ export async function createRide(
     vehicleType: input.vehicleType,
 
     seatsLeft: input.seatsLeft,
-    totalSeats: input.seatsLeft,
+    totalSeats:
+      input.totalSeats ||
+      input.seatsLeft ||
+      (input.vehicleType === "bike" ? 1 : 2),
 
     price: input.price,
 
@@ -235,16 +241,29 @@ export async function confirmRidePassenger(
   }
 
   // Push notification to the confirmed co-rider passenger
-  sendExpoPushNotification(
+  sendPushNotification(
     passengerUserId,
     "🎉 Seat Confirmed!",
     `${updatedRide.driverName} confirmed your seat for ${updatedRide.from} ➔ ${updatedRide.to}!`,
+    "ride_confirmed",
     {
       rideId: updatedRide.id,
       type: "ride_confirmed",
+      from: updatedRide.from,
+      to: updatedRide.to,
+      driverName: updatedRide.driverName,
     },
   ).catch((err) => {
-    console.warn("[Rides] Failed to send confirmation push notification:", err);
+    console.warn("[Rides] Failed to send push notification to co-rider:", err);
+    sendExpoPushNotification(
+      passengerUserId,
+      "🎉 Seat Confirmed!",
+      `${updatedRide.driverName} confirmed your seat for ${updatedRide.from} ➔ ${updatedRide.to}!`,
+      {
+        rideId: updatedRide.id,
+        type: "ride_confirmed",
+      },
+    ).catch(() => {});
   });
 
   return {

@@ -71,7 +71,7 @@ export class RideRepository extends BaseRepository<Ride> {
       vehicleType: ride.vehicleType,
 
       seatsLeft: ride.seatsLeft,
-      totalSeats: ride.totalSeats,
+      totalSeats: ride.totalSeats || (ride.vehicleType === "bike" ? 1 : 2),
 
       price: ride.price,
       verified: ride.verified,

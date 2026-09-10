@@ -5,7 +5,8 @@ export const CreateRideSchema = z.object({
   to: z.string().trim().min(2, "Destination is required").max(120),
   time: z.string().trim().min(2, "Departure time is required").max(80),
   vehicleType: z.enum(["car", "bike"]),
-  seatsLeft: z.number().int().min(1).max(8).default(1),
+  seatsLeft: z.number().int().min(0).max(8).default(1),
+  totalSeats: z.number().int().min(1).max(8).optional(),
   price: z.string().trim().min(1).max(50).default("₹40"),
   notes: z.string().trim().max(300).optional(),
   // Ride location

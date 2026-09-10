@@ -110,7 +110,7 @@ export const EnrollTab: React.FC<EnrollTabProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
     paddingTop: 8,
   },
   successBanner: {

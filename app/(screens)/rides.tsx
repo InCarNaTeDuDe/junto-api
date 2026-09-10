@@ -112,11 +112,25 @@ export default function RidesScreen() {
             prev && prev.id === rideId ? { ...prev, ...res.ride } : prev,
           );
         } else {
+          setSelectedRideForParticipants((prev) => {
+            if (!prev || prev.id !== rideId) return prev;
+            const updatedPassengers = (prev.passengers || []).map((p) =>
+              p.userId === passengerUserId
+                ? { ...p, status: "confirmed" as const }
+                : p,
+            );
+            return {
+              ...prev,
+              seatsLeft: Math.max(0, (prev.seatsLeft ?? 1) - 1),
+              passengers: updatedPassengers,
+            };
+          });
           fetchRides();
         }
         Alert.alert(
           "Co-Rider Confirmed",
-          res.message || "Passenger seat confirmed!",
+          res.message ||
+            "Passenger seat confirmed! Push notification sent to co-rider.",
         );
       }
     } catch (err: any) {
@@ -271,6 +285,7 @@ export default function RidesScreen() {
         time: formattedDeparture,
         vehicleType: offerVehicle,
         seatsLeft: selectedSeats,
+        totalSeats: selectedSeats,
         price: selectedPrice,
         notes: "Scheduled ride • Direct contact",
         verified: true,
@@ -1555,11 +1570,21 @@ export default function RidesScreen() {
                   {selectedRideForParticipants?.to}
                 </Text>
                 <Text style={styles.participantsSeatsInfo}>
-                  💺 {selectedRideForParticipants?.seatsLeft} of{" "}
-                  {selectedRideForParticipants?.totalSeats ||
-                    (selectedRideForParticipants?.vehicleType === "bike"
+                  💺{" "}
+                  {Array.isArray(selectedRideForParticipants?.passengers)
+                    ? selectedRideForParticipants.passengers.reduce(
+                        (sum: number, p: any) =>
+                          p.status === "confirmed" ? sum + (p.seats || 0) : sum,
+                        0,
+                      )
+                    : 0}{" "}
+                  of{" "}
+                  {selectedRideForParticipants?.totalSeats &&
+                  selectedRideForParticipants.totalSeats > 0
+                    ? selectedRideForParticipants.totalSeats
+                    : selectedRideForParticipants?.vehicleType === "bike"
                       ? 1
-                      : 3)}{" "}
+                      : 2}{" "}
                   seat(s) available
                 </Text>
               </View>
@@ -1576,11 +1601,12 @@ export default function RidesScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* List of Co-Rider Requests */}
+            {/* List of Co-Rider Requests with vertical scroll */}
             <ScrollView
-              style={{ maxHeight: 380, width: "100%" }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 4 }}
+              style={styles.participantsScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              contentContainerStyle={{ paddingVertical: 4, paddingBottom: 12 }}
             >
               {!selectedRideForParticipants?.passengers ||
               selectedRideForParticipants.passengers.length === 0 ? (
@@ -1785,15 +1811,6 @@ export default function RidesScreen() {
                 })
               )}
             </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalDoneBtn}
-                onPress={() => setSelectedRideForParticipants(null)}
-              >
-                <Text style={styles.modalDoneBtnText}>Done</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
@@ -2411,6 +2428,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
     gap: 12,
+  },
+  participantsScrollView: {
+    maxHeight: 460,
+    width: "100%",
   },
   participantsModalHeader: {
     flexDirection: "row",
