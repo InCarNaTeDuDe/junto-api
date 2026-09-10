@@ -6,6 +6,7 @@ import {
   joinRide,
   updateRide,
   getMyRides,
+  confirmRidePassenger,
 } from "./rides.service";
 import {
   CreateRideInput,
@@ -132,6 +133,20 @@ export async function getMyRidesHandler(
       success: true,
       data: myRides,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function confirmPassengerHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id, passengerUserId } = req.params;
+    const result = await confirmRidePassenger(id, passengerUserId, req.user!);
+    return res.status(200).json(result);
   } catch (err) {
     next(err);
   }

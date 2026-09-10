@@ -1,8 +1,8 @@
 import { BaseRepository } from "./Base.repository";
 import {
-  ServiceProvider,
   LocalService,
-} from "../entities/ServiceProvider.entity";
+  LocalService as ServiceProvider,
+} from "../entities/LocalServices.entity";
 import { FindManyOptions } from "typeorm";
 
 export interface ServiceProRecord {
@@ -25,8 +25,10 @@ export interface ServiceProRecord {
 }
 
 export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
-  // In-memory fallback store if database is running without PostgreSQL connection
+  // Real-time store: hardcoded data commented out as requested.
+  // Real-time DB insertions and fetching are used exclusively.
   private fallbackStore: ServiceProvider[] = [
+    /*
     // 🔧 Fix & Repair
     {
       id: "pro_suresh_elec",
@@ -41,8 +43,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#EA580C",
       phone: "+91 98480 12345",
-      description:
-        "Licensed master electrician for house wiring, MCB switchboard, geyser & inverter repairs.",
+      description: "Licensed master electrician for house wiring, MCB switchboard, geyser & inverter repairs.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -60,8 +61,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#0284C7",
       phone: "+91 98480 54321",
-      description:
-        "Bathroom & kitchen leak repairs, pipeline blockage clearing, overhead tank & motor fitting.",
+      description: "Bathroom & kitchen leak repairs, pipeline blockage clearing, overhead tank & motor fitting.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -79,8 +79,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#059669",
       phone: "+91 98480 98765",
-      description:
-        "Split & window AC deep jet cleaning, gas charging, cooling coil repair & PCB troubleshooting.",
+      description: "Split & window AC deep jet cleaning, gas charging, cooling coil repair & PCB troubleshooting.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -98,8 +97,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#6366F1",
       phone: "+91 98480 34567",
-      description:
-        "Automatic front/top load washing machines, dryer drum, pump & motor board fixing.",
+      description: "Automatic front/top load washing machines, dryer drum, pump & motor board fixing.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -117,8 +115,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#D97706",
       phone: "+91 98480 23456",
-      description:
-        "Modular wardrobe repair, hydraulic hinges, custom shoe racks, door locks & furniture assembly.",
+      description: "Modular wardrobe repair, hydraulic hinges, custom shoe racks, door locks & furniture assembly.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -136,8 +133,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#8B5CF6",
       phone: "+91 98480 76543",
-      description:
-        "Smart 4K LED TV backlight, sound card, microwave oven & home electronics circuit repairs.",
+      description: "Smart 4K LED TV backlight, sound card, microwave oven & home electronics circuit repairs.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -157,8 +153,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#EC4899",
       phone: "+91 98480 77112",
-      description:
-        "GlamUp ✨ Certified bridal makeup, HD engagement look, party makeup & doorstep saree draping.",
+      description: "GlamUp ✨ Certified bridal makeup, HD engagement look, party makeup & doorstep saree draping.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -176,8 +171,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#F472B6",
       phone: "+91 98480 88223",
-      description:
-        "GlamUp ✨ Hydra glow facial, herbal cleanup, waxing, eyebrow shaping & threading at home.",
+      description: "GlamUp ✨ Hydra glow facial, herbal cleanup, waxing, eyebrow shaping & threading at home.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -195,8 +189,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#B45309",
       phone: "+91 98480 99334",
-      description:
-        "GlamUp ✨ Organic bridal mehendi, Arabic intricate patterns, stylish saree draping & nail art.",
+      description: "GlamUp ✨ Organic bridal mehendi, Arabic intricate patterns, stylish saree draping & nail art.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -214,8 +207,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#8B5CF6",
       phone: "+91 98480 66445",
-      description:
-        "GlamUp ✨ Doorstep hair styling, curls, party blowout, hair spa & brow threading.",
+      description: "GlamUp ✨ Doorstep hair styling, curls, party blowout, hair spa & brow threading.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -234,8 +226,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#DB2777",
       phone: "+91 98480 44556",
-      description:
-        "GlamUp ✨ Gel nails, acrylic extensions, chrome art, french manicure & pedicure at home.",
+      description: "GlamUp ✨ Gel nails, acrylic extensions, chrome art, french manicure & pedicure at home.",
       availableToday: true,
       cluster: "glam",
       createdAt: new Date(),
@@ -256,8 +247,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#10B981",
       phone: "+91 98480 87654",
-      description:
-        "Deep kitchen & bathroom scrubbing, sofa shampooing, full home sanitization & floor buffing.",
+      description: "Deep kitchen & bathroom scrubbing, sofa shampooing, full home sanitization & floor buffing.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -275,8 +265,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#F59E0B",
       phone: "+91 98480 33221",
-      description:
-        "Healthy North & South Indian home meals, daily tiffin service, temporary cook for family dinners.",
+      description: "Healthy North & South Indian home meals, daily tiffin service, temporary cook for family dinners.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -294,8 +283,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#DC2626",
       phone: "+91 98480 11998",
-      description:
-        "100% odorless herbal cockroach gel treatment, termite control & anti-mosquito fogging.",
+      description: "100% odorless herbal cockroach gel treatment, termite control & anti-mosquito fogging.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -313,8 +301,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#6366F1",
       phone: "+91 98480 44882",
-      description:
-        "Careful household packing, unpacking, heavy furniture loading & apartment shifting assistance.",
+      description: "Careful household packing, unpacking, heavy furniture loading & apartment shifting assistance.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -334,8 +321,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#9333EA",
       phone: "+91 98480 45678",
-      description:
-        "Doorstep bike servicing, engine oil change, brake calibration, spark plug & chain lubrication.",
+      description: "Doorstep bike servicing, engine oil change, brake calibration, spark plug & chain lubrication.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -353,8 +339,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#EF4444",
       phone: "+91 98480 55771",
-      description:
-        "24x7 mobile tubeless puncture repair, battery jumpstart & emergency air fill at your doorstep.",
+      description: "24x7 mobile tubeless puncture repair, battery jumpstart & emergency air fill at your doorstep.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -372,8 +357,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#06B6D4",
       phone: "+91 98480 22663",
-      description:
-        "Eco-friendly doorstep foam wash, high-power interior vacuuming & tire gloss polish.",
+      description: "Eco-friendly doorstep foam wash, high-power interior vacuuming & tire gloss polish.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -391,12 +375,12 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       verified: true,
       avatarBg: "#2563EB",
       phone: "+91 98480 99881",
-      description:
-        "24/7 on-call towing, emergency fuel drop, battery boost & minor breakdown roadside assistance.",
+      description: "24/7 on-call towing, emergency fuel drop, battery boost & minor breakdown roadside assistance.",
       availableToday: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as LocalService,
+    */
   ];
 
   constructor() {

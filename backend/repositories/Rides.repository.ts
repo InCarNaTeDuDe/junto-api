@@ -31,11 +31,13 @@ export interface RideRecord {
   status: "active" | "in_progress" | "completed" | "cancelled";
 
   passengers: Array<{
+    id?: string;
     userId: string;
     userName: string;
     seats: number;
     pickupPoint?: string;
     passengerPhone?: string;
+    status?: "pending" | "confirmed" | "declined";
     joinedAt: string;
   }>;
 
@@ -82,12 +84,14 @@ export class RideRepository extends BaseRepository<Ride> {
 
       status: ride.status,
 
-      passengers: (ride.passengers || []).map((passenger) => ({
+      passengers: (ride.passengers || []).map((passenger: any) => ({
+        id: passenger.id,
         userId: passenger.userId,
         userName: passenger.userName,
         seats: passenger.seats,
         pickupPoint: passenger.pickupPoint,
         passengerPhone: passenger.passengerPhone,
+        status: passenger.status || "pending",
         joinedAt: passenger.joinedAt,
       })),
 
@@ -240,9 +244,7 @@ export class RideRepository extends BaseRepository<Ride> {
   }
 
   /**
-   * Join ride.
-   *
-   * Currently only ONE passenger is allowed.
+   * Join ride / request seat
    */
   async joinRide(
     id: string,
@@ -268,11 +270,16 @@ export class RideRepository extends BaseRepository<Ride> {
       throw new Error("Ride is no longer active");
     }
 
-    // Only one passenger for now
-    if (ride.passengers && ride.passengers.length > 0) {
-      throw new Error(
-        "This ride already has a passenger. Only one passenger is allowed for now.",
-      );
+    const currentPassengers = Array.isArray(ride.passengers)
+      ? [...ride.passengers]
+      : [];
+
+    // Check if user already requested
+    const alreadyRequested = currentPassengers.find(
+      (p) => p.userId === passenger.userId,
+    );
+    if (alreadyRequested) {
+      throw new Error("You have already requested a seat for this ride.");
     }
 
     if (ride.seatsLeft < passenger.seats) {
@@ -281,23 +288,71 @@ export class RideRepository extends BaseRepository<Ride> {
       );
     }
 
-    ride.seatsLeft -= passenger.seats;
+    currentPassengers.push({
+      userId: passenger.userId,
+      userName: passenger.userName,
+      seats: passenger.seats,
+      pickupPoint: passenger.pickupPoint,
+      passengerPhone: passenger.passengerPhone,
+      status: "pending",
+      joinedAt: new Date().toISOString(),
+    });
 
-    ride.passengers = [
-      {
-        userId: passenger.userId,
-        userName: passenger.userName,
-        seats: passenger.seats,
-        pickupPoint: passenger.pickupPoint,
-        passengerPhone: passenger.passengerPhone,
-        joinedAt: new Date().toISOString(),
-      },
-    ];
-
+    ride.passengers = currentPassengers;
     ride.updatedAt = new Date();
 
     const savedRide = await this.repo.save(ride);
 
+    return this.toRideRecord(savedRide);
+  }
+
+  /**
+   * Confirm or select a passenger for a ride
+   */
+  async confirmPassenger(
+    rideId: string,
+    driverId: string,
+    passengerUserId: string,
+  ): Promise<RideRecord> {
+    const ride = await this.repo.findOne({
+      where: { id: rideId },
+    });
+
+    if (!ride) {
+      throw new Error("Ride not found");
+    }
+
+    if (ride.userId !== driverId) {
+      throw new Error(
+        "Only the ride creator can select and confirm passengers.",
+      );
+    }
+
+    const currentPassengers = Array.isArray(ride.passengers)
+      ? [...ride.passengers]
+      : [];
+    const targetPassenger = currentPassengers.find(
+      (p) => p.userId === passengerUserId,
+    );
+    if (!targetPassenger) {
+      throw new Error("Passenger request not found.");
+    }
+
+    if (targetPassenger.status !== "confirmed") {
+      const seatsToDeduct = targetPassenger.seats || 1;
+      if (ride.seatsLeft < seatsToDeduct) {
+        throw new Error(
+          "Not enough remaining seats to confirm this passenger.",
+        );
+      }
+      targetPassenger.status = "confirmed";
+      ride.seatsLeft = Math.max(0, ride.seatsLeft - seatsToDeduct);
+    }
+
+    ride.passengers = currentPassengers;
+    ride.updatedAt = new Date();
+
+    const savedRide = await this.repo.save(ride);
     return this.toRideRecord(savedRide);
   }
 

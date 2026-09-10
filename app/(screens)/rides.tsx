@@ -11,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   Image,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -29,6 +30,17 @@ import { useAuthContext } from "@/context/AuthContext";
 const CAR_ICON_IMG = require("@/assets/screens/purple_car_image.png");
 const BIKE_ICON_IMG = require("@/assets/screens/purple_bike_image.png");
 
+export interface RidePassenger {
+  id?: string;
+  userId: string;
+  userName: string;
+  seats: number;
+  pickupPoint?: string;
+  passengerPhone?: string;
+  status?: "pending" | "confirmed" | "declined";
+  joinedAt: string;
+}
+
 interface RideItem {
   id: string;
   userId?: string;
@@ -41,9 +53,11 @@ interface RideItem {
   time: string;
   vehicleType: "car" | "bike";
   seatsLeft: number;
+  totalSeats?: number;
   price: string;
   verified: boolean;
   notes?: string;
+  passengers?: RidePassenger[];
 }
 
 const PRESET_ROUTES = [
@@ -73,6 +87,49 @@ export default function RidesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedRideForParticipants, setSelectedRideForParticipants] =
+    useState<RideItem | null>(null);
+  const [isConfirmingPassenger, setIsConfirmingPassenger] = useState(false);
+
+  const handleConfirmPassenger = async (
+    rideId: string,
+    passengerUserId: string,
+  ) => {
+    try {
+      setIsConfirmingPassenger(true);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${rideId}/passengers/${passengerUserId}/confirm`, {});
+
+      if (res?.success) {
+        if (res.ride) {
+          setRidesList((prev) =>
+            prev.map((r) => (r.id === rideId ? { ...r, ...res.ride } : r)),
+          );
+          setSelectedRideForParticipants((prev) =>
+            prev && prev.id === rideId ? { ...prev, ...res.ride } : prev,
+          );
+        } else {
+          fetchRides();
+        }
+        Alert.alert(
+          "Co-Rider Confirmed",
+          res.message || "Passenger seat confirmed!",
+        );
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Could Not Confirm",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to confirm co-rider.",
+      );
+    } finally {
+      setIsConfirmingPassenger(false);
+    }
+  };
 
   const checkIsRideOwner = useCallback(
     (ride: RideItem) => {
@@ -779,27 +836,25 @@ export default function RidesScreen() {
                       </Text>
                     )}
 
-                    {/* Action Button: Post Owner CANNOT see "Request Seat" button */}
+                    {/* Action Button: Ride Creator views co-riders & selects among them */}
                     {isRideOwner ? (
-                      <View
+                      <TouchableOpacity
                         style={[
                           styles.bookBtn,
                           {
                             backgroundColor: isDark
-                              ? "rgba(124, 58, 237, 0.12)"
+                              ? "rgba(124, 58, 237, 0.16)"
                               : "#F5F3FF",
                             borderColor: isDark
-                              ? "rgba(139, 92, 246, 0.35)"
+                              ? "rgba(139, 92, 246, 0.45)"
                               : "#DDD6FE",
-                            borderWidth: 1,
+                            borderWidth: 1.5,
                           },
                         ]}
+                        onPress={() => setSelectedRideForParticipants(ride)}
+                        activeOpacity={0.8}
                       >
-                        <Ionicons
-                          name="shield-checkmark"
-                          size={15}
-                          color="#7C3AED"
-                        />
+                        <Ionicons name="people" size={15} color="#7C3AED" />
 
                         <Text
                           style={[
@@ -807,9 +862,9 @@ export default function RidesScreen() {
                             { color: "#7C3AED", fontWeight: "700" },
                           ]}
                         >
-                          Your Ride (Driver)
+                          View Co-Riders ({ride.passengers?.length || 0})
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         style={styles.bookBtn}
@@ -1458,6 +1513,290 @@ export default function RidesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Co-Riders & Requests Management Modal for Ride Creator */}
+      <Modal
+        visible={!!selectedRideForParticipants}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSelectedRideForParticipants(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.participantsModalCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            {/* Modal Header */}
+            <View style={styles.participantsModalHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.participantsHeaderRow}>
+                  <View style={styles.participantsIconBadge}>
+                    <Ionicons name="people" size={18} color="#7C3AED" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.participantsModalTitle,
+                      { color: textPrimary },
+                    ]}
+                  >
+                    Co-Riders & Requests
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.participantsModalSubtitle,
+                    { color: textMute },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedRideForParticipants?.from} ➔{" "}
+                  {selectedRideForParticipants?.to}
+                </Text>
+                <Text style={styles.participantsSeatsInfo}>
+                  💺 {selectedRideForParticipants?.seatsLeft} of{" "}
+                  {selectedRideForParticipants?.totalSeats ||
+                    (selectedRideForParticipants?.vehicleType === "bike"
+                      ? 1
+                      : 3)}{" "}
+                  seat(s) available
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalCloseCircle,
+                  { backgroundColor: isDark ? "#334155" : "#F1F5F9" },
+                ]}
+                onPress={() => setSelectedRideForParticipants(null)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={18} color={textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* List of Co-Rider Requests */}
+            <ScrollView
+              style={{ maxHeight: 380, width: "100%" }}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingVertical: 4 }}
+            >
+              {!selectedRideForParticipants?.passengers ||
+              selectedRideForParticipants.passengers.length === 0 ? (
+                <View style={styles.emptyParticipantsWrap}>
+                  <View
+                    style={[
+                      styles.emptyParticipantsIconWrap,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(124, 58, 237, 0.15)"
+                          : "#F5F3FF",
+                      },
+                    ]}
+                  >
+                    <Ionicons name="car-outline" size={36} color="#7C3AED" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.emptyParticipantsTitle,
+                      { color: textPrimary },
+                    ]}
+                  >
+                    No Seat Requests Yet
+                  </Text>
+                  <Text
+                    style={[styles.emptyParticipantsDesc, { color: textMute }]}
+                  >
+                    When commuters on this route request to join your ride, they
+                    will appear here. You can review their details, call them,
+                    and confirm their seat.
+                  </Text>
+                </View>
+              ) : (
+                selectedRideForParticipants.passengers.map((passenger, idx) => {
+                  const isConfirmed = passenger.status === "confirmed";
+                  return (
+                    <View
+                      key={passenger.id || passenger.userId || idx}
+                      style={[
+                        styles.participantCard,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderColor: isConfirmed
+                            ? "#10B981"
+                            : isDark
+                              ? "#334155"
+                              : "#E2E8F0",
+                          borderWidth: isConfirmed ? 1.5 : 1,
+                        },
+                      ]}
+                    >
+                      <View style={styles.participantTopRow}>
+                        <View style={styles.participantAvatar}>
+                          <Text style={styles.participantAvatarText}>
+                            {(passenger.userName || "C")
+                              .charAt(0)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.participantName,
+                                { color: textPrimary },
+                              ]}
+                            >
+                              {passenger.userName}
+                            </Text>
+
+                            <View
+                              style={[
+                                styles.participantStatusPill,
+                                {
+                                  backgroundColor: isConfirmed
+                                    ? "rgba(16, 185, 129, 0.15)"
+                                    : "rgba(245, 158, 11, 0.15)",
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.participantStatusText,
+                                  {
+                                    color: isConfirmed ? "#10B981" : "#D97706",
+                                  },
+                                ]}
+                              >
+                                {isConfirmed ? "✓ Confirmed" : "Pending"}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text
+                            style={[
+                              styles.participantDetail,
+                              { color: textMute },
+                            ]}
+                          >
+                            Requested {passenger.seats || 1} seat(s)
+                          </Text>
+                        </View>
+                      </View>
+
+                      {passenger.pickupPoint ? (
+                        <View style={styles.participantPickupWrap}>
+                          <Ionicons
+                            name="location-outline"
+                            size={14}
+                            color="#7C3AED"
+                          />
+                          <Text
+                            style={[
+                              styles.participantPickupText,
+                              { color: textPrimary },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            Pickup: {passenger.pickupPoint}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      <View style={styles.participantActionsRow}>
+                        {passenger.passengerPhone ? (
+                          <TouchableOpacity
+                            style={[
+                              styles.callBtn,
+                              {
+                                backgroundColor: isDark ? "#334155" : "#E2E8F0",
+                              },
+                            ]}
+                            onPress={() =>
+                              Linking.openURL(`tel:${passenger.passengerPhone}`)
+                            }
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name="call"
+                              size={13}
+                              color={textPrimary}
+                            />
+                            <Text
+                              style={[
+                                styles.callBtnText,
+                                { color: textPrimary },
+                              ]}
+                            >
+                              Call {passenger.passengerPhone}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+
+                        {isConfirmed ? (
+                          <View style={styles.confirmedPill}>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={16}
+                              color="#10B981"
+                            />
+                            <Text style={styles.confirmedPillText}>
+                              Confirmed
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={[
+                              styles.selectPassengerBtn,
+                              { opacity: isConfirmingPassenger ? 0.7 : 1 },
+                            ]}
+                            onPress={() =>
+                              handleConfirmPassenger(
+                                selectedRideForParticipants.id,
+                                passenger.userId,
+                              )
+                            }
+                            disabled={isConfirmingPassenger}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name="checkmark"
+                              size={15}
+                              color="#FFFFFF"
+                            />
+                            <Text style={styles.selectPassengerBtnText}>
+                              {isConfirmingPassenger
+                                ? "Confirming..."
+                                : "Select & Confirm"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalDoneBtn}
+                onPress={() => setSelectedRideForParticipants(null)}
+              >
+                <Text style={styles.modalDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2063,5 +2402,181 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  participantsModalCard: {
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "85%",
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+  },
+  participantsModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(148, 163, 184, 0.15)",
+    paddingBottom: 12,
+  },
+  participantsHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  participantsIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(124, 58, 237, 0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  participantsModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  participantsModalSubtitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  participantsSeatsInfo: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#7C3AED",
+    marginTop: 2,
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyParticipantsWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  emptyParticipantsIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyParticipantsTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  emptyParticipantsDesc: {
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  participantCard: {
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  participantTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  participantAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  participantAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  participantStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  participantStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  participantDetail: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  participantPickupWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 2,
+  },
+  participantPickupText: {
+    fontSize: 12,
+    flex: 1,
+  },
+  participantActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(148, 163, 184, 0.12)",
+  },
+  callBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  callBtnText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  confirmedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+  },
+  confirmedPillText: {
+    color: "#10B981",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  selectPassengerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#10B981",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  selectPassengerBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

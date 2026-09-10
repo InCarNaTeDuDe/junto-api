@@ -25,6 +25,12 @@ import { useAuthContext } from "@/context/AuthContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import {
+  MarketplaceTabs,
+  FindTab,
+  EnrollTab,
+  EnrollFormData,
+} from "@/components/marketplace";
 
 export interface GlamCategoryConfig {
   id: string;
@@ -384,32 +390,42 @@ export default function GlamUpScreen() {
   };
 
   // Handle Joining as Glam Artist via GlamUp Service & Repository
-  const handleEnrollSubmit = async () => {
+  const handleEnrollSubmit = async (formData?: EnrollFormData) => {
     setEnrollFormError(null);
-    if (!enrollName.trim()) {
+    const nameToUse = formData ? formData.name : enrollName;
+    const phoneToUse = formData ? formData.phone : enrollPhone;
+    const catToUse = formData ? formData.category : enrollCategory;
+    const expToUse = formData ? formData.experience : enrollExperience;
+    const distToUse = formData ? formData.distance : enrollDistance;
+    const rateToUse = formData ? formData.rate : enrollVisitingCharge;
+    const descToUse = formData ? formData.description : enrollDescription;
+    const availToUse = formData
+      ? formData.availableToday
+      : enrollAvailableToday;
+
+    if (!nameToUse.trim()) {
       setEnrollFormError("Please enter your name or studio name.");
       return;
     }
-    if (!enrollPhone.trim() || enrollPhone.trim().length < 8) {
+    if (!phoneToUse.trim() || phoneToUse.trim().length < 8) {
       setEnrollFormError("Please enter a valid phone number.");
       return;
     }
 
     setIsEnrollingSubmitting(true);
     try {
-      const chargeNum =
-        parseFloat(enrollVisitingCharge.replace(/[^0-9.]/g, "")) || 299;
+      const chargeNum = parseFloat(rateToUse.replace(/[^0-9.]/g, "")) || 299;
       const payload = {
-        name: enrollName.trim(),
-        category: enrollCategory,
+        name: nameToUse.trim(),
+        category: catToUse,
         categoryIcon: "sparkles",
-        phone: enrollPhone.trim(),
-        experience: enrollExperience,
-        distance: enrollDistance,
+        phone: phoneToUse.trim(),
+        experience: expToUse || "3+ yrs exp",
+        distance: distToUse || "Near you",
         rate: `From ₹${chargeNum} visit`,
         price: chargeNum,
-        description: `GlamUp ✨ ${enrollDescription.trim()}`,
-        availableToday: enrollAvailableToday,
+        description: `GlamUp ✨ ${descToUse.trim()}`,
+        availableToday: availToUse,
         verified: true,
       };
 
@@ -555,64 +571,16 @@ export default function GlamUpScreen() {
       </View>
 
       {/* Main Tabs (Find Artists vs Join as Artist) */}
-      <View
-        style={[
-          styles.tabBar,
-          {
-            borderBottomColor: borderCol,
-            backgroundColor: isDark ? "#0F071D" : "#FFFFFF",
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === "find" && styles.tabItemActive]}
-          onPress={() => setActiveTab("find")}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="sparkles"
-            size={16}
-            color={activeTab === "find" ? brandPink : textSub}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color: activeTab === "find" ? brandPink : textSub,
-                fontWeight: activeTab === "find" ? "700" : "500",
-              },
-            ]}
-          >
-            Find Artists & Salon
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.tabItem,
-            activeTab === "enroll" && styles.tabItemActive,
-          ]}
-          onPress={() => setActiveTab("enroll")}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="person-add"
-            size={16}
-            color={activeTab === "enroll" ? brandPink : textSub}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color: activeTab === "enroll" ? brandPink : textSub,
-                fontWeight: activeTab === "enroll" ? "700" : "500",
-              },
-            ]}
-          >
-            Join as Glam Artist
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <MarketplaceTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        findLabel="Find Artists & Salon"
+        findIcon="sparkles"
+        enrollLabel="Join as Glam Artist"
+        enrollIcon="brush"
+        accentColor={brandPink}
+        isDark={isDark}
+      />
 
       {/* Content */}
       {activeTab === "find" ? (
@@ -623,476 +591,182 @@ export default function GlamUpScreen() {
             { paddingBottom: insets.bottom + 32 },
           ]}
         >
-          {/* Quick Broadcast Need Dropdown */}
-          {showBroadcastBanner && (
-            <View
-              style={[
-                styles.broadcastCard,
-                {
-                  backgroundColor: isDark ? "#1E0D36" : "#FFF1F2",
-                  borderColor: "#FDA4AF",
-                },
-              ]}
-            >
-              <View style={styles.broadcastCardHeader}>
-                <View style={styles.broadcastTitleGroup}>
-                  <Text style={{ fontSize: 18 }}>📢</Text>
-                  <Text
-                    style={[
-                      styles.broadcastCardTitle,
-                      { color: isDark ? "#FFF" : "#9F1239" },
-                    ]}
-                  >
-                    Broadcast Urgent Beauty Need
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowBroadcastBanner(false)}>
-                  <Ionicons name="close-circle" size={20} color="#BE123C" />
-                </TouchableOpacity>
-              </View>
-
-              <Text
-                style={[
-                  styles.broadcastCardSub,
-                  { color: isDark ? "rgba(255,255,255,0.7)" : "#881337" },
-                ]}
-              >
-                Notify all nearby verified makeup artists and beauticians in{" "}
-                {cityName} instantly.
-              </Text>
-
-              {/* Quick Category Chips */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.broadcastCategoryScroll}
-              >
-                {[
-                  "Bridal Makeup",
-                  "Party Makeup",
-                  "Hair Styling",
-                  "Facial",
-                  "Mehendi",
-                  "Nails",
-                  "Threading",
-                ].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.broadcastCatChip,
-                      {
-                        backgroundColor:
-                          broadcastCategory === cat
-                            ? brandPink
-                            : isDark
-                              ? "#2C144D"
-                              : "#FFE4E6",
-                        borderColor:
-                          broadcastCategory === cat
-                            ? brandPink
-                            : isDark
-                              ? "#481E7B"
-                              : "#FDA4AF",
-                      },
-                    ]}
-                    onPress={() => setBroadcastCategory(cat)}
-                  >
-                    <Text
-                      style={[
-                        styles.broadcastCatText,
-                        {
-                          color:
-                            broadcastCategory === cat
-                              ? "#FFF"
-                              : isDark
-                                ? "#F472B6"
-                                : "#9F1239",
-                        },
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <TextInput
-                style={[
-                  styles.broadcastInput,
-                  {
-                    backgroundColor: isDark ? "#140726" : "#FFFFFF",
-                    color: textMain,
-                    borderColor: isDark ? "#451B78" : "#FECDD3",
-                  },
-                ]}
-                placeholder="e.g. Need party makeup for 3 people this evening at Gachibowli..."
-                placeholderTextColor={isDark ? "#7E609C" : "#9CA3AF"}
-                value={broadcastNote}
-                onChangeText={setBroadcastNote}
-                multiline
-                numberOfLines={2}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.broadcastSubmitBtn,
-                  { backgroundColor: brandPink },
-                ]}
-                onPress={handleSendBroadcast}
-                disabled={isBroadcasting}
-                activeOpacity={0.8}
-              >
-                {isBroadcasting ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="paper-plane" size={16} color="#FFF" />
-                    <Text style={styles.broadcastSubmitBtnText}>
-                      Broadcast to Artists Nearby
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Search & Voice Bar */}
-          <View
-            style={[
-              styles.searchBox,
-              { backgroundColor: cardBg, borderColor: borderCol },
-            ]}
-          >
-            <Ionicons name="search" size={18} color={brandPink} />
-            <TextInput
-              style={[styles.searchInput, { color: textMain }]}
-              placeholder="Search bridal, party makeup, facial, mehendi..."
-              placeholderTextColor={
-                isDark ? "rgba(255,255,255,0.4)" : "#94A3B8"
+          <FindTab
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search bridal, party makeup, facial, mehendi..."
+            categories={GLAM_CATEGORIES}
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            verifiedOnly={verifiedOnly}
+            onToggleVerified={() => setVerifiedOnly(!verifiedOnly)}
+            providers={artistsList.map((a) => ({
+              ...a,
+              price: parseFloat(a.rate?.replace(/[^0-9.]/g, "") || "299"),
+            }))}
+            isLoading={isLoading}
+            loadingMessage={`Finding doorstep beauty artists in ${cityName}...`}
+            onSelectProvider={(p) => {
+              const original = artistsList.find((a) => a.id === p.id);
+              if (original) {
+                setSelectedArtist(original);
+                setBookingServiceType(original.category);
               }
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                style={{ padding: 4 }}
-              >
-                <Ionicons name="close-circle" size={16} color={textSub} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.voiceBtn,
-                isSearchListening && styles.voiceBtnListening,
-              ]}
-              onPress={() =>
-                startSearchListening((transcript) => {
-                  setSearchQuery(transcript);
-                })
-              }
-            >
-              <Ionicons
-                name={isSearchListening ? "radio" : "mic"}
-                size={16}
-                color={isSearchListening ? "#EF4444" : brandPink}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Categories Horizontal Scroll */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            {GLAM_CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryPill,
-                    {
-                      backgroundColor: active
-                        ? brandPink
-                        : isDark
-                          ? cat.bgDark
-                          : cat.bgLight,
-                      borderColor: active
-                        ? brandPink
-                        : isDark
-                          ? "#38185C"
-                          : "#FCE7F3",
-                    },
-                  ]}
-                  onPress={() => setSelectedCategory(cat.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ fontSize: 14 }}>{cat.emoji}</Text>
-                  <Text
-                    style={[
-                      styles.categoryPillText,
-                      {
-                        color: active
-                          ? "#FFFFFF"
-                          : isDark
-                            ? "#F472B6"
-                            : "#9F1239",
-                        fontWeight: active ? "700" : "600",
-                      },
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Filter Bar: Verified Only toggle & Results Count */}
-          <View style={styles.filterBar}>
-            <Text style={[styles.resultsCount, { color: textSub }]}>
-              {artistsList.length} verified doorstep beauty specialists
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.verifiedFilterBtn,
-                verifiedOnly && styles.verifiedFilterBtnActive,
-              ]}
-              onPress={() => setVerifiedOnly(!verifiedOnly)}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="shield-checkmark"
-                size={14}
-                color={verifiedOnly ? "#FFFFFF" : brandPink}
-              />
-              <Text
-                style={[
-                  styles.verifiedFilterText,
-                  { color: verifiedOnly ? "#FFFFFF" : brandPink },
-                ]}
-              >
-                Verified Only
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Artists List */}
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={brandPink} />
-              <Text style={[styles.loadingText, { color: textSub }]}>
-                Finding doorstep beauty artists in {cityName}...
-              </Text>
-            </View>
-          ) : artistsList.length === 0 ? (
-            <View
-              style={[
-                styles.emptyCard,
-                { backgroundColor: cardBg, borderColor: borderCol },
-              ]}
-            >
-              <Text style={{ fontSize: 40, marginBottom: 8 }}>💄</Text>
-              <Text style={[styles.emptyTitle, { color: textMain }]}>
-                No beauty specialists found
-              </Text>
-              <Text style={[styles.emptySub, { color: textSub }]}>
-                Try selecting "All Beauty" or broadcast your need using the
-                1-Tap Need button.
-              </Text>
-              <TouchableOpacity
-                style={[styles.resetBtn, { backgroundColor: brandPink }]}
-                onPress={() => {
-                  setSelectedCategory("all");
-                  setSearchQuery("");
-                }}
-              >
-                <Text style={styles.resetBtnText}>View All Beauty Artists</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            artistsList.map((artist) => (
-              <View
-                key={artist.id}
-                style={[
-                  styles.artistCard,
-                  {
-                    backgroundColor: cardBg,
-                    borderColor: borderCol,
-                  },
-                ]}
-              >
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[
-                      styles.avatarCircle,
-                      { backgroundColor: artist.avatarBg || brandPink },
-                    ]}
-                  >
-                    <Ionicons
-                      name={artist.categoryIcon || "sparkles"}
-                      size={22}
-                      color="#FFFFFF"
-                    />
-                  </View>
-
-                  <View style={styles.artistInfo}>
-                    <View style={styles.nameRow}>
-                      <Text
-                        style={[styles.artistName, { color: textMain }]}
-                        numberOfLines={1}
-                      >
-                        {artist.name}
-                      </Text>
-                      {artist.verified && (
-                        <View style={styles.verifiedBadge}>
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={14}
-                            color="#10B981"
-                          />
-                          <Text style={styles.verifiedBadgeText}>Verified</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={styles.badgeRow}>
-                      <View
-                        style={[
-                          styles.categoryTag,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(236,72,153,0.2)"
-                              : "#FDF2F8",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[styles.categoryTagText, { color: brandPink }]}
-                        >
-                          💄 {artist.category}
-                        </Text>
-                      </View>
-                      <View style={styles.ratingBox}>
-                        <Ionicons name="star" size={13} color="#F59E0B" />
-                        <Text style={styles.ratingVal}>
-                          {artist.rating.toFixed(1)}
-                        </Text>
-                        <Text style={styles.ratingCount}>
-                          ({artist.reviewsCount})
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                {artist.description && (
-                  <Text
-                    style={[
-                      styles.artistDesc,
-                      { color: isDark ? "rgba(255,255,255,0.75)" : "#475569" },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {artist.description}
-                  </Text>
-                )}
-
+            }}
+            onResetFilters={() => {
+              setSelectedCategory("all");
+              setSearchQuery("");
+            }}
+            accentColor={brandPink}
+            actionButtonText="Book Doorstep"
+            actionButtonIcon="calendar"
+            isDark={isDark}
+            isListening={isSearchListening}
+            onVoicePress={() =>
+              startSearchListening((transcript) => {
+                setSearchQuery(transcript);
+              })
+            }
+            itemNoun="doorstep beauty specialists"
+            emptyEmoji="💄"
+            emptyTitle="No beauty specialists found"
+            emptySubtitle='Try selecting "All Beauty" or broadcast your need using the 1-Tap Need button.'
+            headerContent={
+              showBroadcastBanner ? (
                 <View
                   style={[
-                    styles.metaRow,
-                    { borderTopColor: borderCol, borderBottomColor: borderCol },
+                    styles.broadcastCard,
+                    {
+                      backgroundColor: isDark ? "#1E0D36" : "#FFF1F2",
+                      borderColor: "#FDA4AF",
+                    },
                   ]}
                 >
-                  <View style={styles.metaItem}>
-                    <Ionicons
-                      name="briefcase-outline"
-                      size={13}
-                      color={textSub}
-                    />
-                    <Text style={[styles.metaText, { color: textSub }]}>
-                      {artist.experience}
-                    </Text>
-                  </View>
-                  <View style={styles.metaDivider} />
-                  <View style={styles.metaItem}>
-                    <Ionicons
-                      name="location-outline"
-                      size={13}
-                      color={textSub}
-                    />
-                    <Text style={[styles.metaText, { color: textSub }]}>
-                      {artist.distance}
-                    </Text>
-                  </View>
-                  <View style={styles.metaDivider} />
-                  <View style={styles.metaItem}>
-                    <Ionicons
-                      name="pricetag-outline"
-                      size={13}
-                      color={brandPink}
-                    />
-                    <Text
-                      style={[
-                        styles.metaText,
-                        { color: brandPink, fontWeight: "700" },
-                      ]}
-                    >
-                      {artist.rate}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Hygiene & Booking Buttons */}
-                <View style={styles.cardActionRow}>
-                  <View style={styles.arrivalTag}>
-                    <View style={styles.liveDot} />
-                    <Text
-                      style={[
-                        styles.arrivalText,
-                        { color: isDark ? "#A7F3D0" : "#065F46" },
-                      ]}
-                    >
-                      Available Today • 30-45m
-                    </Text>
-                  </View>
-
-                  <View style={styles.buttonGroup}>
+                  <View style={styles.broadcastCardHeader}>
+                    <View style={styles.broadcastTitleGroup}>
+                      <Text style={{ fontSize: 18 }}>📢</Text>
+                      <Text
+                        style={[
+                          styles.broadcastCardTitle,
+                          { color: isDark ? "#FFF" : "#9F1239" },
+                        ]}
+                      >
+                        Broadcast Urgent Beauty Need
+                      </Text>
+                    </View>
                     <TouchableOpacity
-                      style={[styles.callBtn, { borderColor: borderCol }]}
-                      onPress={() => {
-                        Alert.alert(
-                          "Direct Call",
-                          `Call ${artist.name} at ${artist.phone} for inquiries?`,
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            { text: "Call", onPress: () => {} },
-                          ],
-                        );
-                      }}
-                      activeOpacity={0.7}
+                      onPress={() => setShowBroadcastBanner(false)}
                     >
-                      <Ionicons name="call" size={14} color={brandPink} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.bookBtn, { backgroundColor: brandPink }]}
-                      onPress={() => {
-                        setSelectedArtist(artist);
-                        setBookingServiceType(artist.category);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="calendar" size={14} color="#FFF" />
-                      <Text style={styles.bookBtnText}>Book Doorstep</Text>
+                      <Ionicons name="close-circle" size={20} color="#BE123C" />
                     </TouchableOpacity>
                   </View>
+
+                  <Text
+                    style={[
+                      styles.broadcastCardSub,
+                      { color: isDark ? "rgba(255,255,255,0.7)" : "#881337" },
+                    ]}
+                  >
+                    Notify all nearby verified makeup artists and beauticians in{" "}
+                    {cityName} instantly.
+                  </Text>
+
+                  {/* Quick Category Chips */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.broadcastCategoryScroll}
+                  >
+                    {[
+                      "Bridal Makeup",
+                      "Party Makeup",
+                      "Hair Styling",
+                      "Facial",
+                      "Mehendi",
+                      "Nails",
+                      "Threading",
+                    ].map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.broadcastCatChip,
+                          {
+                            backgroundColor:
+                              broadcastCategory === cat
+                                ? brandPink
+                                : isDark
+                                  ? "#2C144D"
+                                  : "#FFE4E6",
+                            borderColor:
+                              broadcastCategory === cat
+                                ? brandPink
+                                : isDark
+                                  ? "#481E7B"
+                                  : "#FDA4AF",
+                          },
+                        ]}
+                        onPress={() => setBroadcastCategory(cat)}
+                      >
+                        <Text
+                          style={[
+                            styles.broadcastCatText,
+                            {
+                              color:
+                                broadcastCategory === cat
+                                  ? "#FFF"
+                                  : isDark
+                                    ? "#F472B6"
+                                    : "#9F1239",
+                            },
+                          ]}
+                        >
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <TextInput
+                    style={[
+                      styles.broadcastInput,
+                      {
+                        backgroundColor: isDark ? "#140726" : "#FFFFFF",
+                        color: textMain,
+                        borderColor: isDark ? "#451B78" : "#FECDD3",
+                      },
+                    ]}
+                    placeholder="e.g. Need party makeup for 3 people this evening at Gachibowli..."
+                    placeholderTextColor={isDark ? "#7E609C" : "#9CA3AF"}
+                    value={broadcastNote}
+                    onChangeText={setBroadcastNote}
+                    multiline
+                    numberOfLines={2}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.broadcastSubmitBtn,
+                      { backgroundColor: brandPink },
+                    ]}
+                    onPress={handleSendBroadcast}
+                    disabled={isBroadcasting}
+                    activeOpacity={0.8}
+                  >
+                    {isBroadcasting ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="paper-plane" size={16} color="#FFF" />
+                        <Text style={styles.broadcastSubmitBtnText}>
+                          Broadcast to Artists Nearby
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
-            ))
-          )}
+              ) : null
+            }
+          />
         </ScrollView>
       ) : (
         /* Tab 2: Join as Glam Artist */
@@ -1103,273 +777,51 @@ export default function GlamUpScreen() {
             { paddingBottom: insets.bottom + 32 },
           ]}
         >
-          <View
-            style={[
-              styles.enrollHero,
-              {
-                backgroundColor: isDark ? "#1C0D30" : "#FDF2F8",
-                borderColor: isDark ? "#38185C" : "#FCE7F3",
-              },
+          <EnrollTab
+            heroIcon="💅"
+            heroTitle="Join as a Doorstep Glam Artist"
+            heroSubtitle={`Get booked directly by clients nearby in ${cityName} for bridal makeup, hair styling, mehendi, and doorstep salon.`}
+            cityName={cityName}
+            categories={[
+              "Bridal Makeup",
+              "Party Makeup",
+              "Hair Styling",
+              "Facial & Glow",
+              "Brows & Threading",
+              "Nails & Art",
+              "Mehendi Art",
+              "Saree Draping",
+              "Waxing & Detan",
             ]}
-          >
-            <Text style={{ fontSize: 36, marginBottom: 6 }}>💅</Text>
-            <Text
-              style={[
-                styles.enrollHeroTitle,
-                { color: isDark ? "#FFF" : "#9F1239" },
-              ]}
-            >
-              Join as a Doorstep Glam Artist
-            </Text>
-            <Text
-              style={[
-                styles.enrollHeroSub,
-                { color: isDark ? "rgba(255,255,255,0.7)" : "#881337" },
-              ]}
-            >
-              Get booked directly by clients nearby in {cityName} for bridal
-              makeup, hair styling, mehendi, and doorstep salon.
-            </Text>
-          </View>
-
-          {enrollFormError && (
-            <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={16} color="#DC2626" />
-              <Text style={styles.errorBannerText}>{enrollFormError}</Text>
-            </View>
-          )}
-
-          <View
-            style={[
-              styles.enrollFormCard,
-              { backgroundColor: cardBg, borderColor: borderCol },
-            ]}
-          >
-            <Text style={[styles.inputLabel, { color: textMain }]}>
-              Artist / Studio Name *
-            </Text>
-            <TextInput
-              style={[
-                styles.formInput,
-                {
-                  backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                  color: textMain,
-                  borderColor: borderCol,
-                },
-              ]}
-              placeholder="e.g. Rashmi Bridal Makeovers"
-              placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-              value={enrollName}
-              onChangeText={setEnrollName}
-            />
-
-            <Text
-              style={[styles.inputLabel, { color: textMain, marginTop: 14 }]}
-            >
-              Primary Specialty *
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 8 }}
-            >
-              {[
-                "Bridal Makeup",
-                "Party Makeup",
-                "Hair Styling",
-                "Facial & Glow",
-                "Brows & Threading",
-                "Nails & Art",
-                "Mehendi Art",
-                "Saree Draping",
-                "Waxing & Detan",
-              ].map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.enrollCatChip,
-                    {
-                      backgroundColor:
-                        enrollCategory === cat
-                          ? brandPink
-                          : isDark
-                            ? "#23113D"
-                            : "#FDF2F8",
-                      borderColor:
-                        enrollCategory === cat ? brandPink : borderCol,
-                    },
-                  ]}
-                  onPress={() => setEnrollCategory(cat)}
-                >
-                  <Text
-                    style={[
-                      styles.enrollCatText,
-                      {
-                        color:
-                          enrollCategory === cat
-                            ? "#FFF"
-                            : isDark
-                              ? "#F472B6"
-                              : "#9F1239",
-                      },
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text
-              style={[styles.inputLabel, { color: textMain, marginTop: 14 }]}
-            >
-              Phone Number *
-            </Text>
-            <TextInput
-              style={[
-                styles.formInput,
-                {
-                  backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                  color: textMain,
-                  borderColor: borderCol,
-                },
-              ]}
-              placeholder="+91 98480 12345"
-              placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-              value={enrollPhone}
-              onChangeText={setEnrollPhone}
-              keyboardType="phone-pad"
-            />
-
-            <View style={styles.twoColRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text
-                  style={[
-                    styles.inputLabel,
-                    { color: textMain, marginTop: 14 },
-                  ]}
-                >
-                  Experience
-                </Text>
-                <TextInput
-                  style={[
-                    styles.formInput,
-                    {
-                      backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                      color: textMain,
-                      borderColor: borderCol,
-                    },
-                  ]}
-                  placeholder="e.g. 5 yrs exp"
-                  placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-                  value={enrollExperience}
-                  onChangeText={setEnrollExperience}
-                />
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text
-                  style={[
-                    styles.inputLabel,
-                    { color: textMain, marginTop: 14 },
-                  ]}
-                >
-                  Starting Visit (₹)
-                </Text>
-                <TextInput
-                  style={[
-                    styles.formInput,
-                    {
-                      backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                      color: textMain,
-                      borderColor: borderCol,
-                    },
-                  ]}
-                  placeholder="299"
-                  placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-                  value={enrollVisitingCharge}
-                  onChangeText={setEnrollVisitingCharge}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <Text
-              style={[styles.inputLabel, { color: textMain, marginTop: 14 }]}
-            >
-              Coverage Area
-            </Text>
-            <TextInput
-              style={[
-                styles.formInput,
-                {
-                  backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                  color: textMain,
-                  borderColor: borderCol,
-                },
-              ]}
-              placeholder="e.g. Within 5 km of Banjara Hills"
-              placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-              value={enrollDistance}
-              onChangeText={setEnrollDistance}
-            />
-
-            <Text
-              style={[styles.inputLabel, { color: textMain, marginTop: 14 }]}
-            >
-              About Your Doorstep Service
-            </Text>
-            <TextInput
-              style={[
-                styles.formInputMulti,
-                {
-                  backgroundColor: isDark ? "#0D051A" : "#F8FAFC",
-                  color: textMain,
-                  borderColor: borderCol,
-                },
-              ]}
-              placeholder="Describe your kits, cosmetic brands used (MAC, Huda, Kryolan), sanitation practices..."
-              placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-              value={enrollDescription}
-              onChangeText={setEnrollDescription}
-              multiline
-              numberOfLines={3}
-            />
-
-            <View style={styles.switchRow}>
-              <View>
-                <Text style={[styles.switchTitle, { color: textMain }]}>
-                  Available Today for Bookings
-                </Text>
-                <Text style={[styles.switchSub, { color: textSub }]}>
-                  Clients see green "Available Today" badge
-                </Text>
-              </View>
-              <Switch
-                value={enrollAvailableToday}
-                onValueChange={setEnrollAvailableToday}
-                trackColor={{ false: "#64748B", true: brandPink }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.enrollSubmitBtn, { backgroundColor: brandPink }]}
-              onPress={handleEnrollSubmit}
-              disabled={isEnrollingSubmitting}
-              activeOpacity={0.8}
-            >
-              {isEnrollingSubmitting ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={18} color="#FFF" />
-                  <Text style={styles.enrollSubmitBtnText}>
-                    Publish My Glam Profile
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+            initialData={{
+              name: enrollName,
+              category: enrollCategory,
+              phone: enrollPhone,
+              experience: enrollExperience,
+              rate: enrollVisitingCharge,
+              distance: enrollDistance,
+              description: enrollDescription,
+              availableToday: enrollAvailableToday,
+            }}
+            onSubmit={async (formData) => {
+              await handleEnrollSubmit(formData);
+            }}
+            isSubmitting={isEnrollingSubmitting}
+            accentColor={brandPink}
+            nameLabel="Artist / Studio Name"
+            namePlaceholder="e.g. Rashmi Bridal Makeovers"
+            phoneLabel="Mobile Number"
+            rateLabel="Cost per Visit (₹)"
+            ratePlaceholder="299"
+            experienceLabel="Years of Experience"
+            experiencePlaceholder="Select Years of Experience"
+            distancePlaceholder="e.g. Within 5 km of Banjara Hills"
+            descriptionLabel="About Your Doorstep Service"
+            descriptionPlaceholder="Describe your kits, cosmetic brands used (MAC, Huda, Kryolan), sanitation practices..."
+            submitButtonText="Publish My Glam Profile"
+            errorMessage={enrollFormError}
+            isDark={isDark}
+          />
         </ScrollView>
       )}
 

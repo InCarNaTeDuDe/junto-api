@@ -1,4 +1,6 @@
 import { User } from "../entities/User.entity";
+import { localServicesRepository } from "../repositories/LocalServices.repository";
+import { LocalService } from "../entities/LocalService.entity";
 import {
   CreateServiceProInput,
   QueryServicesInput,
@@ -7,12 +9,12 @@ import {
 } from "./localservices.schema";
 import { io } from "../socket/socket";
 import { sendExpoPushNotification } from "../notifications/notifications.service";
-import { localServicesRepository } from "../repositories/LocalServices.repository";
 
 export interface ServiceProRecord {
   id: string;
   name: string;
   category: string;
+  cluster?: string;
   categoryIcon: string;
   rating: number;
   reviewsCount: number;
@@ -240,10 +242,12 @@ export async function createServicePro(
   const priceMatch = (input.rate || "").match(/\d+/);
   const numericPrice = priceMatch ? parseFloat(priceMatch[0]) : undefined;
 
-  // Insert into DB entity (local_services table via LocalServicesRepository)
+  // Insert into DB entity (service_providers table via LocalServicesRepository)
   const savedEntity = await localServicesRepository.createService({
     providerId: user?.id || undefined,
+    name: input.name,
     title: input.name,
+    cluster: input.cluster || "fix",
     category: input.category,
     description:
       input.description || `Expert ${input.category} doorstep service`,
@@ -263,10 +267,15 @@ export async function createServicePro(
   });
 
   const newPro = localServicesRepository.toRecord(savedEntity);
-  console.log(`[LocalServices] Saved technician into DB with ID: ${newPro.id}`);
+  console.log(
+    `[ServiceProvider] Saved expert into DB with ID: ${newPro.id} (cluster: ${newPro.cluster})`,
+  );
 
   if (io) {
     io.emit("service_pro_created", newPro);
+    if (newPro.cluster === "glam") {
+      io.emit("glam_artist_created", newPro);
+    }
     const allPros = (await localServicesRepository.findAllServices()).map((p) =>
       localServicesRepository.toRecord(p),
     );

@@ -162,11 +162,13 @@ export class Ride {
     default: () => "'[]'",
   })
   passengers!: Array<{
+    id?: string;
     userId: string;
     userName: string;
     seats: number;
     pickupPoint?: string;
     passengerPhone?: string;
+    status?: "pending" | "confirmed" | "declined";
     joinedAt: string;
   }>;
 

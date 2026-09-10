@@ -11,7 +11,7 @@ import { Message } from "../entities/Message.entity";
 import { Notification } from "../entities/Notification.entity";
 import { Ride } from "../entities/Rides.entity";
 import { LocalDeal } from "../entities/LocalDeals.entity";
-import { ServiceProvider } from "../entities/ServiceProvider.entity";
+import { LocalService } from "../entities/LocalServices.entity";
 import { SupportChat } from "../entities/SupportChat.entity";
 
 // import { inMemoryStore } from "../db"; // <-- adjust path if needed
@@ -41,7 +41,7 @@ export const AppDataSource = new DataSource({
     Message,
     Ride,
     LocalDeal,
-    ServiceProvider,
+    LocalService,
     SupportChat,
   ],
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
@@ -69,10 +69,7 @@ export async function initializeDatabase() {
 
     console.log("TypeORM: Successfully connected to PostgreSQL.");
   } catch (err) {
-    console.error(
-      "TypeORM: Failed to connect. Falling back to in-memory database.",
-      err,
-    );
+    console.error("TypeORM: Failed to connect. ", err);
 
     isConnectedToPostgres = false;
   }

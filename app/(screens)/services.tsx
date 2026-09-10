@@ -25,6 +25,14 @@ import { useAuthContext } from "@/context/AuthContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import {
+  MarketplaceTabs,
+  FindTab,
+  EnrollTab,
+  ProviderCard,
+  EmptyState,
+  EnrollFormData,
+} from "@/components/marketplace";
 
 export type ServiceClusterId = "all" | "fix" | "glam" | "home" | "auto";
 
@@ -404,6 +412,8 @@ const EXPERIENCE_OPTIONS = [
   { value: "10+ yrs exp", label: "10+ Years Experience", badge: "10+ yrs" },
 ];
 
+// Hardcoded data commented out as requested. Real-time DB fetching and insertions used exclusively.
+/*
 const FALLBACK_SERVICE_PROS: ServicePro[] = [
   // 🔧 Fix & Repair
   {
@@ -663,6 +673,7 @@ const FALLBACK_SERVICE_PROS: ServicePro[] = [
     availableToday: true,
   },
 ];
+*/
 
 export default function ServicesScreen() {
   const router = useRouter();
@@ -683,7 +694,7 @@ export default function ServicesScreen() {
   const [activeTab, setActiveTab] = useState<"find" | "enroll">("find");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [prosList, setProsList] = useState<ServicePro[]>(FALLBACK_SERVICE_PROS);
+  const [prosList, setProsList] = useState<ServicePro[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Sync cluster and category from URL query parameters
@@ -745,22 +756,19 @@ export default function ServicesScreen() {
 
   // Enroll as Technician / Register as Pro State (Tab 2)
   const [enrollName, setEnrollName] = useState(
-    user?.name ? `${user.name} Services` : "Suresh Technical Services",
+    user?.name ? `${user.name} Services` : "",
   );
   const [enrollCluster, setEnrollCluster] = useState<
     "fix" | "glam" | "home" | "auto"
   >("fix");
   const [enrollCategory, setEnrollCategory] = useState("Electrician");
-  const [enrollPhone, setEnrollPhone] = useState("+91 98480 54321");
+  const [enrollPhone, setEnrollPhone] = useState((user as any)?.phone || "");
   const [enrollExperience, setEnrollExperience] = useState("5 yrs exp");
-  const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
-  const [enrollVisitingCharge, setEnrollVisitingCharge] = useState("150");
+  const [enrollVisitingCharge, setEnrollVisitingCharge] = useState("");
   const [enrollDistance, setEnrollDistance] = useState(
     "Within 3 km of " + cityName.split(",")[0],
   );
-  const [enrollDescription, setEnrollDescription] = useState(
-    "Specialized in domestic wiring, switchboard repairs, appliance troubleshooting, and emergency breakdown fixes.",
-  );
+  const [enrollDescription, setEnrollDescription] = useState("");
   const [enrollAvailableToday, setEnrollAvailableToday] = useState(true);
   const [isEnrollingSubmitting, setIsEnrollingSubmitting] = useState(false);
   const [enrollSuccessModal, setEnrollSuccessModal] = useState(false);
@@ -803,7 +811,7 @@ export default function ServicesScreen() {
       const res = await ApiService.get<{ success: boolean; data: any[] }>(
         "/api/localservices",
       );
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res?.success && Array.isArray(res.data)) {
         const mapped: ServicePro[] = res.data.map((p) => ({
           id: p.id,
           name: p.name,
@@ -823,7 +831,7 @@ export default function ServicesScreen() {
         setProsList(mapped);
       }
     } catch (err) {
-      console.log("Using cached/seed service pros:", err);
+      console.log("Error fetching service pros from API:", err);
     } finally {
       setIsLoading(false);
     }
@@ -959,14 +967,27 @@ export default function ServicesScreen() {
   };
 
   // Submit Technician Enrollment
-  const handleEnrollTechnician = async () => {
+  const handleEnrollTechnician = async (formData?: EnrollFormData) => {
     setEnrollFormError(null);
 
-    const nameToSubmit =
-      enrollName.trim() ||
-      (user?.name ? `${user.name} Services` : "Suresh Technical Services");
-    const phoneToSubmit = enrollPhone.trim() || "+91 98480 54321";
-    const chargeNum = enrollVisitingCharge.trim();
+    const nameToSubmit = formData ? formData.name.trim() : enrollName.trim();
+    const phoneToSubmit = formData ? formData.phone.trim() : enrollPhone.trim();
+    const categoryToSubmit = formData ? formData.category : enrollCategory;
+    const chargeRaw = formData
+      ? formData.rate.trim()
+      : enrollVisitingCharge.trim();
+    const chargeNum = chargeRaw.replace(/[^0-9.]/g, "");
+    const expToSubmit =
+      (formData ? formData.experience : enrollExperience) || "5 yrs exp";
+    const distanceToSubmit =
+      (formData ? formData.distance : enrollDistance) ||
+      `Within 5 km of ${cityName.split(",")[0]}`;
+    const descriptionToSubmit =
+      (formData ? formData.description : enrollDescription) ||
+      `Expert ${categoryToSubmit} serving ${cityName}. Prompt doorstep service.`;
+    const availableToSubmit = formData
+      ? formData.availableToday
+      : enrollAvailableToday;
 
     if (!nameToSubmit) {
       setEnrollFormError("Please enter your full name or business name.");
@@ -984,10 +1005,9 @@ export default function ServicesScreen() {
     }
 
     const rateToSubmit = `From ₹${chargeNum} visit`;
-    const expToSubmit = enrollExperience || "5 yrs exp";
 
     const categoryObj = CATEGORIES.find(
-      (c) => c.name.toLowerCase() === enrollCategory.toLowerCase(),
+      (c) => c.name.toLowerCase() === categoryToSubmit.toLowerCase(),
     );
     const categoryIcon = categoryObj?.icon || "construct";
     const avatarBg = categoryObj?.color || "#9333EA";
@@ -998,19 +1018,17 @@ export default function ServicesScreen() {
 
       const payload = {
         name: nameToSubmit,
-        category: enrollCategory,
+        category: categoryToSubmit,
         cluster: enrollCluster,
         categoryIcon,
         avatarBg,
         experience: expToSubmit,
-        distance: enrollDistance.trim() || "Near you",
+        distance: distanceToSubmit,
         rate: rateToSubmit,
         phone: phoneToSubmit,
-        description:
-          enrollDescription.trim() ||
-          `Expert ${enrollCategory} serving ${cityName}. Prompt doorstep service.`,
+        description: descriptionToSubmit,
         verified: true,
-        availableToday: enrollAvailableToday,
+        availableToday: availableToSubmit,
       };
 
       const res = await ApiService.post<{
@@ -1034,21 +1052,19 @@ export default function ServicesScreen() {
       const localPro: ServicePro = {
         id: `pro_${Date.now()}`,
         name: nameToSubmit,
-        category: enrollCategory,
+        category: categoryToSubmit,
         cluster: enrollCluster,
         categoryIcon,
         rating: 5.0,
         reviewsCount: 1,
         experience: expToSubmit,
-        distance: enrollDistance.trim() || "Near you",
+        distance: distanceToSubmit,
         rate: rateToSubmit,
         verified: true,
         avatarBg,
         phone: phoneToSubmit,
-        description:
-          enrollDescription.trim() ||
-          `Expert ${enrollCategory} serving ${cityName}. Prompt doorstep service.`,
-        availableToday: enrollAvailableToday,
+        description: descriptionToSubmit,
+        availableToday: availableToSubmit,
       };
 
       setProsList((prev) => [localPro, ...prev]);
@@ -1225,115 +1241,17 @@ export default function ServicesScreen() {
       </View>
 
       {/* Main 2 Tabs: "Find Experts" & "Enroll as Technician" */}
-      <View
-        style={[
-          styles.topTabs,
-          { backgroundColor: cardBg, borderBottomColor: border },
-        ]}
-      >
-        <TouchableOpacity
-          style={[
-            styles.tabBtn,
-            activeTab === "find" && styles.tabBtnActive,
-            {
-              backgroundColor:
-                activeTab === "find"
-                  ? isDark
-                    ? "#1E293B"
-                    : "#FFFFFF"
-                  : "transparent",
-              borderColor: activeTab === "find" ? "#9333EA" : "transparent",
-            },
-          ]}
-          onPress={() => setActiveTab("find")}
-        >
-          <Ionicons
-            name="construct-outline"
-            size={16}
-            color={activeTab === "find" ? "#9333EA" : textMute}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color:
-                  activeTab === "find"
-                    ? isDark
-                      ? "#FFF"
-                      : "#0F172A"
-                    : textMute,
-                fontWeight: activeTab === "find" ? "800" : "500",
-              },
-            ]}
-          >
-            Find Experts
-          </Text>
-          <View
-            style={[
-              styles.countPill,
-              {
-                backgroundColor:
-                  activeTab === "find"
-                    ? "#9333EA20"
-                    : isDark
-                      ? "#1E293B"
-                      : "#F1F5F9",
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.countText,
-                { color: activeTab === "find" ? "#9333EA" : textMute },
-              ]}
-            >
-              {prosList.length}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.tabBtn,
-            activeTab === "enroll" && styles.tabBtnActive,
-            {
-              backgroundColor:
-                activeTab === "enroll"
-                  ? isDark
-                    ? "#1E293B"
-                    : "#FFFFFF"
-                  : "transparent",
-              borderColor: activeTab === "enroll" ? "#9333EA" : "transparent",
-            },
-          ]}
-          onPress={() => setActiveTab("enroll")}
-        >
-          <Ionicons
-            name="briefcase-outline"
-            size={16}
-            color={activeTab === "enroll" ? "#9333EA" : textMute}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color:
-                  activeTab === "enroll"
-                    ? isDark
-                      ? "#FFF"
-                      : "#0F172A"
-                    : textMute,
-                fontWeight: activeTab === "enroll" ? "800" : "500",
-              },
-            ]}
-          >
-            Enroll as Technician
-          </Text>
-          {/* <View style={styles.proBadgeMini}>
-            <Text style={styles.proBadgeMiniText}>PRO</Text>
-          </View> */}
-        </TouchableOpacity>
-      </View>
+      <MarketplaceTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        findLabel="Find Experts"
+        findIcon="construct-outline"
+        enrollLabel="Enroll as Technician"
+        enrollIcon="briefcase-outline"
+        findCount={prosList.length}
+        accentColor="#9333EA"
+        isDark={isDark}
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -1760,814 +1678,78 @@ export default function ServicesScreen() {
 
             {/* Empty State */}
             {!isLoading && filteredPros.length === 0 && (
-              <View
-                style={[
-                  styles.emptyCard,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <Ionicons name="search-outline" size={38} color={textMute} />
-                <Text style={[styles.emptyTitle, { color: textPrimary }]}>
-                  No technicians found
-                </Text>
-                <Text style={[styles.emptySub, { color: textMute }]}>
-                  No pros matched "{searchQuery}" in {selectedCategory}. Try
-                  another keyword or enroll as the first technician!
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => setActiveTab("enroll")}
-                >
-                  <Text style={styles.emptyActionText}>
-                    Enroll as a Technician
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <EmptyState
+                emoji="🔧"
+                title="No technicians found"
+                subtitle={`No pros matched "${searchQuery}" in ${selectedCategory}. Try another keyword or enroll as the first technician!`}
+                actionText="Enroll as a Technician"
+                onAction={() => setActiveTab("enroll")}
+                accentColor="#9333EA"
+                isDark={isDark}
+              />
             )}
 
-            {/* Technicians List Cards */}
+            {/* Technicians List Cards using reusable ProviderCard */}
             {filteredPros.map((pro) => {
               const requestSent = sentRequests[pro.id];
 
               return (
-                <View
+                <ProviderCard
                   key={pro.id}
-                  style={[
-                    styles.proCard,
-                    {
-                      backgroundColor: cardBg,
-                      borderColor: requestSent ? "#9333EA" : border,
-                    },
-                  ]}
-                >
-                  {/* Pro Header Info */}
-                  <View style={styles.proHeaderRow}>
-                    <View style={styles.proInfoWrap}>
-                      <View
-                        style={[
-                          styles.proAvatar,
-                          { backgroundColor: pro.avatarBg || "#9333EA" },
-                        ]}
-                      >
-                        <Ionicons
-                          name={pro.categoryIcon || "construct"}
-                          size={22}
-                          color="#FFFFFF"
-                        />
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        {/* Cluster Badge */}
-                        {pro.cluster === "glam" ? (
-                          <View style={styles.proClusterBadgeGlam}>
-                            <Text style={styles.proClusterBadgeGlamText}>
-                              💄 GlamUp ✨ Specialist
-                            </Text>
-                          </View>
-                        ) : pro.cluster === "fix" ? (
-                          <View style={styles.proClusterBadgeFix}>
-                            <Text style={styles.proClusterBadgeFixText}>
-                              🔧 Fix & Repair
-                            </Text>
-                          </View>
-                        ) : pro.cluster === "home" ? (
-                          <View style={styles.proClusterBadgeHome}>
-                            <Text style={styles.proClusterBadgeHomeText}>
-                              🧹 Home Help
-                            </Text>
-                          </View>
-                        ) : pro.cluster === "auto" ? (
-                          <View style={styles.proClusterBadgeAuto}>
-                            <Text style={styles.proClusterBadgeAutoText}>
-                              🚗 Auto Help
-                            </Text>
-                          </View>
-                        ) : null}
-
-                        <View style={styles.proNameRow}>
-                          <Text
-                            style={[styles.proName, { color: textPrimary }]}
-                            numberOfLines={1}
-                          >
-                            {pro.name}
-                          </Text>
-                          {pro.verified && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={15}
-                              color="#10B981"
-                            />
-                          )}
-                        </View>
-
-                        <Text style={[styles.proCatText, { color: textMute }]}>
-                          {pro.category} • {pro.experience}
-                        </Text>
-
-                        <View style={styles.proMetaInline}>
-                          <View style={styles.ratingBadge}>
-                            <Ionicons name="star" size={11} color="#F59E0B" />
-                            <Text style={styles.ratingNum}>{pro.rating}</Text>
-                            <Text style={styles.reviewNum}>
-                              ({pro.reviewsCount})
-                            </Text>
-                          </View>
-                          <Text
-                            style={[styles.distanceText, { color: textMute }]}
-                          >
-                            📍 {pro.distance}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Visiting Rate Badge */}
-                    <View style={styles.rateBadge}>
-                      <Text style={styles.rateText}>{pro.rate}</Text>
-                    </View>
-                  </View>
-
-                  {/* Technician Bio / Description */}
-                  {pro.description ? (
-                    <Text
-                      style={[styles.proDescText, { color: textMute }]}
-                      numberOfLines={2}
-                    >
-                      {pro.description}
-                    </Text>
-                  ) : null}
-
-                  {/* Availability & Request Sent Status Banner */}
-                  <View style={styles.statusChipsRow}>
-                    {pro.availableToday && (
-                      <View style={styles.availTodayBadge}>
-                        <Ionicons name="flash" size={11} color="#10B981" />
-                        <Text style={styles.availTodayText}>
-                          Available Today
-                        </Text>
-                      </View>
-                    )}
-
-                    {requestSent && (
-                      <View style={styles.requestSentBadge}>
-                        <Ionicons
-                          name="checkmark-done"
-                          size={12}
-                          color="#9333EA"
-                        />
-                        <Text style={styles.requestSentText}>
-                          Request Sent ({requestSent.bookingId})
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* 1-Tap Action Row: Call, Chat, and Direct "Send Request" */}
-                  <View style={styles.proActionRow}>
-                    <TouchableOpacity
-                      style={[styles.actionCallBtn, { borderColor: "#10B981" }]}
-                      onPress={() =>
-                        Alert.alert(
-                          "Connecting Call",
-                          `Calling ${pro.name} at ${pro.phone}...`,
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Simulate Call Connected",
-                              onPress: () =>
-                                Alert.alert(
-                                  "Call Ended",
-                                  `Call with ${pro.name} finished.`,
-                                ),
-                            },
-                          ],
-                        )
-                      }
-                    >
-                      <Ionicons name="call" size={13} color="#10B981" />
-                      <Text
-                        style={[styles.actionCallText, { color: "#10B981" }]}
-                      >
-                        Call
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionChatBtn, { borderColor: "#9333EA" }]}
-                      onPress={() => {
-                        router.push("/(tabs)/chats");
-                      }}
-                    >
-                      <Ionicons
-                        name="chatbubble-ellipses"
-                        size={13}
-                        color="#9333EA"
-                      />
-                      <Text
-                        style={[styles.actionChatText, { color: "#9333EA" }]}
-                      >
-                        Chat
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Primary Button: Send Request to This Technician */}
-                    <TouchableOpacity
-                      style={[
-                        styles.actionSendRequestBtn,
-                        requestSent && { backgroundColor: "#059669" },
-                      ]}
-                      onPress={() => {
-                        setRequestTargetPro(pro);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons
-                        name={requestSent ? "checkmark-circle" : "send"}
-                        size={13}
-                        color="#FFFFFF"
-                      />
-                      <Text style={styles.actionSendRequestText}>
-                        {requestSent ? "Send Another Request" : "Send Request"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  provider={pro}
+                  onSelect={(p) => {
+                    const original = filteredPros.find((x) => x.id === p.id);
+                    if (original) setRequestTargetPro(original);
+                  }}
+                  accentColor="#9333EA"
+                  actionButtonText={requestSent ? "Send Again" : "Send Request"}
+                  actionButtonIcon={requestSent ? "checkmark-circle" : "send"}
+                  isDark={isDark}
+                />
               );
             })}
           </>
         ) : (
-          /* ================= TAB 2: ENROLL AS TECHNICIAN (REGISTER AS PRO) ================= */
-          <View style={styles.enrollContainer}>
-            {/* Hero Partner Banner */}
-            <View
-              style={[
-                styles.enrollHeroBanner,
-                {
-                  backgroundColor: isDark ? "#131C2E" : "#FAF5FF",
-                  borderColor: "#9333EA",
-                },
-              ]}
-            >
-              <View style={styles.enrollHeroHeader}>
-                <View style={styles.enrollHeroIconWrap}>
-                  <Ionicons name="shield-checkmark" size={24} color="#9333EA" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.enrollHeroTitle,
-                      { color: isDark ? "#E9D5FF" : "#6B21A8" },
-                    ]}
-                  >
-                    Join as a Verified Technician
-                  </Text>
-                  <Text
-                    style={[
-                      styles.enrollHeroSub,
-                      { color: isDark ? "rgba(255,255,255,0.7)" : "#7E22CE" },
-                    ]}
-                  >
-                    Receive direct booking requests and direct calls from
-                    clients across {cityName.split(",")[0]}.
-                  </Text>
-                </View>
-              </View>
-
-              {/* 3 Perks Row */}
-              <View style={styles.perksRow}>
-                <View style={styles.perkPill}>
-                  <Ionicons name="flash-outline" size={13} color="#9333EA" />
-                  <Text style={styles.perkText}>Direct Leads</Text>
-                </View>
-                <View style={styles.perkPill}>
-                  <Ionicons name="wallet-outline" size={13} color="#10B981" />
-                  <Text style={[styles.perkText, { color: "#10B981" }]}>
-                    0% Commission
-                  </Text>
-                </View>
-                <View style={styles.perkPill}>
-                  <Ionicons name="checkmark-circle" size={13} color="#0284C7" />
-                  <Text style={[styles.perkText, { color: "#0284C7" }]}>
-                    Verified Badge
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Registration Form Card */}
-            <View
-              style={[
-                styles.enrollFormCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <Text style={[styles.formSectionHeader, { color: textPrimary }]}>
-                Technician Profile Details
-              </Text>
-
-              {/* 1. Full / Business Name */}
-              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                Full Name / Business Name{" "}
-                <Text style={{ color: "#EF4444" }}>*</Text>
-              </Text>
-              <View
-                style={[
-                  styles.formInputWrap,
-                  {
-                    borderColor: border,
-                    backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                  },
-                ]}
-              >
-                <Ionicons name="person-outline" size={17} color={textMute} />
-                <TextInput
-                  value={enrollName}
-                  onChangeText={setEnrollName}
-                  placeholder="e.g. Ramesh Kumar or Apex Electricals"
-                  placeholderTextColor={textMute}
-                  style={[styles.formInput, { color: textPrimary }]}
-                />
-              </View>
-
-              {/* 2. Service Category Picker */}
-              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                Category Cluster <Text style={{ color: "#EF4444" }}>*</Text>
-              </Text>
-              <View style={styles.enrollClusterRow}>
-                {SERVICE_CLUSTERS.filter((c) => c.id !== "all").map(
-                  (cluster) => {
-                    const isSelected = enrollCluster === cluster.id;
-                    return (
-                      <TouchableOpacity
-                        key={cluster.id}
-                        onPress={() => {
-                          setEnrollCluster(cluster.id as any);
-                          const firstCat = SERVICE_CATEGORIES.find(
-                            (c) => c.cluster === cluster.id,
-                          );
-                          if (firstCat) setEnrollCategory(firstCat.name);
-                        }}
-                        style={[
-                          styles.enrollClusterChip,
-                          {
-                            backgroundColor: isSelected
-                              ? isDark
-                                ? cluster.cardBgDark
-                                : cluster.cardBgLight
-                              : isDark
-                                ? "#1E293B"
-                                : "#F8FAFC",
-                            borderColor: isSelected ? cluster.color : border,
-                          },
-                        ]}
-                      >
-                        <Text style={{ fontSize: 13 }}>{cluster.emoji}</Text>
-                        <Text
-                          style={[
-                            styles.enrollClusterChipText,
-                            {
-                              color: isSelected ? cluster.color : textPrimary,
-                              fontWeight: isSelected ? "700" : "500",
-                            },
-                          ]}
-                        >
-                          {cluster.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  },
-                )}
-              </View>
-
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  { color: textPrimary, marginTop: 4 },
-                ]}
-              >
-                Specific Trade / Service Specialty{" "}
-                <Text style={{ color: "#EF4444" }}>*</Text>
-              </Text>
-              <View style={styles.enrollCatGrid}>
-                {SERVICE_CATEGORIES.filter(
-                  (c) => c.cluster === enrollCluster,
-                ).map((cat) => {
-                  const isSelected = enrollCategory === cat.name;
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      onPress={() => setEnrollCategory(cat.name)}
-                      style={[
-                        styles.enrollCatCard,
-                        {
-                          backgroundColor: isSelected
-                            ? isDark
-                              ? "#9333EA30"
-                              : "#F3E8FF"
-                            : isDark
-                              ? "#1E293B"
-                              : "#FFFFFF",
-                          borderColor: isSelected ? "#9333EA" : border,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={cat.icon}
-                        size={17}
-                        color={isSelected ? "#9333EA" : cat.color}
-                      />
-                      <Text
-                        style={[
-                          styles.enrollCatText,
-                          {
-                            color: isSelected ? "#9333EA" : textPrimary,
-                            fontWeight: isSelected ? "700" : "500",
-                          },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* 3. Phone / WhatsApp Number */}
-              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                Contact Phone / WhatsApp{" "}
-                <Text style={{ color: "#EF4444" }}>*</Text>
-              </Text>
-              <View
-                style={[
-                  styles.formInputWrap,
-                  {
-                    borderColor: border,
-                    backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                  },
-                ]}
-              >
-                <Ionicons name="call-outline" size={17} color={textMute} />
-                <TextInput
-                  value={enrollPhone}
-                  onChangeText={setEnrollPhone}
-                  placeholder="e.g. +91 98480 12345"
-                  placeholderTextColor={textMute}
-                  keyboardType="phone-pad"
-                  style={[styles.formInput, { color: textPrimary }]}
-                />
-              </View>
-
-              {/* 4. Experience (Dropdown 1-10 yrs and 10+) & Visiting Charge (Numeric Only) */}
-              <View style={styles.formTwoCols}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                    Experience <Text style={{ color: "#EF4444" }}>*</Text>
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.formInputWrap,
-                      styles.dropdownTriggerWrap,
-                      {
-                        borderColor: showExperienceDropdown
-                          ? "#9333EA"
-                          : border,
-                        backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                      },
-                    ]}
-                    onPress={() => setShowExperienceDropdown(true)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={styles.dropdownTriggerInner}>
-                      <Ionicons name="time-outline" size={16} color="#9333EA" />
-                      <Text
-                        style={[
-                          styles.dropdownTriggerText,
-                          { color: textPrimary },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {enrollExperience || "5 yrs exp"}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-down" size={16} color={textMute} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                    Charge per Visit <Text style={{ color: "#EF4444" }}>*</Text>
-                  </Text>
-                  <View
-                    style={[
-                      styles.formInputWrap,
-                      {
-                        // width: "70%",
-                        height: 38,
-                        borderColor: border,
-                        backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                      },
-                    ]}
-                  >
-                    <View style={styles.currencyBadgeWrap}>
-                      <Text
-                        style={[
-                          styles.currencyBadgeText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        ₹
-                      </Text>
-                    </View>
-                    <TextInput
-                      value={enrollVisitingCharge}
-                      onChangeText={(text) => {
-                        const numericVal = text.replace(/[^0-9]/g, "");
-                        setEnrollVisitingCharge(numericVal);
-                      }}
-                      placeholder="150"
-                      placeholderTextColor={textMute}
-                      keyboardType="numeric"
-                      inputMode="numeric"
-                      style={[
-                        styles.formInput,
-                        {
-                          color: textPrimary,
-                          fontWeight: "700",
-                          fontSize: 14,
-                          paddingHorizontal: 0,
-                        },
-                      ]}
-                    />
-                    {/* <Text style={[styles.perVisitSuffix, { color: textMute }]}>
-                      / visit
-                    </Text> */}
-                  </View>
-                </View>
-              </View>
-
-              {/* 5. Service Coverage Area */}
-              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                Service Locality / Areas Covered
-              </Text>
-              <View
-                style={[
-                  styles.formInputWrap,
-                  {
-                    borderColor: border,
-                    backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                  },
-                ]}
-              >
-                <Ionicons name="location-outline" size={17} color={textMute} />
-                <TextInput
-                  value={enrollDistance}
-                  onChangeText={setEnrollDistance}
-                  placeholder={`e.g. Madhapur, Hitech City & ${cityName.split(",")[0]}`}
-                  placeholderTextColor={textMute}
-                  style={[styles.formInput, { color: textPrimary }]}
-                />
-              </View>
-
-              {/* 6. Skills & Specialties Description with Voice */}
-              <View style={styles.labelWithActionRow}>
-                <Text
-                  style={[
-                    styles.fieldLabel,
-                    { color: textPrimary, marginTop: 0 },
-                  ]}
-                >
-                  Skills & Specialties
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.voiceSpeakBtn,
-                    {
-                      backgroundColor: isSkillsListening
-                        ? "#EF4444"
-                        : "#9333EA20",
-                    },
-                  ]}
-                  onPress={handleVoiceEnrollSkills}
-                >
-                  <Ionicons
-                    name="mic"
-                    size={12}
-                    color={isSkillsListening ? "#FFF" : "#9333EA"}
-                  />
-                  <Text
-                    style={[
-                      styles.voiceSpeakBtnText,
-                      { color: isSkillsListening ? "#FFF" : "#9333EA" },
-                    ]}
-                  >
-                    {isSkillsListening ? "Listening..." : "Speak skills"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View
-                style={[
-                  styles.formTextareaWrap,
-                  {
-                    borderColor: border,
-                    backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
-                  },
-                ]}
-              >
-                <TextInput
-                  value={enrollDescription}
-                  onChangeText={setEnrollDescription}
-                  placeholder="e.g. Certified for 3-phase domestic wiring, inverter backup installation, geyser heating coil repair, LED false ceiling lighting..."
-                  placeholderTextColor={textMute}
-                  multiline
-                  numberOfLines={3}
-                  style={[styles.formTextarea, { color: textPrimary }]}
-                />
-              </View>
-
-              {/* 7. Available Today Toggle */}
-              <View style={[styles.switchCard, { borderColor: border }]}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={[styles.switchTitle, { color: textPrimary }]}>
-                    Available for Immediate / Same-Day Calls
-                  </Text>
-                  <Text style={[styles.switchSub, { color: textMute }]}>
-                    Show "Available Today" badge in Find Experts
-                  </Text>
-                </View>
-                <Switch
-                  value={enrollAvailableToday}
-                  onValueChange={setEnrollAvailableToday}
-                  trackColor={{ false: "#94A3B8", true: "#9333EA" }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-
-              {enrollFormError && (
-                <View style={styles.errorAlertBanner}>
-                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
-                  <Text style={styles.errorAlertBannerText}>
-                    {enrollFormError}
-                  </Text>
-                </View>
-              )}
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={styles.enrollSubmitBtn}
-                onPress={handleEnrollTechnician}
-                disabled={isEnrollingSubmitting}
-                activeOpacity={0.88}
-              >
-                {isEnrollingSubmitting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="id-card" size={18} color="#FFFFFF" />
-                    <Text style={styles.enrollSubmitText}>
-                      Submit & Enroll as Technician
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+          /* ================= TAB 2: ENROLL AS TECHNICIAN (REUSABLE ENROLL TAB) ================= */
+          <EnrollTab
+            heroIcon="shield-checkmark"
+            heroTitle="Join as a Verified Technician"
+            heroSubtitle={`Receive direct booking requests and direct calls from clients across ${cityName.split(",")[0]}.`}
+            cityName={cityName}
+            categories={CATEGORIES.filter((c) => c.name !== "All").map(
+              (c) => c.name,
+            )}
+            initialData={{
+              name: enrollName,
+              category: enrollCategory,
+              phone: enrollPhone,
+              experience: enrollExperience,
+              rate: enrollVisitingCharge,
+              distance: enrollDistance,
+              description: enrollDescription,
+              availableToday: enrollAvailableToday,
+            }}
+            onSubmit={async (formData) => {
+              await handleEnrollTechnician(formData);
+            }}
+            isSubmitting={isEnrollingSubmitting}
+            accentColor="#9333EA"
+            nameLabel="Full Name / Business Name"
+            namePlaceholder="e.g. Suresh Technical Services"
+            phoneLabel="Mobile Number"
+            rateLabel="Cost per Visit (₹)"
+            ratePlaceholder="150"
+            experienceLabel="Years of Experience"
+            experiencePlaceholder="Select Years of Experience"
+            distancePlaceholder={`e.g. Madhapur, Hitech City & ${cityName.split(",")[0]}`}
+            descriptionLabel="Skills & Specialties"
+            descriptionPlaceholder="e.g. Specialized in domestic wiring, switchboard repairs, appliance troubleshooting..."
+            submitButtonText="Submit & Enroll as Technician"
+            errorMessage={enrollFormError}
+            isDark={isDark}
+          />
         )}
       </ScrollView>
-
-      {/* ================= MODAL: EXPERIENCE DROPDOWN PICKER (1-10 yrs and 10+) ================= */}
-      <Modal
-        visible={showExperienceDropdown}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowExperienceDropdown(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setShowExperienceDropdown(false)}
-        >
-          <View
-            style={[
-              styles.dropdownPickerCard,
-              {
-                backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
-                borderColor: border,
-              },
-            ]}
-          >
-            {/* Header */}
-            <View style={styles.dropdownPickerHeader}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  flex: 1,
-                }}
-              >
-                <View style={styles.dropdownPickerIconWrap}>
-                  <Ionicons name="time" size={18} color="#9333EA" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[styles.dropdownPickerTitle, { color: textPrimary }]}
-                  >
-                    Select Experience
-                  </Text>
-                  <Text style={[styles.dropdownPickerSub, { color: textMute }]}>
-                    Choose your years in this trade
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowExperienceDropdown(false)}
-                style={[
-                  styles.modalCloseBtn,
-                  { backgroundColor: isDark ? "#334155" : "#F1F5F9" },
-                ]}
-              >
-                <Ionicons name="close" size={18} color={textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Options List */}
-            <ScrollView
-              style={{ maxHeight: 380 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {EXPERIENCE_OPTIONS.map((opt) => {
-                const isSelected = enrollExperience === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.dropdownOptionRow,
-                      {
-                        backgroundColor: isSelected
-                          ? isDark
-                            ? "#9333EA25"
-                            : "#F3E8FF"
-                          : "transparent",
-                        borderColor: isSelected ? "#9333EA" : "transparent",
-                      },
-                    ]}
-                    onPress={() => {
-                      setEnrollExperience(opt.value);
-                      setShowExperienceDropdown(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.dropdownOptionLeft}>
-                      <View
-                        style={[
-                          styles.dropdownOptionBadge,
-                          {
-                            backgroundColor: isSelected
-                              ? "#9333EA"
-                              : isDark
-                                ? "#334155"
-                                : "#E2E8F0",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownOptionBadgeText,
-                            { color: isSelected ? "#FFFFFF" : textPrimary },
-                          ]}
-                        >
-                          {opt.badge}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.dropdownOptionLabel,
-                          {
-                            color: isSelected ? "#9333EA" : textPrimary,
-                            fontWeight: isSelected ? "700" : "500",
-                          },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </View>
-
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#9333EA"
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* ================= MODAL 1: SEND DIRECT REQUEST TO TECHNICIAN ================= */}
       <Modal

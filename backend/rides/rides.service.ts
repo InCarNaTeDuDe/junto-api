@@ -141,13 +141,6 @@ export async function joinRide(
     throw new Error("You cannot join your own ride.");
   }
 
-  // Only ONE passenger for now
-  if (ride.passengers && ride.passengers.length > 0) {
-    throw new Error(
-      "This ride already has a passenger. Only one passenger is allowed for now.",
-    );
-  }
-
   // Validate requested seats
   if (input.seatsRequested < 1) {
     throw new Error("At least one seat must be requested.");
@@ -171,7 +164,7 @@ export async function joinRide(
     throw new Error("Unable to join ride.");
   }
 
-  // Notify connected clients
+  // Notify connected clients (owner gets ride_booked event)
   if (io) {
     io.emit("ride_updated", updatedRide);
 
@@ -184,26 +177,79 @@ export async function joinRide(
     });
 
     const rides = await rideRepository.findAll();
-
     io.emit("rides_updated", rides);
   }
 
-  // Push notification to driver
+  // Push notification sent ONLY to the ride creator / driver
   if (updatedRide.userId) {
     sendExpoPushNotification(
       updatedRide.userId,
-      "🚗 Ride Booking Request",
-      `${passengerName} booked ${input.seatsRequested} seat(s) for ${updatedRide.from} ➔ ${updatedRide.to}`,
+      "🚗 New Seat Request",
+      `${passengerName} requested ${input.seatsRequested} seat(s) for ${updatedRide.from} ➔ ${updatedRide.to}. View co-riders to select.`,
       {
         rideId: updatedRide.id,
-        type: "ride_booked",
+        type: "ride_seat_requested",
+        passengerId: user.id,
       },
-    ).catch(() => {});
+    ).catch((err) => {
+      console.warn("[Rides] Failed to send push notification to driver:", err);
+    });
   }
 
   return {
     success: true,
-    message: `Successfully booked ${input.seatsRequested} seat(s) with ${updatedRide.driverName}!`,
+    message: `Seat request sent to ${updatedRide.driverName}! They will review and confirm your seat.`,
+    ride: updatedRide,
+  };
+}
+
+/**
+ * Driver selects / confirms a co-rider passenger
+ */
+export async function confirmRidePassenger(
+  rideId: string,
+  passengerUserId: string,
+  driver: User,
+) {
+  if (!driver?.id) {
+    throw new Error("Authenticated user is required.");
+  }
+
+  const updatedRide = await rideRepository.confirmPassenger(
+    rideId,
+    driver.id,
+    passengerUserId,
+  );
+
+  // Notify connected clients
+  if (io) {
+    io.emit("ride_updated", updatedRide);
+    io.to(`user:${passengerUserId}`).emit("ride_confirmed", {
+      rideId: updatedRide.id,
+      driverName: updatedRide.driverName,
+      from: updatedRide.from,
+      to: updatedRide.to,
+    });
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  // Push notification to the confirmed co-rider passenger
+  sendExpoPushNotification(
+    passengerUserId,
+    "🎉 Seat Confirmed!",
+    `${updatedRide.driverName} confirmed your seat for ${updatedRide.from} ➔ ${updatedRide.to}!`,
+    {
+      rideId: updatedRide.id,
+      type: "ride_confirmed",
+    },
+  ).catch((err) => {
+    console.warn("[Rides] Failed to send confirmation push notification:", err);
+  });
+
+  return {
+    success: true,
+    message: "Passenger successfully confirmed for this ride!",
     ride: updatedRide,
   };
 }

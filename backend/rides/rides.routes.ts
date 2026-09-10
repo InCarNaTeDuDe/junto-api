@@ -7,6 +7,7 @@ import {
   joinRideHandler,
   updateRideHandler,
   getMyRidesHandler,
+  confirmPassengerHandler,
 } from "./rides.controller";
 import {
   CreateRideSchema,
@@ -29,6 +30,11 @@ router.post(
   authenticate,
   validate(JoinRideSchema),
   joinRideHandler,
+);
+router.post(
+  "/:id/passengers/:passengerUserId/confirm",
+  authenticate,
+  confirmPassengerHandler,
 );
 router.patch(
   "/:id",

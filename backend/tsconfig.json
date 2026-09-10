@@ -12,5 +12,5 @@
     "moduleDetection": "auto",
     "noEmit": true
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts", "entities"]
 }
