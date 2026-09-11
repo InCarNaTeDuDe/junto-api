@@ -1,6 +1,7 @@
 import { useLocation } from "@/context/LocationContext";
 import { CITIES } from "@/data/cities";
 import { useTheme } from "@/hooks/useTheme";
+import { ApiService } from "@/services/api";
 import { requestCurrentLocation } from "@/services/locationServices";
 import { Theme } from "@/theme";
 import { saveSelectedLocation } from "@/utils/secureStorage";
@@ -33,6 +34,10 @@ export default function LocationSearch() {
     city.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  async function setLocationOnUserProfile() {
+    await ApiService.put("/api/auth/profile");
+  }
+
   const useCurrentLocation = async () => {
     if (locationLoading) return;
     try {
@@ -48,6 +53,8 @@ export default function LocationSearch() {
       };
       setSelectedLocation(obj);
       await saveSelectedLocation(obj);
+
+      await setLocationOnUserProfile();
 
       router.back();
 
@@ -210,6 +217,8 @@ export default function LocationSearch() {
                 latitude: item.latitude,
                 longitude: item.longitude,
               });
+
+              await setLocationOnUserProfile();
 
               router.back();
             }}

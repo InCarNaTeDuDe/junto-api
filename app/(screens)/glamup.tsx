@@ -1584,8 +1584,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   enrollBody: {
-    // padding: 16,
-    gap: 16,
+    padding: 16,
+    // gap: 16,
   },
   enrollHero: {
     padding: 20,
