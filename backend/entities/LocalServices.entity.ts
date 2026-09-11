@@ -1,4 +1,6 @@
 import {
+  BeforeInsert,
+  BeforeUpdate,
   Column,
   CreateDateColumn,
   Entity,
@@ -13,12 +15,132 @@ import { User } from "./User.entity";
 export type ServiceCluster = "fix" | "glam" | "home" | "auto" | string;
 
 /**
+ * Standard clusters and canonical categories defined for LocalServices
+ */
+export const SERVICE_CLUSTERS = {
+  AUTO: "auto",
+  FIX: "fix",
+  GLAM: "glam",
+  HOME: "home",
+} as const;
+
+export const LOCAL_SERVICE_CATEGORIES = {
+  // 🚗 Auto Pros & Mechanics
+  AUTO: [
+    "Bike repair",
+    "Puncture",
+    "Car repair",
+    "Car wash",
+    "Roadside assistance",
+  ] as const,
+  // 🔧 Fix & Home Technicians
+  FIX: [
+    "Electrician",
+    "Plumber",
+    "AC repair",
+    "Washing machine repair",
+    "Carpenter",
+    "TV/electronics repair",
+  ] as const,
+  // 💄 GlamUp Beauty & Grooming
+  GLAM: [
+    "Bridal makeup",
+    "Facial",
+    "Mehendi",
+    "Hair styling",
+    "Nails & Art",
+  ] as const,
+  // 🧹 Home Help & Food
+  HOME: [
+    "Deep cleaning",
+    "Cooking",
+    "Pest-control requests",
+    "Moving assistance",
+    "Maids",
+  ] as const,
+};
+
+/**
+ * Robust helper to resolve cluster from category and description
+ */
+export function resolveServiceCluster(
+  category?: string,
+  description?: string,
+  existingCluster?: string,
+): ServiceCluster {
+  const cat = (category || "").toLowerCase();
+  const text = `${cat} ${description || ""}`.toLowerCase();
+
+  // 1. Auto Pro / Bike / Mechanic domain
+  if (
+    cat.includes("bike") ||
+    cat.includes("mechanic") ||
+    cat.includes("puncture") ||
+    cat.includes("car wash") ||
+    cat.includes("roadside") ||
+    cat.includes("car repair") ||
+    cat.includes("two wheeler") ||
+    cat.includes("scooter") ||
+    cat.includes("motorcycle") ||
+    /\b(bike|mechanic|puncture|auto|towing|scooter|activa|motorcycle)\b/i.test(
+      cat,
+    ) ||
+    /\b(bike repair|mechanic|puncture repair|tubeless|bike servicing)\b/i.test(
+      text,
+    )
+  ) {
+    return SERVICE_CLUSTERS.AUTO;
+  }
+
+  // 2. Glam domain
+  if (
+    cat.includes("makeup") ||
+    cat.includes("bridal") ||
+    cat.includes("facial") ||
+    cat.includes("mehendi") ||
+    cat.includes("hair") ||
+    cat.includes("nail") ||
+    cat.includes("wax") ||
+    cat.includes("glam") ||
+    cat.includes("salon") ||
+    cat.includes("beauty")
+  ) {
+    return SERVICE_CLUSTERS.GLAM;
+  }
+
+  // 3. Home Help domain
+  if (
+    cat.includes("clean") ||
+    cat.includes("cook") ||
+    cat.includes("tiffin") ||
+    cat.includes("maid") ||
+    cat.includes("pest") ||
+    cat.includes("moving") ||
+    cat.includes("packers")
+  ) {
+    return SERVICE_CLUSTERS.HOME;
+  }
+
+  // 4. If existing cluster is valid and non-fix, keep it
+  if (
+    existingCluster &&
+    existingCluster !== SERVICE_CLUSTERS.FIX &&
+    ["auto", "glam", "home"].includes(existingCluster.toLowerCase())
+  ) {
+    return existingCluster.toLowerCase() as ServiceCluster;
+  }
+
+  // 5. Default technicians/fix
+  return SERVICE_CLUSTERS.FIX;
+}
+
+/**
  * Unified entity for all local services and doorstep experts:
  * - Table: "local_services"
- * - Technicians (electricians, plumbers, AC repair, carpenters, mechanics)
- * - Beauty & Grooming Experts (bridal makeup, facials, waxing, mehendi, hair styling)
- * - Home Helpers (deep cleaning, maids, home cooks, pest control, movers)
- * - Auto Pros (bike repair, car repair, puncture, car wash, roadside help)
+ * - Technicians: electricians, plumbers, AC repair, carpenters, TV/appliance repair
+ * - Beauty & Grooming: bridal makeup, facials, waxing, mehendi, hair styling
+ * - Home Helpers: deep cleaning, maids, home cooks/tiffin, pest control, movers
+ * - Auto Pros: bike repair, mechanics, puncture, car repair, car wash, roadside help
  */
 @Entity("local_services")
 export class LocalService {
@@ -36,24 +158,24 @@ export class LocalService {
   @JoinColumn({ name: "providerId" })
   provider?: User;
 
-  // Professional / Agency Name (e.g., "Ramesh Electricals", "Rashmi Bridal Makeovers")
+  // Professional / Agency Name (e.g., "Ramesh Electricals", "Rajesh Auto Works")
   @Column({ type: "varchar", length: 150 })
   name!: string;
 
-  // Title getter/setter for compatibility
-  // get title(): string {
-  //   return this.name;
-  // }
-  // set title(val: string) {
-  //   this.name = val;
-  // }
+  // Title compatibility getter/setter
+  get title(): string {
+    return this.name;
+  }
+  set title(val: string) {
+    this.name = val;
+  }
 
-  // Cluster grouping: "fix" (technicians), "glam" (beauty/makeup), "home" (home help), "auto" (mechanics)
+  // Cluster grouping: "auto" (mechanics/bike/puncture), "fix" (technicians), "glam" (beauty), "home" (cleaning/cooks)
   @Index()
-  @Column({ type: "varchar", length: 50, default: "fix" })
+  @Column({ type: "varchar", length: 50, default: "auto" })
   cluster!: ServiceCluster;
 
-  // Specific service category (e.g., "Electrician", "Bridal Makeup", "Bike Repair", "Deep Cleaning")
+  // Specific service category (e.g., "Bike repair", "Electrician", "Bridal makeup", "Deep cleaning")
   @Index()
   @Column({ type: "varchar", length: 100 })
   category!: string;
@@ -115,6 +237,19 @@ export class LocalService {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  normalizeCluster() {
+    this.cluster = resolveServiceCluster(
+      this.category,
+      this.description,
+      this.cluster,
+    );
+    if (!this.name && (this as any).title) {
+      this.name = (this as any).title;
+    }
+  }
 }
 
 // ServiceProvider alias pointing directly to LocalService

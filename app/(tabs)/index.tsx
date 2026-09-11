@@ -942,7 +942,7 @@ export default function Home() {
         </View>
 
         {/* 🎯 "I Need This" Universal Intent Router */}
-        <UniversalNeedBar />
+        {/* <UniversalNeedBar /> */}
 
         {/* Search */}
         {/* <View style={s.searchRow}>

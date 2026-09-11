@@ -613,14 +613,14 @@ const ALL_FEATURES: FeatureItem[] = [
 ];
 
 const ROW_FEATURES: FeatureItem[] = [
-  {
-    id: "ineedthis",
-    name: "I Need This",
-    subtitle: "Universal AI",
-    icon: "hand-left-outline",
-    color: "#6366F1",
-    bg: "#EEF2FF",
-  },
+  // {
+  //   id: "ineedthis",
+  //   name: "I Need This",
+  //   subtitle: "Universal AI",
+  //   icon: "hand-left-outline",
+  //   color: "#6366F1",
+  //   bg: "#EEF2FF",
+  // },
   {
     id: "ridemate",
     name: "RideMate",

@@ -189,17 +189,27 @@ export async function queryUniversalNeedFromDb(
     };
   }
 
-  // 3. Check for Deals / Buy & Sell intent
+  // 3. Check for Deals / Buy & Sell intent (guarded against service/repair queries)
+  const isServiceOrRepairQuery =
+    q.includes("repair") ||
+    q.includes("mechanic") ||
+    q.includes("service") ||
+    q.includes("servicing") ||
+    q.includes("puncture") ||
+    q.includes("fix") ||
+    q.includes("technician");
+
   if (
-    q.includes("cycle") ||
-    q.includes("bicycle") ||
-    q.includes("used") ||
-    q.includes("buy") ||
-    q.includes("sell") ||
-    q.includes("second hand") ||
-    q.includes("headphones") ||
-    q.includes("gadget") ||
-    q.includes("deals")
+    !isServiceOrRepairQuery &&
+    (q.includes("cycle") ||
+      q.includes("bicycle") ||
+      q.includes("used") ||
+      q.includes("buy") ||
+      q.includes("sell") ||
+      q.includes("second hand") ||
+      q.includes("headphones") ||
+      q.includes("gadget") ||
+      q.includes("deals"))
   ) {
     const deals = await dealsRepository.findAll();
     let matchedDeals = deals;
@@ -396,9 +406,43 @@ export async function queryUniversalNeedFromDb(
   // 6. Local Services & Repairs
   // Uses cluster ("auto" | "fix" | "glam" | "home") and categories from LocalServices.entity.ts
   const services = await localServicesRepository.findAllServices();
-  const targetCluster = intent.cluster;
+
+  const isAutoQuery =
+    q.includes("bike") ||
+    q.includes("mechanic") ||
+    q.includes("puncture") ||
+    q.includes("motorcycle") ||
+    q.includes("two wheeler") ||
+    q.includes("two-wheeler") ||
+    q.includes("scooter") ||
+    q.includes("activa") ||
+    q.includes("car repair") ||
+    q.includes("car wash") ||
+    q.includes("roadside") ||
+    q.includes("jumpstart");
+
+  const targetCluster = isAutoQuery ? "auto" : intent.cluster;
   const targetCategory = (intent.category || "").toLowerCase();
   const intentKeywords = (intent.keywords || []).map((k) => k.toLowerCase());
+
+  // Words that shouldn't inflate category scoring
+  const genericWords = new Set([
+    "need",
+    "near",
+    "want",
+    "looking",
+    "for",
+    "the",
+    "and",
+    "please",
+    "some",
+    "service",
+    "services",
+    "repair",
+    "repairs",
+    "clinic",
+    "works",
+  ]);
 
   // Score each service for maximum semantic relevance
   const scored = services.map((s) => {
@@ -409,62 +453,51 @@ export async function queryUniversalNeedFromDb(
     const cluster = (s.cluster || "").toLowerCase();
     const text = `${cat} ${name} ${desc} ${cluster}`;
 
-    // Cluster constraint: if targetCluster is identified, require cluster match or strong category match
+    // Cluster matching bonus or mild mismatch penalty (never hard-zero out legitimate pros)
     if (targetCluster) {
       if (cluster === targetCluster) {
-        score += 50;
+        score += 60;
       } else if (
         targetCategory &&
         (cat === targetCategory || cat.includes(targetCategory))
       ) {
         score += 40;
       } else {
-        // Different cluster without category match -> exclude
-        return { service: s, score: 0 };
+        score -= 20;
       }
     }
 
-    // Exact or partial category match
-    if (targetCategory) {
-      if (cat === targetCategory) score += 60;
-      else if (cat.includes(targetCategory) || targetCategory.includes(cat)) {
-        score += 45;
+    // Auto Pro / Bike Mechanic Domain boosts
+    if (isAutoQuery) {
+      if (cluster === "auto") {
+        score += 80;
       }
-    }
-
-    // Auto / Bike / Mechanic domain signals
-    if (
-      q.includes("bike") ||
-      q.includes("mechanic") ||
-      q.includes("puncture") ||
-      q.includes("motorcycle") ||
-      q.includes("two wheeler") ||
-      q.includes("scooter") ||
-      q.includes("activa")
-    ) {
       if (
         cat.includes("bike") ||
-        cat.includes("puncture") ||
-        cat.includes("auto") ||
-        cluster === "auto"
+        cat.includes("repair") ||
+        cat.includes("mechanic")
       ) {
-        score += 60;
+        score += 65;
+      }
+      if (cat.includes("puncture")) {
+        score += 45;
       }
       if (
+        name.includes("bike") ||
+        name.includes("mechanic") ||
         name.includes("auto") ||
-        name.includes("mech") ||
-        name.includes("puncture") ||
-        name.includes("rajesh")
+        name.includes("repair")
       ) {
-        score += 40;
+        score += 55;
       }
       if (
         desc.includes("bike") ||
-        desc.includes("puncture") ||
-        desc.includes("tubeless") ||
-        desc.includes("servicing")
+        desc.includes("mechanic") ||
+        desc.includes("servicing") ||
+        desc.includes("tuning") ||
+        desc.includes("puncture")
       ) {
-        score += 30;
+        score += 40;
       }
     } else if (
       q.includes("tiffin") ||
@@ -477,7 +510,7 @@ export async function queryUniversalNeedFromDb(
         text.includes("meal") ||
         cluster === "home"
       ) {
-        score += 50;
+        score += 60;
       }
     } else if (q.includes("electric") || q.includes("wiring")) {
       if (
@@ -485,7 +518,7 @@ export async function queryUniversalNeedFromDb(
         text.includes("electric") ||
         cluster === "fix"
       ) {
-        score += 50;
+        score += 60;
       }
     } else if (
       q.includes("plumb") ||
@@ -498,11 +531,11 @@ export async function queryUniversalNeedFromDb(
         text.includes("leak") ||
         cluster === "fix"
       ) {
-        score += 50;
+        score += 60;
       }
     } else if (q.includes("ac") || q.includes("cool")) {
       if (cat.includes("ac") || text.includes("cooling") || cluster === "fix") {
-        score += 50;
+        score += 60;
       }
     } else if (q.includes("clean")) {
       if (
@@ -510,7 +543,7 @@ export async function queryUniversalNeedFromDb(
         text.includes("cleaning") ||
         cluster === "home"
       ) {
-        score += 50;
+        score += 60;
       }
     } else if (
       q.includes("makeup") ||
@@ -522,42 +555,65 @@ export async function queryUniversalNeedFromDb(
         cat.includes("bridal") ||
         cluster === "glam"
       ) {
-        score += 50;
+        score += 60;
       }
     }
 
-    // Specific domain keyword tokens (excluding generic words like "service", "repair", "clinic", "near", "need")
-    const genericWords = new Set([
-      "need",
-      "near",
-      "want",
-      "looking",
-      "for",
-      "the",
-      "and",
-      "please",
-      "some",
-      "service",
-      "services",
-      "repair",
-      "repairs",
-      "clinic",
-    ]);
+    // Exact, substring, or token-level category match
+    if (targetCategory) {
+      if (cat === targetCategory) {
+        score += 70;
+      } else if (cat.includes(targetCategory) || targetCategory.includes(cat)) {
+        score += 50;
+      } else {
+        const targetTokens = targetCategory.split(/\s+/);
+        for (const tok of targetTokens) {
+          if (tok.length >= 3 && !genericWords.has(tok) && cat.includes(tok)) {
+            score += 35;
+          }
+        }
+      }
+    }
+
+    // Keyword tokens from intent
     for (const kw of intentKeywords) {
       if (kw.length >= 3 && !genericWords.has(kw)) {
-        if (cat.includes(kw)) score += 25;
-        if (name.includes(kw)) score += 20;
-        if (desc.includes(kw)) score += 10;
+        if (cat.includes(kw)) score += 30;
+        if (name.includes(kw)) score += 25;
+        if (desc.includes(kw)) score += 15;
       }
+    }
+
+    // Query terms matching directly
+    const queryTokens = q
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !genericWords.has(w));
+    for (const qt of queryTokens) {
+      if (cat.includes(qt)) score += 25;
+      if (name.includes(qt)) score += 20;
+      if (desc.includes(qt)) score += 10;
     }
 
     return { service: s, score };
   });
 
-  const matchedServices = scored
+  let matchedServices = scored
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((item) => item.service);
+
+  // Safety fallback for auto pro / bike mechanic queries
+  if (
+    matchedServices.length === 0 &&
+    (isAutoQuery || targetCluster === "auto")
+  ) {
+    matchedServices = services.filter(
+      (s) =>
+        (s.cluster || "").toLowerCase() === "auto" ||
+        (s.category || "").toLowerCase().includes("bike") ||
+        (s.category || "").toLowerCase().includes("puncture"),
+    );
+  }
 
   const instantResults: UniversalNeedResultItem[] = matchedServices
     .slice(0, 3)

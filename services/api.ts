@@ -88,8 +88,9 @@ async function request<T>(
 
     requestBody = {
       ...requestBody,
-      locationName: location.name,
-      locationState: location.state,
+      ...(endpoint !== "/api/auth/profile"
+        ? { locationName: location.name, locationState: location.state }
+        : {}),
       latitude: location.latitude,
       longitude: location.longitude,
       isAutoDetected: location.isAutoDetected,
