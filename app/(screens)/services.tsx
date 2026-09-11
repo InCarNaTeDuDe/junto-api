@@ -1349,7 +1349,7 @@ export default function ServicesScreen() {
             </TouchableOpacity>
 
             {/* 1. Category Cluster Selector */}
-            <ScrollView
+            {/* <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.clusterScroll}
@@ -1408,7 +1408,7 @@ export default function ServicesScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </ScrollView> */}
 
             {/* Dedicated Highlight Banner for Selected Cluster */}
             {selectedCluster !== "all" &&

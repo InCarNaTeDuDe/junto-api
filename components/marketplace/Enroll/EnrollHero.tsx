@@ -26,7 +26,7 @@ export const EnrollHero: React.FC<EnrollHeroProps> = ({
 
   return (
     <View style={[styles.card, { backgroundColor: bg, borderColor: border }]}>
-      <Text style={styles.icon}>{icon}</Text>
+      {/* <Text style={styles.icon}>{icon}</Text> */}
       <Text style={[styles.title, { color: textPrimary }]}>{title}</Text>
       <Text style={[styles.subtitle, { color: textMute }]}>
         {subtitle}
