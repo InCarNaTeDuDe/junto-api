@@ -18,6 +18,8 @@ import ridesRoutes from "./rides/rides.routes";
 import localservicesRoutes from "./localservices/localservices.routes";
 import glamupRoutes from "./glamup/glamup.routes";
 import dealsRoutes from "./deals/deals.routes";
+import universalNeedRoutes from "./universalneed/universalneed.routes";
+
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
 
@@ -169,6 +171,8 @@ async function startServer() {
   app.use("/api/localservices", localservicesRoutes);
   app.use("/api/glamup", glamupRoutes);
   app.use("/api/deals", dealsRoutes);
+  app.use("/api/universal-need", universalNeedRoutes);
+
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);

@@ -28,7 +28,6 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
   // Real-time store: hardcoded data commented out as requested.
   // Real-time DB insertions and fetching are used exclusively.
   private fallbackStore: ServiceProvider[] = [
-    /*
     // 🔧 Fix & Repair
     {
       id: "pro_suresh_elec",
@@ -380,7 +379,6 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       createdAt: new Date(),
       updatedAt: new Date(),
     } as LocalService,
-    */
   ];
 
   constructor() {
@@ -388,41 +386,50 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
   }
 
   /**
-   * Helper to derive cluster from category if not explicitly provided
+   * Helper to derive cluster from category and description accurately based on LocalServices.entity.ts
    */
   private deriveCluster(category?: string, description?: string): string {
-    const text = `${category || ""} ${description || ""}`.toLowerCase();
+    const cat = (category || "").toLowerCase();
+    const text = `${cat} ${description || ""}`.toLowerCase();
+
+    // 1. Auto cluster (Bike repair, Puncture, Car wash, Roadside, Mechanic)
     if (
-      text.includes("makeup") ||
-      text.includes("bridal") ||
-      text.includes("mehendi") ||
-      text.includes("hair") ||
-      text.includes("facial") ||
-      text.includes("waxing") ||
-      text.includes("nail") ||
-      text.includes("glam")
-    ) {
-      return "glam";
-    }
-    if (
-      text.includes("bike") ||
-      text.includes("puncture") ||
-      text.includes("car") ||
-      text.includes("auto") ||
-      text.includes("roadside")
+      cat.includes("bike") ||
+      cat.includes("puncture") ||
+      cat.includes("car wash") ||
+      cat.includes("roadside") ||
+      /\b(bike|motorcycle|scooter|mechanic|puncture|car wash|roadside)\b/i.test(cat) ||
+      /\b(bike repair|mechanic|puncture repair|tubeless puncture)\b/i.test(text)
     ) {
       return "auto";
     }
+
+    // 2. Glam cluster (Bridal makeup, Facial, Mehendi, Hair styling, Nails & Art)
     if (
-      text.includes("clean") ||
-      text.includes("cook") ||
-      text.includes("maid") ||
-      text.includes("pest") ||
-      text.includes("moving") ||
-      text.includes("packing")
+      cat.includes("makeup") ||
+      cat.includes("bridal") ||
+      cat.includes("facial") ||
+      cat.includes("mehendi") ||
+      cat.includes("hair") ||
+      cat.includes("nail") ||
+      cat.includes("wax") ||
+      cat.includes("glam")
+    ) {
+      return "glam";
+    }
+
+    // 3. Home cluster (Deep cleaning, Cooking, Pest-control, Moving assistance)
+    if (
+      cat.includes("clean") ||
+      cat.includes("cook") ||
+      cat.includes("pest") ||
+      cat.includes("moving") ||
+      cat.includes("maid")
     ) {
       return "home";
     }
+
+    // 4. Fix cluster (Electrician, Plumber, AC repair, Washing machine, Carpenter, TV/electronics)
     return "fix";
   }
 
@@ -485,20 +492,89 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
     });
   }
 
+  private isSeeded = false;
+
+  async ensureSeedData(): Promise<void> {
+    if (!this.isConnected || this.isSeeded) return;
+    try {
+      const autoCount = await this.repo.count({
+        where: [
+          { cluster: "auto" },
+          { category: "Bike repair" },
+          { category: "Puncture" },
+        ],
+      });
+      if (autoCount === 0) {
+        console.log("Seeding verified community pros into PostgreSQL database...");
+        for (const item of this.fallbackStore) {
+          const name = item.name || item.title || "Service Pro";
+          const exists = await this.repo.findOne({ where: { name } });
+          if (!exists) {
+            const cluster =
+              item.cluster || this.deriveCluster(item.category, item.description);
+            const newEntity = this.repo.create({
+              name,
+              title: name,
+              cluster,
+              category: item.category,
+              description: item.description || "",
+              price: item.price,
+              locationName: item.locationName,
+              latitude: item.latitude,
+              longitude: item.longitude,
+              phone: item.phone,
+              experience: item.experience,
+              rate: item.rate,
+              avatarBg: item.avatarBg,
+              categoryIcon: item.categoryIcon,
+              availableToday: item.availableToday ?? true,
+              verified: item.verified ?? true,
+              rating: item.rating ? Number(item.rating) : 4.8,
+              reviewsCount: item.reviewsCount ? Number(item.reviewsCount) : 20,
+            });
+            await this.repo.save(newEntity);
+          }
+        }
+        console.log("Verified community pros successfully seeded into PostgreSQL.");
+      }
+      this.isSeeded = true;
+    } catch (err) {
+      console.warn("ensureSeedData warning:", err);
+    }
+  }
+
   async findAllServices(
     options?: FindManyOptions<ServiceProvider>,
   ): Promise<ServiceProvider[]> {
     if (!this.isConnected) {
-      return [...this.fallbackStore].sort(
-        (a, b) =>
-          new Date(b.createdAt || 0).getTime() -
-          new Date(a.createdAt || 0).getTime(),
-      );
+      return this.fallbackStore
+        .map((item) => ({
+          ...item,
+          name: item.name || item.title || "Service Pro",
+          title: item.title || item.name || "Service Pro",
+          cluster:
+            item.cluster ||
+            this.deriveCluster(item.category, item.description),
+        }))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt || 0).getTime() -
+            new Date(a.createdAt || 0).getTime(),
+        );
     }
-    return this.repo.find({
+    await this.ensureSeedData();
+    const records = await this.repo.find({
       ...options,
       order: options?.order || { createdAt: "DESC" },
     });
+    return records.map((item) => ({
+      ...item,
+      name: item.name || item.title || "Service Pro",
+      title: item.title || item.name || "Service Pro",
+      cluster:
+        item.cluster ||
+        this.deriveCluster(item.category, item.description),
+    }));
   }
 
   async createService(

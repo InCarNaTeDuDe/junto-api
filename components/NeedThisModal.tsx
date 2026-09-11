@@ -21,6 +21,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import {
   parseUserNeed,
+  fetchDbUniversalNeed,
   SUGGESTED_NEED_PROMPTS,
   IntentMatch,
   SuggestedNeedPrompt,
@@ -129,11 +130,27 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
     }
   }, [isListening]);
 
-  // Parse intent whenever query updates
+  // Fetch live DB entities whenever query updates (no static fallback)
   useEffect(() => {
-    if (query.trim().length >= 2) {
-      const match = parseUserNeed(query);
-      setMatchedIntent(match);
+    const trimmed = query.trim();
+    if (trimmed.length >= 2) {
+      let isMounted = true;
+      fetchDbUniversalNeed(trimmed)
+        .then((dbMatch) => {
+          if (isMounted) {
+            setMatchedIntent(dbMatch);
+          }
+        })
+        .catch((err) => {
+          console.warn("NeedThisModal DB fetch error:", err);
+          if (isMounted) {
+            setMatchedIntent(null);
+          }
+        });
+
+      return () => {
+        isMounted = false;
+      };
     } else {
       setMatchedIntent(null);
     }

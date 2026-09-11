@@ -22,6 +22,8 @@ export interface IntentMatch {
   secondaryActionLabel?: string;
   secondaryRoute?: string;
   tags: string[];
+  isDbLive?: boolean;
+  source?: "database" | "cache";
   instantResults: Array<{
     id: string;
     title: string;
@@ -33,7 +35,131 @@ export interface IntentMatch {
     actionText?: string;
     rating?: number;
     price?: string;
+    phone?: string;
+    entityType?: string;
+    isDbRecord?: boolean;
   }>;
+}
+
+const MODULE_CONFIG: Record<
+  string,
+  {
+    moduleName: string;
+    route: string;
+    color: string;
+    bg: string;
+    icon: string;
+    actionLabel: string;
+  }
+> = {
+  services: {
+    moduleName: "Local Pro Services & Repairs",
+    route: "/services",
+    color: "#D97706",
+    bg: "#FEF3C7",
+    icon: "construct",
+    actionLabel: "Explore All Local Pros",
+  },
+  rides: {
+    moduleName: "RideMate Carpool",
+    route: "/rides",
+    color: "#2563EB",
+    bg: "#DBEAFE",
+    icon: "car",
+    actionLabel: "Browse All Carpools",
+  },
+  tickets: {
+    moduleName: "TicketSwap Community",
+    route: "/tickets",
+    color: "#7C3AED",
+    bg: "#EDE9FE",
+    icon: "ticket",
+    actionLabel: "Browse All Event Tickets",
+  },
+  deals: {
+    moduleName: "Local Deals Marketplace",
+    route: "/deals",
+    color: "#16A34A",
+    bg: "#DCFCE7",
+    icon: "pricetag",
+    actionLabel: "Explore All Deals",
+  },
+  helpme: {
+    moduleName: "Ask Nearby & Help",
+    route: "/activities",
+    color: "#DC2626",
+    bg: "#FEE2E2",
+    icon: "help-buoy",
+    actionLabel: "View Local Community Board",
+  },
+  daymates: {
+    moduleName: "DayMates & Activities",
+    route: "/activities",
+    color: "#4F46E5",
+    bg: "#EEF2FF",
+    icon: "people",
+    actionLabel: "View Community Activities",
+  },
+};
+
+export async function fetchDbUniversalNeed(
+  rawQuery: string,
+): Promise<IntentMatch | null> {
+  const query = (rawQuery || "").trim();
+  if (!query) return null;
+
+  try {
+    const url = `/api/universal-need/query?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const json = await res.json();
+    if (!json.success || !json.data) return null;
+
+    const dbData = json.data;
+    const config = MODULE_CONFIG[dbData.module] || MODULE_CONFIG.services;
+
+    const results = (dbData.instantResults || []).map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      detail: item.detail || "",
+      badge: item.badge || "",
+      price: item.price || "",
+      actionText: item.actionText || "Connect",
+      phone: item.phone,
+      entityType: item.entityType,
+      isDbRecord: true,
+      route: item.route || config.route,
+      avatarBg: config.color,
+    }));
+
+    return {
+      id: `db-${Date.now()}`,
+      module: dbData.module,
+      moduleName: dbData.moduleName || config.moduleName,
+      badge: dbData.badge || "Database",
+      icon: config.icon,
+      color: config.color,
+      bg: config.bg,
+      headline:
+        dbData.headline || `Found ${results.length} records in Database`,
+      explanation: dbData.explanation || "Directly pulled from database.",
+      route: config.route,
+      actionLabel: config.actionLabel,
+      tags: [],
+      isDbLive: true,
+      source: "database",
+      instantResults: results,
+    };
+  } catch (err) {
+    console.warn("fetchDbUniversalNeed error:", err);
+    return null;
+  }
 }
 
 export interface SuggestedNeedPrompt {
