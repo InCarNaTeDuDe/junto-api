@@ -7,6 +7,8 @@ import {
   updateRide,
   getMyRides,
   confirmRidePassenger,
+  cancelSeatRequest,
+  deleteRide,
 } from "./rides.service";
 import {
   CreateRideInput,
@@ -151,3 +153,30 @@ export async function confirmPassengerHandler(
     next(err);
   }
 }
+
+export async function cancelSeatRequestHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await cancelSeatRequest(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteRideHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await deleteRide(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+

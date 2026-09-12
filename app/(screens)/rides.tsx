@@ -41,6 +41,16 @@ export interface RidePassenger {
   joinedAt: string;
 }
 
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmStyle?: "destructive" | "primary";
+  onConfirm: () => void;
+}
+
 interface RideItem {
   id: string;
   userId?: string;
@@ -90,6 +100,77 @@ export default function RidesScreen() {
   const [selectedRideForParticipants, setSelectedRideForParticipants] =
     useState<RideItem | null>(null);
   const [isConfirmingPassenger, setIsConfirmingPassenger] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
+    null,
+  );
+  const [isDeletingRide, setIsDeletingRide] = useState<string | null>(null);
+  const [isCancellingSeat, setIsCancellingSeat] = useState<string | null>(null);
+  const [myRequestedRideIds, setMyRequestedRideIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const checkIsRideOwner = useCallback(
+    (ride: RideItem) => {
+      if (!ride) return false;
+      const currentUserId = user?.id;
+      const currentUserName = user?.name?.trim().toLowerCase();
+      const rideDriverName = ride.driverName?.trim().toLowerCase();
+
+      if (
+        currentUserId &&
+        (ride.userId === currentUserId || ride.driverId === currentUserId)
+      ) {
+        return true;
+      }
+      if (
+        currentUserName &&
+        rideDriverName &&
+        currentUserName === rideDriverName
+      ) {
+        return true;
+      }
+      if (
+        rideDriverName === "you" ||
+        rideDriverName === "you (host)" ||
+        rideDriverName === "you (driver)" ||
+        rideDriverName?.includes("(you)")
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [user?.id, user?.name],
+  );
+
+  const getUserSeatRequest = useCallback(
+    (ride: RideItem): RidePassenger | undefined => {
+      if (!ride?.passengers || !Array.isArray(ride.passengers))
+        return undefined;
+      const currentUserId = user?.id;
+      const currentUserName = user?.name?.trim().toLowerCase();
+
+      return ride.passengers.find((p) => {
+        if (currentUserId && p.userId === currentUserId) return true;
+        if (
+          currentUserName &&
+          p.userName &&
+          p.userName.trim().toLowerCase() === currentUserName
+        ) {
+          return true;
+        }
+        return false;
+      });
+    },
+    [user?.id, user?.name],
+  );
+
+  const hasUserRequested = useCallback(
+    (ride: RideItem) => {
+      if (myRequestedRideIds.has(ride.id)) return true;
+      return !!getUserSeatRequest(ride);
+    },
+    [myRequestedRideIds, getUserSeatRequest],
+  );
 
   const handleConfirmPassenger = async (
     rideId: string,
@@ -145,38 +226,120 @@ export default function RidesScreen() {
     }
   };
 
-  const checkIsRideOwner = useCallback(
-    (ride: RideItem) => {
-      if (!ride) return false;
-      const currentUserId = user?.id;
-      const currentUserName = user?.name?.trim().toLowerCase();
-      const rideDriverName = ride.driverName?.trim().toLowerCase();
+  const handleCancelSeatRequest = (ride: RideItem) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Cancel Seat Request",
+      message: `Are you sure you want to cancel your seat request for ${ride.from} ➔ ${ride.to}?`,
+      confirmText: "YES",
+      cancelText: "NO",
+      confirmStyle: "destructive",
+      onConfirm: async () => {
+        try {
+          setIsCancellingSeat(ride.id);
+          const res = await ApiService.post<{
+            success: boolean;
+            message: string;
+            ride: RideItem;
+          }>(`/api/rides/${ride.id}/cancel-seat`, {});
 
-      if (
-        currentUserId &&
-        (ride.userId === currentUserId || ride.driverId === currentUserId)
-      ) {
-        return true;
-      }
-      if (
-        currentUserName &&
-        rideDriverName &&
-        currentUserName === rideDriverName
-      ) {
-        return true;
-      }
-      if (
-        rideDriverName === "you" ||
-        rideDriverName === "you (host)" ||
-        rideDriverName === "you (driver)" ||
-        rideDriverName?.includes("(you)")
-      ) {
-        return true;
-      }
-      return false;
-    },
-    [user?.id, user?.name],
-  );
+          setMyRequestedRideIds((prev) => {
+            const next = new Set(prev);
+            next.delete(ride.id);
+            return next;
+          });
+
+          if (res?.ride) {
+            setRidesList((prev) =>
+              prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+            );
+          } else {
+            setRidesList((prev) =>
+              prev.map((r) => {
+                if (r.id !== ride.id) return r;
+                const req = getUserSeatRequest(r);
+                const restoredSeats =
+                  req?.status === "confirmed" ? req.seats || 1 : 0;
+                return {
+                  ...r,
+                  seatsLeft: Math.min(
+                    r.totalSeats || (r.vehicleType === "bike" ? 1 : 2),
+                    r.seatsLeft + restoredSeats,
+                  ),
+                  passengers: (r.passengers || []).filter(
+                    (p) =>
+                      p.userId !== user?.id &&
+                      p.userName?.trim().toLowerCase() !==
+                        user?.name?.trim().toLowerCase(),
+                  ),
+                };
+              }),
+            );
+          }
+          Alert.alert(
+            "Seat Cancelled",
+            res?.message || "Your seat request has been cancelled.",
+          );
+        } catch (err: any) {
+          Alert.alert(
+            "Could Not Cancel",
+            err?.response?.data?.message ||
+              err?.message ||
+              "Failed to cancel seat request. Please try again.",
+          );
+        } finally {
+          setIsCancellingSeat(null);
+        }
+      },
+    });
+  };
+
+  const handleDeleteRide = (ride: RideItem) => {
+    if (!checkIsRideOwner(ride)) {
+      Alert.alert(
+        "Permission Denied",
+        "Only the creator of this ride can delete it.",
+      );
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Ride",
+      message: `Are you sure you want to delete this ride (${ride.from} ➔ ${ride.to})? This action cannot be undone.`,
+      confirmText: "YES",
+      cancelText: "NO",
+      confirmStyle: "destructive",
+      onConfirm: async () => {
+        try {
+          setIsDeletingRide(ride.id);
+          const res = await ApiService.delete<{
+            success: boolean;
+            message: string;
+          }>(`/api/rides/${ride.id}`);
+
+          setRidesList((prev) => prev.filter((r) => r.id !== ride.id));
+          setSelectedRideForParticipants((prev) =>
+            prev?.id === ride.id ? null : prev,
+          );
+
+          Alert.alert(
+            "Ride Deleted",
+            res?.message || "Your ride offer has been removed.",
+          );
+        } catch (err: any) {
+          Alert.alert(
+            "Delete Failed",
+            err?.response?.data?.message ||
+              err?.message ||
+              "Unable to delete ride.",
+          );
+        } finally {
+          setIsDeletingRide(null);
+        }
+      },
+    });
+  };
 
   // Fetch real-time rides from backend
   const fetchRides = async () => {
@@ -206,11 +369,13 @@ export default function RidesScreen() {
     socket.on("ride_created", refreshRides);
     socket.on("rides_updated", refreshRides);
     socket.on("ride_updated", refreshRides);
+    socket.on("ride_deleted", refreshRides);
 
     return () => {
       socket.off("ride_created", refreshRides);
       socket.off("rides_updated", refreshRides);
       socket.off("ride_updated", refreshRides);
+      socket.off("ride_deleted", refreshRides);
     };
   }, []);
 
@@ -321,23 +486,54 @@ export default function RidesScreen() {
       Alert.alert("Notice", "You cannot request a seat on your own ride.");
       return;
     }
+    if (ride.seatsLeft <= 0) {
+      Alert.alert("Ride Full", "There are no remaining seats for this ride.");
+      return;
+    }
     try {
-      await ApiService.post(`/api/rides/${ride.id}/join`, {
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${ride.id}/join`, {
         seatsRequested: 1,
       });
 
-      setRidesList((prev) =>
-        prev.map((r) =>
-          r.id === ride.id
-            ? { ...r, seatsLeft: Math.max(0, r.seatsLeft - 1) }
-            : r,
-        ),
+      setMyRequestedRideIds((prev) => new Set([...prev, ride.id]));
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        setRidesList((prev) =>
+          prev.map((r) =>
+            r.id === ride.id
+              ? {
+                  ...r,
+                  seatsLeft: Math.max(0, r.seatsLeft - 1),
+                  passengers: [
+                    ...(r.passengers || []),
+                    {
+                      userId: user?.id || "guest",
+                      userName: user?.name || "You",
+                      seats: 1,
+                      status: "pending",
+                      joinedAt: new Date().toISOString(),
+                    },
+                  ],
+                }
+              : r,
+          ),
+        );
+      }
+      setBookingSuccessModal(ride);
+    } catch (e: any) {
+      Alert.alert(
+        "Unable to request seat",
+        e?.response?.data?.message || e?.message || "Please try again.",
       );
-    } catch (e) {
-      Alert.alert("Unable to request seat", "Please try again.");
-      console.log("Booked ride optimistically");
     }
-    setBookingSuccessModal(ride);
   };
 
   const filteredRides = ridesList.filter((ride) => {
@@ -658,6 +854,9 @@ export default function RidesScreen() {
             ) : (
               filteredRides.map((ride) => {
                 const isRideOwner = checkIsRideOwner(ride);
+                const hasRequested = hasUserRequested(ride);
+                const userSeatReq = getUserSeatRequest(ride);
+                const isFull = (ride.seatsLeft ?? 0) <= 0;
                 return (
                   <View
                     key={ride.id}
@@ -851,35 +1050,180 @@ export default function RidesScreen() {
                       </Text>
                     )}
 
-                    {/* Action Button: Ride Creator views co-riders & selects among them */}
+                    {/* Action Buttons */}
                     {isRideOwner ? (
-                      <TouchableOpacity
-                        style={[
-                          styles.bookBtn,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(124, 58, 237, 0.16)"
-                              : "#F5F3FF",
-                            borderColor: isDark
-                              ? "rgba(139, 92, 246, 0.45)"
-                              : "#DDD6FE",
-                            borderWidth: 1.5,
-                          },
-                        ]}
-                        onPress={() => setSelectedRideForParticipants(ride)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="people" size={15} color="#7C3AED" />
-
-                        <Text
+                      /* Option to delete ride only for the creator (with YES/NO confirmation) */
+                      <View style={styles.actionRowContainer}>
+                        <TouchableOpacity
                           style={[
-                            styles.bookBtnText,
-                            { color: "#7C3AED", fontWeight: "700" },
+                            styles.bookBtn,
+                            styles.creatorViewBtn,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(124, 58, 237, 0.16)"
+                                : "#F5F3FF",
+                              borderColor: isDark
+                                ? "rgba(139, 92, 246, 0.45)"
+                                : "#DDD6FE",
+                              borderWidth: 1.5,
+                            },
+                          ]}
+                          onPress={() => setSelectedRideForParticipants(ride)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="people" size={15} color="#7C3AED" />
+
+                          <Text
+                            style={[
+                              styles.bookBtnText,
+                              { color: "#7C3AED", fontWeight: "700" },
+                            ]}
+                          >
+                            View Co-Riders ({ride.passengers?.length || 0})
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.deleteRideBtn,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(239, 68, 68, 0.12)"
+                                : "#FEF2F2",
+                              borderColor: isDark
+                                ? "rgba(239, 68, 68, 0.3)"
+                                : "#FECACA",
+                            },
+                          ]}
+                          onPress={() => handleDeleteRide(ride)}
+                          disabled={isDeletingRide === ride.id}
+                          activeOpacity={0.8}
+                        >
+                          {isDeletingRide === ride.id ? (
+                            <ActivityIndicator size="small" color="#EF4444" />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name="trash-outline"
+                                size={15}
+                                color="#EF4444"
+                              />
+                              <Text style={styles.deleteRideBtnText}>
+                                Delete
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    ) : hasRequested ? (
+                      /* Once we request for a seat: Add option to cancel the requested seat */
+                      <View style={styles.actionRowContainer}>
+                        <View
+                          style={[
+                            styles.requestedBadgeWrap,
+                            {
+                              backgroundColor:
+                                userSeatReq?.status === "confirmed"
+                                  ? isDark
+                                    ? "rgba(16, 185, 129, 0.18)"
+                                    : "#ECFDF5"
+                                  : isDark
+                                    ? "rgba(245, 158, 11, 0.18)"
+                                    : "#FFFBEB",
+                              borderColor:
+                                userSeatReq?.status === "confirmed"
+                                  ? "#10B981"
+                                  : "#F59E0B",
+                            },
                           ]}
                         >
-                          View Co-Riders ({ride.passengers?.length || 0})
+                          <Ionicons
+                            name={
+                              userSeatReq?.status === "confirmed"
+                                ? "checkmark-circle"
+                                : "time-outline"
+                            }
+                            size={14}
+                            color={
+                              userSeatReq?.status === "confirmed"
+                                ? "#10B981"
+                                : "#F59E0B"
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.requestedBadgeText,
+                              {
+                                color:
+                                  userSeatReq?.status === "confirmed"
+                                    ? "#10B981"
+                                    : "#D97706",
+                              },
+                            ]}
+                          >
+                            {userSeatReq?.status === "confirmed"
+                              ? "Seat Confirmed"
+                              : "Seat Requested"}
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.cancelSeatBtn,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(239, 68, 68, 0.12)"
+                                : "#FEF2F2",
+                              borderColor: isDark
+                                ? "rgba(239, 68, 68, 0.3)"
+                                : "#FECACA",
+                            },
+                          ]}
+                          onPress={() => handleCancelSeatRequest(ride)}
+                          disabled={isCancellingSeat === ride.id}
+                          activeOpacity={0.8}
+                        >
+                          {isCancellingSeat === ride.id ? (
+                            <ActivityIndicator size="small" color="#EF4444" />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name="close-circle-outline"
+                                size={15}
+                                color="#EF4444"
+                              />
+                              <Text style={styles.cancelSeatBtnText}>
+                                Cancel Seat
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    ) : isFull ? (
+                      /* When seats are 0 remaining don't show button request seat for others */
+                      <View
+                        style={[
+                          styles.rideFullBadge,
+                          {
+                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                            borderColor: border,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="ban-outline"
+                          size={14}
+                          color={textMute}
+                        />
+                        <Text
+                          style={[
+                            styles.rideFullBadgeText,
+                            { color: textMute },
+                          ]}
+                        >
+                          Ride Full • 0 Seats Left
                         </Text>
-                      </TouchableOpacity>
+                      </View>
                     ) : (
                       <TouchableOpacity
                         style={styles.bookBtn}
@@ -1524,6 +1868,33 @@ export default function RidesScreen() {
               >
                 <Text style={styles.modalDoneBtnText}>Got it!</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalCancelSeatBtn,
+                  {
+                    borderColor: border,
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                  },
+                ]}
+                onPress={() => {
+                  const targetRide = bookingSuccessModal;
+                  setBookingSuccessModal(null);
+                  if (targetRide) {
+                    handleCancelSeatRequest(targetRide);
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={15}
+                  color="#EF4444"
+                />
+                <Text style={styles.modalCancelSeatBtnText}>
+                  Cancel Seat Request
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1811,9 +2182,131 @@ export default function RidesScreen() {
                 })
               )}
             </ScrollView>
+
+            {/* Ride Creator Option: Delete This Ride (with YES/NO Confirmation) */}
+            {selectedRideForParticipants && (
+              <View
+                style={[
+                  styles.participantsModalFooter,
+                  { borderTopColor: border },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.modalDeleteRideBtn}
+                  onPress={() => {
+                    handleDeleteRide(selectedRideForParticipants);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                  <Text style={styles.modalDeleteRideBtnText}>
+                    Delete This Ride
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
+
+      {/* YES/NO Confirmation Modal (Explicit, Prominent & Accessible) */}
+      {confirmDialog && (
+        <Modal
+          visible={confirmDialog.isOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setConfirmDialog(null)}
+        >
+          <View style={styles.confirmBackdrop}>
+            <View
+              style={[
+                styles.confirmCard,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.confirmIconCircle,
+                  {
+                    backgroundColor:
+                      confirmDialog.confirmStyle === "destructive"
+                        ? isDark
+                          ? "rgba(239, 68, 68, 0.2)"
+                          : "#FEF2F2"
+                        : isDark
+                          ? "rgba(124, 58, 237, 0.2)"
+                          : "#EDE9FE",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    confirmDialog.confirmStyle === "destructive"
+                      ? "alert-circle-outline"
+                      : "help-circle-outline"
+                  }
+                  size={32}
+                  color={
+                    confirmDialog.confirmStyle === "destructive"
+                      ? "#EF4444"
+                      : "#7C3AED"
+                  }
+                />
+              </View>
+
+              <Text style={[styles.confirmTitle, { color: textPrimary }]}>
+                {confirmDialog.title}
+              </Text>
+
+              <Text style={[styles.confirmMessage, { color: textMute }]}>
+                {confirmDialog.message}
+              </Text>
+
+              <View style={styles.confirmButtonsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.confirmBtnNo,
+                    {
+                      borderColor: border,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    },
+                  ]}
+                  onPress={() => setConfirmDialog(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[styles.confirmBtnNoText, { color: textPrimary }]}
+                  >
+                    {confirmDialog.cancelText || "NO"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.confirmBtnYes,
+                    {
+                      backgroundColor:
+                        confirmDialog.confirmStyle === "destructive"
+                          ? "#EF4444"
+                          : "#7C3AED",
+                    },
+                  ]}
+                  onPress={() => {
+                    const action = confirmDialog.onConfirm;
+                    setConfirmDialog(null);
+                    action();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.confirmBtnYesText}>
+                    {confirmDialog.confirmText || "YES"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -2599,5 +3092,185 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "700",
+  },
+  actionRowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  creatorViewBtn: {
+    flex: 1,
+    marginTop: 0,
+  },
+  deleteRideBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  deleteRideBtnText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  requestedBadgeWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  requestedBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  cancelSeatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  cancelSeatBtnText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  rideFullBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  rideFullBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  modalCancelSeatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+    width: "100%",
+  },
+  modalCancelSeatBtnText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  participantsModalFooter: {
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+  },
+  modalDeleteRideBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 11,
+    borderRadius: 10,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.25)",
+  },
+  modalDeleteRideBtnText: {
+    color: "#EF4444",
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  confirmCard: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  confirmIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  confirmButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+  },
+  confirmBtnNo: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnNoText: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  confirmBtnYes: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnYesText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });

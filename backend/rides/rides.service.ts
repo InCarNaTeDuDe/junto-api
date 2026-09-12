@@ -337,3 +337,105 @@ export async function getMyRides(userId: string): Promise<{
     riding,
   };
 }
+
+/**
+ * Cancel a seat request
+ */
+export async function cancelSeatRequest(
+  rideId: string,
+  user: User,
+): Promise<{
+  success: boolean;
+  message: string;
+  ride: RideRecord;
+}> {
+  if (!user?.id) {
+    throw new Error("Authenticated user is required to cancel a seat request.");
+  }
+
+  const passengerName = user.name || "A passenger";
+  const updatedRide = await rideRepository.cancelSeatRequest(
+    rideId,
+    user.id,
+    user.name,
+  );
+
+  // Notify connected clients via socket
+  if (io) {
+    io.emit("ride_updated", updatedRide);
+    io.to(`user:${updatedRide.userId}`).emit("ride_seat_cancelled", {
+      rideId: updatedRide.id,
+      passengerName,
+      from: updatedRide.from,
+      to: updatedRide.to,
+    });
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  // Push notification to ride creator
+  if (updatedRide.userId) {
+    sendExpoPushNotification(
+      updatedRide.userId,
+      "Seat Request Cancelled",
+      `${passengerName} cancelled their seat request for ${updatedRide.from} ➔ ${updatedRide.to}.`,
+      {
+        rideId: updatedRide.id,
+        type: "ride_seat_cancelled",
+        passengerId: user.id,
+      },
+    ).catch(() => {});
+  }
+
+  return {
+    success: true,
+    message: "Seat request cancelled successfully.",
+    ride: updatedRide,
+  };
+}
+
+/**
+ * Delete a ride - creator only
+ */
+export async function deleteRide(
+  rideId: string,
+  user: User,
+): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  if (!user?.id) {
+    throw new Error("Authenticated user is required to delete a ride.");
+  }
+
+  const ride = await rideRepository.findById(rideId);
+  if (!ride) {
+    throw new Error("Ride not found.");
+  }
+
+  const isOwner =
+    ride.userId === user.id ||
+    (user.name &&
+      ride.driverName?.trim().toLowerCase() ===
+        user.name.trim().toLowerCase()) ||
+    ride.driverName?.trim().toLowerCase() === "you" ||
+    ride.driverName?.trim().toLowerCase().includes("(you)");
+
+  if (!isOwner) {
+    throw new Error("Only the creator of this ride can delete it.");
+  }
+
+  await rideRepository.deleteRide(rideId);
+
+  // Notify connected clients via socket
+  if (io) {
+    io.emit("ride_deleted", { id: rideId });
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  return {
+    success: true,
+    message: "Ride deleted successfully.",
+  };
+}

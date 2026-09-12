@@ -8,6 +8,8 @@ import {
   updateRideHandler,
   getMyRidesHandler,
   confirmPassengerHandler,
+  cancelSeatRequestHandler,
+  deleteRideHandler,
 } from "./rides.controller";
 import {
   CreateRideSchema,
@@ -31,6 +33,9 @@ router.post(
   validate(JoinRideSchema),
   joinRideHandler,
 );
+router.post("/:id/cancel-seat", authenticate, cancelSeatRequestHandler);
+router.delete("/:id/join", authenticate, cancelSeatRequestHandler);
+router.delete("/:id", authenticate, deleteRideHandler);
 router.post(
   "/:id/passengers/:passengerUserId/confirm",
   authenticate,

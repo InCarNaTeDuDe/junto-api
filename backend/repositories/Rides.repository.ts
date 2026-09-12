@@ -357,6 +357,54 @@ export class RideRepository extends BaseRepository<Ride> {
   }
 
   /**
+   * Cancel passenger seat request or booking
+   */
+  async cancelSeatRequest(
+    rideId: string,
+    userId: string,
+    userName?: string,
+  ): Promise<RideRecord> {
+    const ride = await this.repo.findOne({
+      where: { id: rideId },
+    });
+
+    if (!ride) {
+      throw new Error("Ride not found");
+    }
+
+    const currentPassengers = Array.isArray(ride.passengers)
+      ? [...ride.passengers]
+      : [];
+
+    const index = currentPassengers.findIndex(
+      (p) =>
+        (userId && p.userId === userId) ||
+        (userName &&
+          p.userName?.trim().toLowerCase() === userName.trim().toLowerCase()),
+    );
+
+    if (index === -1) {
+      throw new Error("You do not have an active seat request for this ride.");
+    }
+
+    const targetPassenger = currentPassengers[index];
+    // If the seat was already confirmed, restore the seats
+    if (targetPassenger.status === "confirmed") {
+      const seatsToRestore = targetPassenger.seats || 1;
+      const maxSeats = ride.totalSeats || (ride.vehicleType === "bike" ? 1 : 2);
+      ride.seatsLeft = Math.min(maxSeats, ride.seatsLeft + seatsToRestore);
+    }
+
+    // Remove passenger request
+    currentPassengers.splice(index, 1);
+    ride.passengers = currentPassengers;
+    ride.updatedAt = new Date();
+
+    const savedRide = await this.repo.save(ride);
+    return this.toRideRecord(savedRide);
+  }
+
+  /**
    * Update ride
    */
   async updateRide(
