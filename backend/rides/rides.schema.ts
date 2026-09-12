@@ -7,7 +7,14 @@ export const CreateRideSchema = z.object({
   vehicleType: z.enum(["car", "bike"]),
   seatsLeft: z.number().int().min(0).max(8).default(1),
   totalSeats: z.number().int().min(1).max(8).optional(),
-  price: z.string().trim().min(1).max(50).default("₹40"),
+  price: z
+    .union([z.number(), z.string()])
+    .transform((val) => {
+      if (typeof val === "number") return val;
+      const parsed = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+      return isNaN(parsed) ? 0 : parsed;
+    })
+    .pipe(z.number().min(0, "Price must be a valid non-negative number")),
   notes: z.string().trim().max(300).optional(),
   // Ride location
   locationName: z.string().trim().max(120).optional(),

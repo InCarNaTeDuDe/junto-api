@@ -18,7 +18,7 @@ export const CreateDealSchema = z.object({
     .enum(["Brand New", "Like New", "Good", "Fair"])
     .default("Like New"),
   location: z.string().trim().min(2).max(120).default("Madhapur, Hyderabad"),
-  distance: z.string().trim().max(50).default("Near you"),
+  distance: z.string().trim().max(50).optional().default(""),
   sellerPhone: z.string().trim().min(5).max(30),
   description: z.string().trim().min(5, "Description is required").max(1000),
   image: z

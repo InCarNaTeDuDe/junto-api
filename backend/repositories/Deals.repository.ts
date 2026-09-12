@@ -1,61 +1,50 @@
 import { BaseRepository } from "./Base.repository";
 import { LocalDeal } from "../entities/LocalDeals.entity";
 import { FindManyOptions } from "typeorm";
+import { DealRecord } from "../deals/deals.service";
 
 export class DealsRepository extends BaseRepository<LocalDeal> {
-  private fallbackStore: LocalDeal[] = [
-    {
-      id: "deal-cycle-1",
-      userId: "user-seller-1",
-      title: "Firefox Target 21-Speed Mountain Cycle",
-      description:
-        "Shimano 21-speed gears, front disc brakes, alloy frame, barely 8 months old. Includes helmet, lock, and water cage.",
-      businessName: "Anil K. (Hitec City)",
-      category: "Cycles",
-      originalPrice: 15500,
-      dealPrice: 6200,
-      locationName: "Kondapur, Hyderabad",
-      latitude: 17.4699,
-      longitude: 78.3578,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as LocalDeal,
-    {
-      id: "deal-cycle-2",
-      userId: "user-seller-2",
-      title: "Decathlon Rockrider ST30 Hybrid Bicycle",
-      description:
-        "Lightweight city & trail bicycle, serviced last week, smooth shifting, perfect for daily commuting.",
-      businessName: "Sandeep Rao (Madhapur)",
-      category: "Cycles",
-      originalPrice: 11000,
-      dealPrice: 4800,
-      locationName: "Madhapur, Hyderabad",
-      latitude: 17.4483,
-      longitude: 78.3915,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as LocalDeal,
-    {
-      id: "deal-sony-1",
-      userId: "user-seller-3",
-      title: "Sony WH-1000XM4 Noise Cancelling Headphones",
-      description:
-        "Original box, carrying case, 30-hour battery life. Selling because upgraded to XM5.",
-      businessName: "Kiran G. (Gachibowli)",
-      category: "Electronics",
-      originalPrice: 24990,
-      dealPrice: 11500,
-      locationName: "Gachibowli, Hyderabad",
-      latitude: 17.4435,
-      longitude: 78.3772,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as LocalDeal,
-  ];
+  // Pure dynamic store: all static fallback data removed
+  private fallbackStore: LocalDeal[] = [];
 
   constructor() {
     super(LocalDeal);
+  }
+
+  /**
+   * Transforms a LocalDeal DB entity into application DealRecord
+   */
+  public toRecord(deal: LocalDeal): DealRecord {
+    return {
+      id: deal.id,
+      sellerId: deal.userId || deal.id,
+      userId: deal.userId,
+      title: deal.title,
+      category: (deal.category || "General") as any,
+      price: deal.price || (deal.dealPrice ? `₹${deal.dealPrice}` : "₹0"),
+      originalPrice: deal.originalPrice ? `₹${deal.originalPrice}` : undefined,
+      condition: (deal.condition || "Like New") as any,
+      location: deal.locationName || "Local Area",
+      distance: deal.distance || "",
+      sellerName: deal.sellerName || deal.businessName || "Local Neighbor",
+      sellerRating: Number(deal.sellerRating || 5.0),
+      sellerPhone: deal.sellerPhone || "",
+      sellerAvatarBg: deal.sellerAvatarBg || "#3B82F6",
+      verified: deal.verified ?? true,
+      postedTime: deal.createdAt
+        ? new Date(deal.createdAt).toLocaleDateString()
+        : "Recently",
+      image:
+        deal.image ||
+        "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500",
+      description: deal.description || "",
+      views: Number(deal.views || 1),
+      status: (deal.status || "available") as any,
+      inquiries: deal.inquiries || [],
+      createdAt: deal.createdAt
+        ? new Date(deal.createdAt).toISOString()
+        : new Date().toISOString(),
+    };
   }
 
   override async findAll(
@@ -104,10 +93,74 @@ export class DealsRepository extends BaseRepository<LocalDeal> {
           d.title.toLowerCase().includes(term) ||
           d.description.toLowerCase().includes(term) ||
           (d.category && d.category.toLowerCase().includes(term)) ||
-          d.locationName.toLowerCase().includes(term),
+          (d.locationName && d.locationName.toLowerCase().includes(term)),
       );
     }
-    return this.findAll();
+    const all = await this.findAll();
+    return all.filter(
+      (d) =>
+        d.title.toLowerCase().includes(term) ||
+        d.description.toLowerCase().includes(term) ||
+        (d.category && d.category.toLowerCase().includes(term)) ||
+        (d.locationName && d.locationName.toLowerCase().includes(term)),
+    );
+  }
+
+  override async create(data: Partial<LocalDeal>): Promise<LocalDeal> {
+    if (!this.isConnected) {
+      const fallbackItem: LocalDeal = {
+        id: `deal-${Date.now()}`,
+        userId: data.userId as any,
+        title: data.title || "",
+        description: data.description || "",
+        businessName: data.businessName || data.sellerName || "Local Neighbor",
+        sellerName: data.sellerName || data.businessName || "Local Neighbor",
+        sellerPhone: data.sellerPhone || "",
+        sellerAvatarBg: data.sellerAvatarBg || "#3B82F6",
+        sellerRating: 5.0,
+        category: data.category,
+        price: data.price || "",
+        originalPrice: data.originalPrice,
+        dealPrice: data.dealPrice,
+        condition: data.condition || "Like New",
+        locationName: data.locationName || "",
+        distance: data.distance || "",
+        latitude: data.latitude,
+        longitude: data.longitude,
+        image:
+          data.image ||
+          "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500",
+        verified: data.verified ?? true,
+        views: 1,
+        status: (data.status as any) || "available",
+        inquiries: data.inquiries || [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as LocalDeal;
+      this.fallbackStore.unshift(fallbackItem);
+      return fallbackItem;
+    }
+
+    const entity = this.repo.create(data);
+    return this.repo.save(entity);
+  }
+
+  override async update(criteria: string | number | any, data: any) {
+    if (!this.isConnected) {
+      const idStr =
+        typeof criteria === "object" ? (criteria as any).id : String(criteria);
+      const index = this.fallbackStore.findIndex((d) => d.id === idStr);
+      if (index !== -1) {
+        this.fallbackStore[index] = {
+          ...this.fallbackStore[index],
+          ...data,
+          updatedAt: new Date(),
+        } as LocalDeal;
+      }
+      return { raw: [], generatedMaps: [], affected: 1 } as any;
+    }
+
+    return super.update(criteria, data);
   }
 }
 

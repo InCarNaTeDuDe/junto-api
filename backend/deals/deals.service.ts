@@ -5,6 +5,7 @@ import {
   ContactSellerInput,
 } from "./deals.schema";
 import { io } from "../socket/socket";
+import { dealsRepository } from "../repositories/Deals.repository";
 
 export interface DealRecord {
   id: string;
@@ -46,20 +47,32 @@ export interface DealRecord {
   createdAt: string;
 }
 
-let dealsStore: DealRecord[] = [];
+function isValidUuid(val?: string): boolean {
+  return Boolean(
+    val &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      val,
+    ),
+  );
+}
 
-export async function listDeals(query: QueryDealsInput) {
-  let result = [...dealsStore].filter((d) => d.status === "available");
+export async function listDeals(
+  query: Partial<QueryDealsInput> = {},
+): Promise<DealRecord[]> {
+  const deals = await dealsRepository.findAll();
+  let records = deals.map((d) => dealsRepository.toRecord(d));
+
+  records = records.filter((d) => d.status === "available");
 
   if (query.category && query.category !== "All") {
-    result = result.filter(
+    records = records.filter(
       (d) => d.category.toLowerCase() === query.category.toLowerCase(),
     );
   }
 
   if (query.search) {
     const term = query.search.toLowerCase();
-    result = result.filter(
+    records = records.filter(
       (d) =>
         d.title.toLowerCase().includes(term) ||
         d.description.toLowerCase().includes(term) ||
@@ -69,43 +82,54 @@ export async function listDeals(query: QueryDealsInput) {
   }
 
   if (query.condition) {
-    result = result.filter((d) => d.condition === query.condition);
+    records = records.filter((d) => d.condition === query.condition);
   }
 
-  return result.sort(
+  return records.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 }
 
 export async function getDealById(id: string): Promise<DealRecord | null> {
-  const deal = dealsStore.find((d) => d.id === id);
-  if (deal) {
-    deal.views += 1;
-  }
-  return deal || null;
+  const deal = await dealsRepository.findById(id);
+  if (!deal) return null;
+
+  const newViews = (deal.views || 0) + 1;
+  await dealsRepository.update(deal.id, { views: newViews });
+  deal.views = newViews;
+
+  return dealsRepository.toRecord(deal);
 }
 
 export async function createDeal(
   input: CreateDealInput,
   user?: User | any,
 ): Promise<DealRecord> {
-  const newDeal: DealRecord = {
-    id: `deal-${Date.now()}`,
-    sellerId: user?.id || `seller_${Date.now()}`,
-    userId: user?.id || `seller_${Date.now()}`,
+  const numericPrice =
+    parseFloat(String(input.price).replace(/[^0-9.]/g, "")) || 0;
+  const originalNumericPrice = input.originalPrice
+    ? parseFloat(String(input.originalPrice).replace(/[^0-9.]/g, "")) ||
+      undefined
+    : undefined;
+
+  const validUserId = isValidUuid(user?.id) ? user.id : undefined;
+
+  // Insert directly into PostgreSQL database via DealsRepository
+  const dealEntity = await dealsRepository.create({
+    userId: validUserId,
     title: input.title,
     category: input.category,
-    price: input.price,
-    originalPrice: input.originalPrice,
-    condition: input.condition,
-    location: input.location,
-    distance: input.distance || "Near you",
+    price: input.price.startsWith("₹") ? input.price : `₹${input.price}`,
+    dealPrice: numericPrice,
+    originalPrice: originalNumericPrice,
+    condition: input.condition || "Like New",
+    locationName: input.location,
+    distance: input.distance || "",
     sellerName: user?.name || "Local Neighbor",
-    sellerRating: 5.0,
     sellerPhone: input.sellerPhone,
     sellerAvatarBg: "#3B82F6",
+    sellerRating: 5.0,
     verified: input.verified ?? true,
-    postedTime: "Just now",
     image:
       input.image ||
       "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500",
@@ -113,21 +137,21 @@ export async function createDeal(
     views: 1,
     status: "available",
     inquiries: [],
-    createdAt: new Date().toISOString(),
-  };
+  });
 
-  dealsStore.unshift(newDeal);
+  const newDeal = dealsRepository.toRecord(dealEntity);
 
   if (io) {
     io.emit("deal_created", newDeal);
-    io.emit("deals_updated", dealsStore);
+    const allDeals = await listDeals({});
+    io.emit("deals_updated", allDeals);
   }
 
   return newDeal;
 }
 
 export async function contactSeller(dealId: string, input: ContactSellerInput) {
-  const deal = dealsStore.find((d) => d.id === dealId);
+  const deal = await dealsRepository.findById(dealId);
   if (!deal) {
     throw new Error("Deal not found");
   }
@@ -141,19 +165,26 @@ export async function contactSeller(dealId: string, input: ContactSellerInput) {
     createdAt: new Date().toISOString(),
   };
 
-  deal.inquiries.push(inquiry);
+  const currentInquiries = Array.isArray(deal.inquiries)
+    ? [...deal.inquiries]
+    : [];
+  currentInquiries.push(inquiry);
+
+  await dealsRepository.update(deal.id, { inquiries: currentInquiries });
+
+  const record = dealsRepository.toRecord(deal);
 
   if (io) {
-    io.to(`user:${deal.sellerId}`).emit("deal_inquiry", {
-      dealId: deal.id,
-      dealTitle: deal.title,
+    io.to(`user:${record.sellerId}`).emit("deal_inquiry", {
+      dealId: record.id,
+      dealTitle: record.title,
       inquiry,
     });
   }
 
   return {
     success: true,
-    message: `Message sent to ${deal.sellerName}!`,
+    message: `Message sent to ${record.sellerName}!`,
     inquiry,
   };
 }

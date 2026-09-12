@@ -234,6 +234,7 @@ export default function LocalDealsScreen() {
 
   // Voice Modals and State
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [sellerMobile, setSellerMobile] = useState("");
   const [voiceParsedData, setVoiceParsedData] =
     useState<ParsedDealVoice | null>(null);
   const [selectedDealForAction, setSelectedDealForAction] =
@@ -311,6 +312,14 @@ export default function LocalDealsScreen() {
       return;
     }
 
+    if (!sellerMobile.trim()) {
+      Alert.alert(
+        "Mobile Number Required",
+        "Please enter your mobile number so interested buyers can contact you.",
+      );
+      return;
+    }
+
     try {
       setIsPublishing(true);
       const payload = {
@@ -318,9 +327,11 @@ export default function LocalDealsScreen() {
         category: voiceParsedData.category,
         price: voiceParsedData.price,
         condition: voiceParsedData.condition,
-        location: `${voiceParsedData.location}, ${cityShort}`,
-        distance: "0.4 km away (Nearby)",
-        sellerPhone: "+91 98480 00000",
+        location: voiceParsedData.location
+          ? `${voiceParsedData.location}, ${cityShort}`
+          : cityShort,
+        distance: "",
+        sellerPhone: sellerMobile.trim(),
         description:
           voiceParsedData.details || "Listed in 1-tap via Voice Assist.",
         image:
@@ -343,10 +354,10 @@ export default function LocalDealsScreen() {
           originalPrice: res.data.originalPrice,
           condition: res.data.condition,
           location: res.data.location,
-          distance: res.data.distance,
+          distance: res.data.distance || "",
           sellerName: res.data.sellerName || user?.name || "You (Host)",
           sellerRating: 5.0,
-          sellerPhone: res.data.sellerPhone,
+          sellerPhone: res.data.sellerPhone || sellerMobile.trim(),
           sellerAvatarBg: "#10B981",
           verified: true,
           postedTime: "Just now",
@@ -364,11 +375,13 @@ export default function LocalDealsScreen() {
           category: voiceParsedData.category,
           price: voiceParsedData.price,
           condition: voiceParsedData.condition,
-          location: `${voiceParsedData.location}, ${cityShort}`,
-          distance: "0.4 km away (Nearby)",
+          location: voiceParsedData.location
+            ? `${voiceParsedData.location}, ${cityShort}`
+            : cityShort,
+          distance: "",
           sellerName: user?.name ? `${user.name} (You)` : "You (Host)",
           sellerRating: 5.0,
-          sellerPhone: "+91 98480 00000",
+          sellerPhone: sellerMobile.trim(),
           sellerAvatarBg: "#10B981",
           verified: true,
           postedTime: "Just now",
@@ -1091,6 +1104,39 @@ export default function LocalDealsScreen() {
                 </View>
               </View>
             )}
+
+            {/* Mobile Number Textbox for Seller */}
+            <View style={{ marginTop: 12, marginBottom: 4, width: "100%" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: textPrimary,
+                  marginBottom: 6,
+                }}
+              >
+                📱 Seller Mobile Number (for WhatsApp / calls):
+              </Text>
+              <TextInput
+                style={{
+                  height: 44,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: border,
+                  backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                  paddingHorizontal: 12,
+                  fontSize: 14,
+                  color: textPrimary,
+                }}
+                placeholder="Enter 10-digit mobile number"
+                placeholderTextColor={textMute}
+                keyboardType="phone-pad"
+                value={sellerMobile}
+                onChangeText={(text) =>
+                  setSellerMobile(text.replace(/[^0-9+ ]/g, ""))
+                }
+              />
+            </View>
 
             {/* Publish Button */}
             <TouchableOpacity

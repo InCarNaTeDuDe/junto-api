@@ -64,7 +64,7 @@ interface RideItem {
   vehicleType: "car" | "bike";
   seatsLeft: number;
   totalSeats?: number;
-  price: string;
+  price: number | string;
   verified: boolean;
   notes?: string;
   passengers?: RidePassenger[];
@@ -79,7 +79,6 @@ const PRESET_ROUTES = [
 ];
 
 const SEAT_PRESETS = { car: [1, 2, 3, 4], bike: [1] };
-const PRICE_PRESETS = ["Free", "₹30", "₹50", "₹70", "₹100"];
 
 export default function RidesScreen() {
   const router = useRouter();
@@ -388,7 +387,7 @@ export default function RidesScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [offerVehicle, setOfferVehicle] = useState<"car" | "bike">("car");
   const [selectedSeats, setSelectedSeats] = useState(2);
-  const [selectedPrice, setSelectedPrice] = useState("₹40");
+  const [selectedPrice, setSelectedPrice] = useState("");
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString("en-US", {
@@ -438,8 +437,19 @@ export default function RidesScreen() {
       return;
     }
 
+    if (!selectedPrice.trim()) {
+      Alert.alert(
+        "Missing Price",
+        "Please enter a numeric price for the ride.",
+      );
+      return;
+    }
+
     try {
       setIsPublishing(true);
+
+      const numericRidePrice =
+        parseFloat(selectedPrice.replace(/[^0-9.]/g, "")) || 0;
 
       const res = await ApiService.post<{
         success: boolean;
@@ -451,7 +461,7 @@ export default function RidesScreen() {
         vehicleType: offerVehicle,
         seatsLeft: selectedSeats,
         totalSeats: selectedSeats,
-        price: selectedPrice,
+        price: numericRidePrice,
         notes: "Scheduled ride • Direct contact",
         verified: true,
       });
@@ -468,6 +478,7 @@ export default function RidesScreen() {
 
       setOfferFrom("");
       setOfferTo("");
+      setSelectedPrice("");
       setActiveTab("find");
 
       Alert.alert(
@@ -895,7 +906,7 @@ export default function RidesScreen() {
                             )}
                           </View>
 
-                          <View style={styles.ratingRow}>
+                          {/* <View style={styles.ratingRow}>
                             <Ionicons name="star" size={12} color="#F59E0B" />
 
                             <Text
@@ -903,13 +914,19 @@ export default function RidesScreen() {
                             >
                               {ride.driverRating}
                             </Text>
-                          </View>
+                          </View> */}
                         </View>
                       </View>
 
                       <View style={styles.priceWrap}>
                         <Text style={[styles.priceTag, { color: "#10B981" }]}>
-                          {ride.price}
+                          {typeof ride.price === "number"
+                            ? `₹${ride.price}`
+                            : ride.price?.startsWith("₹")
+                              ? ride.price
+                              : Number(ride.price) === 0
+                                ? "Free"
+                                : `₹${ride.price}`}
                         </Text>
 
                         <Text style={[styles.priceSub, { color: textMute }]}>
@@ -918,7 +935,7 @@ export default function RidesScreen() {
                       </View>
                     </View>
 
-                    {/* Route Timeline */}
+                    {/* Route Timeline with Vehicle Icon next to From/To vertical column */}
                     <View style={styles.routeContainer}>
                       <View style={styles.routeDotsCol}>
                         <View
@@ -975,10 +992,58 @@ export default function RidesScreen() {
                           </Text>
                         </View>
                       </View>
+
+                      {/* Prominent Vehicle Icon next to From and To vertical column */}
+                      <View
+                        style={[
+                          styles.vehicleSideBadge,
+                          {
+                            backgroundColor:
+                              ride.vehicleType === "car"
+                                ? isDark
+                                  ? "rgba(124, 58, 237, 0.15)"
+                                  : "#F3E8FF"
+                                : isDark
+                                  ? "rgba(16, 185, 129, 0.15)"
+                                  : "#ECFDF5",
+                            borderColor:
+                              ride.vehicleType === "car"
+                                ? isDark
+                                  ? "rgba(167, 139, 250, 0.5)"
+                                  : "#DDD6FE"
+                                : isDark
+                                  ? "rgba(16, 185, 129, 0.5)"
+                                  : "#A7F3D0",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            ride.vehicleType === "car" ? "car-sport" : "bicycle"
+                          }
+                          size={34}
+                          color={
+                            ride.vehicleType === "car" ? "#7C3AED" : "#10B981"
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.vehicleSideBadgeText,
+                            {
+                              color:
+                                ride.vehicleType === "car"
+                                  ? "#7C3AED"
+                                  : "#10B981",
+                            },
+                          ]}
+                        >
+                          {ride.vehicleType === "car" ? "CAR" : "BIKE"}
+                        </Text>
+                      </View>
                     </View>
 
                     {/* Ride Meta Badge row */}
-                    <View style={styles.metaRow}>
+                    {/* <View style={styles.metaRow}>
                       <View
                         style={[
                           styles.metaBadge,
@@ -1042,7 +1107,7 @@ export default function RidesScreen() {
                           {ride.seatsLeft > 1 ? "s" : ""} left
                         </Text>
                       </View>
-                    </View>
+                    </View> */}
 
                     {ride.notes && (
                       <Text style={[styles.notesText, { color: textMute }]}>
@@ -1200,30 +1265,33 @@ export default function RidesScreen() {
                         </TouchableOpacity>
                       </View>
                     ) : isFull ? (
-                      /* When seats are 0 remaining don't show button request seat for others */
-                      <View
+                      /* if 0 seats are showing in listing card, disable the request seat button */
+                      <TouchableOpacity
                         style={[
-                          styles.rideFullBadge,
+                          styles.bookBtn,
+                          styles.bookBtnDisabled,
                           {
-                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                            backgroundColor: isDark ? "#1E293B" : "#E2E8F0",
                             borderColor: border,
                           },
                         ]}
+                        disabled={true}
+                        activeOpacity={1}
                       >
                         <Ionicons
                           name="ban-outline"
-                          size={14}
+                          size={15}
                           color={textMute}
                         />
                         <Text
                           style={[
-                            styles.rideFullBadgeText,
-                            { color: textMute },
+                            styles.bookBtnText,
+                            { color: textMute, fontWeight: "600" },
                           ]}
                         >
-                          Ride Full • 0 Seats Left
+                          Request Seat (0 Seats Left)
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         style={styles.bookBtn}
@@ -1769,34 +1837,42 @@ export default function RidesScreen() {
 
               <View style={{ flex: 1.2 }}>
                 <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                  Fuel Split / Seat:
+                  Price (₹):
                 </Text>
-                <View style={styles.seatPillRow}>
-                  {PRICE_PRESETS.map((price) => {
-                    const active = selectedPrice === price;
-                    return (
-                      <TouchableOpacity
-                        key={price}
-                        onPress={() => setSelectedPrice(price)}
-                        style={[
-                          styles.pricePill,
-                          {
-                            backgroundColor: active ? "#7C3AED" : cardBg,
-                            borderColor: active ? "#7C3AED" : border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.pricePillText,
-                            { color: active ? "#FFF" : textPrimary },
-                          ]}
-                        >
-                          {price}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View
+                  style={[
+                    styles.numericPriceContainer,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderColor: border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "800",
+                      color: "#7C3AED",
+                      marginRight: 4,
+                    }}
+                  >
+                    ₹
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.numericPriceInput,
+                      {
+                        color: textPrimary,
+                      },
+                    ]}
+                    placeholder="e.g. 40"
+                    placeholderTextColor={textMute}
+                    keyboardType="numeric"
+                    value={selectedPrice}
+                    onChangeText={(text) =>
+                      setSelectedPrice(text.replace(/[^0-9]/g, ""))
+                    }
+                  />
                 </View>
               </View>
             </View>
@@ -1857,7 +1933,12 @@ export default function RidesScreen() {
                 {bookingSuccessModal?.from} ➔ {bookingSuccessModal?.to}
               </Text>
               <Text style={[styles.summaryTime, { color: "#7C3AED" }]}>
-                ⏰ {bookingSuccessModal?.time} • {bookingSuccessModal?.price}
+                ⏰ {bookingSuccessModal?.time} •{" "}
+                {typeof bookingSuccessModal?.price === "number"
+                  ? `₹${bookingSuccessModal?.price}`
+                  : bookingSuccessModal?.price?.startsWith("₹")
+                    ? bookingSuccessModal?.price
+                    : `₹${bookingSuccessModal?.price}`}
               </Text>
             </View>
 
@@ -2182,29 +2263,6 @@ export default function RidesScreen() {
                 })
               )}
             </ScrollView>
-
-            {/* Ride Creator Option: Delete This Ride (with YES/NO Confirmation) */}
-            {selectedRideForParticipants && (
-              <View
-                style={[
-                  styles.participantsModalFooter,
-                  { borderTopColor: border },
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.modalDeleteRideBtn}
-                  onPress={() => {
-                    handleDeleteRide(selectedRideForParticipants);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  <Text style={styles.modalDeleteRideBtnText}>
-                    Delete This Ride
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </View>
       </Modal>
@@ -2523,6 +2581,21 @@ const styles = StyleSheet.create({
   routeTextCol: {
     flex: 1,
   },
+  vehicleSideBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    minWidth: 64,
+  },
+  vehicleSideBadgeText: {
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    marginTop: 2,
+  },
   locationLabel: {
     fontSize: 9.5,
     fontWeight: "800",
@@ -2564,10 +2637,28 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
+  bookBtnDisabled: {
+    opacity: 0.8,
+  },
   bookBtnText: {
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "700",
+  },
+  numericPriceContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 38,
+    marginTop: 2,
+  },
+  numericPriceInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    paddingVertical: 0,
   },
   offerContainer: {
     gap: 12,

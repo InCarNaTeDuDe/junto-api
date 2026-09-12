@@ -19,7 +19,7 @@ export interface RideRecord {
   seatsLeft: number;
   totalSeats: number;
 
-  price: string;
+  price: number;
   verified: boolean;
   notes?: string;
 
@@ -73,7 +73,10 @@ export class RideRepository extends BaseRepository<Ride> {
       seatsLeft: ride.seatsLeft,
       totalSeats: ride.totalSeats || (ride.vehicleType === "bike" ? 1 : 2),
 
-      price: ride.price,
+      price:
+        typeof ride.price === "number"
+          ? ride.price
+          : parseFloat(String(ride.price || "0").replace(/[^0-9.]/g, "")) || 0,
       verified: ride.verified,
       notes: ride.notes,
 
@@ -119,7 +122,7 @@ export class RideRepository extends BaseRepository<Ride> {
     seatsLeft: number;
     totalSeats: number;
 
-    price: string;
+    price: number | string;
     verified?: boolean;
     notes?: string;
 
@@ -128,6 +131,11 @@ export class RideRepository extends BaseRepository<Ride> {
     latitude?: number;
     longitude?: number;
   }): Promise<RideRecord> {
+    const numericPrice =
+      typeof data.price === "string"
+        ? parseFloat(data.price.replace(/[^0-9.]/g, "")) || 0
+        : Number(data.price) || 0;
+
     const ride = this.repo.create({
       userId: data.driverId,
 
@@ -146,7 +154,7 @@ export class RideRepository extends BaseRepository<Ride> {
       seatsLeft: data.seatsLeft,
       totalSeats: data.totalSeats,
 
-      price: data.price,
+      price: numericPrice,
       verified: data.verified ?? true,
       notes: data.notes,
 
@@ -158,11 +166,11 @@ export class RideRepository extends BaseRepository<Ride> {
       status: "active",
 
       passengers: [],
-    });
+    } as any);
 
-    const savedRide = await this.repo.save(ride);
+    const savedRide = await this.repo.save(ride as any);
 
-    return this.toRideRecord(savedRide);
+    return this.toRideRecord(savedRide as Ride);
   }
 
   /**
@@ -415,7 +423,7 @@ export class RideRepository extends BaseRepository<Ride> {
       time: string;
       vehicleType: "car" | "bike";
       seatsLeft: number;
-      price: string;
+      price: number | string;
       verified: boolean;
       notes: string;
       status: "active" | "in_progress" | "completed" | "cancelled";
@@ -425,7 +433,14 @@ export class RideRepository extends BaseRepository<Ride> {
       longitude: number;
     }>,
   ): Promise<RideRecord | null> {
-    await this.repo.update(id, data);
+    const updateData: any = { ...data };
+    if (updateData.price !== undefined) {
+      updateData.price =
+        typeof updateData.price === "string"
+          ? parseFloat(updateData.price.replace(/[^0-9.]/g, "")) || 0
+          : Number(updateData.price) || 0;
+    }
+    await this.repo.update(id, updateData);
 
     const updatedRide = await this.repo.findOne({
       where: {

@@ -81,7 +81,7 @@ export async function queryUniversalNeedFromDb(
         subtitle: `${ride.time} • Driver: ${ride.driverName} (★ ${ride.driverRating})`,
         detail: ride.notes || `Available ${ride.vehicleType} carpool.`,
         badge: `${ride.seatsLeft} Seats Left`,
-        price: ride.price,
+        price: typeof ride.price === "number" ? `₹${ride.price}` : ride.price,
         actionText: "Join Ride",
         route: "/(tabs)/rides",
         entityType: "Ride",

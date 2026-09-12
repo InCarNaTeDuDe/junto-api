@@ -102,10 +102,28 @@ export class Ride {
   totalSeats!: number;
 
   @Column({
-    type: "varchar",
-    length: 50,
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: {
+      to: (value: number | string) => {
+        if (value === null || value === undefined) return 0;
+        const num =
+          typeof value === "number"
+            ? value
+            : parseFloat(String(value).replace(/[^0-9.]/g, ""));
+        return isNaN(num) ? 0 : num;
+      },
+      from: (value: string | number) => {
+        if (value === null || value === undefined) return 0;
+        const num =
+          typeof value === "number" ? value : parseFloat(String(value));
+        return isNaN(num) ? 0 : num;
+      },
+    },
   })
-  price!: string;
+  price!: number;
 
   @Column({
     type: "boolean",
