@@ -190,6 +190,87 @@ export class Ride {
     joinedAt: string;
   }>;
 
+  @Column({
+    type: "varchar",
+    length: 120,
+    nullable: true,
+  })
+  vehicleModel?: string;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    nullable: true,
+  })
+  registrationNumber?: string;
+
+  @Column({
+    type: "varchar",
+    length: 200,
+    nullable: true,
+  })
+  pickupLocation?: string;
+
+  @Column({
+    type: "varchar",
+    length: 200,
+    nullable: true,
+  })
+  dropLocation?: string;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  currentLatitude?: number;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  currentLongitude?: number;
+
+  @Column({
+    type: "varchar",
+    length: 60,
+    nullable: true,
+  })
+  lastGpsUpdatedAt?: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+  })
+  isGpsActive?: boolean;
+
+  @Column({
+    type: "jsonb",
+    default: () => "'[]'",
+  })
+  ratings?: Array<{
+    id?: string;
+    fromUserId: string;
+    fromUserName: string;
+    toRole?: "driver" | "passenger";
+    rating: number;
+    review?: string;
+    tags?: string[];
+    createdAt: string;
+  }>;
+
+  @Column({
+    type: "jsonb",
+    default: () => "'[]'",
+  })
+  reports?: Array<{
+    id?: string;
+    reportedByUserId: string;
+    reportedByName: string;
+    category: string;
+    description: string;
+    createdAt: string;
+  }>;
+
   @CreateDateColumn({
     type: "timestamp",
   })

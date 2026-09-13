@@ -10,17 +10,29 @@ import {
   confirmPassengerHandler,
   cancelSeatRequestHandler,
   deleteRideHandler,
+  startRideHandler,
+  completeRideHandler,
+  updateLocationHandler,
+  rateRideHandler,
+  reportProblemHandler,
+  verifyVehicleHandler,
+  verifyDriverHandler,
 } from "./rides.controller";
 import {
   CreateRideSchema,
   JoinRideSchema,
   UpdateRideSchema,
+  UpdateLocationSchema,
+  RideRatingSchema,
+  ReportProblemSchema,
 } from "./rides.schema";
 import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
 
 // Authenticated ride endpoints
+router.post("/verify-vehicle", authenticate, verifyVehicleHandler);
+router.post("/verify-driver", authenticate, verifyDriverHandler);
 router.get("/", authenticate, getRidesHandler);
 router.get("/my", authenticate, getMyRidesHandler);
 router.get("/:id", authenticate, getRideByIdHandler);
@@ -48,5 +60,27 @@ router.patch(
   updateRideHandler,
 );
 router.put("/:id", authenticate, validate(UpdateRideSchema), updateRideHandler);
+
+// Safety, Live GPS Tracking, Ratings & Reports endpoints
+router.post("/:id/start", authenticate, startRideHandler);
+router.post("/:id/complete", authenticate, completeRideHandler);
+router.post(
+  "/:id/location",
+  authenticate,
+  validate(UpdateLocationSchema),
+  updateLocationHandler,
+);
+router.post(
+  "/:id/rate",
+  authenticate,
+  validate(RideRatingSchema),
+  rateRideHandler,
+);
+router.post(
+  "/:id/report",
+  authenticate,
+  validate(ReportProblemSchema),
+  reportProblemHandler,
+);
 
 export default router;

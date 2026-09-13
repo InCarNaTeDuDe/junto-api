@@ -726,7 +726,7 @@ export default function LocalDealsScreen() {
   const editModalHeight =
     Platform.OS === "web"
       ? Math.min(windowHeight * 0.88, 720)
-      : Math.min(Math.max(windowHeight * 0.85, 520), 720);
+      : Math.min(windowHeight * 0.82, 600);
 
   const createInitialVoiceData = useCallback((): ParsedDealVoice => {
     return {
@@ -2469,7 +2469,8 @@ export default function LocalDealsScreen() {
                   backgroundColor: cardBg,
                   borderColor: border,
                   height: editModalHeight,
-                  maxHeight: "90%",
+                  maxHeight: Platform.OS === "web" ? "90%" : "86%",
+                  flexShrink: 1,
                 },
               ]}
             >

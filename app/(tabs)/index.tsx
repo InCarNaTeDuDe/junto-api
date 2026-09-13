@@ -1064,9 +1064,9 @@ export default function Home() {
           ))}
         </ScrollView> */}
 
-        {/* Popular activities */}
+        {/* Find your vibe */}
         <View style={s.sectionHead}>
-          <Text style={s.sectionTitle}>Popular Activities</Text>
+          <Text style={s.sectionTitle}>Find Your Vibe</Text>
           {selectedChip && (
             <Pressable style={s.viewAll} onPress={() => setSelectedChip(null)}>
               <Text style={s.viewAllText}>Clear chip</Text>
@@ -1102,9 +1102,12 @@ export default function Home() {
           })}
         </ScrollView>
 
-        {/* Popular around you */}
+        {/* Activities matching your vibe */}
         <View style={s.sectionHead}>
-          <Text style={s.sectionTitle}>Popular around you</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={s.sectionTitle}>Activities matching your vibe</Text>
+            <Text style={{ fontSize: moderateScale(16) }}>☕</Text>
+          </View>
           {(hasActiveFilters || q.trim().length > 0) && (
             <Pressable
               style={s.viewAll}

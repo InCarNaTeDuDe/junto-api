@@ -16,12 +16,17 @@ export const CreateRideSchema = z.object({
     })
     .pipe(z.number().min(0, "Price must be a valid non-negative number")),
   notes: z.string().trim().max(300).optional(),
-  // Ride location
+  // Ride location & details
   locationName: z.string().trim().max(120).optional(),
   locationState: z.string().trim().max(120).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   verified: z.boolean().optional().default(true),
+  // Safety & Vehicle details
+  vehicleModel: z.string().trim().max(120).optional(),
+  registrationNumber: z.string().trim().max(50).optional(),
+  pickupLocation: z.string().trim().max(200).optional(),
+  dropLocation: z.string().trim().max(200).optional(),
 });
 
 export const QueryRideSchema = z.object({
@@ -46,9 +51,39 @@ export const UpdateRideSchema = z.object({
     .optional(),
   seatsLeft: z.number().int().min(0).max(8).optional(),
   notes: z.string().trim().max(300).optional(),
+  vehicleModel: z.string().trim().max(120).optional(),
+  registrationNumber: z.string().trim().max(50).optional(),
+  pickupLocation: z.string().trim().max(200).optional(),
+  dropLocation: z.string().trim().max(200).optional(),
+  currentLatitude: z.number().optional(),
+  currentLongitude: z.number().optional(),
+  lastGpsUpdatedAt: z.string().optional(),
+  isGpsActive: z.boolean().optional(),
+});
+
+export const UpdateLocationSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+  speed: z.number().optional(),
+  heading: z.number().optional(),
+});
+
+export const RideRatingSchema = z.object({
+  rating: z.number().min(1).max(5),
+  review: z.string().trim().max(500).optional(),
+  tags: z.array(z.string()).optional(),
+  toRole: z.enum(["driver", "passenger"]).optional(),
+});
+
+export const ReportProblemSchema = z.object({
+  category: z.string().trim().min(2).max(100),
+  description: z.string().trim().min(3).max(1000),
 });
 
 export type CreateRideInput = z.infer<typeof CreateRideSchema>;
 export type QueryRideInput = z.infer<typeof QueryRideSchema>;
 export type JoinRideInput = z.infer<typeof JoinRideSchema>;
 export type UpdateRideInput = z.infer<typeof UpdateRideSchema>;
+export type UpdateLocationInput = z.infer<typeof UpdateLocationSchema>;
+export type RideRatingInput = z.infer<typeof RideRatingSchema>;
+export type ReportProblemInput = z.infer<typeof ReportProblemSchema>;

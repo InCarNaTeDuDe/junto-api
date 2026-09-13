@@ -41,6 +41,38 @@ export interface RideRecord {
     joinedAt: string;
   }>;
 
+  // Safety & Vehicle details
+  vehicleModel?: string;
+  registrationNumber?: string;
+  pickupLocation?: string;
+  dropLocation?: string;
+
+  // Live GPS Tracking
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastGpsUpdatedAt?: string;
+  isGpsActive?: boolean;
+
+  // Ratings & Reports
+  ratings?: Array<{
+    id?: string;
+    fromUserId: string;
+    fromUserName: string;
+    toRole?: "driver" | "passenger";
+    rating: number;
+    review?: string;
+    tags?: string[];
+    createdAt: string;
+  }>;
+  reports?: Array<{
+    id?: string;
+    reportedByUserId: string;
+    reportedByName: string;
+    category: string;
+    description: string;
+    createdAt: string;
+  }>;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -98,6 +130,23 @@ export class RideRepository extends BaseRepository<Ride> {
         joinedAt: passenger.joinedAt,
       })),
 
+      vehicleModel:
+        ride.vehicleModel ||
+        (ride.vehicleType === "car"
+          ? "Maruti Swift (Silver)"
+          : "Honda Activa (Black)"),
+      registrationNumber: ride.registrationNumber || "TS-09-EA-4521",
+      pickupLocation: ride.pickupLocation || ride.from,
+      dropLocation: ride.dropLocation || ride.to,
+
+      currentLatitude: ride.currentLatitude ?? ride.latitude,
+      currentLongitude: ride.currentLongitude ?? ride.longitude,
+      lastGpsUpdatedAt: ride.lastGpsUpdatedAt,
+      isGpsActive: ride.isGpsActive ?? false,
+
+      ratings: Array.isArray(ride.ratings) ? ride.ratings : [],
+      reports: Array.isArray(ride.reports) ? ride.reports : [],
+
       createdAt: ride.createdAt.toISOString(),
       updatedAt: ride.updatedAt.toISOString(),
     };
@@ -130,6 +179,11 @@ export class RideRepository extends BaseRepository<Ride> {
     locationState?: string;
     latitude?: number;
     longitude?: number;
+
+    vehicleModel?: string;
+    registrationNumber?: string;
+    pickupLocation?: string;
+    dropLocation?: string;
   }): Promise<RideRecord> {
     const numericPrice =
       typeof data.price === "string"
@@ -163,9 +217,25 @@ export class RideRepository extends BaseRepository<Ride> {
       latitude: data.latitude,
       longitude: data.longitude,
 
+      vehicleModel:
+        data.vehicleModel ||
+        (data.vehicleType === "car"
+          ? "Maruti Swift (Silver)"
+          : "Honda Activa (Black)"),
+      registrationNumber:
+        data.registrationNumber ||
+        `TS-${Math.floor(10 + Math.random() * 89)}-EA-${Math.floor(1000 + Math.random() * 9000)}`,
+      pickupLocation: data.pickupLocation || data.from,
+      dropLocation: data.dropLocation || data.to,
+      currentLatitude: data.latitude,
+      currentLongitude: data.longitude,
+      isGpsActive: false,
+
       status: "active",
 
       passengers: [],
+      ratings: [],
+      reports: [],
     } as any);
 
     const savedRide = await this.repo.save(ride as any);
@@ -186,9 +256,7 @@ export class RideRepository extends BaseRepository<Ride> {
       return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
     }
     const rides = await this.repo.find({
-      where: {
-        status: "active",
-      },
+      where: [{ status: "active" }, { status: "in_progress" }],
       order: {
         createdAt: "DESC",
       },
@@ -453,6 +521,100 @@ export class RideRepository extends BaseRepository<Ride> {
     }
 
     return this.toRideRecord(updatedRide);
+  }
+
+  /**
+   * Update live GPS location
+   */
+  async updateLocation(
+    id: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<RideRecord | null> {
+    const ride = await this.repo.findOne({ where: { id } });
+    if (!ride) return null;
+    ride.currentLatitude = latitude;
+    ride.currentLongitude = longitude;
+    ride.lastGpsUpdatedAt = new Date().toISOString();
+    ride.isGpsActive = true;
+    ride.updatedAt = new Date();
+    const saved = await this.repo.save(ride);
+    return this.toRideRecord(saved);
+  }
+
+  /**
+   * Add passenger or driver rating and review
+   */
+  async addRating(
+    id: string,
+    ratingData: {
+      fromUserId: string;
+      fromUserName: string;
+      toRole?: "driver" | "passenger";
+      rating: number;
+      review?: string;
+      tags?: string[];
+    },
+  ): Promise<RideRecord> {
+    const ride = await this.repo.findOne({ where: { id } });
+    if (!ride) throw new Error("Ride not found");
+    const currentRatings = Array.isArray(ride.ratings) ? [...ride.ratings] : [];
+    const newRating = {
+      id: "rate_" + Date.now(),
+      fromUserId: ratingData.fromUserId,
+      fromUserName: ratingData.fromUserName,
+      toRole: ratingData.toRole || "driver",
+      rating: ratingData.rating,
+      review: ratingData.review,
+      tags: ratingData.tags || [],
+      createdAt: new Date().toISOString(),
+    };
+    currentRatings.push(newRating);
+    ride.ratings = currentRatings;
+
+    // Recalculate driver rating if rated to driver
+    if (ratingData.toRole !== "passenger") {
+      const driverRatings = currentRatings.filter(
+        (r) => r.toRole !== "passenger",
+      );
+      if (driverRatings.length > 0) {
+        const sum = driverRatings.reduce((acc, curr) => acc + curr.rating, 0);
+        ride.driverRating = Number((sum / driverRatings.length).toFixed(1));
+      }
+    }
+
+    ride.updatedAt = new Date();
+    const saved = await this.repo.save(ride);
+    return this.toRideRecord(saved);
+  }
+
+  /**
+   * Report problem
+   */
+  async addReport(
+    id: string,
+    reportData: {
+      reportedByUserId: string;
+      reportedByName: string;
+      category: string;
+      description: string;
+    },
+  ): Promise<RideRecord> {
+    const ride = await this.repo.findOne({ where: { id } });
+    if (!ride) throw new Error("Ride not found");
+    const currentReports = Array.isArray(ride.reports) ? [...ride.reports] : [];
+    currentReports.push({
+      id: "rep_" + Date.now(),
+      reportedByUserId: reportData.reportedByUserId,
+      reportedByName: reportData.reportedByName,
+      category: reportData.category,
+      description: reportData.description,
+      createdAt: new Date().toISOString(),
+    });
+    ride.reports = currentReports;
+    ride.updatedAt = new Date();
+    const saved = await this.repo.save(ride);
+    return this.toRideRecord(saved);
   }
 
   /**

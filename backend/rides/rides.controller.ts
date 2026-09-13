@@ -9,12 +9,22 @@ import {
   confirmRidePassenger,
   cancelSeatRequest,
   deleteRide,
+  startRide,
+  completeRide,
+  updateRideGpsLocation,
+  rateRide,
+  reportRideProblem,
+  verifyVehicleService,
+  verifyDriverService,
 } from "./rides.service";
 import {
   CreateRideInput,
   QueryRideInput,
   JoinRideInput,
   UpdateRideInput,
+  UpdateLocationInput,
+  RideRatingInput,
+  ReportProblemInput,
 } from "./rides.schema";
 
 export async function getRidesHandler(
@@ -180,3 +190,107 @@ export async function deleteRideHandler(
   }
 }
 
+export async function startRideHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await startRide(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function completeRideHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await completeRide(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateLocationHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await updateRideGpsLocation(
+      req.params.id,
+      req.user!,
+      req.body as UpdateLocationInput,
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function rateRideHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await rateRide(
+      req.params.id,
+      req.user!,
+      req.body as RideRatingInput,
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reportProblemHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await reportRideProblem(
+      req.params.id,
+      req.user!,
+      req.body as ReportProblemInput,
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyVehicleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { registrationNumber, vehicleType } = req.body;
+    const result = await verifyVehicleService(registrationNumber, vehicleType);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyDriverHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { dlNumber, phone } = req.body;
+    const result = await verifyDriverService(dlNumber, phone, req.user);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
