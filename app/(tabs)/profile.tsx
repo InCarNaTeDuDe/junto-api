@@ -671,7 +671,7 @@ export default function ProfileScreen() {
             <View style={s.menuItemSeparator} />
 
             {/* Saved */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={s.menuItemRow}
               onPress={() => setActiveModal("saved")}
               activeOpacity={0.7}
@@ -692,7 +692,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             <View style={s.menuItemSeparator} />
 
@@ -1290,7 +1290,7 @@ export default function ProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.switchTitle}>Two-Factor Authentication</Text>
                 <Text style={s.switchSub}>
-                  Keep ticket escrow & wallet transfers secure
+                  Keep your account & direct listings secure
                 </Text>
               </View>
               <Switch
@@ -1372,12 +1372,12 @@ export default function ProfileScreen() {
               style={s.helpItem}
               onPress={() =>
                 Alert.alert(
-                  "Ticket Guarantee",
-                  "All ticket transfers on Junto are escrow protected.",
+                  "Ticket Swap Guarantee",
+                  "Junto helps buyers and sellers offer direct deals. Sellers avoid complete loss when plans change, and buyers get great ticket offers with 0% platform fee.",
                 )
               }
             >
-              <Text style={s.helpTitle}>How does Ticket Escrow work?</Text>
+              <Text style={s.helpTitle}>How does Ticket Swap work?</Text>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
             <TouchableOpacity
@@ -1651,7 +1651,7 @@ export default function ProfileScreen() {
                   color={t.success}
                 />
                 <Text style={s.featureText}>
-                  0% Escrow fee on concert & movie ticket swaps
+                  0% platform fee on concert & movie ticket swaps
                 </Text>
               </View>
               <View style={s.featureRow}>

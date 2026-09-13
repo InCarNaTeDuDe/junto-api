@@ -358,6 +358,49 @@ export default function LocalDealsScreen() {
       return;
     }
 
+    // Check if any fields were actually modified
+    const initialTitle = (editingDeal.title || "").trim();
+    const initialPrice = editingDeal.price
+      ? editingDeal.price.replace(/[^0-9]/g, "")
+      : "";
+    const initialOriginalPrice = editingDeal.originalPrice
+      ? editingDeal.originalPrice.replace(/[^0-9]/g, "")
+      : "";
+    const initialCategory = editingDeal.category || "General";
+    const initialCondition = editingDeal.condition || "Good";
+    const initialLocation = (editingDeal.location || "").trim();
+    const initialPhone = editingDeal.sellerPhone
+      ? editingDeal.sellerPhone.replace(/\D/g, "").slice(-10)
+      : "";
+    const initialDescription = (editingDeal.description || "").trim();
+    const initialImage = (editingDeal.image || "").trim();
+
+    const currentTitle = editDealTitle.trim();
+    const currentPrice = editDealPrice.replace(/[^0-9]/g, "");
+    const currentOriginalPrice = editDealOriginalPrice.replace(/[^0-9]/g, "");
+    const currentCategory = editDealCategory;
+    const currentCondition = editDealCondition;
+    const currentLocation = editDealLocation.trim();
+    const currentPhone = cleanEditPhone;
+    const currentDescription = editDealDescription.trim();
+    const currentImage = editDealImage.trim();
+
+    const hasChanges =
+      currentTitle !== initialTitle ||
+      currentPrice !== initialPrice ||
+      currentOriginalPrice !== initialOriginalPrice ||
+      currentCategory !== initialCategory ||
+      currentCondition !== initialCondition ||
+      currentLocation !== initialLocation ||
+      currentPhone !== initialPhone ||
+      currentDescription !== initialDescription ||
+      (currentImage !== "" && currentImage !== initialImage);
+
+    if (!hasChanges) {
+      Alert.alert("No Changes", "No changes were made to the listing.");
+      return;
+    }
+
     try {
       setIsEditDealSubmitting(true);
       const formattedPrice = editDealPrice.startsWith("₹")
@@ -674,12 +717,16 @@ export default function LocalDealsScreen() {
     }
   }, [transcript, cityShort]);
 
-  // Responsive height calculation for Voice Sell Modal
+  // Responsive height calculation for Voice Sell & Edit Deal Modals
   const { height: windowHeight } = useWindowDimensions();
   const voiceModalHeight =
     Platform.OS === "web"
       ? Math.min(windowHeight * 0.88, 720)
       : Math.min(Math.max(windowHeight * 0.85, 480), 680);
+  const editModalHeight =
+    Platform.OS === "web"
+      ? Math.min(windowHeight * 0.88, 720)
+      : Math.min(Math.max(windowHeight * 0.85, 520), 720);
 
   const createInitialVoiceData = useCallback((): ParsedDealVoice => {
     return {
@@ -2411,135 +2458,66 @@ export default function LocalDealsScreen() {
         onRequestClose={() => setEditingDeal(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.voiceModalCard,
-              {
-                backgroundColor: cardBg,
-                borderColor: border,
-                maxHeight: "90%",
-              },
-            ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.voiceKeyboardWrapper}
           >
             <View
-              style={[styles.voiceModalHeader, { borderBottomColor: border }]}
+              style={[
+                styles.voiceModalCard,
+                {
+                  backgroundColor: cardBg,
+                  borderColor: border,
+                  height: editModalHeight,
+                  maxHeight: "90%",
+                },
+              ]}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.voiceModalTitle, { color: textPrimary }]}>
-                  Edit Deal Listing
-                </Text>
-                <Text style={{ fontSize: 13, marginTop: 2, color: textMute }}>
-                  Update price, condition, or photos in Cloudinary (deals/)
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setEditingDeal(null)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              <View
+                style={[styles.voiceModalHeader, { borderBottomColor: border }]}
               >
-                <Ionicons name="close" size={22} color={textMute} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={{ flex: 1, paddingHorizontal: 16 }}
-              contentContainerStyle={{ paddingVertical: 14, gap: 12 }}
-              showsVerticalScrollIndicator={false}
-            >
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Title:
-                </Text>
-                <TextInput
-                  value={editDealTitle}
-                  onChangeText={setEditDealTitle}
-                  placeholder="e.g. Firefox mountain bicycle"
-                  placeholderTextColor={textMute}
-                  style={[
-                    styles.searchInput,
-                    {
-                      borderColor: border,
-                      color: textPrimary,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderWidth: 1,
-                    },
-                  ]}
-                />
-              </View>
-
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Category:
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ marginVertical: 4 }}
-                >
-                  {DEAL_CATEGORIES.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      onPress={() => setEditDealCategory(cat)}
-                      style={[
-                        styles.catPill,
-                        {
-                          backgroundColor:
-                            editDealCategory === cat
-                              ? "#D97706"
-                              : isDark
-                                ? "#1E293B"
-                                : "#F1F5F9",
-                          borderColor:
-                            editDealCategory === cat ? "#D97706" : border,
-                          marginRight: 6,
-                          paddingVertical: 6,
-                          paddingHorizontal: 12,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color:
-                            editDealCategory === cat ? "#FFF" : textPrimary,
-                          fontWeight: editDealCategory === cat ? "700" : "500",
-                          fontSize: 12,
-                        }}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={{ flexDirection: "row", gap: 10 }}>
                 <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.voiceModalTitle, { color: textPrimary }]}
+                  >
+                    Edit Deal Listing
+                  </Text>
+                  <Text style={{ fontSize: 13, marginTop: 2, color: textMute }}>
+                    Update price, condition, or photos in Cloudinary (deals/)
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setEditingDeal(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={22} color={textMute} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={{ flex: 1, paddingHorizontal: 16 }}
+                contentContainerStyle={{
+                  paddingVertical: 14,
+                  gap: 12,
+                  paddingBottom: 24,
+                }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View>
                   <Text
                     style={[
                       styles.parsedEditLabel,
                       { color: textMute, marginBottom: 4 },
                     ]}
                   >
-                    Selling Price (₹):
+                    Title:
                   </Text>
                   <TextInput
-                    value={editDealPrice}
-                    onChangeText={setEditDealPrice}
-                    placeholder="e.g. 6000"
+                    value={editDealTitle}
+                    onChangeText={setEditDealTitle}
+                    placeholder="e.g. Firefox mountain bicycle"
                     placeholderTextColor={textMute}
-                    keyboardType="numeric"
                     style={[
                       styles.searchInput,
                       {
@@ -2554,329 +2532,412 @@ export default function LocalDealsScreen() {
                     ]}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+
+                <View>
                   <Text
                     style={[
                       styles.parsedEditLabel,
                       { color: textMute, marginBottom: 4 },
                     ]}
                   >
-                    Original Price (Optional):
+                    Category:
                   </Text>
-                  <TextInput
-                    value={editDealOriginalPrice}
-                    onChangeText={setEditDealOriginalPrice}
-                    placeholder="e.g. 12000"
-                    placeholderTextColor={textMute}
-                    keyboardType="numeric"
-                    style={[
-                      styles.searchInput,
-                      {
-                        borderColor: border,
-                        color: textPrimary,
-                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                        borderRadius: 10,
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        borderWidth: 1,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Condition:
-                </Text>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  {DEAL_CONDITIONS.map((cond) => (
-                    <TouchableOpacity
-                      key={cond}
-                      onPress={() => setEditDealCondition(cond)}
-                      style={[
-                        styles.catPill,
-                        {
-                          flex: 1,
-                          justifyContent: "center",
-                          backgroundColor:
-                            editDealCondition === cond
-                              ? "#10B981"
-                              : isDark
-                                ? "#1E293B"
-                                : "#F1F5F9",
-                          borderColor:
-                            editDealCondition === cond ? "#10B981" : border,
-                          paddingVertical: 8,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          textAlign: "center",
-                          color:
-                            editDealCondition === cond ? "#FFF" : textPrimary,
-                          fontWeight:
-                            editDealCondition === cond ? "700" : "500",
-                          fontSize: 12,
-                        }}
-                      >
-                        {cond}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Location:
-                </Text>
-                <TextInput
-                  value={editDealLocation}
-                  onChangeText={setEditDealLocation}
-                  placeholder="e.g. Madhapur, Hyderabad"
-                  placeholderTextColor={textMute}
-                  style={[
-                    styles.searchInput,
-                    {
-                      borderColor: border,
-                      color: textPrimary,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderWidth: 1,
-                    },
-                  ]}
-                />
-              </View>
-
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Contact Mobile Number:
-                </Text>
-                <TextInput
-                  value={editDealPhone}
-                  onChangeText={(text) =>
-                    setEditDealPhone(text.replace(/[^0-9]/g, "").slice(0, 10))
-                  }
-                  placeholder="Enter 10-digit mobile number"
-                  placeholderTextColor={textMute}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  style={[
-                    styles.searchInput,
-                    {
-                      borderColor: border,
-                      color: textPrimary,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderWidth: 1,
-                    },
-                  ]}
-                />
-              </View>
-
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Description & Details:
-                </Text>
-                <TextInput
-                  value={editDealDescription}
-                  onChangeText={setEditDealDescription}
-                  placeholder="Item details, accessories included, pickup directions..."
-                  placeholderTextColor={textMute}
-                  multiline
-                  numberOfLines={3}
-                  style={[
-                    styles.searchInput,
-                    {
-                      borderColor: border,
-                      color: textPrimary,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderWidth: 1,
-                      minHeight: 65,
-                      textAlignVertical: "top",
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Cloudinary Item Image in deals/ folder */}
-              <View>
-                <Text
-                  style={[
-                    styles.parsedEditLabel,
-                    { color: textMute, marginBottom: 4 },
-                  ]}
-                >
-                  Item Image (Cloudinary deals/ folder):
-                </Text>
-                {editDealImage ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: 10,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: border,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                    }}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginVertical: 4 }}
                   >
-                    <Image
-                      source={{ uri: editDealImage }}
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 8,
-                        backgroundColor: "#E2E8F0",
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: "700",
-                          color: textPrimary,
-                        }}
+                    {DEAL_CATEGORIES.map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setEditDealCategory(cat)}
+                        style={[
+                          styles.catPill,
+                          {
+                            backgroundColor:
+                              editDealCategory === cat
+                                ? "#D97706"
+                                : isDark
+                                  ? "#1E293B"
+                                  : "#F1F5F9",
+                            borderColor:
+                              editDealCategory === cat ? "#D97706" : border,
+                            marginRight: 6,
+                            paddingVertical: 6,
+                            paddingHorizontal: 12,
+                          },
+                        ]}
                       >
-                        Item Photo Attached
-                      </Text>
-                      <Text
-                        style={{ fontSize: 11, color: textMute }}
-                        numberOfLines={1}
-                      >
-                        {editDealImage}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setEditDealImage("")}
-                      style={{
-                        padding: 6,
-                        borderRadius: 8,
-                        backgroundColor: "rgba(239, 68, 68, 0.12)",
-                      }}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={16}
-                        color="#EF4444"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handlePickEditDealImage}
-                    disabled={isUploadingEditDealImage}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      paddingVertical: 12,
-                      paddingHorizontal: 14,
-                      borderRadius: 10,
-                      borderWidth: 1.5,
-                      borderStyle: "dashed",
-                      borderColor: "#D97706",
-                      backgroundColor: isDark
-                        ? "rgba(217, 119, 6, 0.1)"
-                        : "#FFFBEB",
-                    }}
-                  >
-                    {isUploadingEditDealImage ? (
-                      <>
-                        <ActivityIndicator size="small" color="#D97706" />
                         <Text
                           style={{
-                            fontSize: 12.5,
-                            fontWeight: "600",
-                            color: textPrimary,
+                            color:
+                              editDealCategory === cat ? "#FFF" : textPrimary,
+                            fontWeight:
+                              editDealCategory === cat ? "700" : "500",
+                            fontSize: 12,
                           }}
                         >
-                          Uploading to Cloudinary...
+                          {cat}
                         </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Ionicons
-                          name="cloud-upload-outline"
-                          size={18}
-                          color="#D97706"
-                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.parsedEditLabel,
+                        { color: textMute, marginBottom: 4 },
+                      ]}
+                    >
+                      Selling Price (₹):
+                    </Text>
+                    <TextInput
+                      value={editDealPrice}
+                      onChangeText={setEditDealPrice}
+                      placeholder="e.g. 6000"
+                      placeholderTextColor={textMute}
+                      keyboardType="numeric"
+                      style={[
+                        styles.searchInput,
+                        {
+                          borderColor: border,
+                          color: textPrimary,
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          borderWidth: 1,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.parsedEditLabel,
+                        { color: textMute, marginBottom: 4 },
+                      ]}
+                    >
+                      Original Price (Optional):
+                    </Text>
+                    <TextInput
+                      value={editDealOriginalPrice}
+                      onChangeText={setEditDealOriginalPrice}
+                      placeholder="e.g. 12000"
+                      placeholderTextColor={textMute}
+                      keyboardType="numeric"
+                      style={[
+                        styles.searchInput,
+                        {
+                          borderColor: border,
+                          color: textPrimary,
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          borderWidth: 1,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Condition:
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {DEAL_CONDITIONS.map((cond) => (
+                      <TouchableOpacity
+                        key={cond}
+                        onPress={() => setEditDealCondition(cond)}
+                        style={[
+                          styles.catPill,
+                          {
+                            flex: 1,
+                            justifyContent: "center",
+                            backgroundColor:
+                              editDealCondition === cond
+                                ? "#10B981"
+                                : isDark
+                                  ? "#1E293B"
+                                  : "#F1F5F9",
+                            borderColor:
+                              editDealCondition === cond ? "#10B981" : border,
+                            paddingVertical: 8,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            textAlign: "center",
+                            color:
+                              editDealCondition === cond ? "#FFF" : textPrimary,
+                            fontWeight:
+                              editDealCondition === cond ? "700" : "500",
+                            fontSize: 12,
+                          }}
+                        >
+                          {cond}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Location:
+                  </Text>
+                  <TextInput
+                    value={editDealLocation}
+                    onChangeText={setEditDealLocation}
+                    placeholder="e.g. Madhapur, Hyderabad"
+                    placeholderTextColor={textMute}
+                    style={[
+                      styles.searchInput,
+                      {
+                        borderColor: border,
+                        color: textPrimary,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Contact Mobile Number:
+                  </Text>
+                  <TextInput
+                    value={editDealPhone}
+                    onChangeText={(text) =>
+                      setEditDealPhone(text.replace(/[^0-9]/g, "").slice(0, 10))
+                    }
+                    placeholder="Enter 10-digit mobile number"
+                    placeholderTextColor={textMute}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    style={[
+                      styles.searchInput,
+                      {
+                        borderColor: border,
+                        color: textPrimary,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Description & Details:
+                  </Text>
+                  <TextInput
+                    value={editDealDescription}
+                    onChangeText={setEditDealDescription}
+                    placeholder="Item details, accessories included, pickup directions..."
+                    placeholderTextColor={textMute}
+                    multiline
+                    numberOfLines={3}
+                    style={[
+                      styles.searchInput,
+                      {
+                        borderColor: border,
+                        color: textPrimary,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                        minHeight: 65,
+                        textAlignVertical: "top",
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* Cloudinary Item Image in deals/ folder */}
+                <View>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Item Image (Cloudinary deals/ folder):
+                  </Text>
+                  {editDealImage ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: 10,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: border,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      }}
+                    >
+                      <Image
+                        source={{ uri: editDealImage }}
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 8,
+                          backgroundColor: "#E2E8F0",
+                        }}
+                      />
+                      <View style={{ flex: 1 }}>
                         <Text
                           style={{
                             fontSize: 12.5,
                             fontWeight: "700",
-                            color: "#D97706",
+                            color: textPrimary,
                           }}
                         >
-                          Upload Photo (deals/ folder)
+                          Item Photo Attached
                         </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+                        <Text
+                          style={{ fontSize: 11, color: textMute }}
+                          numberOfLines={1}
+                        >
+                          {editDealImage}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setEditDealImage("")}
+                        style={{
+                          padding: 6,
+                          borderRadius: 8,
+                          backgroundColor: "rgba(239, 68, 68, 0.12)",
+                        }}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={16}
+                          color="#EF4444"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handlePickEditDealImage}
+                      disabled={isUploadingEditDealImage}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        paddingVertical: 12,
+                        paddingHorizontal: 14,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderStyle: "dashed",
+                        borderColor: "#D97706",
+                        backgroundColor: isDark
+                          ? "rgba(217, 119, 6, 0.1)"
+                          : "#FFFBEB",
+                      }}
+                    >
+                      {isUploadingEditDealImage ? (
+                        <>
+                          <ActivityIndicator size="small" color="#D97706" />
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: "600",
+                              color: textPrimary,
+                            }}
+                          >
+                            Uploading to Cloudinary...
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="cloud-upload-outline"
+                            size={18}
+                            color="#D97706"
+                          />
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: "700",
+                              color: "#D97706",
+                            }}
+                          >
+                            Upload Photo (deals/ folder)
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[
-                  styles.publishVoiceDealBtn,
-                  { backgroundColor: "#D97706", marginTop: 8 },
-                ]}
-                onPress={handleSaveEditDeal}
-                disabled={isEditDealSubmitting}
-                activeOpacity={0.85}
-              >
-                {isEditDealSubmitting ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <Ionicons name="checkmark-done" size={18} color="#FFF" />
-                    <Text style={styles.publishVoiceDealText}>
-                      Save Changes to Listing
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.publishVoiceDealBtn,
+                    { backgroundColor: "#D97706", marginTop: 8 },
+                  ]}
+                  onPress={handleSaveEditDeal}
+                  disabled={isEditDealSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {isEditDealSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Ionicons name="checkmark-done" size={18} color="#FFF" />
+                      <Text style={styles.publishVoiceDealText}>
+                        Save Changes to Listing
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

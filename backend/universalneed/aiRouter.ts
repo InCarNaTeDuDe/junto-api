@@ -16,37 +16,82 @@ export interface IntentAnalysisResult {
   explanation?: string;
 }
 
-const SYSTEM_PROMPT = `You are the AI Intent Classifier for DayMates Universal Need Router.
+const SYSTEM_PROMPT = `You are the AI Intent Classifier for Junto (formerly DayMates) Universal Need Router.
+Junto is a direct community connection platform that facilitates peer-to-peer deals, rides, companion activities, and local verified doorstep services.
+
+IMPORTANT PLATFORM ARCHITECTURE & BUSINESS MODEL:
+- Junto is a direct connection platform: Junto does NOT handle payments and does NOT operate an escrow model.
+- Buyers and sellers connect directly to offer deals, negotiate, and mutually benefit with 0% platform fee.
+
 Analyze the user's natural language request and classify it into one of the 6 platform modules:
 
-1. "services" - Local pro doorstep services and repairs.
+1. "services" - Local technicians, home repairs, auto pros, and grooming professionals.
+   Local pros register on Junto so users can easily find the best available person and select based on criteria (ratings, verified status, proximity, pricing).
    Clusters and Categories from LocalServices.entity.ts:
    - "auto":
-     * "Bike repair" (mechanic, bike servicing, engine oil, chain, two-wheeler, scooter, motorcycle, activa, puncture, repair)
-     * "Puncture" (tubeless puncture, tyre, air check, flat tyre, jumpstart)
-     * "Car repair" (car mechanic, breakdown, engine, brakes)
+     * "Bike repair" / "Motor repair" (mechanic, bike servicing, engine oil, chain, two-wheeler, scooter, motorcycle, activa, motor repair)
+     * "Puncture" (tubeless puncture, flat tyre, tyre air check, stepney change)
+     * "Car repair" (car mechanic, breakdown, engine, brakes, car servicing)
      * "Car wash" (foam wash, car cleaning, interior vacuum)
-     * "Roadside assistance" (towing, emergency fuel, breakdown help)
+     * "Roadside assistance" (towing, jumpstart, battery dead, emergency fuel, breakdown help)
    - "fix":
-     * "Electrician" (wiring, switches, switchboard, geyser, inverter)
-     * "Plumber" (pipe leaks, tap fitting, blockage, overhead tank)
-     * "AC repair" (cooling, jet cleaning, gas charging, AC servicing)
-     * "Washing machine repair" (appliances, drum, dryer)
-     * "Carpenter" (woodwork, hinges, wardrobes, furniture)
-     * "TV/electronics repair" (LED TV, screen, microwave)
+     * "Electrician" (wiring, switches, switchboard, fan repair, geyser, inverter)
+     * "Plumber" (pipe leaks, tap fitting, blockage, drainage, overhead tank)
+     * "AC repair" (AC cleaning, jet service, gas charging, cooling issues, AC installation)
+     * "Washing machine repair" (drum issue, motor, water intake, drainage, dryer)
+     * "Fridge repair" (refrigerator cooling, gas leak, compressor, defrost issue)
+     * "Carpenter" (furniture assembly, door locks, hinges, wardrobes, woodwork)
+     * "TV/electronics repair" (LED/OLED TV, display screen, sound, microwave, mixer)
    - "glam":
-     * "Bridal makeup", "Facial", "Mehendi", "Hair styling", "Nails & Art"
+     * "Bridal makeup" & Party makeup
+     * "Eyebrows" & "Threading"
+     * "Hair styling" & Haircut / Coloring
+     * "Facial" & Cleanup
+     * "Wax" / Waxing (arms, legs, full body)
+     * "Mehendi" (bridal, festive, arabic)
+     * "Saree draping"
+     * "Nails & Art" (nail extensions, gel polish)
    - "home":
-     * "Deep cleaning", "Cooking" / "Tiffin", "Pest-control requests", "Moving assistance", "Maids"
+     * "Temporary maid" / "Maids" (daily chore help, sweeping, mopping, utensil cleaning)
+     * "Moving assistance" / Packers & Movers (shifting house, loading, luggage help)
+     * "Deep cleaning" (bathroom, kitchen, full home sanitization)
+     * "Cooking" / "Tiffin" (home cook, daily meals, north/south Indian food)
+     * "Pest-control requests" (cockroach, termite, bedbug control)
 
-2. "rides" - RideMate carpools, sharing rides, travel to cities (e.g. Vijayawada, Bengaluru, Airport).
-3. "tickets" - TicketSwap for event tickets, concert passes (Coldplay, Diljit, IPL, movies).
-4. "deals" - Buying/selling pre-owned goods, local deals, discounts (used cycle, phone, camera).
-5. "helpme" - Urgent community alerts, lost and found (lost wallet, lost pet, emergency help).
-6. "daymates" - Social activities, sports buddies (badminton partner, gym buddy, weekend walk, coffee).
+2. "rides" - RideMate carpools & bike pool rides.
+   When someone misses a train or bus, or when public transport tickets/seats are unavailable, Junto shows who is going on that route so users can request them to join their ride.
+   - Ride creator can offer rides for free or charge any specific amount of their interest.
+   - Junto charges 0% platform fee (the ride creator gets 100% of the money).
+   - Ride creators can see requests from interested co-riders and accept them.
+   - Interested co-riders select "Request Seat" to send their interest to the ride creator.
+   - Covers city-to-city (e.g. Hyderabad to Vijayawada, Bengaluru, Airport) and daily city commutes.
+
+3. "tickets" - TicketSwap direct peer ticket marketplace.
+   If someone drops the plan of watching a movie, attending a concert (Coldplay, Diljit, Sunburn), or going to a sports match (IPL, cricket), they can avoid a complete loss by offering the ticket to someone else, so buyer and seller can mutually benefit.
+   - Buyer gains ticket offers at good deals; seller avoids wasting the ticket.
+   - IMPORTANT: Junto does NOT handle payments and does NOT operate an escrow model. Buyers and sellers connect directly to coordinate transfer.
+
+4. "deals" - Local Deals pre-owned marketplace.
+   Integrated with Junto where users can buy or sell used products, such as mobile phones, washing machines, shirts, clothes, watches, cycles, laptops, furniture, etc.
+   - Sellers can upload photos before posting (into Cloudinary deals/ folder) or use 5-second voice listing.
+   - Buyers can make offers and contact sellers directly.
+
+5. "helpme" - Ask Nearby community emergency assistance & lost & found.
+   Broadcast urgent requests to verified locals nearby:
+   - Blood donation (e.g. urgent O+ or rare blood groups)
+   - Mobile lost / phones misplaced
+   - Keys lost (bike keys, house keys)
+   - Medicine emergency / urgent pharmacy requests
+   - Lost bags / wallets / luggage
+   - Supported urgency modes: "Urgent", "Soon", "Not urgent".
+
+6. "daymates" - Social activities and companion meetups.
+   Connect with nearby people for shared activities:
+   - Walking, gym workout partner, movies, coffee, lunch, casual games, drinks, sports (badminton, cricket, tennis).
+   - Users can delete DayMates activities anytime by going into Profile -> Activities -> delete button available on the card.
 
 CRITICAL INSTRUCTIONS FOR AUTO & MECHANICS:
-If the user mentions bike, mechanic, scooter, motorcycle, puncture, two-wheeler, tyre, flat tyre, car repair, or roadside help:
+If the user mentions bike, mechanic, scooter, motorcycle, puncture, two-wheeler, tyre, flat tyre, car repair, motor repair, or roadside help:
 Always return "module": "services", "cluster": "auto", and "category": "Bike repair" (or "Puncture", "Car repair", "Car wash", "Roadside assistance").
 
 Return ONLY valid JSON matching this structure:
@@ -149,6 +194,12 @@ export function normalizeAiIntent(
     ) {
       category = "Washing machine repair";
       cluster = "fix";
+    } else if (
+      catLower.includes("fridge") ||
+      catLower.includes("refrigerator")
+    ) {
+      category = "Fridge repair";
+      cluster = "fix";
     } else if (catLower.includes("carpenter") || catLower.includes("wood")) {
       category = "Carpenter";
       cluster = "fix";
@@ -164,8 +215,15 @@ export function normalizeAiIntent(
     } else if (catLower.includes("pest")) {
       category = "Pest-control requests";
       cluster = "home";
-    } else if (catLower.includes("mover") || catLower.includes("pack")) {
+    } else if (
+      catLower.includes("mover") ||
+      catLower.includes("pack") ||
+      catLower.includes("moving")
+    ) {
       category = "Moving assistance";
+      cluster = "home";
+    } else if (catLower.includes("maid")) {
+      category = "Maids";
       cluster = "home";
     } else if (catLower.includes("makeup") || catLower.includes("bridal")) {
       category = "Bridal makeup";
@@ -178,6 +236,15 @@ export function normalizeAiIntent(
       cluster = "glam";
     } else if (catLower.includes("hair")) {
       category = "Hair styling";
+      cluster = "glam";
+    } else if (catLower.includes("eyebrow") || catLower.includes("thread")) {
+      category = "Eyebrows & Threading";
+      cluster = "glam";
+    } else if (catLower.includes("wax")) {
+      category = "Wax";
+      cluster = "glam";
+    } else if (catLower.includes("saree") || catLower.includes("drap")) {
+      category = "Saree draping";
       cluster = "glam";
     } else if (catLower.includes("nail")) {
       category = "Nails & Art";
@@ -359,27 +426,36 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     q.includes("vijayawada") ||
     q.includes("bengaluru") ||
     q.includes("bangalore") ||
+    q.includes("hyderabad") ||
     q.includes("airport") ||
     q.includes("carpool") ||
+    q.includes("bike pool") ||
+    q.includes("bikepool") ||
     q.includes("ride") ||
     q.includes("lift to") ||
     q.includes("go to") ||
     q.includes("travel to") ||
-    q.includes("drive to")
+    q.includes("drive to") ||
+    q.includes("missed train") ||
+    q.includes("missed bus") ||
+    q.includes("request seat") ||
+    (q.includes("seat") &&
+      (q.includes("route") || q.includes("travel") || q.includes("commute")))
   ) {
     let dest: string | undefined = undefined;
     if (q.includes("vijayawada")) dest = "vijayawada";
     else if (q.includes("bengaluru") || q.includes("bangalore"))
       dest = "bengaluru";
     else if (q.includes("airport")) dest = "airport";
+    else if (q.includes("hyderabad")) dest = "hyderabad";
 
     return {
       module: "rides",
       destination: dest,
-      keywords: [dest || "ride", "carpool"],
-      confidence: 0.9,
+      keywords: [dest || "ride", "carpool", "seat"],
+      confidence: 0.92,
       source: "code_logic",
-      explanation: "Carpool and rideshare intent identified from keywords.",
+      explanation: "Carpool, bike pool, or rideshare intent identified.",
     };
   }
 
@@ -390,17 +466,19 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     q.includes("concert") ||
     q.includes("coldplay") ||
     q.includes("diljit") ||
+    q.includes("sunburn") ||
     q.includes("ipl") ||
     q.includes("movie") ||
     q.includes("cinema") ||
-    q.includes("show")
+    q.includes("show") ||
+    q.includes("swap")
   ) {
     return {
       module: "tickets",
-      keywords: ["ticket", "concert", "pass"],
-      confidence: 0.9,
+      keywords: ["ticket", "concert", "pass", "swap"],
+      confidence: 0.92,
       source: "code_logic",
-      explanation: "Event ticket marketplace intent identified.",
+      explanation: "TicketSwap peer-to-peer ticket offer intent identified.",
     };
   }
 
@@ -419,6 +497,7 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     q.includes("tire") ||
     q.includes("flat tyre") ||
     q.includes("car repair") ||
+    q.includes("motor repair") ||
     q.includes("car wash") ||
     q.includes("towing") ||
     q.includes("roadside") ||
@@ -447,33 +526,16 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     };
   }
 
-  // 4. Deals & Marketplace (Only for genuine buy/sell without service/repair intent)
+  // 4. HelpMe & Emergency Broadcast (Ask Nearby)
   if (
-    q.includes("buy") ||
-    q.includes("sell") ||
-    q.includes("second hand") ||
-    q.includes("used") ||
-    q.includes("cycle") ||
-    q.includes("bicycle") ||
-    q.includes("deal") ||
-    q.includes("discount") ||
-    q.includes("marketplace") ||
-    q.includes("pre-owned")
-  ) {
-    return {
-      module: "deals",
-      keywords: ["buy", "sell", "deal", "used"],
-      confidence: 0.88,
-      source: "code_logic",
-      explanation: "Local deals and marketplace intent identified.",
-    };
-  }
-
-  // 5. HelpMe & Emergency Broadcast
-  if (
+    q.includes("blood") ||
+    q.includes("donation") ||
+    q.includes("medicine") ||
     q.includes("lost") ||
     q.includes("found") ||
     q.includes("wallet") ||
+    q.includes("keys") ||
+    q.includes("bag") ||
     q.includes("missing") ||
     q.includes("stolen") ||
     q.includes("emergency") ||
@@ -485,62 +547,84 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
   ) {
     return {
       module: "helpme",
-      keywords: ["lost", "found", "urgent", "emergency"],
-      confidence: 0.9,
+      keywords: ["emergency", "urgent", "lost", "nearby"],
+      confidence: 0.92,
       source: "code_logic",
       explanation: "Community alert and urgent broadcast intent identified.",
     };
   }
 
-  // 6. DayMates Activities
+  // 5. DayMates Activities
   if (
+    q.includes("walking") ||
+    q.includes("walk") ||
     q.includes("badminton") ||
     q.includes("partner") ||
     q.includes("buddy") ||
     q.includes("cricket") ||
     q.includes("tennis") ||
+    q.includes("sports") ||
     q.includes("gym") ||
     q.includes("workout") ||
     q.includes("coffee") ||
-    q.includes("walk") ||
+    q.includes("lunch") ||
+    q.includes("dinner") ||
+    q.includes("drinks") ||
+    q.includes("game") ||
     q.includes("meetup") ||
+    q.includes("companion") ||
     q.includes("activity")
   ) {
     return {
       module: "daymates",
-      keywords: ["activity", "partner", "social"],
-      confidence: 0.88,
+      keywords: ["activity", "partner", "social", "companion"],
+      confidence: 0.9,
       source: "code_logic",
       explanation: "Social activity companion intent identified.",
     };
   }
 
-  // Cluster: "glam" (Bridal Makeup, Facials, Waxing, Mehendi, Hair)
+  // 6. Cluster: "glam" (Bridal Makeup, Facials, Waxing, Mehendi, Hair, Eyebrows/Threading, Saree draping, Nails)
   if (
     q.includes("makeup") ||
     q.includes("bridal") ||
     q.includes("mehendi") ||
     q.includes("hair") ||
     q.includes("facial") ||
+    q.includes("wax") ||
     q.includes("waxing") ||
+    q.includes("eyebrow") ||
+    q.includes("thread") ||
+    q.includes("saree") ||
+    q.includes("drap") ||
+    q.includes("nail") ||
     q.includes("grooming") ||
     q.includes("beauty") ||
     q.includes("salon") ||
     q.includes("glam")
   ) {
+    let cat = "Facial";
+    if (q.includes("makeup") || q.includes("bridal")) cat = "Bridal makeup";
+    else if (q.includes("mehendi")) cat = "Mehendi";
+    else if (q.includes("hair")) cat = "Hair styling";
+    else if (q.includes("eyebrow") || q.includes("thread"))
+      cat = "Eyebrows & Threading";
+    else if (q.includes("wax")) cat = "Wax";
+    else if (q.includes("saree") || q.includes("drap")) cat = "Saree draping";
+    else if (q.includes("nail")) cat = "Nails & Art";
+
     return {
       module: "services",
       cluster: "glam",
-      category: q.includes("bridal") ? "Bridal makeup" : "Facial",
-      keywords: ["makeup", "bridal", "beauty", "glam"],
+      category: cat,
+      keywords: ["makeup", "beauty", "glam", cat.toLowerCase()],
       confidence: 0.95,
       source: "code_logic",
-      explanation:
-        "Glam & beauty service identified from LocalServices entity.",
+      explanation: `Glam & grooming service (${cat}) identified from LocalServices.`,
     };
   }
 
-  // Cluster: "home" (Deep Cleaning, Maids, Cooking / Tiffin, Pest Control)
+  // 7. Cluster: "home" (Deep Cleaning, Maids, Cooking / Tiffin, Pest Control, Moving assistance)
   if (
     q.includes("cook") ||
     q.includes("tiffin") ||
@@ -550,7 +634,8 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     q.includes("maid") ||
     q.includes("pest") ||
     q.includes("moving") ||
-    q.includes("packers")
+    q.includes("packers") ||
+    q.includes("shifting")
   ) {
     const cat =
       q.includes("cook") || q.includes("tiffin") || q.includes("meal")
@@ -559,23 +644,28 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
           ? "Pest-control requests"
           : q.includes("clean")
             ? "Deep cleaning"
-            : "Maids";
+            : q.includes("moving") ||
+                q.includes("packers") ||
+                q.includes("shifting")
+              ? "Moving assistance"
+              : "Maids";
 
     return {
       module: "services",
       cluster: "home",
       category: cat,
-      keywords: ["home", "cook", "cleaning", "maid"],
+      keywords: ["home", "maid", "cleaning", cat.toLowerCase()],
       confidence: 0.95,
       source: "code_logic",
-      explanation: `Home assistance service (${cat}) identified from LocalServices entity.`,
+      explanation: `Home assistance service (${cat}) identified from LocalServices.`,
     };
   }
 
-  // Cluster: "fix" (Electrician, Plumber, AC Repair, Carpenter, Appliance)
+  // 8. Cluster: "fix" (Electrician, Plumber, AC Repair, Carpenter, Washing Machine, Fridge, TV)
   if (
     q.includes("electric") ||
     q.includes("wiring") ||
+    q.includes("switch") ||
     q.includes("plumb") ||
     q.includes("pipe") ||
     q.includes("leak") ||
@@ -585,29 +675,63 @@ export function classifyWithCodeLogic(query: string): IntentAnalysisResult {
     q.includes("carpenter") ||
     q.includes("wood") ||
     q.includes("washing machine") ||
+    q.includes("fridge") ||
+    q.includes("refrigerator") ||
     q.includes("appliance") ||
     q.includes("geyser") ||
     q.includes("tv")
   ) {
     const cat =
-      q.includes("electric") || q.includes("wiring")
+      q.includes("electric") || q.includes("wiring") || q.includes("switch")
         ? "Electrician"
         : q.includes("plumb") || q.includes("pipe") || q.includes("leak")
           ? "Plumber"
           : q.includes("ac") || q.includes("cooling")
             ? "AC repair"
-            : q.includes("carpenter")
+            : q.includes("carpenter") || q.includes("wood")
               ? "Carpenter"
-              : "Washing machine repair";
+              : q.includes("fridge") || q.includes("refrigerator")
+                ? "Fridge repair"
+                : q.includes("tv")
+                  ? "TV/electronics repair"
+                  : "Washing machine repair";
 
     return {
       module: "services",
       cluster: "fix",
       category: cat,
-      keywords: ["technician", "repair", "fix"],
+      keywords: ["technician", "repair", "fix", cat.toLowerCase()],
       confidence: 0.95,
       source: "code_logic",
-      explanation: `Technician repair service (${cat}) identified from LocalServices entity.`,
+      explanation: `Technician repair service (${cat}) identified from LocalServices.`,
+    };
+  }
+
+  // 9. Deals & Marketplace (Pre-owned products: phones, washing machines, shirts, watches, cycles, etc.)
+  if (
+    q.includes("buy") ||
+    q.includes("sell") ||
+    q.includes("second hand") ||
+    q.includes("used") ||
+    q.includes("cycle") ||
+    q.includes("bicycle") ||
+    q.includes("mobile") ||
+    q.includes("phone") ||
+    q.includes("shirt") ||
+    q.includes("clothes") ||
+    q.includes("watch") ||
+    q.includes("laptop") ||
+    q.includes("deal") ||
+    q.includes("discount") ||
+    q.includes("marketplace") ||
+    q.includes("pre-owned")
+  ) {
+    return {
+      module: "deals",
+      keywords: ["buy", "sell", "deal", "used", "product"],
+      confidence: 0.88,
+      source: "code_logic",
+      explanation: "Local deals and pre-owned marketplace intent identified.",
     };
   }
 

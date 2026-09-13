@@ -22,18 +22,19 @@ const PROJECT_KNOWLEDGE_BASE = `
 DayMates (formerly Junto) App Knowledge Base & Customer Support Guidelines:
 
 1. ABOUT DAYMATES (JUNTO):
-DayMates is a premium social discovery and event ticket marketplace app for finding activity companions ("DayMates"), discovering local events, asking nearby locals real-time questions, and buying/selling/swapping event or movie tickets safely via Escrow.
+Junto is a direct community connection platform for finding activity companions ("DayMates"), discovering local events, asking nearby locals real-time questions, arranging peer carpool rides ("RideMate"), finding verified local technicians & doorstep services, and buying/selling/swapping event or movie tickets directly between buyers and sellers with 0% platform fees (Junto does NOT handle payments or use an escrow model).
 
 2. KEY FEATURES & HOW THEY WORK:
-- **DayMates (Social Activities)**: Users can post or join activities like grabbing coffee, gym sessions, board games, concert meetups, or dining out.
-- **Ticket Swap & Marketplace**: Users can buy, sell, or swap tickets for movies, concerts, and events. All ticket transactions are protected by Junto Escrow.
-- **Ask Nearby**: Broadcast real-time queries to nearby locals (e.g., "How long is the line at Toit?", "Is there parking near Church Street?").
-- **Real-Time Chat**: Chat directly with host organizers, daymate companions, ticket buyers/sellers, or group activity participants.
-- **Location Switching**: Change active location at any time (e.g., Koramangala, Indiranagar, MG Road, HSR Layout, Bengaluru).
-- **Safety & Verification**: Verified profiles, Trust Scores, Escrow payment hold, and mandatory public venue meetup safety guidelines.
+- **DayMates (Social Activities)**: Users can post or join activities like grabbing coffee, gym sessions, walking, sports, games, lunch, or dining out. Users can delete their activities anytime from Profile -> Activities.
+- **Ticket Swap & Marketplace**: Users can buy, sell, or swap tickets for movies, concerts, and events. If someone drops plans to watch a movie or attend an event, they can avoid complete loss and offer the ticket to someone else, so buyer and seller mutually benefit with 0% platform fees.
+- **RideMate (Carpool & Bike Pool)**: Connect with drivers or riders heading your way (e.g. if someone missed a train or bus). 0% platform fee—the ride creator keeps 100% of the price. Co-riders can tap "Request Seat" to join.
+- **Local Services**: Verified local technicians (electrician, plumber, carpenter, AC repair, washing machine repair, fridge repair, TV repair, bike/car repair, puncture, makeup, threading, hair styling, maids, moving assistance) register on Junto so users can choose the best person based on criteria.
+- **Local Deals**: Marketplace to buy and sell used products (mobiles, washing machines, shirts, watches, cycles, etc.) with photo uploads.
+- **Ask Nearby**: Broadcast real-time urgent queries to nearby locals (blood donation, lost keys/mobile/bag, medicine emergencies) with Urgency levels (Urgent, Soon, Not urgent).
+- **Safety & Verification**: Verified profiles, Trust Scores, and public meetup safety guidelines.
 
 3. FREQUENTLY ASKED QUESTIONS (FAQ):
-- **How does Ticket Escrow work?**: When you buy or swap a ticket, DayMates holds the payment securely in Escrow until both parties verify and confirm ticket transfer.
+- **How does Ticket Swap work?**: If you can no longer attend an event or movie, post your ticket on Junto to avoid complete loss. Buyers discover great ticket deals, and both parties connect directly with 0% platform fee.
 - **How do I list a ticket for sale?**: Tap the '+' button in the navigation bar, select "Sell / Swap Ticket", fill in movie/event details, price, venue, and post.
 - **Is DayMates safe for meeting people?**: Yes! We emphasize profile verification, community ratings, and safety rules (always meet in well-lit public spots).
 - **How do I change my location?**: Tap on your location badge at the top of Home/Explore/Profile screens or go to Profile -> Location -> Change.
@@ -51,13 +52,12 @@ function generateFallbackSupportAnswer(userMessage: string): string {
   const query = userMessage.toLowerCase();
 
   if (
-    query.includes("escrow") ||
     query.includes("ticket") ||
     query.includes("swap") ||
     query.includes("buy") ||
     query.includes("sell")
   ) {
-    return "🎟️ **Junto Ticket Escrow & Marketplace**:\n\n- **How it works**: When you purchase or swap a ticket, Junto holds your funds securely in Escrow.\n- **Protection**: The payment is only released to the seller after both parties verify and confirm the transfer.\n- **How to post**: Tap the '+' button in the bottom navigation bar and choose **'Sell / Swap Ticket'**.\n\nLet me know if you need help with a specific ticket order!";
+    return "🎟️ **Junto Ticket Swap & Marketplace**:\n\n- **Direct Peer Deals**: If your plans change, avoid complete loss by offering your ticket to another user.\n- **0% Platform Fee**: Junto does not take a cut or charge escrow fees; buyers get great ticket offers, and sellers recover their money.\n- **How to post**: Tap the '+' button in the bottom navigation bar and choose **'Sell / Swap Ticket'**.\n\nLet me know if you need help with a specific ticket listing!";
   }
 
   if (
@@ -97,7 +97,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     return "🚗 **Junto Community Rides & Carpooling**:\n\n- Find and share verified rides with friendly locals heading your way.\n- Filter by morning/evening routes, smoke-free preferences, and women-only carpools.\n- Split fuel costs seamlessly through the app!";
   }
 
-  return "👋 I'm here to help you get the most out of **DayMates**!\n\n- **DayMates Activities**: Join companions for coffee, gym, or events.\n- **Ticket Swaps**: Buy, sell, or swap event tickets protected by Escrow.\n- **Local Deals & Rides**: Discover nearby specials and community carpools.\n\nFeel free to ask any question, or reach out to **support@junto.app** anytime!";
+  return "👋 I'm here to help you get the most out of **Junto**!\n\n- **DayMates Activities**: Join companions for walking, coffee, gym, sports, or events.\n- **Ticket Swaps**: Buy, sell, or swap event tickets directly with 0% platform fee.\n- **Local Deals & Rides**: Discover pre-owned items and community carpools.\n\nFeel free to ask any question, or reach out to **support@junto.app** anytime!";
 }
 
 async function callOpenRouter(

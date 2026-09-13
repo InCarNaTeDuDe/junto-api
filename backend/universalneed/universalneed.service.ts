@@ -158,7 +158,7 @@ export async function queryUniversalNeedFromDb(
         subtitle: `${t.category} • ${t.section || "General Seating"} • Tonight / Live`,
         detail:
           t.description ||
-          "Direct digital ticket transfer with secure escrow check.",
+          "Direct peer ticket transfer between buyer and seller with 0% platform fee.",
         badge: "Instant Transfer",
         price: `₹${t.price}`,
         actionText: "Swap Ticket",
