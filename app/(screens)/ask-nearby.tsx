@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   StyleSheet,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ import {
 } from "react-native-safe-area-context";
 import { PushNotificationService } from "@/services/notifications";
 import { JuntoScreenHeader } from "@/components/JuntoScreenHeader";
+import { pickAndUploadImage } from "@/services/cloudinaryService";
 
 export interface AskNearbyFormProps {
   from?: "create" | "activity-chat" | "activity-details";
@@ -549,9 +551,29 @@ export default function AskNearbyScreen({
   const [selectedCategory, setSelectedCategory] = useState<string>("blood");
   const [selectedUrgency, setSelectedUrgency] = useState<string>("urgent");
   const [description, setDescription] = useState<string>("");
+  const [itemImage, setItemImage] = useState<string>("");
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [postedSuccess, setPostedSuccess] = useState<boolean>(false);
+
+  const handlePickImage = async () => {
+    try {
+      setIsUploadingImage(true);
+      const res = await pickAndUploadImage("activities");
+      if (res?.url) {
+        setItemImage(res.url);
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Notice", err?.message || "Could not upload image");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setItemImage("");
+  };
 
   const activeCategoryObj =
     CATEGORIES.find((c) => c.id === selectedCategory) || CATEGORIES[0];
@@ -583,7 +605,7 @@ export default function AskNearbyScreen({
   const handlePostRequest = async () => {
     setIsSubmitting(true);
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         title: `${activeCategoryObj.title}: Need Help`,
         category: activeCategoryObj.title,
         description:
@@ -593,6 +615,10 @@ export default function AskNearbyScreen({
         locationName: locationObj?.name || "Koramangala, Bengaluru",
         type: "ASK_NEARBY",
       };
+
+      if (itemImage) {
+        payload.image = itemImage;
+      }
 
       await ApiService.post("/api/asknearby", payload);
       setPostedSuccess(true);
@@ -810,6 +836,224 @@ export default function AskNearbyScreen({
             onChangeText={setDescription}
             multiline
           />
+        </View>
+
+        {/* Item Photo Upload Section */}
+        <View style={styles.inputCard}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <Text style={styles.inputLabel}>Photo of Item (Found / Lost)</Text>
+            {itemImage ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: "rgba(16, 185, 129, 0.15)",
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                <Text
+                  style={{ fontSize: 11, fontWeight: "600", color: "#10B981" }}
+                >
+                  Cloudinary Uploaded
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {itemImage ? (
+            <View style={{ gap: 10 }}>
+              <View
+                style={{
+                  position: "relative",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: isDark
+                    ? "rgba(255,255,255,0.12)"
+                    : "rgba(0,0,0,0.08)",
+                  backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                }}
+              >
+                <Image
+                  source={{ uri: itemImage }}
+                  style={{
+                    width: "100%",
+                    height: 160,
+                    borderRadius: 12,
+                    resizeMode: "cover",
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={handleRemoveImage}
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    backgroundColor: "rgba(0,0,0,0.65)",
+                    borderRadius: 20,
+                    padding: 6,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  disabled={isUploadingImage}
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: isDark
+                      ? "rgba(168, 85, 247, 0.2)"
+                      : "#F3E8FF",
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {isUploadingImage ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={primary || "#A855F7"}
+                    />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="camera-outline"
+                        size={16}
+                        color={primary || "#A855F7"}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "600",
+                          color: primary || "#A855F7",
+                        }}
+                      >
+                        Change Photo
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleRemoveImage}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: isDark ? "rgba(239, 68, 68, 0.3)" : "#FCA5A5",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "500",
+                      color: "#EF4444",
+                    }}
+                  >
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handlePickImage}
+              disabled={isUploadingImage}
+              style={{
+                borderWidth: 1.5,
+                borderStyle: "dashed",
+                borderColor: isDark
+                  ? "rgba(168, 85, 247, 0.4)"
+                  : "rgba(168, 85, 247, 0.5)",
+                borderRadius: 12,
+                paddingVertical: 20,
+                paddingHorizontal: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isDark
+                  ? "rgba(168, 85, 247, 0.05)"
+                  : "rgba(168, 85, 247, 0.03)",
+                gap: 8,
+              }}
+              activeOpacity={0.75}
+            >
+              {isUploadingImage ? (
+                <View style={{ alignItems: "center", gap: 6 }}>
+                  <ActivityIndicator
+                    size="small"
+                    color={primary || "#A855F7"}
+                  />
+                  <Text style={{ fontSize: 12, color: sub || "#94A3B8" }}>
+                    Uploading photo to Cloudinary...
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark
+                        ? "rgba(168, 85, 247, 0.2)"
+                        : "#F3E8FF",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons
+                      name="camera"
+                      size={22}
+                      color={primary || "#A855F7"}
+                    />
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "600",
+                        color: text || (isDark ? "#FFFFFF" : "#1E293B"),
+                      }}
+                    >
+                      Attach item photo (Found / Lost)
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: sub || "#94A3B8",
+                        marginTop: 2,
+                      }}
+                    >
+                      Tap to select photo from gallery or camera
+                    </Text>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Section 3: Nearby Audience */}

@@ -58,6 +58,9 @@ export class Message {
   @Column({ type: "text" })
   content!: string;
 
+  @Column({ type: "text", nullable: true })
+  image?: string | null;
+
   @CreateDateColumn({
     type: "timestamptz",
   })

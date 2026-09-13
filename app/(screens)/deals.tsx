@@ -159,7 +159,7 @@ export default function LocalDealsScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [dealsList, setDealsList] = useState<DealItem[]>(INITIAL_DEALS);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
 
   const checkIsDealOwner = useCallback(
@@ -274,10 +274,10 @@ export default function LocalDealsScreen() {
   const [editDealTitle, setEditDealTitle] = useState("");
   const [editDealPrice, setEditDealPrice] = useState("");
   const [editDealOriginalPrice, setEditDealOriginalPrice] = useState("");
-  const [editDealCategory, setEditDealCategory] = useState("General");
-  const [editDealCondition, setEditDealCondition] = useState<
-    "Brand New" | "Like New" | "Good"
-  >("Good");
+  const [editDealCategory, setEditDealCategory] =
+    useState<DealItem["category"]>("General");
+  const [editDealCondition, setEditDealCondition] =
+    useState<DealItem["condition"]>("Good");
   const [editDealLocation, setEditDealLocation] = useState("");
   const [editDealPhone, setEditDealPhone] = useState("");
   const [editDealDescription, setEditDealDescription] = useState("");
@@ -314,7 +314,9 @@ export default function LocalDealsScreen() {
     setEditDealCategory(deal.category || "General");
     setEditDealCondition((deal.condition as any) || "Good");
     setEditDealLocation(deal.location || "");
-    setEditDealPhone(deal.sellerPhone || "");
+    setEditDealPhone(
+      deal.sellerPhone ? deal.sellerPhone.replace(/\D/g, "").slice(-10) : "",
+    );
     setEditDealDescription(deal.description || "");
     setEditDealImage(deal.image || "");
   };
@@ -347,6 +349,14 @@ export default function LocalDealsScreen() {
       Alert.alert("Price Required", "Please provide a price.");
       return;
     }
+    const cleanEditPhone = editDealPhone.replace(/\D/g, "");
+    if (cleanEditPhone.length !== 10) {
+      Alert.alert(
+        "Invalid Mobile Number",
+        "Please enter a valid 10-digit contact mobile number (e.g. 9876543210).",
+      );
+      return;
+    }
 
     try {
       setIsEditDealSubmitting(true);
@@ -366,7 +376,7 @@ export default function LocalDealsScreen() {
         category: editDealCategory,
         condition: editDealCondition,
         location: editDealLocation.trim(),
-        sellerPhone: editDealPhone.trim(),
+        sellerPhone: cleanEditPhone,
         description: editDealDescription.trim(),
         image: editDealImage.trim() || editingDeal.image,
       };
@@ -713,10 +723,11 @@ export default function LocalDealsScreen() {
       return;
     }
 
-    if (!sellerMobile.trim()) {
+    const cleanSellerPhone = sellerMobile.replace(/\D/g, "");
+    if (cleanSellerPhone.length !== 10) {
       Alert.alert(
-        "Mobile Number Required",
-        "Please enter your mobile number so interested buyers can contact you.",
+        "Invalid Mobile Number",
+        "Please enter a valid 10-digit mobile number (e.g. 9876543210) so interested buyers can contact you.",
       );
       return;
     }
@@ -744,7 +755,7 @@ export default function LocalDealsScreen() {
         condition: voiceParsedData.condition,
         location: formattedLocation,
         distance: "",
-        sellerPhone: sellerMobile.trim(),
+        sellerPhone: cleanSellerPhone,
         description:
           voiceParsedData.details || "Listed in 1-tap via Voice Assist.",
         image:
@@ -1059,7 +1070,9 @@ export default function LocalDealsScreen() {
         {/* Deals Count & Info */}
         <View style={styles.countRow}>
           <Text style={[styles.countText, { color: textPrimary }]}>
-            {filteredDeals.length} deals nearby
+            {isLoading
+              ? "Finding neighborhood deals..."
+              : `${filteredDeals.length} deals nearby`}
           </Text>
           <Text style={[styles.countSub, { color: textMute }]}>
             Verified local community sellers
@@ -1067,7 +1080,38 @@ export default function LocalDealsScreen() {
         </View>
 
         {/* Deals Grid / List */}
-        {filteredDeals.length === 0 ? (
+        {isLoading ? (
+          <View
+            style={[
+              styles.emptyBox,
+              {
+                backgroundColor: cardBg,
+                borderColor: border,
+                paddingVertical: 50,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            ]}
+          >
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text
+              style={[
+                styles.emptyTitle,
+                { color: textPrimary, marginTop: 14, fontSize: 16 },
+              ]}
+            >
+              Loading neighborhood deals...
+            </Text>
+            <Text
+              style={[
+                styles.emptySub,
+                { color: textMute, marginTop: 4, textAlign: "center" },
+              ]}
+            >
+              Fetching the latest verified listings in {cityShort}
+            </Text>
+          </View>
+        ) : filteredDeals.length === 0 ? (
           <View
             style={[
               styles.emptyBox,
@@ -1149,7 +1193,7 @@ export default function LocalDealsScreen() {
 
                     <Text
                       style={[styles.dealTitle, { color: textPrimary }]}
-                      numberOfLines={2}
+                      numberOfLines={1}
                     >
                       {deal.title}
                     </Text>
@@ -1179,6 +1223,49 @@ export default function LocalDealsScreen() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* Action Buttons: Delete and EDIT buttons vertically on card on right side, ICONS ONLY */}
+                  {isDealOwner && (
+                    <View style={styles.cardVerticalActions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.actionIconBtn,
+                          {
+                            borderColor: "#D97706",
+                            backgroundColor: isDark
+                              ? "rgba(217, 119, 6, 0.15)"
+                              : "#FEF3C7",
+                          },
+                        ]}
+                        onPress={() => handleOpenEditDeal(deal)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Edit"
+                      >
+                        <Ionicons name="pencil" size={15} color="#D97706" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.actionIconBtn,
+                          {
+                            borderColor: "#EF4444",
+                            backgroundColor: isDark
+                              ? "rgba(239, 68, 68, 0.15)"
+                              : "#FEE2E2",
+                          },
+                        ]}
+                        onPress={() => handleDeleteDeal(deal)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Delete"
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={15}
+                          color="#EF4444"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 {/* Description */}
@@ -1231,78 +1318,24 @@ export default function LocalDealsScreen() {
                   {/* Action Buttons: Post Owner CANNOT see buyer/request action buttons */}
                   {isDealOwner ? (
                     <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
+                      style={[
+                        styles.ownerBadge,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(16, 185, 129, 0.12)"
+                            : "#ECFDF5",
+                          borderColor: isDark
+                            ? "rgba(16, 185, 129, 0.35)"
+                            : "#A7F3D0",
+                        },
+                      ]}
                     >
-                      <TouchableOpacity
-                        style={[
-                          styles.callBtn,
-                          {
-                            borderColor: "#D97706",
-                            backgroundColor: isDark
-                              ? "rgba(217, 119, 6, 0.15)"
-                              : "#FEF3C7",
-                          },
-                        ]}
-                        onPress={() => handleOpenEditDeal(deal)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="pencil" size={13} color="#D97706" />
-                        <Text
-                          style={[styles.callBtnText, { color: "#D97706" }]}
-                        >
-                          Edit
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.callBtn,
-                          {
-                            borderColor: "#EF4444",
-                            backgroundColor: isDark
-                              ? "rgba(239, 68, 68, 0.15)"
-                              : "#FEE2E2",
-                          },
-                        ]}
-                        onPress={() => handleDeleteDeal(deal)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={13}
-                          color="#EF4444"
-                        />
-                        <Text
-                          style={[styles.callBtnText, { color: "#EF4444" }]}
-                        >
-                          Delete
-                        </Text>
-                      </TouchableOpacity>
-
-                      <View
-                        style={[
-                          styles.ownerBadge,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(16, 185, 129, 0.12)"
-                              : "#ECFDF5",
-                            borderColor: isDark
-                              ? "rgba(16, 185, 129, 0.35)"
-                              : "#A7F3D0",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="person-circle-outline"
-                          size={14}
-                          color="#10B981"
-                        />
-                        <Text style={styles.ownerBadgeText}>Your Listing</Text>
-                      </View>
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={14}
+                        color="#10B981"
+                      />
+                      <Text style={styles.ownerBadgeText}>You</Text>
                     </View>
                   ) : (
                     <View style={styles.actionBtnsRow}>
@@ -1930,7 +1963,7 @@ export default function LocalDealsScreen() {
                       marginBottom: 6,
                     }}
                   >
-                    📸 Item Photo (Cloudinary deals/ folder):
+                    📸 Item Photo:
                   </Text>
                   {dealCustomImage ? (
                     <View
@@ -1968,7 +2001,7 @@ export default function LocalDealsScreen() {
                           style={{ fontSize: 11, color: textMute }}
                           numberOfLines={1}
                         >
-                          {dealCustomImage}
+                          {/* {dealCustomImage} */}
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -2067,9 +2100,10 @@ export default function LocalDealsScreen() {
                     placeholder="Enter 10-digit mobile number"
                     placeholderTextColor={textMute}
                     keyboardType="phone-pad"
+                    maxLength={10}
                     value={sellerMobile}
                     onChangeText={(text) =>
-                      setSellerMobile(text.replace(/[^0-9+ ]/g, ""))
+                      setSellerMobile(text.replace(/[^0-9]/g, "").slice(0, 10))
                     }
                   />
                 </View>
@@ -2087,7 +2121,8 @@ export default function LocalDealsScreen() {
                     styles.publishVoiceDealBtn,
                     {
                       opacity:
-                        voiceParsedData?.title.trim() && sellerMobile.trim()
+                        voiceParsedData?.title.trim() &&
+                        sellerMobile.replace(/\D/g, "").length === 10
                           ? 1
                           : 0.85,
                     },
@@ -2393,18 +2428,15 @@ export default function LocalDealsScreen() {
                 <Text style={[styles.voiceModalTitle, { color: textPrimary }]}>
                   Edit Deal Listing
                 </Text>
-                <Text style={[styles.voiceModalSub, { color: textMute }]}>
+                <Text style={{ fontSize: 13, marginTop: 2, color: textMute }}>
                   Update price, condition, or photos in Cloudinary (deals/)
                 </Text>
               </View>
               <TouchableOpacity
-                style={[
-                  styles.closeModalBtn,
-                  { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
-                ]}
                 onPress={() => setEditingDeal(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={20} color={textPrimary} />
+                <Ionicons name="close" size={22} color={textMute} />
               </TouchableOpacity>
             </View>
 
@@ -2641,10 +2673,13 @@ export default function LocalDealsScreen() {
                 </Text>
                 <TextInput
                   value={editDealPhone}
-                  onChangeText={setEditDealPhone}
-                  placeholder="e.g. +91 98480 12345"
+                  onChangeText={(text) =>
+                    setEditDealPhone(text.replace(/[^0-9]/g, "").slice(0, 10))
+                  }
+                  placeholder="Enter 10-digit mobile number"
                   placeholderTextColor={textMute}
                   keyboardType="phone-pad"
+                  maxLength={10}
                   style={[
                     styles.searchInput,
                     {
@@ -3035,27 +3070,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   dealCard: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 12,
-    gap: 10,
+    padding: 10,
+    gap: 8,
     ...Platform.select({
-      web: { boxShadow: "0 2px 10px rgba(0,0,0,0.04)" },
+      web: { boxShadow: "0 2px 8px rgba(0,0,0,0.04)" },
     }),
   },
   dealTopSection: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    alignItems: "center",
   },
   dealImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 76,
+    height: 76,
+    borderRadius: 10,
     backgroundColor: "#E2E8F0",
   },
   dealInfoWrap: {
     flex: 1,
     justifyContent: "space-between",
+    minHeight: 76,
+  },
+  cardVerticalActions: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "center",
+    height: 76,
+    paddingLeft: 2,
+  },
+  actionIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   conditionBadge: {
     paddingHorizontal: 7,
@@ -3070,46 +3122,43 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   dealTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 2,
+    lineHeight: 17,
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 2,
   },
   priceMain: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
     color: "#10B981",
   },
   priceOriginal: {
-    fontSize: 12,
+    fontSize: 11.5,
     textDecorationLine: "line-through",
   },
   locationMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 2,
   },
   locationText: {
-    fontSize: 11.5,
+    fontSize: 11,
   },
   descText: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11.5,
+    lineHeight: 15,
   },
   dealFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 8,
+    paddingTop: 6,
     borderTopWidth: 1,
-    gap: 8,
+    gap: 6,
   },
   sellerRow: {
     flexDirection: "row",

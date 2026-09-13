@@ -26,6 +26,7 @@ import { useTheme } from "@/hooks/useTheme";
 interface Thread {
   id: string;
   name: string;
+  channelId?: string;
   partnerName?: string | null;
   partnerAvatar?: string | null;
   partnerUrl?: string | null;
@@ -40,6 +41,7 @@ interface Thread {
   activityEmoji?: string;
   place?: string;
   participantId?: string | null;
+  image?: string | null;
 }
 
 export default function ChatsScreen() {
@@ -88,6 +90,7 @@ export default function ChatsScreen() {
 
           return {
             id: ch.id,
+            channelId: ch.channelId || `${ch.id}_${ch.participantId || "host"}`,
             name: displayName,
             partnerName: pName,
             partnerAvatar: pAvatar,
@@ -100,7 +103,7 @@ export default function ChatsScreen() {
               pName && ch.name !== pName
                 ? ch.name
                 : ch.subtitle || ch.type || "Channel",
-            lastMessage: ch.lastMessage || "Tap to open channel",
+            lastMessage: ch.lastMessage || "Tap to open chat",
             lastTime: ch.lastTime || "Active",
             unreadCount:
               typeof ch.unreadCount === "number" ? ch.unreadCount : 0,
@@ -108,7 +111,8 @@ export default function ChatsScreen() {
             isGroup: false,
             activityEmoji: ch.activityEmoji || "💬",
             place: ch.locationName || "Nearby",
-            participantId: ch.participantId || ch.organizerId || null,
+            participantId: ch.participantId || null,
+            image: ch.image || null,
           };
         });
 
@@ -225,14 +229,17 @@ export default function ChatsScreen() {
       prev.map((t) => (t.id === thread.id ? { ...t, unreadCount: 0 } : t)),
     );
     setActiveChatId(thread.id);
-    ApiService.post("/api/messages/mark-read", { activityId: thread.id }).catch(
-      () => {},
-    );
+    ApiService.post("/api/messages/mark-read", {
+      activityId: thread.id,
+      participantId: thread.participantId,
+    }).catch(() => {});
 
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
         id: thread.id,
+        activityId: thread.id,
+        participantId: thread.participantId || "",
         name: thread.name,
         user: thread.partnerName || thread.name,
         partner: thread.partnerName || thread.name,
@@ -245,6 +252,7 @@ export default function ChatsScreen() {
         avatar:
           thread.partnerAvatar || thread.partnerUrl || thread.avatar || "",
         activityEmoji: thread.activityEmoji || "💬",
+        image: thread.image || "",
       },
     });
   };

@@ -234,6 +234,7 @@ export async function popularActivitiesAround(locationFilter?: {
       userAvatar: a.organizer?.avatar,
       organizerId: a.organizerId,
       activityEmoji: a.activityEmoji,
+      image: a.image,
       createdAt: a.createdAt || a.datetime,
       latitude: a.latitude,
       longitude: a.longitude,

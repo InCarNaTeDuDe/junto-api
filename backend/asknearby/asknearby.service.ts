@@ -42,6 +42,7 @@ const mapAskNearbyResponse = (req: any) => ({
   description: req.description,
   category: req.tags?.[0] || "General",
   urgency: req.tags?.[1] || "Urgent",
+  image: req.image || null,
   locationName: req.locationName,
   locationState: req.locationState,
   latitude: req.latitude,
@@ -65,6 +66,7 @@ export async function createAskNearby(
       body.description || `${body.category} request (${body.urgency})`,
     category: ActivityCategory.ASK_NEARBY,
     activityEmoji: getEmojiForCategory(body.category),
+    image: body.image || undefined,
     datetime: new Date(),
     cost: 0,
     maxParticipants: 5,
@@ -95,6 +97,8 @@ export async function createAskNearby(
     type: "ASK NEARBY",
     category: "ASK NEARBY",
     avatar: organizer.avatar,
+    activityEmoji: request.activityEmoji,
+    image: request.image || undefined,
   };
 
   const notification = await notificationRepository.createNotification({

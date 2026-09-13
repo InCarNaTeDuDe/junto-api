@@ -19,7 +19,13 @@ export const CreateDealSchema = z.object({
     .default("Like New"),
   location: z.string().trim().min(2).max(120).default("Madhapur, Hyderabad"),
   distance: z.string().trim().max(50).optional().default(""),
-  sellerPhone: z.string().trim().min(5).max(30),
+  sellerPhone: z
+    .string()
+    .trim()
+    .refine(
+      (val) => val.replace(/\D/g, "").length === 10,
+      "Mobile number must be a valid 10-digit number",
+    ),
   description: z.string().trim().min(5, "Description is required").max(1000),
   image: z.string().trim().optional(),
   verified: z.boolean().optional().default(true),

@@ -310,14 +310,27 @@ const FeedRow = ({ item, s, C }) => {
         type: item.type,
         category: item.type,
         avatar: avatarUrl,
+        image: item.image,
       },
     });
   };
 
   return (
     <Pressable style={s.feedCard} onPress={handlePress}>
-      <View style={[s.thumb, { backgroundColor: item.thumbBg }]}>
-        {item.activityEmoji ? (
+      <View
+        style={[s.thumb, { backgroundColor: item.thumbBg, overflow: "hidden" }]}
+      >
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: moderateScale(14),
+            }}
+            resizeMode="cover"
+          />
+        ) : item.activityEmoji ? (
           <Text style={{ fontSize: moderateScale(22) }}>
             {item.activityEmoji}
           </Text>
@@ -455,14 +468,25 @@ const UserFeedRow = ({ item, s, C }) => {
         type: meta.label,
         category: meta.label,
         avatar: avatarUrl,
+        image: item.image,
       },
     });
   };
 
   return (
     <Pressable style={s.feedCard} onPress={handlePress}>
-      <View style={[s.thumb, { backgroundColor: meta.bg }]}>
-        {item.activityEmoji ? (
+      <View style={[s.thumb, { backgroundColor: meta.bg, overflow: "hidden" }]}>
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: moderateScale(14),
+            }}
+            resizeMode="cover"
+          />
+        ) : item.activityEmoji ? (
           <Text style={{ fontSize: moderateScale(34) }}>
             {item.activityEmoji}
           </Text>

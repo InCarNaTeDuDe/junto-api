@@ -44,6 +44,7 @@ export default function ActivityChatScreen() {
     avatar?: string;
     activityEmoji?: string;
     emoji?: string;
+    image?: string;
   }>();
 
   const { user } = useAuthContext();
@@ -124,6 +125,7 @@ export default function ActivityChatScreen() {
   const myAvatar =
     user?.avatar ||
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+  const activityImage = params.image || activityDetail?.image || null;
 
   const [inputMessage, setInputMessage] = useState("");
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
@@ -137,9 +139,13 @@ export default function ActivityChatScreen() {
   const loadMessages = async () => {
     try {
       setChatsLoading(true);
-      const res = await ApiService.get<any>(
-        `/api/messages?activityId=${chatId}`,
-      );
+      const targetPartnerId =
+        params.participantId ||
+        (organizerId && organizerId !== user?.id ? organizerId : undefined);
+      const query = targetPartnerId
+        ? `/api/messages?activityId=${chatId}&participantId=${targetPartnerId}`
+        : `/api/messages?activityId=${chatId}`;
+      const res = await ApiService.get<any>(query);
       const mapped = res.messages.map((m: any) => ({
         id: m.id,
         sender: m.senderId === user?.id ? "me" : "them",
@@ -190,6 +196,20 @@ export default function ActivityChatScreen() {
       console.log("CLIENT RECEIVED MESSAGE VIA SOCKET:", msg);
       if (msg.activityId && msg.activityId !== chatId) return;
 
+      const targetPartnerId =
+        params.participantId ||
+        (organizerId && organizerId !== user?.id ? organizerId : null);
+
+      if (targetPartnerId) {
+        const isFromPartner = msg.senderId === targetPartnerId;
+        const isFromMe =
+          msg.senderId === user?.id &&
+          (!msg.participantId || msg.participantId === targetPartnerId);
+        if (!isFromPartner && !isFromMe) {
+          return;
+        }
+      }
+
       setIsPartnerTyping(false);
       const newMessage: Message = {
         id: msg.id,
@@ -223,7 +243,7 @@ export default function ActivityChatScreen() {
       socket.off("receive_message");
       socket.off("user_typing");
     };
-  }, [chatId, user?.id]);
+  }, [chatId, user?.id, params.participantId]);
 
   // Find or initialize chat in global store
 
@@ -248,18 +268,35 @@ export default function ActivityChatScreen() {
     setInputMessage(text);
     if (!user?.id || !chatId) return;
 
+    const targetPartnerId =
+      params.participantId ||
+      (organizerId && organizerId !== user.id ? organizerId : undefined);
+
     if (text.trim().length > 0) {
-      socket.emit("typing", { chatId, userId: user.id, userName: user.name });
+      socket.emit("typing", {
+        chatId,
+        userId: user.id,
+        partnerId: targetPartnerId,
+        userName: user.name,
+      });
 
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
 
       typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("stop_typing", { chatId, userId: user.id });
+        socket.emit("stop_typing", {
+          chatId,
+          userId: user.id,
+          partnerId: targetPartnerId,
+        });
       }, 2500);
     } else {
-      socket.emit("stop_typing", { chatId, userId: user.id });
+      socket.emit("stop_typing", {
+        chatId,
+        userId: user.id,
+        partnerId: targetPartnerId,
+      });
     }
   };
 
@@ -399,8 +436,16 @@ export default function ActivityChatScreen() {
         {/* Activity Banner Context */}
         <View style={s.activityCard}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <View style={s.bannerEmojiBox}>
-              <Text style={{ fontSize: 26 }}>{activityEmoji}</Text>
+            <View style={[s.bannerEmojiBox, { overflow: "hidden" }]}>
+              {activityImage ? (
+                <Image
+                  source={{ uri: activityImage }}
+                  style={{ width: "100%", height: "100%", borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={{ fontSize: 26 }}>{activityEmoji}</Text>
+              )}
             </View>
 
             <View style={{ flex: 1 }}>

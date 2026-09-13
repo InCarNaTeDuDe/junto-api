@@ -41,30 +41,50 @@ export function initializeSocket(server: HttpServer) {
         data.participantId,
       );
 
-      // console.log("SAVED MESSAGE:", savedMessage);
-
-      io.to(data.chatId).emit("receive_message", savedMessage);
+      // Deliver message strictly to both parties involved in the conversation
+      io.to(`user:${data.senderId}`).emit("receive_message", savedMessage);
+      if (
+        savedMessage.participantId &&
+        savedMessage.participantId !== data.senderId
+      ) {
+        io.to(`user:${savedMessage.participantId}`).emit(
+          "receive_message",
+          savedMessage,
+        );
+      }
     });
 
     socket.on(
       "typing",
-      (data: { chatId: string; userId: string; userName?: string }) => {
-        console.log("TYPING EVENT:", data);
-        socket.to(data.chatId).emit("user_typing", {
-          userId: data.userId,
-          userName: data.userName,
-          isTyping: true,
-        });
+      (data: {
+        chatId: string;
+        userId: string;
+        partnerId?: string;
+        userName?: string;
+      }) => {
+        if (data.partnerId) {
+          io.to(`user:${data.partnerId}`).emit("user_typing", {
+            chatId: data.chatId,
+            userId: data.userId,
+            userName: data.userName,
+            isTyping: true,
+          });
+        }
       },
     );
 
-    socket.on("stop_typing", (data: { chatId: string; userId: string }) => {
-      console.log("STOP TYPING EVENT:", data);
-      socket.to(data.chatId).emit("user_typing", {
-        userId: data.userId,
-        isTyping: false,
-      });
-    });
+    socket.on(
+      "stop_typing",
+      (data: { chatId: string; userId: string; partnerId?: string }) => {
+        if (data.partnerId) {
+          io.to(`user:${data.partnerId}`).emit("user_typing", {
+            chatId: data.chatId,
+            userId: data.userId,
+            isTyping: false,
+          });
+        }
+      },
+    );
   });
 
   return io;

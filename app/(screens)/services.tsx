@@ -35,6 +35,7 @@ import {
   EmptyState,
   EnrollFormData,
 } from "@/components/marketplace";
+import { MarketplaceProvider } from "@/components/marketplace/types";
 
 export type ServiceClusterId = "all" | "fix" | "glam" | "home" | "auto";
 
@@ -2367,7 +2368,7 @@ export default function ServicesScreen() {
         <View style={styles.modalBackdrop}>
           <View
             style={[
-              styles.bookingModalCard,
+              styles.bookingModalSheet,
               {
                 backgroundColor: cardBg,
                 borderColor: border,
@@ -2390,7 +2391,7 @@ export default function ServicesScreen() {
               </View>
               <TouchableOpacity
                 style={[
-                  styles.closeModalBtn,
+                  styles.modalCloseBtn,
                   { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
                 ]}
                 onPress={() => setEditingPro(null)}
@@ -2742,7 +2743,7 @@ export default function ServicesScreen() {
               {/* Save Changes Button */}
               <TouchableOpacity
                 style={[
-                  styles.bookSubmitBtn,
+                  styles.modalSendBtn,
                   { backgroundColor: "#9333EA", marginTop: 10 },
                 ]}
                 onPress={handleSaveEditPro}
@@ -2761,7 +2762,7 @@ export default function ServicesScreen() {
                     }}
                   >
                     <Ionicons name="checkmark-done" size={18} color="#FFF" />
-                    <Text style={styles.bookSubmitBtnText}>
+                    <Text style={styles.modalSendBtnText}>
                       Save Changes to Listing
                     </Text>
                   </View>

@@ -9,6 +9,7 @@ import { FindManyOptions } from "typeorm";
 
 export interface ServiceProRecord {
   id: string;
+  providerId?: string;
   name: string;
   category: string;
   cluster: string;
@@ -23,6 +24,8 @@ export interface ServiceProRecord {
   phone: string;
   description?: string;
   availableToday: boolean;
+  image?: string;
+  avatar?: string;
   createdAt: string;
 }
 

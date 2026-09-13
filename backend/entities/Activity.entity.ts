@@ -49,6 +49,9 @@ export class Activity {
   @Column({ type: "varchar", nullable: true })
   activityEmoji?: string;
 
+  @Column({ type: "text", nullable: true })
+  image?: string;
+
   @Column({ type: "timestamp" })
   datetime!: Date;
 

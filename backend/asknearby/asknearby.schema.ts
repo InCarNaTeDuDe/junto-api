@@ -17,6 +17,7 @@ export const CreateAskNearbySchema = z.object({
   longitude: z.number().optional().default(77.6245),
   isAutoDetected: z.boolean().optional().default(false),
   type: z.string().optional().default("ASK_NEARBY"),
+  image: z.string().trim().optional().nullable(),
 });
 
 export const QueryAskNearbySchema = z.object({

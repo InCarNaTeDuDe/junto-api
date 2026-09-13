@@ -21,6 +21,8 @@ export async function getChannels(req: Request, res: Response) {
 export async function getMessages(req: Request, res: Response) {
   try {
     const activityId = (req.query.activityId || req.body.activityId) as string;
+    const participantId = (req.query.participantId ||
+      req.body.participantId) as string | undefined;
     const userId = req.user?.id || "guest-user";
     if (!activityId) {
       return res
@@ -28,9 +30,9 @@ export async function getMessages(req: Request, res: Response) {
         .json({ error: "activityId parameter is required" });
     }
 
-    markChannelAsRead(userId, activityId);
+    markChannelAsRead(userId, activityId, participantId);
 
-    const messages = await fetchMessages(activityId);
+    const messages = await fetchMessages(activityId, userId, participantId);
     res.json({ status: "success", messages });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to fetch messages" });
@@ -40,10 +42,10 @@ export async function getMessages(req: Request, res: Response) {
 export async function markChannelRead(req: Request, res: Response) {
   try {
     const userId = req.user?.id || "guest-user";
-    const { activityId, chatId } = req.body;
+    const { activityId, chatId, participantId } = req.body;
     const targetId = activityId || chatId;
     if (targetId) {
-      markChannelAsRead(userId, targetId);
+      markChannelAsRead(userId, targetId, participantId);
     }
     res.json({ status: "success" });
   } catch (err: any) {
