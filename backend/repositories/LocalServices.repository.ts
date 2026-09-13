@@ -51,6 +51,7 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
   public toRecord(entity: ServiceProvider): ServiceProRecord {
     return {
       id: entity.id,
+      providerId: entity.providerId,
       name: entity.name || entity.title || "Service Expert",
       category: entity.category,
       cluster: resolveServiceCluster(
@@ -59,6 +60,8 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
         entity.cluster,
       ),
       categoryIcon: entity.categoryIcon || "construct",
+      image: entity.image,
+      avatar: entity.avatar,
       rating: entity.rating ? Number(entity.rating) : 5.0,
       reviewsCount: entity.reviewsCount ? Number(entity.reviewsCount) : 1,
       experience: entity.experience || "3+ yrs exp",
@@ -172,6 +175,8 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
         rate: data.rate,
         avatarBg: data.avatarBg,
         categoryIcon: data.categoryIcon,
+        image: data.image,
+        avatar: data.avatar,
         availableToday: data.availableToday ?? true,
         verified: data.verified ?? true,
         rating: data.rating ?? 5.0,
@@ -189,6 +194,44 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
       name: data.name || data.title || "Service Expert",
     } as any);
     return (await this.repo.save(entity as any)) as ServiceProvider;
+  }
+
+  async updateService(
+    id: string,
+    data: Partial<ServiceProvider>,
+  ): Promise<ServiceProvider | null> {
+    const cluster =
+      data.category || data.description
+        ? resolveServiceCluster(data.category, data.description, data.cluster)
+        : data.cluster;
+
+    const payload: any = { ...data };
+    if (cluster) payload.cluster = cluster;
+    if (data.name) payload.title = data.name;
+
+    if (!this.isConnected) {
+      const idx = this.fallbackStore.findIndex((s) => s.id === id);
+      if (idx === -1) return null;
+      this.fallbackStore[idx] = {
+        ...this.fallbackStore[idx],
+        ...payload,
+        updatedAt: new Date(),
+      };
+      return this.fallbackStore[idx];
+    }
+
+    await this.repo.update(id, payload);
+    return this.findById(id);
+  }
+
+  async deleteService(id: string): Promise<boolean> {
+    if (!this.isConnected) {
+      const initLen = this.fallbackStore.length;
+      this.fallbackStore = this.fallbackStore.filter((s) => s.id !== id);
+      return this.fallbackStore.length < initLen;
+    }
+    const res = await this.repo.delete(id);
+    return Boolean(res.affected && res.affected > 0);
   }
 }
 

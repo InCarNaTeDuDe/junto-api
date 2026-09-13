@@ -64,36 +64,42 @@ async function request<T>(
   if (
     hasBody &&
     !endpoint.startsWith("/api/auth/google") &&
-    !endpoint.startsWith("/api/notifications/register-token")
+    !endpoint.startsWith("/api/notifications/register-token") &&
+    !endpoint.startsWith("/api/upload") &&
+    !endpoint.startsWith("/api/cloudinary")
   ) {
     console.log(`Passing Location to this endpoint -> ${endpoint}`);
 
     const location = await getSelectedLocation();
-    // this is the 1st route hits immediateky after logging in, so all POST request exopect location.
+    // this is the 1st route hits immediately after logging in, so all POST requests expect location.
     if (endpoint === "/api/activity/activities-around" && !location) {
       console.log(
         `Skipping ${endpoint} request because location is not available yet.`,
       );
       return undefined as T;
     }
-    // Example:
 
-    if (!location) {
-      Alert.alert(
-        "Error",
-        `location missing for endpoint: ${endpoint}, method: ${method}`,
-      );
-      throw new Error("Location is required");
-    }
+    // Use selected location or sensible default if not yet chosen in web preview
+    const effectiveLocation = location || {
+      name: "Hyderabad",
+      state: "Telangana",
+      latitude: 17.385,
+      longitude: 78.4866,
+      isAutoDetected: false,
+    };
 
     requestBody = {
       ...requestBody,
-      ...(endpoint !== "/api/auth/profile"
-        ? { locationName: location.name, locationState: location.state }
+      ...(endpoint !== "/api/auth/profile" && !requestBody?.locationName
+        ? {
+            locationName: effectiveLocation.name,
+            locationState: effectiveLocation.state,
+          }
         : {}),
-      latitude: location.latitude,
-      longitude: location.longitude,
-      isAutoDetected: location.isAutoDetected,
+      latitude: requestBody?.latitude ?? effectiveLocation.latitude,
+      longitude: requestBody?.longitude ?? effectiveLocation.longitude,
+      isAutoDetected:
+        requestBody?.isAutoDetected ?? effectiveLocation.isAutoDetected,
     };
   }
 

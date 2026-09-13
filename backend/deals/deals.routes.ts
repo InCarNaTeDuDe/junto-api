@@ -4,9 +4,15 @@ import {
   listDealsHandler,
   getDealByIdHandler,
   createDealHandler,
+  updateDealHandler,
+  deleteDealHandler,
   contactSellerHandler,
 } from "./deals.controller";
-import { CreateDealSchema, ContactSellerSchema } from "./deals.schema";
+import {
+  CreateDealSchema,
+  UpdateDealSchema,
+  ContactSellerSchema,
+} from "./deals.schema";
 import { authenticate } from "../middleware/authenticate";
 
 const router = Router();
@@ -17,6 +23,14 @@ router.get("/:id", authenticate, getDealByIdHandler);
 
 // Create deal & contact seller
 router.post("/", authenticate, validate(CreateDealSchema), createDealHandler);
+router.patch(
+  "/:id",
+  authenticate,
+  validate(UpdateDealSchema),
+  updateDealHandler,
+);
+router.put("/:id", authenticate, validate(UpdateDealSchema), updateDealHandler);
+router.delete("/:id", authenticate, deleteDealHandler);
 router.post(
   "/:id/contact",
   authenticate,

@@ -1043,8 +1043,8 @@ export default function RidesScreen() {
                     </View>
 
                     {/* Ride Meta Badge row */}
-                    {/* <View style={styles.metaRow}>
-                      <View
+                    <View style={styles.metaRow}>
+                      {/* <View
                         style={[
                           styles.metaBadge,
                           {
@@ -1063,7 +1063,7 @@ export default function RidesScreen() {
                         >
                           {ride.vehicleType === "car" ? "Car" : "Bike"}
                         </Text>
-                      </View>
+                      </View> */}
 
                       <View
                         style={[
@@ -1107,7 +1107,7 @@ export default function RidesScreen() {
                           {ride.seatsLeft > 1 ? "s" : ""} left
                         </Text>
                       </View>
-                    </View> */}
+                    </View>
 
                     {ride.notes && (
                       <Text style={[styles.notesText, { color: textMute }]}>

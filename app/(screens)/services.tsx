@@ -11,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   Switch,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -25,6 +26,7 @@ import { useAuthContext } from "@/context/AuthContext";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import { pickAndUploadImage } from "@/services/cloudinaryService";
 import {
   MarketplaceTabs,
   FindTab,
@@ -74,6 +76,8 @@ export interface ServicePro {
   phone: string;
   description?: string;
   availableToday?: boolean;
+  avatar?: string;
+  userId?: string;
 }
 
 export const SERVICE_CLUSTERS: ServiceClusterConfig[] = [
@@ -511,6 +515,140 @@ export default function ServicesScreen() {
   const [enrollSuccessModal, setEnrollSuccessModal] = useState(false);
   const [enrollFormError, setEnrollFormError] = useState<string | null>(null);
 
+  // Edit Technician Profile Modal State
+  const [editingPro, setEditingPro] = useState<ServicePro | null>(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [editProName, setEditProName] = useState("");
+  const [editProCategory, setEditProCategory] = useState("");
+  const [editProPhone, setEditProPhone] = useState("");
+  const [editProRate, setEditProRate] = useState("");
+  const [editProExperience, setEditProExperience] = useState("");
+  const [editProDistance, setEditProDistance] = useState("");
+  const [editProDescription, setEditProDescription] = useState("");
+  const [editProAvatar, setEditProAvatar] = useState("");
+  const [editProAvailableToday, setEditProAvailableToday] = useState(true);
+  const [isUploadingEditPhoto, setIsUploadingEditPhoto] = useState(false);
+
+  const checkIsProOwner = (pro: ServicePro | MarketplaceProvider) => {
+    if (!user) return false;
+    const proUid = (pro as any).userId;
+    if (proUid && (proUid === user.id || proUid === (user as any)._id)) {
+      return true;
+    }
+    const cleanUserPhone = (user as any)?.phone?.replace(/[^0-9]/g, "") || "";
+    const cleanProPhone = pro?.phone?.replace(/[^0-9]/g, "") || "";
+    if (
+      cleanUserPhone &&
+      cleanProPhone &&
+      cleanUserPhone.endsWith(cleanProPhone.slice(-10))
+    ) {
+      return true;
+    }
+    if (
+      user.name &&
+      pro.name &&
+      (pro.name.toLowerCase().includes(user.name.toLowerCase()) ||
+        user.name.toLowerCase().includes(pro.name.toLowerCase()))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleOpenEditPro = (pro: ServicePro | MarketplaceProvider) => {
+    const fullPro = prosList.find((p) => p.id === pro.id) || pro;
+    setEditingPro(fullPro as ServicePro);
+    setEditProName(fullPro.name || "");
+    setEditProCategory(fullPro.category || "");
+    setEditProPhone(fullPro.phone || "");
+    setEditProRate(fullPro.rate ? fullPro.rate.replace(/[^0-9]/g, "") : "");
+    setEditProExperience(fullPro.experience || "5 yrs exp");
+    setEditProDistance(fullPro.distance || "");
+    setEditProDescription(fullPro.description || "");
+    setEditProAvatar((fullPro as any).avatar || (fullPro as any).image || "");
+    setEditProAvailableToday(fullPro.availableToday ?? true);
+  };
+
+  const handlePickEditProPhoto = async () => {
+    try {
+      setIsUploadingEditPhoto(true);
+      const res = await pickAndUploadImage("services");
+      if (res?.url) {
+        setEditProAvatar(res.url);
+        Alert.alert("Photo Ready", "Photo uploaded to Cloudinary (services/)");
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Notice", err?.message || "Could not upload image");
+    } finally {
+      setIsUploadingEditPhoto(false);
+    }
+  };
+
+  const handleSaveEditPro = async () => {
+    if (!editingPro) return;
+    if (!editProName.trim() || !editProPhone.trim()) {
+      Alert.alert(
+        "Missing Details",
+        "Please provide a name and contact number.",
+      );
+      return;
+    }
+
+    try {
+      setIsEditSubmitting(true);
+      const updatedData = {
+        name: editProName.trim(),
+        category: editProCategory.trim(),
+        phone: editProPhone.trim(),
+        rate: editProRate ? `From ₹${editProRate} visit` : editingPro.rate,
+        experience: editProExperience.trim(),
+        distance: editProDistance.trim(),
+        description: editProDescription.trim(),
+        avatar: editProAvatar.trim(),
+        availableToday: editProAvailableToday,
+      };
+
+      await ApiService.patch(
+        `/api/localservices/${editingPro.id}`,
+        updatedData,
+      );
+
+      setProsList((prev) =>
+        prev.map((p) =>
+          p.id === editingPro.id ? { ...p, ...updatedData } : p,
+        ),
+      );
+      Alert.alert("Success", "Technician profile updated successfully!");
+      setEditingPro(null);
+    } catch {
+      // Fallback
+      setProsList((prev) =>
+        prev.map((p) =>
+          p.id === editingPro.id
+            ? {
+                ...p,
+                name: editProName.trim(),
+                category: editProCategory.trim(),
+                phone: editProPhone.trim(),
+                rate: editProRate
+                  ? `From ₹${editProRate} visit`
+                  : editingPro.rate,
+                experience: editProExperience.trim(),
+                distance: editProDistance.trim(),
+                description: editProDescription.trim(),
+                avatar: editProAvatar.trim(),
+                availableToday: editProAvailableToday,
+              }
+            : p,
+        ),
+      );
+      Alert.alert("Updated", "Technician profile updated!");
+      setEditingPro(null);
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
   // Voice Speech instances
   const {
     isListening: isSearchListening,
@@ -564,6 +702,8 @@ export default function ServicesScreen() {
           phone: p.phone || "+91 98480 12345",
           description: p.description,
           availableToday: p.availableToday ?? true,
+          avatar: p.avatar || p.image,
+          userId: p.userId,
         }));
         setProsList(mapped);
       }
@@ -725,6 +865,7 @@ export default function ServicesScreen() {
     const availableToSubmit = formData
       ? formData.availableToday
       : enrollAvailableToday;
+    const avatarToSubmit = formData?.avatar || "";
 
     if (!nameToSubmit) {
       setEnrollFormError("Please enter your full name or business name.");
@@ -766,6 +907,7 @@ export default function ServicesScreen() {
         description: descriptionToSubmit,
         verified: true,
         availableToday: availableToSubmit,
+        avatar: avatarToSubmit,
       };
 
       const res = await ApiService.post<{
@@ -1429,6 +1571,7 @@ export default function ServicesScreen() {
             {/* Technicians List Cards using reusable ProviderCard */}
             {filteredPros.map((pro) => {
               const requestSent = sentRequests[pro.id];
+              const isOwner = checkIsProOwner(pro);
 
               return (
                 <ProviderCard
@@ -1438,6 +1581,7 @@ export default function ServicesScreen() {
                     const original = filteredPros.find((x) => x.id === p.id);
                     if (original) setRequestTargetPro(original);
                   }}
+                  onEdit={isOwner ? (p) => handleOpenEditPro(p) : undefined}
                   accentColor="#9333EA"
                   actionButtonText={requestSent ? "Send Again" : "Send Request"}
                   actionButtonIcon={requestSent ? "checkmark-circle" : "send"}
@@ -2209,6 +2353,421 @@ export default function ServicesScreen() {
             >
               <Text style={styles.modalDoneBtnText}>Got it, Thanks!</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL 5: EDIT TECHNICIAN LISTING ================= */}
+      <Modal
+        visible={!!editingPro}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setEditingPro(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.bookingModalCard,
+              {
+                backgroundColor: cardBg,
+                borderColor: border,
+                maxHeight: "90%",
+              },
+            ]}
+          >
+            <View
+              style={[styles.bookingModalHeader, { borderBottomColor: border }]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.bookingModalTitle, { color: textPrimary }]}
+                >
+                  Edit Technician Listing
+                </Text>
+                <Text style={[styles.bookingModalSub, { color: textMute }]}>
+                  Update your rates, contact, and Cloudinary portfolio photo
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.closeModalBtn,
+                  { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                ]}
+                onPress={() => setEditingPro(null)}
+              >
+                <Ionicons name="close" size={20} color={textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1, paddingHorizontal: 18 }}
+              contentContainerStyle={{ paddingVertical: 14, gap: 12 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Business / Professional Name
+                </Text>
+                <TextInput
+                  value={editProName}
+                  onChangeText={setEditProName}
+                  placeholder="e.g. Ramesh Electricals"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Category
+                </Text>
+                <TextInput
+                  value={editProCategory}
+                  onChangeText={setEditProCategory}
+                  placeholder="e.g. Electrician, Plumber"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Phone Number
+                </Text>
+                <TextInput
+                  value={editProPhone}
+                  onChangeText={setEditProPhone}
+                  placeholder="Mobile number for clients"
+                  placeholderTextColor={textMute}
+                  keyboardType="phone-pad"
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Visiting Charge (₹)
+                </Text>
+                <TextInput
+                  value={editProRate}
+                  onChangeText={setEditProRate}
+                  placeholder="e.g. 150"
+                  placeholderTextColor={textMute}
+                  keyboardType="numeric"
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Experience
+                </Text>
+                <TextInput
+                  value={editProExperience}
+                  onChangeText={setEditProExperience}
+                  placeholder="e.g. 5 yrs exp"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Service Coverage
+                </Text>
+                <TextInput
+                  value={editProDistance}
+                  onChangeText={setEditProDistance}
+                  placeholder="e.g. Within 5 km"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Description & Specialties
+                </Text>
+                <TextInput
+                  value={editProDescription}
+                  onChangeText={setEditProDescription}
+                  placeholder="Describe your services, warranty, and turnaround..."
+                  placeholderTextColor={textMute}
+                  multiline
+                  numberOfLines={3}
+                  style={[
+                    styles.formInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                      textAlignVertical: "top",
+                      minHeight: 65,
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Cloudinary services/ photo upload */}
+              <View>
+                <Text
+                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                >
+                  Provider Photo (Cloudinary services/ folder)
+                </Text>
+                {editProAvatar ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: 10,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: border,
+                      backgroundColor: isDark ? "#0B0F19" : "#F8FAFC",
+                    }}
+                  >
+                    <Image
+                      source={{ uri: editProAvatar }}
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: 8,
+                        backgroundColor: "#E2E8F0",
+                      }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "700",
+                          color: textPrimary,
+                        }}
+                      >
+                        Photo Attached
+                      </Text>
+                      <Text
+                        style={{ fontSize: 11, color: textMute }}
+                        numberOfLines={1}
+                      >
+                        {editProAvatar}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setEditProAvatar("")}
+                      style={{
+                        padding: 6,
+                        borderRadius: 8,
+                        backgroundColor: "rgba(239, 68, 68, 0.12)",
+                      }}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={16}
+                        color="#EF4444"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handlePickEditProPhoto}
+                    disabled={isUploadingEditPhoto}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderStyle: "dashed",
+                      borderColor: "#9333EA",
+                      backgroundColor: isDark
+                        ? "rgba(147, 51, 234, 0.1)"
+                        : "#FAF5FF",
+                    }}
+                  >
+                    {isUploadingEditPhoto ? (
+                      <>
+                        <ActivityIndicator size="small" color="#9333EA" />
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: "600",
+                            color: textPrimary,
+                          }}
+                        >
+                          Uploading to Cloudinary...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="cloud-upload-outline"
+                          size={18}
+                          color="#9333EA"
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: "700",
+                            color: "#9333EA",
+                          }}
+                        >
+                          Upload Photo to services/
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Available Today Switch */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 8,
+                }}
+              >
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: textPrimary,
+                    }}
+                  >
+                    Available for Bookings Today
+                  </Text>
+                  <Text style={{ fontSize: 11, color: textMute }}>
+                    Displays the green Available Today badge
+                  </Text>
+                </View>
+                <Switch
+                  value={editProAvailableToday}
+                  onValueChange={setEditProAvailableToday}
+                  trackColor={{ false: "#64748B", true: "#9333EA" }}
+                  thumbColor="#FFF"
+                />
+              </View>
+
+              {/* Save Changes Button */}
+              <TouchableOpacity
+                style={[
+                  styles.bookSubmitBtn,
+                  { backgroundColor: "#9333EA", marginTop: 10 },
+                ]}
+                onPress={handleSaveEditPro}
+                disabled={isEditSubmitting}
+                activeOpacity={0.85}
+              >
+                {isEditSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Ionicons name="checkmark-done" size={18} color="#FFF" />
+                    <Text style={styles.bookSubmitBtnText}>
+                      Save Changes to Listing
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>

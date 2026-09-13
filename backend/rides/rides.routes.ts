@@ -47,5 +47,6 @@ router.patch(
   validate(UpdateRideSchema),
   updateRideHandler,
 );
+router.put("/:id", authenticate, validate(UpdateRideSchema), updateRideHandler);
 
 export default router;

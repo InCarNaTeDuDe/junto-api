@@ -3,12 +3,15 @@ import {
   listServicePros,
   getServiceProById,
   createServicePro,
+  updateServicePro,
+  deleteServicePro,
   bookService,
   listBookings,
   updateBookingStatus,
 } from "./localservices.service";
 import {
   CreateServiceProInput,
+  UpdateServiceProInput,
   QueryServicesInput,
   BookServiceInput,
   UpdateBookingStatusInput,
@@ -128,6 +131,55 @@ export async function updateBookingStatusHandler(
       success: true,
       message: "Booking status updated successfully",
       data: booking,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateServiceProHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const updated = await updateServicePro(
+      req.params.id,
+      req.body as UpdateServiceProInput,
+      req.user,
+    );
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: "Service provider not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Service listing updated successfully",
+      data: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteServiceProHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const success = await deleteServicePro(req.params.id, req.user);
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        message: "Service provider not found or already deleted",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Service listing deleted successfully",
     });
   } catch (err) {
     next(err);

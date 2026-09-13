@@ -58,6 +58,8 @@ export interface EnrollFormData {
   distance: string;
   description: string;
   availableToday: boolean;
+  avatar?: string;
+  portfolioImages?: string[];
 }
 
 export interface EnrollFormErrors {

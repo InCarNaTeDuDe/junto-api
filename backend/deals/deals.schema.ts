@@ -21,15 +21,12 @@ export const CreateDealSchema = z.object({
   distance: z.string().trim().max(50).optional().default(""),
   sellerPhone: z.string().trim().min(5).max(30),
   description: z.string().trim().min(5, "Description is required").max(1000),
-  image: z
-    .string()
-    .trim()
-    .url()
-    .optional()
-    .default(
-      "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500",
-    ),
+  image: z.string().trim().optional(),
   verified: z.boolean().optional().default(true),
+});
+
+export const UpdateDealSchema = CreateDealSchema.partial().extend({
+  status: z.enum(["available", "reserved", "sold"]).optional(),
 });
 
 export const QueryDealsSchema = z.object({
@@ -47,5 +44,6 @@ export const ContactSellerSchema = z.object({
 });
 
 export type CreateDealInput = z.infer<typeof CreateDealSchema>;
+export type UpdateDealInput = z.infer<typeof UpdateDealSchema>;
 export type QueryDealsInput = z.infer<typeof QueryDealsSchema>;
 export type ContactSellerInput = z.infer<typeof ContactSellerSchema>;

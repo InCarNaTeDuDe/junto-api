@@ -16,10 +16,14 @@ export const CreateServiceProSchema = z.object({
   description: z.string().trim().max(500).optional(),
   verified: z.boolean().optional().default(true),
   avatarBg: z.string().optional().default("#EA580C"),
+  image: z.string().optional(),
+  avatar: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   availableToday: z.boolean().optional().default(true),
 });
+
+export const UpdateServiceProSchema = CreateServiceProSchema.partial();
 
 export const QueryServicesSchema = z.object({
   category: z.string().optional().default("all"),
@@ -58,6 +62,7 @@ export const UpdateBookingStatusSchema = z.object({
 });
 
 export type CreateServiceProInput = z.infer<typeof CreateServiceProSchema>;
+export type UpdateServiceProInput = z.infer<typeof UpdateServiceProSchema>;
 export type QueryServicesInput = z.infer<typeof QueryServicesSchema>;
 export type BookServiceInput = z.infer<typeof BookServiceSchema>;
 export type UpdateBookingStatusInput = z.infer<

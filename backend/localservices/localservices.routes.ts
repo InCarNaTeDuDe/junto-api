@@ -4,12 +4,15 @@ import {
   listServiceProsHandler,
   getServiceProByIdHandler,
   createServiceProHandler,
+  updateServiceProHandler,
+  deleteServiceProHandler,
   bookServiceHandler,
   listBookingsHandler,
   updateBookingStatusHandler,
 } from "./localservices.controller";
 import {
   CreateServiceProSchema,
+  UpdateServiceProSchema,
   BookServiceSchema,
   UpdateBookingStatusSchema,
 } from "./localservices.schema";
@@ -29,6 +32,19 @@ router.post(
   validate(CreateServiceProSchema),
   createServiceProHandler,
 );
+router.patch(
+  "/:id",
+  authenticate,
+  validate(UpdateServiceProSchema),
+  updateServiceProHandler,
+);
+router.put(
+  "/:id",
+  authenticate,
+  validate(UpdateServiceProSchema),
+  updateServiceProHandler,
+);
+router.delete("/:id", authenticate, deleteServiceProHandler);
 router.post(
   "/:id/book",
   authenticate,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,10 @@ import {
   Platform,
   Modal,
   Image,
+  KeyboardAvoidingView,
+  Animated,
+  useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -28,6 +32,7 @@ import {
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 import { useAuthContext } from "@/context/AuthContext";
+import { pickAndUploadImage } from "@/services/cloudinaryService";
 
 interface DealItem {
   id: string;
@@ -60,6 +65,19 @@ interface DealItem {
 }
 
 const INITIAL_DEALS: DealItem[] = [];
+
+const DEAL_CATEGORIES = [
+  "Cycles",
+  "Mobiles",
+  "Electronics",
+  "Furniture",
+  "Appliances",
+  "Books",
+  "Fitness",
+  "General",
+] as const;
+
+const DEAL_CONDITIONS = ["Brand New", "Like New", "Good", "Fair"] as const;
 
 const CATEGORIES = [
   { id: "all", name: "All Deals", icon: "grid" as const, color: "#2563EB" },
@@ -246,6 +264,175 @@ export default function LocalDealsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [offerSuccessModal, setOfferSuccessModal] = useState(false);
 
+  // Cloudinary image upload for Voice Sell
+  const [dealCustomImage, setDealCustomImage] = useState<string>("");
+  const [isUploadingDealImage, setIsUploadingDealImage] =
+    useState<boolean>(false);
+
+  // Edit Deal Modal state
+  const [editingDeal, setEditingDeal] = useState<DealItem | null>(null);
+  const [editDealTitle, setEditDealTitle] = useState("");
+  const [editDealPrice, setEditDealPrice] = useState("");
+  const [editDealOriginalPrice, setEditDealOriginalPrice] = useState("");
+  const [editDealCategory, setEditDealCategory] = useState("General");
+  const [editDealCondition, setEditDealCondition] = useState<
+    "Brand New" | "Like New" | "Good"
+  >("Good");
+  const [editDealLocation, setEditDealLocation] = useState("");
+  const [editDealPhone, setEditDealPhone] = useState("");
+  const [editDealDescription, setEditDealDescription] = useState("");
+  const [editDealImage, setEditDealImage] = useState("");
+  const [isUploadingEditDealImage, setIsUploadingEditDealImage] =
+    useState(false);
+  const [isEditDealSubmitting, setIsEditDealSubmitting] = useState(false);
+
+  const handlePickVoiceDealImage = async () => {
+    try {
+      setIsUploadingDealImage(true);
+      const res = await pickAndUploadImage("deals");
+      if (res?.url) {
+        setDealCustomImage(res.url);
+        Alert.alert(
+          "Image Attached",
+          "Product photo uploaded to Cloudinary (deals/)",
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Notice", err?.message || "Could not upload image");
+    } finally {
+      setIsUploadingDealImage(false);
+    }
+  };
+
+  const handleOpenEditDeal = (deal: DealItem) => {
+    setEditingDeal(deal);
+    setEditDealTitle(deal.title || "");
+    setEditDealPrice(deal.price ? deal.price.replace(/[^0-9]/g, "") : "");
+    setEditDealOriginalPrice(
+      deal.originalPrice ? deal.originalPrice.replace(/[^0-9]/g, "") : "",
+    );
+    setEditDealCategory(deal.category || "General");
+    setEditDealCondition((deal.condition as any) || "Good");
+    setEditDealLocation(deal.location || "");
+    setEditDealPhone(deal.sellerPhone || "");
+    setEditDealDescription(deal.description || "");
+    setEditDealImage(deal.image || "");
+  };
+
+  const handlePickEditDealImage = async () => {
+    try {
+      setIsUploadingEditDealImage(true);
+      const res = await pickAndUploadImage("deals");
+      if (res?.url) {
+        setEditDealImage(res.url);
+        Alert.alert(
+          "Image Attached",
+          "Product photo uploaded to Cloudinary (deals/)",
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Notice", err?.message || "Could not upload image");
+    } finally {
+      setIsUploadingEditDealImage(false);
+    }
+  };
+
+  const handleSaveEditDeal = async () => {
+    if (!editingDeal) return;
+    if (!editDealTitle.trim()) {
+      Alert.alert("Title Required", "Please provide a title for this item.");
+      return;
+    }
+    if (!editDealPrice.trim()) {
+      Alert.alert("Price Required", "Please provide a price.");
+      return;
+    }
+
+    try {
+      setIsEditDealSubmitting(true);
+      const formattedPrice = editDealPrice.startsWith("₹")
+        ? editDealPrice
+        : `₹${editDealPrice}`;
+      const formattedOriginalPrice = editDealOriginalPrice
+        ? editDealOriginalPrice.startsWith("₹")
+          ? editDealOriginalPrice
+          : `₹${editDealOriginalPrice}`
+        : undefined;
+
+      const updatePayload = {
+        title: editDealTitle.trim(),
+        price: formattedPrice,
+        originalPrice: formattedOriginalPrice,
+        category: editDealCategory,
+        condition: editDealCondition,
+        location: editDealLocation.trim(),
+        sellerPhone: editDealPhone.trim(),
+        description: editDealDescription.trim(),
+        image: editDealImage.trim() || editingDeal.image,
+      };
+
+      await ApiService.patch(`/api/deals/${editingDeal.id}`, updatePayload);
+
+      setDealsList((prev) =>
+        prev.map((d) =>
+          d.id === editingDeal.id ? { ...d, ...updatePayload } : d,
+        ),
+      );
+      Alert.alert("Success", "Deal listing updated successfully!");
+      setEditingDeal(null);
+    } catch {
+      // Fallback in case of offline/disconnect
+      const formattedPrice = editDealPrice.startsWith("₹")
+        ? editDealPrice
+        : `₹${editDealPrice}`;
+      setDealsList((prev) =>
+        prev.map((d) =>
+          d.id === editingDeal.id
+            ? {
+                ...d,
+                title: editDealTitle.trim(),
+                price: formattedPrice,
+                category: editDealCategory as any,
+                condition: editDealCondition,
+                location: editDealLocation.trim(),
+                sellerPhone: editDealPhone.trim(),
+                description: editDealDescription.trim(),
+                image: editDealImage.trim() || editingDeal.image,
+              }
+            : d,
+        ),
+      );
+      Alert.alert("Updated", "Listing updated locally.");
+      setEditingDeal(null);
+    } finally {
+      setIsEditDealSubmitting(false);
+    }
+  };
+
+  const handleDeleteDeal = (deal: DealItem) => {
+    Alert.alert(
+      "Delete Listing",
+      `Are you sure you want to remove "${deal.title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await ApiService.delete(`/api/deals/${deal.id}`);
+              setDealsList((prev) => prev.filter((d) => d.id !== deal.id));
+              Alert.alert("Removed", "Listing has been deleted.");
+            } catch {
+              setDealsList((prev) => prev.filter((d) => d.id !== deal.id));
+              Alert.alert("Removed", "Listing deleted.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const formatDate = (d: Date) =>
     d.toLocaleDateString("en-US", {
       month: "short",
@@ -279,6 +466,196 @@ export default function LocalDealsScreen() {
     stopListening,
   } = useVoiceSpeech("deals-voice-sell");
 
+  // Audio Beep generator using Web Audio API
+  const playListeningBeep = useCallback(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const AudioCtx =
+          window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === "suspended") {
+            ctx.resume();
+          }
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = "sine";
+          // Gentle, high-tech two-tone chime
+          osc.frequency.setValueAtTime(540, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(
+            880,
+            ctx.currentTime + 0.08,
+          );
+
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.17);
+          setTimeout(() => {
+            ctx.close().catch(() => {});
+          }, 350);
+        }
+      }
+    } catch {
+      // Audio playback fails gracefully if browser restricts
+    }
+  }, []);
+
+  // Mic scaling animation (small to big) & animated sound wave bars
+  const micScaleAnim = useRef(new Animated.Value(1)).current;
+  const micRingScaleAnim = useRef(new Animated.Value(1)).current;
+  const micRingOpacityAnim = useRef(new Animated.Value(0.65)).current;
+
+  const soundBar1 = useRef(new Animated.Value(6)).current;
+  const soundBar2 = useRef(new Animated.Value(12)).current;
+  const soundBar3 = useRef(new Animated.Value(18)).current;
+  const soundBar4 = useRef(new Animated.Value(10)).current;
+  const soundBar5 = useRef(new Animated.Value(7)).current;
+
+  // Handle listening animation and sound effects
+  useEffect(() => {
+    if (isListening) {
+      playListeningBeep();
+
+      // Continuous scale animation: small to big and back
+      const scaleLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(micScaleAnim, {
+            toValue: 1.2,
+            duration: 550,
+            useNativeDriver: false,
+          }),
+          Animated.timing(micScaleAnim, {
+            toValue: 0.94,
+            duration: 550,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      scaleLoop.start();
+
+      // Expanding radiant outer ring
+      const ringLoop = Animated.loop(
+        Animated.parallel([
+          Animated.timing(micRingScaleAnim, {
+            toValue: 1.65,
+            duration: 1100,
+            useNativeDriver: false,
+          }),
+          Animated.timing(micRingOpacityAnim, {
+            toValue: 0,
+            duration: 1100,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      ringLoop.start();
+
+      // Sound bars oscillation (sound visualizer)
+      const b1 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(soundBar1, {
+            toValue: 18,
+            duration: 260,
+            useNativeDriver: false,
+          }),
+          Animated.timing(soundBar1, {
+            toValue: 6,
+            duration: 260,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      const b2 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(soundBar2, {
+            toValue: 24,
+            duration: 210,
+            useNativeDriver: false,
+          }),
+          Animated.timing(soundBar2, {
+            toValue: 8,
+            duration: 210,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      const b3 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(soundBar3, {
+            toValue: 26,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(soundBar3, {
+            toValue: 10,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      const b4 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(soundBar4, {
+            toValue: 20,
+            duration: 240,
+            useNativeDriver: false,
+          }),
+          Animated.timing(soundBar4, {
+            toValue: 6,
+            duration: 240,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      const b5 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(soundBar5, {
+            toValue: 16,
+            duration: 280,
+            useNativeDriver: false,
+          }),
+          Animated.timing(soundBar5, {
+            toValue: 5,
+            duration: 280,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+
+      b1.start();
+      b2.start();
+      b3.start();
+      b4.start();
+      b5.start();
+
+      return () => {
+        scaleLoop.stop();
+        ringLoop.stop();
+        b1.stop();
+        b2.stop();
+        b3.stop();
+        b4.stop();
+        b5.stop();
+      };
+    } else {
+      micScaleAnim.setValue(1);
+      micRingScaleAnim.setValue(1);
+      micRingOpacityAnim.setValue(0.65);
+      soundBar1.setValue(6);
+      soundBar2.setValue(12);
+      soundBar3.setValue(18);
+      soundBar4.setValue(10);
+      soundBar5.setValue(7);
+    }
+  }, [isListening, playListeningBeep]);
+
   // Trigger speech parsing when transcript arrives
   useEffect(() => {
     if (transcript.trim().length > 3) {
@@ -287,14 +664,38 @@ export default function LocalDealsScreen() {
     }
   }, [transcript, cityShort]);
 
+  // Responsive height calculation for Voice Sell Modal
+  const { height: windowHeight } = useWindowDimensions();
+  const voiceModalHeight =
+    Platform.OS === "web"
+      ? Math.min(windowHeight * 0.88, 720)
+      : Math.min(Math.max(windowHeight * 0.85, 480), 680);
+
+  const createInitialVoiceData = useCallback((): ParsedDealVoice => {
+    return {
+      rawTranscript: "",
+      title: "",
+      category: "General",
+      price: "",
+      condition: "Good",
+      location: cityShort || "Madhapur, Hyderabad",
+      details: "",
+    };
+  }, [cityShort]);
+
   const handleOpenVoiceSell = () => {
     setShowVoiceModal(true);
-    setVoiceParsedData(null);
     setTranscript("");
-    startListening((finalText) => {
-      const parsed = parseVoiceListing(finalText, cityShort);
-      setVoiceParsedData(parsed);
-    });
+    // Pre-populate with clean default structure so breakdown fields are immediately visible on mobile & web
+    setVoiceParsedData(createInitialVoiceData());
+    try {
+      startListening((finalText) => {
+        const parsed = parseVoiceListing(finalText, cityShort);
+        setVoiceParsedData(parsed);
+      });
+    } catch (e) {
+      console.warn("Speech recognition error:", e);
+    }
   };
 
   const handleSelectPresetSpeech = (preset: string) => {
@@ -306,8 +707,8 @@ export default function LocalDealsScreen() {
   const handlePublishVoiceDeal = async () => {
     if (!voiceParsedData || !voiceParsedData.title.trim()) {
       Alert.alert(
-        "Please speak",
-        "Tell us what item you are selling and price.",
+        "Please enter item title",
+        "Tell us or type what item you want to sell (e.g. 'Selling cycle for ₹6,000').",
       );
       return;
     }
@@ -322,20 +723,34 @@ export default function LocalDealsScreen() {
 
     try {
       setIsPublishing(true);
+      const formattedPrice = voiceParsedData.price
+        ? voiceParsedData.price.startsWith("₹")
+          ? voiceParsedData.price
+          : `₹${voiceParsedData.price}`
+        : "₹0";
+
+      const formattedLocation = voiceParsedData.location
+        ? voiceParsedData.location
+            .toLowerCase()
+            .includes(cityShort.toLowerCase())
+          ? voiceParsedData.location
+          : `${voiceParsedData.location}, ${cityShort}`
+        : cityShort;
+
       const payload = {
-        title: voiceParsedData.title,
+        title: voiceParsedData.title.trim(),
         category: voiceParsedData.category,
-        price: voiceParsedData.price,
+        price: formattedPrice,
         condition: voiceParsedData.condition,
-        location: voiceParsedData.location
-          ? `${voiceParsedData.location}, ${cityShort}`
-          : cityShort,
+        location: formattedLocation,
         distance: "",
         sellerPhone: sellerMobile.trim(),
         description:
           voiceParsedData.details || "Listed in 1-tap via Voice Assist.",
         image:
-          CATEGORY_IMAGES[voiceParsedData.category] || CATEGORY_IMAGES.General,
+          dealCustomImage ||
+          CATEGORY_IMAGES[voiceParsedData.category] ||
+          CATEGORY_IMAGES.General,
         verified: true,
       };
 
@@ -371,13 +786,11 @@ export default function LocalDealsScreen() {
           id: `deal-${Date.now()}`,
           sellerId: user?.id,
           userId: user?.id,
-          title: voiceParsedData.title,
+          title: voiceParsedData.title.trim(),
           category: voiceParsedData.category,
-          price: voiceParsedData.price,
+          price: formattedPrice,
           condition: voiceParsedData.condition,
-          location: voiceParsedData.location
-            ? `${voiceParsedData.location}, ${cityShort}`
-            : cityShort,
+          location: formattedLocation,
           distance: "",
           sellerName: user?.name ? `${user.name} (You)` : "You (Host)",
           sellerRating: 5.0,
@@ -398,6 +811,7 @@ export default function LocalDealsScreen() {
       setShowVoiceModal(false);
       setVoiceParsedData(null);
       setTranscript("");
+      setDealCustomImage("");
       Alert.alert(
         "🎉 Deal Posted!",
         "Your item has been published to the neighborhood marketplace in real-time.",
@@ -584,7 +998,7 @@ export default function LocalDealsScreen() {
                 styles.searchMicBtn,
                 {
                   backgroundColor: isListening
-                    ? "#EF4444"
+                    ? "#7C3AED"
                     : isDark
                       ? "#1E293B"
                       : "#FEF3C7",
@@ -817,24 +1231,78 @@ export default function LocalDealsScreen() {
                   {/* Action Buttons: Post Owner CANNOT see buyer/request action buttons */}
                   {isDealOwner ? (
                     <View
-                      style={[
-                        styles.ownerBadge,
-                        {
-                          backgroundColor: isDark
-                            ? "rgba(16, 185, 129, 0.12)"
-                            : "#ECFDF5",
-                          borderColor: isDark
-                            ? "rgba(16, 185, 129, 0.35)"
-                            : "#A7F3D0",
-                        },
-                      ]}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      <Ionicons
-                        name="person-circle-outline"
-                        size={14}
-                        color="#10B981"
-                      />
-                      <Text style={styles.ownerBadgeText}>Your Listing</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.callBtn,
+                          {
+                            borderColor: "#D97706",
+                            backgroundColor: isDark
+                              ? "rgba(217, 119, 6, 0.15)"
+                              : "#FEF3C7",
+                          },
+                        ]}
+                        onPress={() => handleOpenEditDeal(deal)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="pencil" size={13} color="#D97706" />
+                        <Text
+                          style={[styles.callBtnText, { color: "#D97706" }]}
+                        >
+                          Edit
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.callBtn,
+                          {
+                            borderColor: "#EF4444",
+                            backgroundColor: isDark
+                              ? "rgba(239, 68, 68, 0.15)"
+                              : "#FEE2E2",
+                          },
+                        ]}
+                        onPress={() => handleDeleteDeal(deal)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={13}
+                          color="#EF4444"
+                        />
+                        <Text
+                          style={[styles.callBtnText, { color: "#EF4444" }]}
+                        >
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View
+                        style={[
+                          styles.ownerBadge,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(16, 185, 129, 0.12)"
+                              : "#ECFDF5",
+                            borderColor: isDark
+                              ? "rgba(16, 185, 129, 0.35)"
+                              : "#A7F3D0",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="person-circle-outline"
+                          size={14}
+                          color="#10B981"
+                        />
+                        <Text style={styles.ownerBadgeText}>Your Listing</Text>
+                      </View>
                     </View>
                   ) : (
                     <View style={styles.actionBtnsRow}>
@@ -900,259 +1368,740 @@ export default function LocalDealsScreen() {
         }}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.voiceModalCard,
-              { backgroundColor: cardBg, borderColor: border },
-            ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.voiceKeyboardWrapper}
           >
-            {/* Header */}
-            <View style={styles.voiceModalHeader}>
-              <View style={styles.voiceModalTitleRow}>
-                <Ionicons name="mic" size={22} color="#D97706" />
-                <Text style={[styles.voiceModalTitle, { color: textPrimary }]}>
-                  Voice Sell (1-Tap Listing)
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  stopListening();
-                  setShowVoiceModal(false);
-                }}
-              >
-                <Ionicons name="close" size={22} color={textMute} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Listening Indicator / Mic Orb */}
-            <View style={styles.micOrbContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.micOrb,
-                  {
-                    backgroundColor: isListening ? "#EF4444" : "#F59E0B",
-                  },
-                ]}
-                onPress={() => {
-                  if (isListening) {
-                    stopListening();
-                  } else {
-                    startListening((text) => {
-                      const p = parseVoiceListing(text, cityShort);
-                      setVoiceParsedData(p);
-                    });
-                  }
-                }}
-              >
-                <Ionicons
-                  name={isListening ? "mic" : "mic-outline"}
-                  size={38}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
-              <Text
-                style={[
-                  styles.micStateText,
-                  { color: isListening ? "#EF4444" : textPrimary },
-                ]}
-              >
-                {isListening
-                  ? "Listening... Speak clearly"
-                  : "Tap Mic to Start Speaking"}
-              </Text>
-              <Text style={[styles.micSubText, { color: textMute }]}>
-                Tell item name, price, condition & area.
-              </Text>
-              {voiceError && (
-                <View
-                  style={[
-                    styles.micErrorBanner,
-                    {
-                      backgroundColor: isDark ? "#451A1A" : "#FEE2E2",
-                      borderColor: "#EF4444",
-                    },
-                  ]}
-                >
-                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                  <Text
-                    style={[
-                      styles.micErrorText,
-                      { color: isDark ? "#FCA5A5" : "#991B1B" },
-                    ]}
-                  >
-                    {voiceError}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Live Transcript / Interim */}
             <View
               style={[
-                styles.transcriptBox,
+                styles.voiceModalCard,
                 {
-                  backgroundColor: isDark ? "#1E293B" : "#FEF3C730",
+                  backgroundColor: cardBg,
                   borderColor: border,
+                  height: voiceModalHeight,
                 },
               ]}
             >
-              <Text style={[styles.transcriptLabel, { color: textMute }]}>
-                HEARD AUDIO:
-              </Text>
-              <Text style={[styles.transcriptText, { color: textPrimary }]}>
-                {transcript ||
-                  interimTranscript ||
-                  "e.g. 'Selling Firefox cycle with 21 gears in like new condition for 6500 rupees at Madhapur'"}
-              </Text>
-            </View>
-
-            {/* One-Tap Voice Presets to Try (Zero Friction) */}
-            <Text style={[styles.presetHeading, { color: textPrimary }]}>
-              ⚡ Or tap an instant voice sample to test:
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.presetSpeechScroll}
-            >
-              {VOICE_PRESETS.map((preset, i) => (
+              {/* Header - Pinned at Top */}
+              <View
+                style={[styles.voiceModalHeader, { borderBottomColor: border }]}
+              >
+                <View style={styles.voiceModalTitleRow}>
+                  <Ionicons name="mic" size={22} color="#D97706" />
+                  <Text
+                    style={[styles.voiceModalTitle, { color: textPrimary }]}
+                  >
+                    Voice Sell (1-Tap Listing)
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  key={i}
-                  onPress={() => handleSelectPresetSpeech(preset)}
+                  onPress={() => {
+                    stopListening();
+                    setShowVoiceModal(false);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={22} color={textMute} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Scrollable Content Body */}
+              <ScrollView
+                style={styles.voiceModalScroll}
+                contentContainerStyle={styles.voiceModalScrollContent}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Listening Indicator / Mic Orb */}
+                <View style={styles.micOrbContainer}>
+                  <View style={styles.micOrbWrapper}>
+                    {isListening && (
+                      <Animated.View
+                        style={[
+                          styles.micPulseRing,
+                          {
+                            transform: [{ scale: micRingScaleAnim }],
+                            opacity: micRingOpacityAnim,
+                          },
+                        ]}
+                      />
+                    )}
+                    <Animated.View
+                      style={{
+                        transform: [{ scale: isListening ? micScaleAnim : 1 }],
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.micOrb,
+                          {
+                            backgroundColor: isListening
+                              ? "#7C3AED"
+                              : "#F59E0B",
+                            ...Platform.select({
+                              web: {
+                                boxShadow: isListening
+                                  ? "0 8px 26px rgba(124, 58, 237, 0.55)"
+                                  : "0 6px 20px rgba(245, 158, 11, 0.4)",
+                              },
+                            }),
+                          },
+                        ]}
+                        onPress={() => {
+                          if (isListening) {
+                            stopListening();
+                          } else {
+                            playListeningBeep();
+                            startListening((text) => {
+                              const p = parseVoiceListing(text, cityShort);
+                              setVoiceParsedData(p);
+                            });
+                          }
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name={isListening ? "mic" : "mic-outline"}
+                          size={36}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  </View>
+
+                  {/* Status & Sound Wave Indicator */}
+                  <View style={styles.micStatusRow}>
+                    <Text
+                      style={[
+                        styles.micStateText,
+                        {
+                          color: isListening
+                            ? isDark
+                              ? "#C4B5FD"
+                              : "#7C3AED"
+                            : textPrimary,
+                        },
+                      ]}
+                    >
+                      {isListening
+                        ? "Listening... Speak clearly"
+                        : "Tap Mic to Start Speaking"}
+                    </Text>
+
+                    {isListening && (
+                      <View
+                        style={[
+                          styles.soundBeepIndicator,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(124, 58, 237, 0.22)"
+                              : "#EDE9FE",
+                            borderColor: isDark ? "#7C3AED" : "#C4B5FD",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="volume-high"
+                          size={13}
+                          color={isDark ? "#C4B5FD" : "#7C3AED"}
+                        />
+                        <View style={styles.soundBarsContainer}>
+                          <Animated.View
+                            style={[
+                              styles.soundBar,
+                              {
+                                height: soundBar1,
+                                backgroundColor: isDark ? "#C4B5FD" : "#7C3AED",
+                              },
+                            ]}
+                          />
+                          <Animated.View
+                            style={[
+                              styles.soundBar,
+                              {
+                                height: soundBar2,
+                                backgroundColor: isDark ? "#DDD6FE" : "#8B5CF6",
+                              },
+                            ]}
+                          />
+                          <Animated.View
+                            style={[
+                              styles.soundBar,
+                              {
+                                height: soundBar3,
+                                backgroundColor: isDark ? "#C4B5FD" : "#7C3AED",
+                              },
+                            ]}
+                          />
+                          <Animated.View
+                            style={[
+                              styles.soundBar,
+                              {
+                                height: soundBar4,
+                                backgroundColor: isDark ? "#DDD6FE" : "#8B5CF6",
+                              },
+                            ]}
+                          />
+                          <Animated.View
+                            style={[
+                              styles.soundBar,
+                              {
+                                height: soundBar5,
+                                backgroundColor: isDark ? "#C4B5FD" : "#7C3AED",
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            styles.soundBeepText,
+                            { color: isDark ? "#DDD6FE" : "#6D28D9" },
+                          ]}
+                        >
+                          Sound Active
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text style={[styles.micSubText, { color: textMute }]}>
+                    Tell item name, price, condition & area.
+                  </Text>
+                  {voiceError && (
+                    <View
+                      style={[
+                        styles.micErrorBanner,
+                        {
+                          backgroundColor: isDark ? "#451A1A" : "#FEE2E2",
+                          borderColor: "#EF4444",
+                        },
+                      ]}
+                    >
+                      <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                      <Text
+                        style={[
+                          styles.micErrorText,
+                          { color: isDark ? "#FCA5A5" : "#991B1B" },
+                        ]}
+                      >
+                        {voiceError}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Live Transcript / Interim */}
+                <View
                   style={[
-                    styles.presetSpeechPill,
+                    styles.transcriptBox,
                     {
-                      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                      backgroundColor: isDark ? "#1E293B" : "#FEF3C730",
                       borderColor: border,
                     },
                   ]}
                 >
-                  <Ionicons name="volume-high" size={13} color="#D97706" />
-                  <Text
-                    style={[styles.presetSpeechText, { color: textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    &quot;{preset.slice(0, 35)}...&quot;
+                  <Text style={[styles.transcriptLabel, { color: textMute }]}>
+                    HEARD AUDIO:
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Auto Parsed Breakdown Preview */}
-            {voiceParsedData && (
-              <View
-                style={[
-                  styles.parsedCard,
-                  {
-                    backgroundColor: isDark ? "#064E3B20" : "#ECFDF5",
-                    borderColor: "#10B981",
-                  },
-                ]}
-              >
-                <View style={styles.parsedCardHeader}>
-                  <Ionicons name="sparkles" size={16} color="#10B981" />
-                  <Text style={styles.parsedCardTitle}>
-                    AI Parsed Listing Breakdown
+                  <Text style={[styles.transcriptText, { color: textPrimary }]}>
+                    {transcript ||
+                      interimTranscript ||
+                      "e.g. 'Selling Firefox cycle with 21 gears in like new condition for 6500 rupees at Madhapur'"}
                   </Text>
                 </View>
-                <View style={styles.parsedGrid}>
-                  <View style={styles.parsedRow}>
-                    <Text style={[styles.parsedKey, { color: textMute }]}>
-                      Title:
-                    </Text>
-                    <Text style={[styles.parsedVal, { color: textPrimary }]}>
-                      {voiceParsedData.title}
-                    </Text>
-                  </View>
-                  <View style={styles.parsedRow}>
-                    <Text style={[styles.parsedKey, { color: textMute }]}>
-                      Category:
-                    </Text>
-                    <Text style={[styles.parsedVal, { color: "#8B5CF6" }]}>
-                      {voiceParsedData.category}
-                    </Text>
-                  </View>
-                  <View style={styles.parsedRow}>
-                    <Text style={[styles.parsedKey, { color: textMute }]}>
-                      Price:
-                    </Text>
-                    <Text
+
+                {/* One-Tap Voice Presets to Try (Zero Friction) */}
+                <Text style={[styles.presetHeading, { color: textPrimary }]}>
+                  ⚡ Or tap an instant voice sample to test:
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.presetSpeechScroll}
+                >
+                  {VOICE_PRESETS.map((preset, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => handleSelectPresetSpeech(preset)}
                       style={[
-                        styles.parsedVal,
-                        { color: "#10B981", fontWeight: "800" },
+                        styles.presetSpeechPill,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          borderColor: border,
+                        },
                       ]}
                     >
-                      {voiceParsedData.price}
-                    </Text>
+                      <Ionicons name="volume-high" size={13} color="#D97706" />
+                      <Text
+                        style={[
+                          styles.presetSpeechText,
+                          { color: textPrimary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        &quot;{preset.slice(0, 35)}...&quot;
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Auto Parsed Breakdown Preview */}
+                {voiceParsedData && (
+                  <View
+                    style={[
+                      styles.parsedCard,
+                      {
+                        backgroundColor: isDark ? "#064E3B20" : "#ECFDF5",
+                        borderColor: "#10B981",
+                      },
+                    ]}
+                  >
+                    <View style={styles.parsedCardHeader}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Ionicons name="sparkles" size={16} color="#10B981" />
+                        <Text style={styles.parsedCardTitle}>
+                          AI Parsed Listing Breakdown
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          backgroundColor: isDark
+                            ? "rgba(16, 185, 129, 0.2)"
+                            : "#D1FAE5",
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: "rgba(16, 185, 129, 0.4)",
+                        }}
+                      >
+                        <Ionicons name="pencil" size={11} color="#059669" />
+                        <Text
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: "700",
+                            color: "#059669",
+                          }}
+                        >
+                          Editable
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.parsedGrid}>
+                      {/* Title */}
+                      <View style={styles.parsedEditField}>
+                        <Text
+                          style={[styles.parsedEditLabel, { color: textMute }]}
+                        >
+                          Title:
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.parsedEditInput,
+                            {
+                              backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+                              borderColor: border,
+                              color: textPrimary,
+                            },
+                          ]}
+                          value={voiceParsedData.title}
+                          onChangeText={(text) =>
+                            setVoiceParsedData((prev) =>
+                              prev ? { ...prev, title: text } : null,
+                            )
+                          }
+                          placeholder="e.g. Ready to sell my used bicycle"
+                          placeholderTextColor={textMute}
+                        />
+                      </View>
+
+                      {/* Category */}
+                      <View style={styles.parsedEditField}>
+                        <Text
+                          style={[styles.parsedEditLabel, { color: textMute }]}
+                        >
+                          Category:
+                        </Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.categoryChipsScroll}
+                        >
+                          {DEAL_CATEGORIES.map((cat) => {
+                            const isSelected =
+                              voiceParsedData.category?.toLowerCase() ===
+                              cat.toLowerCase();
+                            return (
+                              <TouchableOpacity
+                                key={cat}
+                                onPress={() =>
+                                  setVoiceParsedData((prev) =>
+                                    prev
+                                      ? { ...prev, category: cat as any }
+                                      : null,
+                                  )
+                                }
+                                style={[
+                                  styles.catChip,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? "#8B5CF6"
+                                      : isDark
+                                        ? "#1E293B"
+                                        : "#FFFFFF",
+                                    borderColor: isSelected
+                                      ? "#8B5CF6"
+                                      : border,
+                                  },
+                                ]}
+                                activeOpacity={0.8}
+                              >
+                                <Text
+                                  style={[
+                                    styles.catChipText,
+                                    {
+                                      color: isSelected
+                                        ? "#FFFFFF"
+                                        : textPrimary,
+                                      fontWeight: isSelected ? "700" : "500",
+                                    },
+                                  ]}
+                                >
+                                  {cat}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+
+                      {/* Price */}
+                      <View style={styles.parsedEditField}>
+                        <Text
+                          style={[styles.parsedEditLabel, { color: textMute }]}
+                        >
+                          Price:
+                        </Text>
+                        <View
+                          style={[
+                            styles.priceInputWrapper,
+                            {
+                              backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+                              borderColor: border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 15,
+                              fontWeight: "800",
+                              color: "#10B981",
+                              marginRight: 4,
+                            }}
+                          >
+                            ₹
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.parsedEditInputBare,
+                              {
+                                color: textPrimary,
+                              },
+                            ]}
+                            value={voiceParsedData.price.replace(/^₹\s?/, "")}
+                            onChangeText={(text) => {
+                              const cleaned = text.replace(/[^0-9,]/g, "");
+                              setVoiceParsedData((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      price: cleaned ? `₹${cleaned}` : "",
+                                    }
+                                  : null,
+                              );
+                            }}
+                            placeholder="1,500"
+                            placeholderTextColor={textMute}
+                            keyboardType="numeric"
+                          />
+                        </View>
+                      </View>
+
+                      {/* Condition */}
+                      <View style={styles.parsedEditField}>
+                        <Text
+                          style={[styles.parsedEditLabel, { color: textMute }]}
+                        >
+                          Condition:
+                        </Text>
+                        <View style={styles.conditionRow}>
+                          {DEAL_CONDITIONS.map((cond) => {
+                            const isSelected =
+                              voiceParsedData.condition === cond;
+                            return (
+                              <TouchableOpacity
+                                key={cond}
+                                onPress={() =>
+                                  setVoiceParsedData((prev) =>
+                                    prev ? { ...prev, condition: cond } : null,
+                                  )
+                                }
+                                style={[
+                                  styles.conditionChip,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? "#10B981"
+                                      : isDark
+                                        ? "#1E293B"
+                                        : "#FFFFFF",
+                                    borderColor: isSelected
+                                      ? "#10B981"
+                                      : border,
+                                  },
+                                ]}
+                                activeOpacity={0.8}
+                              >
+                                <Text
+                                  style={[
+                                    styles.conditionChipText,
+                                    {
+                                      color: isSelected
+                                        ? "#FFFFFF"
+                                        : textPrimary,
+                                      fontWeight: isSelected ? "700" : "500",
+                                    },
+                                  ]}
+                                >
+                                  {cond}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+
+                      {/* Location */}
+                      <View style={styles.parsedEditField}>
+                        <Text
+                          style={[styles.parsedEditLabel, { color: textMute }]}
+                        >
+                          Location:
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.parsedEditInput,
+                            {
+                              backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+                              borderColor: border,
+                              color: textPrimary,
+                            },
+                          ]}
+                          value={voiceParsedData.location}
+                          onChangeText={(text) =>
+                            setVoiceParsedData((prev) =>
+                              prev ? { ...prev, location: text } : null,
+                            )
+                          }
+                          placeholder="e.g. Hyderabad"
+                          placeholderTextColor={textMute}
+                        />
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.parsedRow}>
-                    <Text style={[styles.parsedKey, { color: textMute }]}>
-                      Condition:
-                    </Text>
-                    <Text style={[styles.parsedVal, { color: textPrimary }]}>
-                      {voiceParsedData.condition}
-                    </Text>
-                  </View>
-                  <View style={styles.parsedRow}>
-                    <Text style={[styles.parsedKey, { color: textMute }]}>
-                      Location:
-                    </Text>
-                    <Text style={[styles.parsedVal, { color: textPrimary }]}>
-                      {voiceParsedData.location}
-                    </Text>
-                  </View>
+                )}
+
+                {/* Cloudinary Item Photo Upload (deals/ folder) */}
+                <View style={{ marginTop: 6, marginBottom: 8, width: "100%" }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: textPrimary,
+                      marginBottom: 6,
+                    }}
+                  >
+                    📸 Item Photo (Cloudinary deals/ folder):
+                  </Text>
+                  {dealCustomImage ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: 10,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: border,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      }}
+                    >
+                      <Image
+                        source={{ uri: dealCustomImage }}
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 8,
+                          backgroundColor: "#E2E8F0",
+                        }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: textPrimary,
+                          }}
+                        >
+                          Photo Uploaded
+                        </Text>
+                        <Text
+                          style={{ fontSize: 11, color: textMute }}
+                          numberOfLines={1}
+                        >
+                          {dealCustomImage}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setDealCustomImage("")}
+                        style={{
+                          padding: 6,
+                          borderRadius: 8,
+                          backgroundColor: "rgba(239, 68, 68, 0.12)",
+                        }}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={16}
+                          color="#EF4444"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handlePickVoiceDealImage}
+                      disabled={isUploadingDealImage}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        paddingVertical: 12,
+                        paddingHorizontal: 14,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderStyle: "dashed",
+                        borderColor: "#D97706",
+                        backgroundColor: isDark
+                          ? "rgba(217, 119, 6, 0.1)"
+                          : "#FFFBEB",
+                      }}
+                    >
+                      {isUploadingDealImage ? (
+                        <>
+                          <ActivityIndicator size="small" color="#D97706" />
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: "600",
+                              color: textPrimary,
+                            }}
+                          >
+                            Uploading image to Cloudinary...
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="cloud-upload-outline"
+                            size={18}
+                            color="#D97706"
+                          />
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: "700",
+                              color: "#D97706",
+                            }}
+                          >
+                            Upload Photo (deals/ folder)
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
-              </View>
-            )}
 
-            {/* Mobile Number Textbox for Seller */}
-            <View style={{ marginTop: 12, marginBottom: 4, width: "100%" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: textPrimary,
-                  marginBottom: 6,
-                }}
+                {/* Mobile Number Textbox for Seller */}
+                <View style={{ marginTop: 2, marginBottom: 4, width: "100%" }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: textPrimary,
+                      marginBottom: 6,
+                    }}
+                  >
+                    📱 Seller Mobile Number (for WhatsApp / calls):
+                  </Text>
+                  <TextInput
+                    style={{
+                      height: 44,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: border,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      paddingHorizontal: 12,
+                      fontSize: 14,
+                      color: textPrimary,
+                    }}
+                    placeholder="Enter 10-digit mobile number"
+                    placeholderTextColor={textMute}
+                    keyboardType="phone-pad"
+                    value={sellerMobile}
+                    onChangeText={(text) =>
+                      setSellerMobile(text.replace(/[^0-9+ ]/g, ""))
+                    }
+                  />
+                </View>
+              </ScrollView>
+
+              {/* Pinned Bottom Footer with Publish Button */}
+              <View
+                style={[
+                  styles.voiceModalFooter,
+                  { borderTopColor: border, backgroundColor: cardBg },
+                ]}
               >
-                📱 Seller Mobile Number (for WhatsApp / calls):
-              </Text>
-              <TextInput
-                style={{
-                  height: 44,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: border,
-                  backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                  paddingHorizontal: 12,
-                  fontSize: 14,
-                  color: textPrimary,
-                }}
-                placeholder="Enter 10-digit mobile number"
-                placeholderTextColor={textMute}
-                keyboardType="phone-pad"
-                value={sellerMobile}
-                onChangeText={(text) =>
-                  setSellerMobile(text.replace(/[^0-9+ ]/g, ""))
-                }
-              />
+                <TouchableOpacity
+                  style={[
+                    styles.publishVoiceDealBtn,
+                    {
+                      opacity:
+                        voiceParsedData?.title.trim() && sellerMobile.trim()
+                          ? 1
+                          : 0.85,
+                    },
+                  ]}
+                  onPress={handlePublishVoiceDeal}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                  <Text style={styles.publishVoiceDealText}>
+                    Confirm &amp; List Item (1-Tap)
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            {/* Publish Button */}
-            <TouchableOpacity
-              style={[
-                styles.publishVoiceDealBtn,
-                { opacity: voiceParsedData ? 1 : 0.6 },
-              ]}
-              onPress={handlePublishVoiceDeal}
-              disabled={!voiceParsedData}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.publishVoiceDealText}>
-                Confirm &amp; List Item (1-Tap)
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1415,6 +2364,483 @@ export default function LocalDealsScreen() {
             >
               <Text style={styles.successDoneText}>Got it</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Deal Modal */}
+      <Modal
+        visible={!!editingDeal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setEditingDeal(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.voiceModalCard,
+              {
+                backgroundColor: cardBg,
+                borderColor: border,
+                maxHeight: "90%",
+              },
+            ]}
+          >
+            <View
+              style={[styles.voiceModalHeader, { borderBottomColor: border }]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.voiceModalTitle, { color: textPrimary }]}>
+                  Edit Deal Listing
+                </Text>
+                <Text style={[styles.voiceModalSub, { color: textMute }]}>
+                  Update price, condition, or photos in Cloudinary (deals/)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.closeModalBtn,
+                  { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                ]}
+                onPress={() => setEditingDeal(null)}
+              >
+                <Ionicons name="close" size={20} color={textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1, paddingHorizontal: 16 }}
+              contentContainerStyle={{ paddingVertical: 14, gap: 12 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Title:
+                </Text>
+                <TextInput
+                  value={editDealTitle}
+                  onChangeText={setEditDealTitle}
+                  placeholder="e.g. Firefox mountain bicycle"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.searchInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Category:
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginVertical: 4 }}
+                >
+                  {DEAL_CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setEditDealCategory(cat)}
+                      style={[
+                        styles.catPill,
+                        {
+                          backgroundColor:
+                            editDealCategory === cat
+                              ? "#D97706"
+                              : isDark
+                                ? "#1E293B"
+                                : "#F1F5F9",
+                          borderColor:
+                            editDealCategory === cat ? "#D97706" : border,
+                          marginRight: 6,
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color:
+                            editDealCategory === cat ? "#FFF" : textPrimary,
+                          fontWeight: editDealCategory === cat ? "700" : "500",
+                          fontSize: 12,
+                        }}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Selling Price (₹):
+                  </Text>
+                  <TextInput
+                    value={editDealPrice}
+                    onChangeText={setEditDealPrice}
+                    placeholder="e.g. 6000"
+                    placeholderTextColor={textMute}
+                    keyboardType="numeric"
+                    style={[
+                      styles.searchInput,
+                      {
+                        borderColor: border,
+                        color: textPrimary,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.parsedEditLabel,
+                      { color: textMute, marginBottom: 4 },
+                    ]}
+                  >
+                    Original Price (Optional):
+                  </Text>
+                  <TextInput
+                    value={editDealOriginalPrice}
+                    onChangeText={setEditDealOriginalPrice}
+                    placeholder="e.g. 12000"
+                    placeholderTextColor={textMute}
+                    keyboardType="numeric"
+                    style={[
+                      styles.searchInput,
+                      {
+                        borderColor: border,
+                        color: textPrimary,
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Condition:
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {DEAL_CONDITIONS.map((cond) => (
+                    <TouchableOpacity
+                      key={cond}
+                      onPress={() => setEditDealCondition(cond)}
+                      style={[
+                        styles.catPill,
+                        {
+                          flex: 1,
+                          justifyContent: "center",
+                          backgroundColor:
+                            editDealCondition === cond
+                              ? "#10B981"
+                              : isDark
+                                ? "#1E293B"
+                                : "#F1F5F9",
+                          borderColor:
+                            editDealCondition === cond ? "#10B981" : border,
+                          paddingVertical: 8,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          textAlign: "center",
+                          color:
+                            editDealCondition === cond ? "#FFF" : textPrimary,
+                          fontWeight:
+                            editDealCondition === cond ? "700" : "500",
+                          fontSize: 12,
+                        }}
+                      >
+                        {cond}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Location:
+                </Text>
+                <TextInput
+                  value={editDealLocation}
+                  onChangeText={setEditDealLocation}
+                  placeholder="e.g. Madhapur, Hyderabad"
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.searchInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Contact Mobile Number:
+                </Text>
+                <TextInput
+                  value={editDealPhone}
+                  onChangeText={setEditDealPhone}
+                  placeholder="e.g. +91 98480 12345"
+                  placeholderTextColor={textMute}
+                  keyboardType="phone-pad"
+                  style={[
+                    styles.searchInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Description & Details:
+                </Text>
+                <TextInput
+                  value={editDealDescription}
+                  onChangeText={setEditDealDescription}
+                  placeholder="Item details, accessories included, pickup directions..."
+                  placeholderTextColor={textMute}
+                  multiline
+                  numberOfLines={3}
+                  style={[
+                    styles.searchInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                      minHeight: 65,
+                      textAlignVertical: "top",
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Cloudinary Item Image in deals/ folder */}
+              <View>
+                <Text
+                  style={[
+                    styles.parsedEditLabel,
+                    { color: textMute, marginBottom: 4 },
+                  ]}
+                >
+                  Item Image (Cloudinary deals/ folder):
+                </Text>
+                {editDealImage ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: 10,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: border,
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    }}
+                  >
+                    <Image
+                      source={{ uri: editDealImage }}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 8,
+                        backgroundColor: "#E2E8F0",
+                      }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "700",
+                          color: textPrimary,
+                        }}
+                      >
+                        Item Photo Attached
+                      </Text>
+                      <Text
+                        style={{ fontSize: 11, color: textMute }}
+                        numberOfLines={1}
+                      >
+                        {editDealImage}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setEditDealImage("")}
+                      style={{
+                        padding: 6,
+                        borderRadius: 8,
+                        backgroundColor: "rgba(239, 68, 68, 0.12)",
+                      }}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={16}
+                        color="#EF4444"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handlePickEditDealImage}
+                    disabled={isUploadingEditDealImage}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderStyle: "dashed",
+                      borderColor: "#D97706",
+                      backgroundColor: isDark
+                        ? "rgba(217, 119, 6, 0.1)"
+                        : "#FFFBEB",
+                    }}
+                  >
+                    {isUploadingEditDealImage ? (
+                      <>
+                        <ActivityIndicator size="small" color="#D97706" />
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: "600",
+                            color: textPrimary,
+                          }}
+                        >
+                          Uploading to Cloudinary...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="cloud-upload-outline"
+                          size={18}
+                          color="#D97706"
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: "700",
+                            color: "#D97706",
+                          }}
+                        >
+                          Upload Photo (deals/ folder)
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[
+                  styles.publishVoiceDealBtn,
+                  { backgroundColor: "#D97706", marginTop: 8 },
+                ]}
+                onPress={handleSaveEditDeal}
+                disabled={isEditDealSubmitting}
+                activeOpacity={0.85}
+              >
+                {isEditDealSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Ionicons name="checkmark-done" size={18} color="#FFF" />
+                    <Text style={styles.publishVoiceDealText}>
+                      Save Changes to Listing
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1782,19 +3208,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 16,
   },
+  voiceKeyboardWrapper: {
+    width: "100%",
+    maxWidth: 440,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   voiceModalCard: {
     width: "100%",
     maxWidth: 440,
     borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
-    gap: 12,
-    maxHeight: "90%",
+    flexDirection: "column",
+    overflow: "hidden",
   },
   voiceModalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  voiceModalScroll: {
+    flex: 1,
+    width: "100%",
+  },
+  voiceModalScrollContent: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  voiceModalFooter: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    width: "100%",
   },
   voiceModalTitleRow: {
     flexDirection: "row",
@@ -1807,23 +3258,77 @@ const styles = StyleSheet.create({
   },
   micOrbContainer: {
     alignItems: "center",
-    paddingVertical: 10,
-    gap: 6,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  micOrbWrapper: {
+    width: 84,
+    height: 84,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  micPulseRing: {
+    position: "absolute",
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "rgba(124, 58, 237, 0.35)",
+    borderWidth: 2,
+    borderColor: "#8B5CF6",
   },
   micOrb: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
     ...Platform.select({
       web: { boxShadow: "0 6px 20px rgba(245, 158, 11, 0.4)" },
+      default: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 6,
+      },
     }),
+  },
+  micStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  soundBeepIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  soundBarsContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 2,
+    height: 18,
+    paddingBottom: 1,
+  },
+  soundBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  soundBeepText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   micStateText: {
     fontSize: 14,
     fontWeight: "700",
-    marginTop: 4,
   },
   micSubText: {
     fontSize: 11.5,
@@ -1881,15 +3386,15 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
   },
   parsedCard: {
-    padding: 12,
+    padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 8,
+    gap: 10,
   },
   parsedCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
   },
   parsedCardTitle: {
     fontSize: 12.5,
@@ -1897,7 +3402,64 @@ const styles = StyleSheet.create({
     color: "#10B981",
   },
   parsedGrid: {
+    gap: 8,
+  },
+  parsedEditField: {
     gap: 4,
+  },
+  parsedEditLabel: {
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  parsedEditInput: {
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  categoryChipsScroll: {
+    flexDirection: "row",
+    gap: 6,
+    paddingVertical: 2,
+  },
+  catChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  catChipText: {
+    fontSize: 11.5,
+  },
+  priceInputWrapper: {
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  parsedEditInputBare: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: "700",
+    paddingVertical: 0,
+  },
+  conditionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  conditionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  conditionChipText: {
+    fontSize: 11.5,
   },
   parsedRow: {
     flexDirection: "row",
@@ -1916,9 +3478,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 13,
-    borderRadius: 16,
+    borderRadius: 14,
     gap: 8,
-    marginTop: 4,
   },
   publishVoiceDealText: {
     color: "#FFFFFF",

@@ -9,6 +9,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { CategorySelector } from "./CategorySelector";
@@ -17,6 +19,7 @@ import {
   EnrollFormErrors,
   MarketplaceCategory,
 } from "../types";
+import { pickAndUploadImage } from "@/services/cloudinaryService";
 
 export const EXPERIENCE_OPTIONS = [
   { value: "1 yr exp", label: "1 Year Experience", badge: "1" },
@@ -113,7 +116,27 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
       ? initialData.availableToday
       : true,
   );
+  const [avatar, setAvatar] = useState(initialData?.avatar || "");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isExperienceModalOpen, setIsExperienceModalOpen] = useState(false);
+
+  const handleUploadPhoto = async () => {
+    try {
+      setIsUploadingPhoto(true);
+      const res = await pickAndUploadImage("services");
+      if (res && res.url) {
+        setAvatar(res.url);
+        Alert.alert(
+          "Photo Ready",
+          "Provider photo uploaded to Cloudinary (services/)",
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Notice", err?.message || "Could not upload image");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const [errors, setErrors] = useState<EnrollFormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -180,6 +203,7 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
       distance: distance.trim() || "Near you",
       description: description.trim(),
       availableToday,
+      avatar: avatar.trim(),
     };
 
     await onSubmit(formData);
@@ -444,7 +468,119 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
         />
       </View>
 
-      {/* 8. Submit Button */}
+      {/* 8. Provider / Technician Photo (Cloudinary services/ folder) */}
+      <View style={styles.formGroup}>
+        <View style={styles.labelRow}>
+          <Text style={[styles.label, { color: textPrimary }]}>
+            Profile / Workshop Photo{" "}
+            <Text style={{ fontSize: 11, fontWeight: "500", color: textMute }}>
+              (Cloudinary services/)
+            </Text>
+          </Text>
+        </View>
+
+        {avatar ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              padding: 10,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: border,
+              backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+            }}
+          >
+            <Image
+              source={{ uri: avatar }}
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 10,
+                backgroundColor: "#E2E8F0",
+              }}
+            />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: "700",
+                  color: textPrimary,
+                }}
+              >
+                Photo uploaded
+              </Text>
+              <Text style={{ fontSize: 11, color: textMute }} numberOfLines={1}>
+                {avatar}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setAvatar("")}
+              style={{
+                padding: 6,
+                borderRadius: 8,
+                backgroundColor: "rgba(239, 68, 68, 0.12)",
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 12,
+              borderWidth: 1.5,
+              borderColor: border,
+              borderStyle: "dashed",
+              backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+            }}
+            onPress={handleUploadPhoto}
+            disabled={isUploadingPhoto}
+            activeOpacity={0.8}
+          >
+            {isUploadingPhoto ? (
+              <>
+                <ActivityIndicator size="small" color={accentColor} />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: textPrimary,
+                  }}
+                >
+                  Uploading to Cloudinary...
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={20}
+                  color={accentColor}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: textPrimary,
+                  }}
+                >
+                  Upload Technician Photo
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 9. Submit Button */}
       <TouchableOpacity
         style={[
           styles.submitBtn,

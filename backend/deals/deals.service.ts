@@ -1,6 +1,7 @@
 import { User } from "../entities/User.entity";
 import {
   CreateDealInput,
+  UpdateDealInput,
   QueryDealsInput,
   ContactSellerInput,
 } from "./deals.schema";
@@ -187,4 +188,82 @@ export async function contactSeller(dealId: string, input: ContactSellerInput) {
     message: `Message sent to ${record.sellerName}!`,
     inquiry,
   };
+}
+
+export async function updateDeal(
+  dealId: string,
+  input: UpdateDealInput,
+  user?: User | any,
+): Promise<DealRecord> {
+  const deal = await dealsRepository.findById(dealId);
+  if (!deal) {
+    throw new Error("Deal not found");
+  }
+
+  // If user is authenticated and deal has owner, ensure they are owner
+  if (user?.id && deal.userId && deal.userId !== user.id) {
+    throw new Error("Unauthorized to edit this deal");
+  }
+
+  const updateData: any = {};
+  if (input.title !== undefined) updateData.title = input.title;
+  if (input.category !== undefined) updateData.category = input.category;
+  if (input.price !== undefined) {
+    updateData.price = input.price.startsWith("₹")
+      ? input.price
+      : `₹${input.price}`;
+    updateData.dealPrice =
+      parseFloat(String(input.price).replace(/[^0-9.]/g, "")) || 0;
+  }
+  if (input.originalPrice !== undefined) {
+    updateData.originalPrice = input.originalPrice
+      ? parseFloat(String(input.originalPrice).replace(/[^0-9.]/g, "")) ||
+        undefined
+      : undefined;
+  }
+  if (input.condition !== undefined) updateData.condition = input.condition;
+  if (input.location !== undefined) updateData.locationName = input.location;
+  if (input.sellerPhone !== undefined)
+    updateData.sellerPhone = input.sellerPhone;
+  if (input.description !== undefined)
+    updateData.description = input.description;
+  if (input.image !== undefined) updateData.image = input.image;
+  if (input.status !== undefined) updateData.status = input.status;
+  if (input.verified !== undefined) updateData.verified = input.verified;
+
+  await dealsRepository.update(deal.id, updateData);
+  const updated = await dealsRepository.findById(deal.id);
+  const record = dealsRepository.toRecord(updated || deal);
+
+  if (io) {
+    io.emit("deal_updated", record);
+    const allDeals = await listDeals({});
+    io.emit("deals_updated", allDeals);
+  }
+
+  return record;
+}
+
+export async function deleteDeal(
+  dealId: string,
+  user?: User | any,
+): Promise<boolean> {
+  const deal = await dealsRepository.findById(dealId);
+  if (!deal) {
+    return false;
+  }
+
+  if (user?.id && deal.userId && deal.userId !== user.id) {
+    throw new Error("Unauthorized to delete this deal");
+  }
+
+  await dealsRepository.delete(dealId);
+
+  if (io) {
+    io.emit("deal_deleted", { id: dealId });
+    const allDeals = await listDeals({});
+    io.emit("deals_updated", allDeals);
+  }
+
+  return true;
 }

@@ -3,6 +3,7 @@ import { localServicesRepository } from "../repositories/LocalServices.repositor
 import { LocalService } from "../entities/LocalService.entity";
 import {
   CreateServiceProInput,
+  UpdateServiceProInput,
   QueryServicesInput,
   BookServiceInput,
   UpdateBookingStatusInput,
@@ -12,6 +13,7 @@ import { sendExpoPushNotification } from "../notifications/notifications.service
 
 export interface ServiceProRecord {
   id: string;
+  providerId?: string;
   name: string;
   category: string;
   cluster?: string;
@@ -26,6 +28,8 @@ export interface ServiceProRecord {
   phone: string;
   description?: string;
   availableToday: boolean;
+  image?: string;
+  avatar?: string;
   createdAt: string;
 }
 
@@ -260,6 +264,8 @@ export async function createServicePro(
     rate: input.rate || "From ₹150 visit",
     avatarBg: input.avatarBg || "#EA580C",
     categoryIcon: input.categoryIcon || "construct",
+    image: input.image,
+    avatar: input.avatar,
     availableToday: input.availableToday ?? true,
     verified: input.verified ?? true,
     rating: 5.0,
@@ -283,6 +289,72 @@ export async function createServicePro(
   }
 
   return newPro;
+}
+
+export async function updateServicePro(
+  id: string,
+  input: UpdateServiceProInput,
+  user?: User | any,
+): Promise<ServiceProRecord | null> {
+  const existing = await localServicesRepository.findById(id);
+  if (!existing) {
+    return null;
+  }
+
+  const updateData: any = {};
+  if (input.name !== undefined) {
+    updateData.name = input.name;
+    updateData.title = input.name;
+  }
+  if (input.category !== undefined) updateData.category = input.category;
+  if (input.cluster !== undefined) updateData.cluster = input.cluster;
+  if (input.categoryIcon !== undefined)
+    updateData.categoryIcon = input.categoryIcon;
+  if (input.experience !== undefined) updateData.experience = input.experience;
+  if (input.distance !== undefined) updateData.locationName = input.distance;
+  if (input.rate !== undefined) updateData.rate = input.rate;
+  if (input.phone !== undefined) updateData.phone = input.phone;
+  if (input.description !== undefined)
+    updateData.description = input.description;
+  if (input.availableToday !== undefined)
+    updateData.availableToday = input.availableToday;
+  if (input.image !== undefined) updateData.image = input.image;
+  if (input.avatar !== undefined) updateData.avatar = input.avatar;
+  if (input.avatarBg !== undefined) updateData.avatarBg = input.avatarBg;
+  if (input.verified !== undefined) updateData.verified = input.verified;
+
+  const updatedEntity = await localServicesRepository.updateService(
+    id,
+    updateData,
+  );
+  if (!updatedEntity) return null;
+
+  const updatedPro = localServicesRepository.toRecord(updatedEntity);
+
+  if (io) {
+    io.emit("service_pro_updated", updatedPro);
+    const allPros = (await localServicesRepository.findAllServices()).map((p) =>
+      localServicesRepository.toRecord(p),
+    );
+    io.emit("service_pros_updated", allPros);
+  }
+
+  return updatedPro;
+}
+
+export async function deleteServicePro(
+  id: string,
+  user?: User | any,
+): Promise<boolean> {
+  const success = await localServicesRepository.deleteService(id);
+  if (success && io) {
+    io.emit("service_pro_deleted", { id });
+    const allPros = (await localServicesRepository.findAllServices()).map((p) =>
+      localServicesRepository.toRecord(p),
+    );
+    io.emit("service_pros_updated", allPros);
+  }
+  return success;
 }
 
 export async function bookService(

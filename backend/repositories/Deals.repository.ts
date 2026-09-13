@@ -162,6 +162,20 @@ export class DealsRepository extends BaseRepository<LocalDeal> {
 
     return super.update(criteria, data);
   }
+
+  override async delete(criteria: string | number | any) {
+    if (!this.isConnected) {
+      const idStr =
+        typeof criteria === "object" ? (criteria as any).id : String(criteria);
+      const initLen = this.fallbackStore.length;
+      this.fallbackStore = this.fallbackStore.filter((d) => d.id !== idStr);
+      return {
+        raw: [],
+        affected: this.fallbackStore.length < initLen ? 1 : 0,
+      } as any;
+    }
+    return super.delete(criteria);
+  }
 }
 
 export const dealsRepository = new DealsRepository();

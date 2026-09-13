@@ -19,6 +19,7 @@ import localservicesRoutes from "./localservices/localservices.routes";
 import glamupRoutes from "./glamup/glamup.routes";
 import dealsRoutes from "./deals/deals.routes";
 import universalNeedRoutes from "./universalneed/universalneed.routes";
+import cloudinaryRoutes from "./cloudinary/cloudinary.routes";
 
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
@@ -99,7 +100,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Support up to 50mb image payloads for high-resolution Cloudinary image uploads
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // CORS middleware to enable seamless local mobile / emulator / web development
   app.use((req, res, next) => {
@@ -114,7 +117,7 @@ async function startServer() {
     res.header("Access-Control-Allow-Credentials", "true");
     res.header(
       "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     );
     res.header(
       "Access-Control-Allow-Headers",
@@ -172,6 +175,8 @@ async function startServer() {
   app.use("/api/glamup", glamupRoutes);
   app.use("/api/deals", dealsRoutes);
   app.use("/api/universal-need", universalNeedRoutes);
+  app.use("/api/upload", cloudinaryRoutes);
+  app.use("/api/cloudinary", cloudinaryRoutes);
 
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);

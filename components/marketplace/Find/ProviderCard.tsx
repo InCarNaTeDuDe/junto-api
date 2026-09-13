@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarketplaceProvider } from "../types";
@@ -12,6 +13,7 @@ import { MarketplaceProvider } from "../types";
 interface ProviderCardProps {
   provider: MarketplaceProvider;
   onSelect: (provider: MarketplaceProvider) => void;
+  onEdit?: (provider: MarketplaceProvider) => void;
   accentColor?: string;
   actionButtonText?: string;
   actionButtonIcon?: keyof typeof Ionicons.glyphMap;
@@ -21,6 +23,7 @@ interface ProviderCardProps {
 export const ProviderCard: React.FC<ProviderCardProps> = ({
   provider,
   onSelect,
+  onEdit,
   accentColor = "#EA580C",
   actionButtonText = "Book Doorstep",
   actionButtonIcon = "calendar-outline",
@@ -38,24 +41,36 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
     }
   };
 
+  const providerPhoto = (provider as any).avatar || (provider as any).image;
+
   return (
     <View
       style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
     >
       {/* Top row: Avatar + Name + Category + Rating */}
       <View style={styles.topRow}>
-        <View
-          style={[
-            styles.avatar,
-            { backgroundColor: provider.avatarBg || accentColor },
-          ]}
-        >
-          <Ionicons
-            name={(provider.categoryIcon as any) || "construct"}
-            size={22}
-            color="#FFFFFF"
+        {providerPhoto ? (
+          <Image
+            source={{ uri: providerPhoto }}
+            style={[
+              styles.avatar,
+              { backgroundColor: provider.avatarBg || accentColor },
+            ]}
           />
-        </View>
+        ) : (
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: provider.avatarBg || accentColor },
+            ]}
+          >
+            <Ionicons
+              name={(provider.categoryIcon as any) || "construct"}
+              size={22}
+              color="#FFFFFF"
+            />
+          </View>
+        )}
 
         <View style={styles.infoCol}>
           <View style={styles.nameRow}>
@@ -152,6 +167,24 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         </View>
 
         <View style={styles.btnRow}>
+          {onEdit && (
+            <TouchableOpacity
+              style={[
+                styles.callBtn,
+                {
+                  borderColor: accentColor,
+                  backgroundColor: isDark
+                    ? "rgba(147, 51, 234, 0.18)"
+                    : "#F3E8FF",
+                },
+              ]}
+              onPress={() => onEdit(provider)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="pencil" size={14} color={accentColor} />
+            </TouchableOpacity>
+          )}
+
           {provider.phone ? (
             <TouchableOpacity
               style={[

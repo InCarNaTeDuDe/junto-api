@@ -220,6 +220,12 @@ export class LocalService {
   @Column({ type: "varchar", length: 50, default: "construct" })
   categoryIcon?: string;
 
+  @Column({ type: "text", nullable: true })
+  image?: string;
+
+  @Column({ type: "text", nullable: true })
+  avatar?: string;
+
   @Column({ type: "boolean", default: true })
   availableToday?: boolean;
 
