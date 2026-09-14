@@ -49,6 +49,12 @@ export const UpdateRideSchema = z.object({
   status: z
     .enum(["active", "in_progress", "completed", "cancelled"])
     .optional(),
+  from: z.string().trim().min(2).max(120).optional(),
+  to: z.string().trim().min(2).max(120).optional(),
+  time: z.string().trim().min(2).max(100).optional(),
+  price: z.coerce.number().min(0).max(5000).optional(),
+  vehicleType: z.enum(["car", "bike"]).optional(),
+  totalSeats: z.number().int().min(1).max(8).optional(),
   seatsLeft: z.number().int().min(0).max(8).optional(),
   notes: z.string().trim().max(300).optional(),
   vehicleModel: z.string().trim().max(120).optional(),

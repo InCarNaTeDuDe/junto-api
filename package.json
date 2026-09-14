@@ -94,6 +94,7 @@
     "babel-preset-expo": "~54.0.11",
     "concurrently": "^10.0.3",
     "esbuild": "^0.25.0",
+    "knip": "^6.35.1",
     "metro": "^0.83.1",
     "metro-resolver": "~0.83.1",
     "ts-node": "^10.9.2",

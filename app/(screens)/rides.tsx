@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -23,14 +23,9 @@ import {
 } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
-import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 import { useAuthContext } from "@/context/AuthContext";
-import RideSequentialStepper from "@/components/rides/RideSequentialStepper";
-
-const CAR_ICON_IMG = require("@/assets/screens/purple_car_image.png");
-const BIKE_ICON_IMG = require("@/assets/screens/purple_bike_image.png");
 
 export interface RidePassenger {
   id?: string;
@@ -43,17 +38,7 @@ export interface RidePassenger {
   joinedAt: string;
 }
 
-interface ConfirmDialogState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmText?: string;
-  cancelText?: string;
-  confirmStyle?: "destructive" | "primary";
-  onConfirm: () => void;
-}
-
-interface RideItem {
+export interface RideItem {
   id: string;
   userId?: string;
   driverId?: string;
@@ -69,8 +54,8 @@ interface RideItem {
   price: number | string;
   verified: boolean;
   notes?: string;
+  date?: string;
   passengers?: RidePassenger[];
-  // Safety & Vehicle details
   vehicleModel?: string;
   registrationNumber?: string;
   pickupLocation?: string;
@@ -80,35 +65,30 @@ interface RideItem {
   currentLongitude?: number;
   lastGpsUpdatedAt?: string;
   isGpsActive?: boolean;
-  ratings?: Array<{
-    id?: string;
-    fromUserId: string;
-    fromUserName: string;
-    toRole?: "driver" | "passenger";
-    rating: number;
-    review?: string;
-    tags?: string[];
-    createdAt: string;
-  }>;
-  reports?: Array<{
-    id?: string;
-    reportedByUserId: string;
-    reportedByName: string;
-    category: string;
-    description: string;
-    createdAt: string;
-  }>;
 }
 
-const PRESET_ROUTES = [
-  { from: "Hitec City", to: "Gachibowli" },
-  { from: "Madhapur", to: "Financial District" },
-  { from: "Kondapur", to: "Jubilee Hills" },
-  { from: "Kukatpally", to: "Hitec City" },
-  { from: "Secunderabad", to: "Begumpet" },
+const POPULAR_LOCATIONS = [
+  "Hitec City Cyber Towers",
+  "Gachibowli Wipro Circle",
+  "Madhapur Metro Station",
+  "Financial District WaveRock",
+  "Kondapur Botanical Garden",
+  "Kukatpally KPHB",
+  "Jubilee Hills Checkpost",
+  "Secunderabad Station",
 ];
 
-const SEAT_PRESETS = { car: [1, 2, 3, 4], bike: [1] };
+/**
+ * Capitalizes every word in a string (e.g. "hyderabad" -> "Hyderabad", "hitec city" -> "Hitec City")
+ */
+export const toTitleCase = (text: string): string => {
+  if (!text) return "";
+  return text.replace(/(^|[\s,.\-\/()]+)([a-z])/gi, (match) => {
+    const lastChar = match.slice(-1);
+    const prefix = match.slice(0, -1);
+    return prefix + lastChar.toUpperCase();
+  });
+};
 
 export default function RidesScreen() {
   const router = useRouter();
@@ -118,26 +98,74 @@ export default function RidesScreen() {
   const { user } = useAuthContext();
   const cityName = selectedLocation?.name || "Hyderabad";
 
-  const [activeTab, setActiveTab] = useState<"find" | "offer">("find");
+  // Tab State: 'find' | 'offer' | 'my_rides'
+  const [activeTab, setActiveTab] = useState<"find" | "offer" | "my_rides">(
+    "find",
+  );
   const [vehicleFilter, setVehicleFilter] = useState<"all" | "car" | "bike">(
     "all",
   );
-  const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [selectedRideForParticipants, setSelectedRideForParticipants] =
-    useState<RideItem | null>(null);
-  const [isConfirmingPassenger, setIsConfirmingPassenger] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
+
+  // Offer Ride Form State (Clean, simple, no verification)
+  const [offerPickup, setOfferPickup] = useState("");
+  const [offerDrop, setOfferDrop] = useState("");
+  const [offerVehicleType, setOfferVehicleType] = useState<"car" | "bike">(
+    "car",
+  );
+  const [offerVehicleNumber, setOfferVehicleNumber] = useState("");
+  const [offerVehicleModel, setOfferVehicleModel] = useState("");
+  const [offerSeats, setOfferSeats] = useState<number>(3);
+  const [offerPrice, setOfferPrice] = useState<string>("");
+  const [offerNotes, setOfferNotes] = useState("");
+
+  // Departure Date & Time State
+  const [departureDate, setDepartureDate] = useState<Date>(new Date());
+  const [departureTime, setDepartureTime] = useState<Date>(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 30);
+    return d;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Edit Ride Modal State
+  const [editModalRide, setEditModalRide] = useState<RideItem | null>(null);
+  const [editPickup, setEditPickup] = useState("");
+  const [editDrop, setEditDrop] = useState("");
+  const [editVehicleType, setEditVehicleType] = useState<"car" | "bike">("car");
+  const [editVehicleNumber, setEditVehicleNumber] = useState("");
+  const [editVehicleModel, setEditVehicleModel] = useState("");
+  const [editSeats, setEditSeats] = useState<number>(3);
+  const [editPrice, setEditPrice] = useState<string>("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editDepartureDate, setEditDepartureDate] = useState<Date>(new Date());
+  const [editDepartureTime, setEditDepartureTime] = useState<Date>(new Date());
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [showEditTimePicker, setShowEditTimePicker] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Action loaders
+  const [actionLoadingRideId, setActionLoadingRideId] = useState<string | null>(
     null,
   );
-  const [isDeletingRide, setIsDeletingRide] = useState<string | null>(null);
-  const [isCancellingSeat, setIsCancellingSeat] = useState<string | null>(null);
-  const [myRequestedRideIds, setMyRequestedRideIds] = useState<Set<string>>(
-    new Set(),
-  );
 
+  // Rating Modal
+  const [ratingModalRide, setRatingModalRide] = useState<RideItem | null>(null);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingReview, setRatingReview] = useState("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
+  // Delete Ride Confirmation Modal
+  const [deleteConfirmRide, setDeleteConfirmRide] = useState<RideItem | null>(
+    null,
+  );
+  const [isDeletingRide, setIsDeletingRide] = useState(false);
+
+  // Check if current user is owner of a ride
   const checkIsRideOwner = useCallback(
     (ride: RideItem) => {
       if (!ride) return false;
@@ -171,6 +199,7 @@ export default function RidesScreen() {
     [user?.id, user?.name],
   );
 
+  // Check if current user requested or joined a ride
   const getUserSeatRequest = useCallback(
     (ride: RideItem): RidePassenger | undefined => {
       if (!ride?.passengers || !Array.isArray(ride.passengers))
@@ -193,194 +222,16 @@ export default function RidesScreen() {
     [user?.id, user?.name],
   );
 
-  const hasUserRequested = useCallback(
-    (ride: RideItem) => {
-      if (myRequestedRideIds.has(ride.id)) return true;
-      return !!getUserSeatRequest(ride);
-    },
-    [myRequestedRideIds, getUserSeatRequest],
-  );
-
-  const handleConfirmPassenger = async (
-    rideId: string,
-    passengerUserId: string,
-  ) => {
-    try {
-      setIsConfirmingPassenger(true);
-      const res = await ApiService.post<{
-        success: boolean;
-        message: string;
-        ride: RideItem;
-      }>(`/api/rides/${rideId}/passengers/${passengerUserId}/confirm`, {});
-
-      if (res?.success) {
-        if (res.ride) {
-          setRidesList((prev) =>
-            prev.map((r) => (r.id === rideId ? { ...r, ...res.ride } : r)),
-          );
-          setSelectedRideForParticipants((prev) =>
-            prev && prev.id === rideId ? { ...prev, ...res.ride } : prev,
-          );
-        } else {
-          setSelectedRideForParticipants((prev) => {
-            if (!prev || prev.id !== rideId) return prev;
-            const updatedPassengers = (prev.passengers || []).map((p) =>
-              p.userId === passengerUserId
-                ? { ...p, status: "confirmed" as const }
-                : p,
-            );
-            return {
-              ...prev,
-              seatsLeft: Math.max(0, (prev.seatsLeft ?? 1) - 1),
-              passengers: updatedPassengers,
-            };
-          });
-          fetchRides();
-        }
-        Alert.alert(
-          "Co-Rider Confirmed",
-          res.message ||
-            "Passenger seat confirmed! Push notification sent to co-rider.",
-        );
-      }
-    } catch (err: any) {
-      Alert.alert(
-        "Could Not Confirm",
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to confirm co-rider.",
-      );
-    } finally {
-      setIsConfirmingPassenger(false);
-    }
-  };
-
-  const handleCancelSeatRequest = (ride: RideItem) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Cancel Seat Request",
-      message: `Are you sure you want to cancel your seat request for ${ride.from} ➔ ${ride.to}?`,
-      confirmText: "YES",
-      cancelText: "NO",
-      confirmStyle: "destructive",
-      onConfirm: async () => {
-        try {
-          setIsCancellingSeat(ride.id);
-          const res = await ApiService.post<{
-            success: boolean;
-            message: string;
-            ride: RideItem;
-          }>(`/api/rides/${ride.id}/cancel-seat`, {});
-
-          setMyRequestedRideIds((prev) => {
-            const next = new Set(prev);
-            next.delete(ride.id);
-            return next;
-          });
-
-          if (res?.ride) {
-            setRidesList((prev) =>
-              prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
-            );
-          } else {
-            setRidesList((prev) =>
-              prev.map((r) => {
-                if (r.id !== ride.id) return r;
-                const req = getUserSeatRequest(r);
-                const restoredSeats =
-                  req?.status === "confirmed" ? req.seats || 1 : 0;
-                return {
-                  ...r,
-                  seatsLeft: Math.min(
-                    r.totalSeats || (r.vehicleType === "bike" ? 1 : 2),
-                    r.seatsLeft + restoredSeats,
-                  ),
-                  passengers: (r.passengers || []).filter(
-                    (p) =>
-                      p.userId !== user?.id &&
-                      p.userName?.trim().toLowerCase() !==
-                        user?.name?.trim().toLowerCase(),
-                  ),
-                };
-              }),
-            );
-          }
-          Alert.alert(
-            "Seat Cancelled",
-            res?.message || "Your seat request has been cancelled.",
-          );
-        } catch (err: any) {
-          Alert.alert(
-            "Could Not Cancel",
-            err?.response?.data?.message ||
-              err?.message ||
-              "Failed to cancel seat request. Please try again.",
-          );
-        } finally {
-          setIsCancellingSeat(null);
-        }
-      },
-    });
-  };
-
-  const handleDeleteRide = (ride: RideItem) => {
-    if (!checkIsRideOwner(ride)) {
-      Alert.alert(
-        "Permission Denied",
-        "Only the creator of this ride can delete it.",
-      );
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Ride",
-      message: `Are you sure you want to delete this ride (${ride.from} ➔ ${ride.to})? This action cannot be undone.`,
-      confirmText: "YES",
-      cancelText: "NO",
-      confirmStyle: "destructive",
-      onConfirm: async () => {
-        try {
-          setIsDeletingRide(ride.id);
-          const res = await ApiService.delete<{
-            success: boolean;
-            message: string;
-          }>(`/api/rides/${ride.id}`);
-
-          setRidesList((prev) => prev.filter((r) => r.id !== ride.id));
-          setSelectedRideForParticipants((prev) =>
-            prev?.id === ride.id ? null : prev,
-          );
-
-          Alert.alert(
-            "Ride Deleted",
-            res?.message || "Your ride offer has been removed.",
-          );
-        } catch (err: any) {
-          Alert.alert(
-            "Delete Failed",
-            err?.response?.data?.message ||
-              err?.message ||
-              "Unable to delete ride.",
-          );
-        } finally {
-          setIsDeletingRide(null);
-        }
-      },
-    });
-  };
-
   // Fetch real-time rides from backend
   const fetchRides = async () => {
     try {
       setIsLoading(true);
-
       const res = await ApiService.get<{
         success: boolean;
         data: RideItem[];
       }>("/api/rides");
 
-      if (res?.success) {
+      if (res?.success && Array.isArray(res.data)) {
         setRidesList(res.data);
       }
     } catch (err) {
@@ -395,37 +246,12 @@ export default function RidesScreen() {
 
     const refreshRides = () => fetchRides();
 
-    const handleLocationUpdate = (data: {
-      rideId: string;
-      latitude: number;
-      longitude: number;
-      speed?: number;
-      heading?: number;
-      lastGpsUpdatedAt?: string;
-    }) => {
-      setRidesList((prev) =>
-        prev.map((r) =>
-          r.id === data.rideId
-            ? {
-                ...r,
-                currentLatitude: data.latitude,
-                currentLongitude: data.longitude,
-                lastGpsUpdatedAt:
-                  data.lastGpsUpdatedAt || new Date().toISOString(),
-                isGpsActive: true,
-              }
-            : r,
-        ),
-      );
-    };
-
     socket.on("ride_created", refreshRides);
     socket.on("rides_updated", refreshRides);
     socket.on("ride_updated", refreshRides);
     socket.on("ride_deleted", refreshRides);
     socket.on("ride_started", refreshRides);
     socket.on("ride_completed", refreshRides);
-    socket.on("ride_location_updated", handleLocationUpdate);
 
     return () => {
       socket.off("ride_created", refreshRides);
@@ -434,211 +260,537 @@ export default function RidesScreen() {
       socket.off("ride_deleted", refreshRides);
       socket.off("ride_started", refreshRides);
       socket.off("ride_completed", refreshRides);
-      socket.off("ride_location_updated", handleLocationUpdate);
     };
   }, []);
 
-  // Safety System State
-  const [safetyModalRide, setSafetyModalRide] = useState<RideItem | null>(null);
-  const [ratingModalRide, setRatingModalRide] = useState<RideItem | null>(null);
-  const [ratingScore, setRatingScore] = useState<number>(5);
-  const [ratingReview, setRatingReview] = useState<string>("");
-  const [selectedRatingTags, setSelectedRatingTags] = useState<string[]>([]);
-  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+  // Format date and time
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
-  const [reportModalRide, setReportModalRide] = useState<RideItem | null>(null);
-  const [reportCategory, setReportCategory] = useState<string>(
-    "Rash or Reckless Driving",
-  );
-  const [reportDescription, setReportDescription] = useState<string>("");
-  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
+  const formatTime = (time: Date) => {
+    return time.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
 
-  const [driverProfileModalRide, setDriverProfileModalRide] =
-    useState<RideItem | null>(null);
+  const formatDeparture = (date: Date, time: Date) => {
+    const dStr = date.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    const tStr = time.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return `${dStr} at ${tStr}`;
+  };
 
-  // Offer Vehicle Details State
-  const [offerVehicleModel, setOfferVehicleModel] = useState("");
-  const [offerRegNumber, setOfferRegNumber] = useState("");
-  const [offerPickupPoint, setOfferPickupPoint] = useState("");
-  const [offerDropPoint, setOfferDropPoint] = useState("");
+  const onDateChange = (_: any, selectedDate?: Date) => {
+    if (Platform.OS !== "web") setShowDatePicker(false);
+    if (selectedDate) {
+      setDepartureDate(selectedDate);
+    }
+  };
 
-  // Active in-progress ride owned by current user for GPS streaming
-  const activeDriverRide = ridesList.find(
-    (r) => checkIsRideOwner(r) && r.status === "in_progress",
-  );
+  const onTimeChange = (_: any, selectedTime?: Date) => {
+    if (Platform.OS !== "web") setShowTimePicker(false);
+    if (selectedTime) {
+      setDepartureTime(selectedTime);
+    }
+  };
 
-  // GPS Tracking Loop: 15-30s intervals with battery/network optimizations
-  useEffect(() => {
-    if (!activeDriverRide) return;
+  // Switch vehicle type
+  const handleVehicleTypeChange = (type: "car" | "bike") => {
+    setOfferVehicleType(type);
+    if (type === "bike") {
+      setOfferSeats(1);
+    } else if (offerSeats < 2) {
+      setOfferSeats(3);
+    }
+  };
 
-    let isSubscribed = true;
-    let lastCoords: { lat: number; lng: number } | null = null;
-    let intervalTimer: any = null;
+  // Publish / Offer Ride
+  const handlePublishRide = async () => {
+    const pickup = offerPickup.trim();
+    const drop = offerDrop.trim();
+    const vehicleNum = offerVehicleNumber.trim().toUpperCase();
 
-    const transmitLocation = async (
-      latitude: number,
-      longitude: number,
-      speed?: number,
-      heading?: number,
-    ) => {
-      if (!isSubscribed || !activeDriverRide) return;
+    if (!pickup) {
+      Alert.alert("Missing Pickup", "Please enter your pickup location.");
+      return;
+    }
+    if (!drop) {
+      Alert.alert("Missing Drop Location", "Please enter your drop location.");
+      return;
+    }
+    if (!vehicleNum) {
+      Alert.alert(
+        "Vehicle Number Required",
+        "Please enter your vehicle registration number (e.g. TS 09 EA 1234). No verification needed.",
+      );
+      return;
+    }
 
-      // Battery & Network Optimization:
-      // Skip updates if coordinate movement is negligible (< ~17m) to save phone battery on long traffic stops or highway cruises
-      if (lastCoords) {
-        const deltaLat = Math.abs(latitude - lastCoords.lat);
-        const deltaLng = Math.abs(longitude - lastCoords.lng);
-        if (deltaLat < 0.00015 && deltaLng < 0.00015) {
-          return;
-        }
-      }
+    const priceNum = parseFloat(offerPrice.replace(/[^0-9.]/g, "")) || 0;
+    const departureStr = formatDeparture(departureDate, departureTime);
 
-      try {
-        lastCoords = { lat: latitude, lng: longitude };
-        await ApiService.post(`/api/rides/${activeDriverRide.id}/location`, {
-          latitude,
-          longitude,
-          speed,
-          heading,
-        });
-      } catch (err) {
-        console.log("GPS sync non-fatal blip:", err);
-      }
-    };
-
-    const captureAndSend = () => {
-      if (typeof navigator !== "undefined" && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (!isSubscribed) return;
-            transmitLocation(
-              pos.coords.latitude,
-              pos.coords.longitude,
-              pos.coords.speed ?? undefined,
-              pos.coords.heading ?? undefined,
-            );
-          },
-          (err) => {
-            console.log("GPS location notice:", err.message);
-          },
-          {
-            // Low-power optimized geolocation options
-            enableHighAccuracy: false,
-            timeout: 12000,
-            maximumAge: 15000, // Reuses cached position within 15 seconds to conserve battery
-          },
-        );
-      }
-    };
-
-    // Immediate initial sync upon ride start
-    captureAndSend();
-
-    // 20-second interval (fits precisely within 15–30s user requirement)
-    intervalTimer = setInterval(captureAndSend, 20000);
-
-    return () => {
-      isSubscribed = false;
-      if (intervalTimer) clearInterval(intervalTimer);
-    };
-  }, [activeDriverRide?.id, activeDriverRide?.status]);
-
-  const handleStartRide = async (ride: RideItem) => {
     try {
+      setIsPublishing(true);
+      const payload = {
+        from: pickup,
+        to: drop,
+        pickupLocation: pickup,
+        dropLocation: drop,
+        time: departureStr,
+        vehicleType: offerVehicleType,
+        registrationNumber: vehicleNum,
+        vehicleModel:
+          offerVehicleModel.trim() ||
+          (offerVehicleType === "car" ? "Car" : "Two-Wheeler"),
+        seatsLeft: offerSeats,
+        totalSeats: offerSeats,
+        price: priceNum,
+        notes: offerNotes.trim() || undefined,
+        verified: true,
+      };
+
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        data?: RideItem;
+        ride?: RideItem;
+      }>("/api/rides", payload);
+
+      const createdRide = res?.data || res?.ride;
+      if (createdRide) {
+        setRidesList((prev) => [createdRide, ...prev]);
+      } else {
+        await fetchRides();
+      }
+
+      // Reset form
+      setOfferPickup("");
+      setOfferDrop("");
+      setOfferVehicleNumber("");
+      setOfferVehicleModel("");
+      setOfferNotes("");
+      setOfferPrice("");
+      setOfferSeats(offerVehicleType === "car" ? 3 : 1);
+
+      // Immediately land on browse rides tab
+      setActiveTab("find");
+
+      Alert.alert(
+        "Ride Offered! 🎉",
+        "Your ride post is now live in the browse feed for commuters nearby.",
+        [{ text: "OK" }],
+      );
+    } catch (err: any) {
+      Alert.alert(
+        "Could Not Offer Ride",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Please check your details and try again.",
+      );
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  // Open Edit Ride Modal with prefilled values
+  const openEditRideModal = (ride: RideItem) => {
+    setEditModalRide(ride);
+    setEditPickup(ride.pickupLocation || ride.from || "");
+    setEditDrop(ride.dropLocation || ride.to || "");
+    setEditVehicleType(ride.vehicleType || "car");
+    setEditVehicleNumber(ride.registrationNumber || "");
+    setEditVehicleModel(ride.vehicleModel || "");
+    setEditSeats(ride.seatsLeft ?? (ride.vehicleType === "bike" ? 1 : 3));
+    setEditPrice(
+      ride.price !== undefined && ride.price !== null ? String(ride.price) : "",
+    );
+    setEditNotes(ride.notes || "");
+    setEditDepartureDate(new Date());
+    const nextTime = new Date();
+    nextTime.setMinutes(nextTime.getMinutes() + 30);
+    setEditDepartureTime(nextTime);
+    setShowEditDatePicker(false);
+    setShowEditTimePicker(false);
+  };
+
+  const onEditDateChange = (_: any, selectedDate?: Date) => {
+    if (Platform.OS !== "web") setShowEditDatePicker(false);
+    if (selectedDate) {
+      setEditDepartureDate(selectedDate);
+    }
+  };
+
+  const onEditTimeChange = (_: any, selectedTime?: Date) => {
+    if (Platform.OS !== "web") setShowEditTimePicker(false);
+    if (selectedTime) {
+      setEditDepartureTime(selectedTime);
+    }
+  };
+
+  // Save changes to edited ride
+  const handleSaveEditRide = async () => {
+    if (!editModalRide) return;
+    const pickup = editPickup.trim();
+    const drop = editDrop.trim();
+    const vehicleNum = editVehicleNumber.trim().toUpperCase();
+
+    if (!pickup) {
+      Alert.alert("Pickup Required", "Please enter your pickup location.");
+      return;
+    }
+    if (!drop) {
+      Alert.alert("Drop Location Required", "Please enter your drop location.");
+      return;
+    }
+    if (!vehicleNum) {
+      Alert.alert(
+        "Vehicle Number Required",
+        "Please enter your vehicle registration number.",
+      );
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, "")) || 0;
+      const formattedTime = formatDeparture(
+        editDepartureDate,
+        editDepartureTime,
+      );
+
+      const payload = {
+        from: pickup,
+        to: drop,
+        pickupLocation: pickup,
+        dropLocation: drop,
+        vehicleType: editVehicleType,
+        vehicleModel: editVehicleModel.trim() || undefined,
+        registrationNumber: vehicleNum,
+        seatsLeft: editSeats,
+        totalSeats: editSeats,
+        price: priceNum,
+        time: formattedTime,
+        notes: editNotes.trim() || undefined,
+      };
+
+      const res = await ApiService.patch<{
+        success: boolean;
+        message: string;
+        data?: RideItem;
+        ride?: RideItem;
+      }>(`/api/rides/${editModalRide.id}`, payload);
+
+      const updatedRide = res?.data || res?.ride;
+
+      setRidesList((prev) =>
+        prev.map((r) =>
+          r.id === editModalRide.id
+            ? { ...r, ...payload, ...(updatedRide || {}) }
+            : r,
+        ),
+      );
+
+      setEditModalRide(null);
+      Alert.alert("Ride Updated! ✅", "Your ride details have been updated.");
+    } catch (err: any) {
+      Alert.alert(
+        "Update Failed",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not update ride details.",
+      );
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Request a seat on a ride
+  const handleRequestSeat = async (ride: RideItem) => {
+    if (checkIsRideOwner(ride)) {
+      Alert.alert("Your Ride", "You are the driver of this ride.");
+      return;
+    }
+    if (ride.seatsLeft <= 0) {
+      Alert.alert("Ride Full", "There are no remaining seats on this ride.");
+      return;
+    }
+
+    try {
+      setActionLoadingRideId(ride.id);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${ride.id}/join`, {
+        seatsRequested: 1,
+        pickupPoint: ride.pickupLocation || ride.from,
+      });
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+
+      Alert.alert(
+        "Seat Requested! 🚗",
+        "Your request has been sent to the driver. You will see it under 'My Rides'.",
+        [
+          { text: "Go to My Rides", onPress: () => setActiveTab("my_rides") },
+          { text: "OK" },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert(
+        "Request Failed",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not request seat.",
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
+  // Cancel seat request (for passenger)
+  const handleCancelSeat = (ride: RideItem) => {
+    Alert.alert(
+      "Cancel Seat Request",
+      `Cancel your seat request for ${ride.from} ➔ ${ride.to}?`,
+      [
+        { text: "Keep Request", style: "cancel" },
+        {
+          text: "Cancel Request",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setActionLoadingRideId(ride.id);
+              await ApiService.post(`/api/rides/${ride.id}/cancel-seat`, {});
+              await fetchRides();
+              Alert.alert("Cancelled", "Your seat request has been cancelled.");
+            } catch (err: any) {
+              Alert.alert(
+                "Error",
+                err?.response?.data?.message ||
+                  err?.message ||
+                  "Failed to cancel seat.",
+              );
+            } finally {
+              setActionLoadingRideId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Confirm / Accept a passenger (for driver)
+  const handleAcceptPassenger = async (
+    rideId: string,
+    passengerUserId: string,
+  ) => {
+    try {
+      setActionLoadingRideId(rideId);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${rideId}/passengers/${passengerUserId}/confirm`, {});
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === rideId ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+      Alert.alert("Co-Rider Confirmed ✓", "Seat confirmed for this co-rider!");
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to confirm passenger.",
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
+  // Start ride (for driver)
+  const handleStartRide = async (ride: RideItem) => {
+    const confirmedCount = (ride.passengers || []).filter(
+      (p) => p.status === "confirmed",
+    ).length;
+
+    if (confirmedCount === 0) {
+      Alert.alert(
+        "No Co-Riders Confirmed",
+        "You don't have any confirmed co-riders on this trip yet. Once a passenger requests and you confirm them, you can start the ride.",
+      );
+      return;
+    }
+
+    try {
+      setActionLoadingRideId(ride.id);
       const res = await ApiService.post<{
         success: boolean;
         message: string;
         ride: RideItem;
       }>(`/api/rides/${ride.id}/start`, {});
 
-      if (res?.success) {
+      if (res?.ride) {
         setRidesList((prev) =>
-          prev.map((r) =>
-            r.id === ride.id
-              ? {
-                  ...r,
-                  status: "in_progress",
-                  isGpsActive: true,
-                  lastGpsUpdatedAt: new Date().toISOString(),
-                }
-              : r,
-          ),
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
         );
-        Alert.alert(
-          "Trip Started 🟢",
-          "Live GPS safety tracking is now active. Passengers can monitor your live journey in real-time.",
-        );
+      } else {
+        await fetchRides();
       }
+      Alert.alert(
+        "Ride Started 🟢",
+        "Your trip is now active with your co-rider(s). Emergency controls and safety sharing are now active.",
+      );
     } catch (err: any) {
       Alert.alert(
-        "Could Not Start Ride",
-        err?.response?.data?.message || err?.message || "Please try again.",
+        "Could Not Start",
+        err?.response?.data?.message || err?.message || "Unable to start ride.",
       );
+    } finally {
+      setActionLoadingRideId(null);
     }
   };
 
-  const handleCompleteRide = async (ride: RideItem) => {
+  // End ride (for driver)
+  const handleEndRide = async (ride: RideItem) => {
+    Alert.alert(
+      "End Ride",
+      "Have you reached the destination and completed the trip?",
+      [
+        { text: "Continue Trip", style: "cancel" },
+        {
+          text: "End Ride",
+          style: "default",
+          onPress: async () => {
+            try {
+              setActionLoadingRideId(ride.id);
+              const res = await ApiService.post<{
+                success: boolean;
+                message: string;
+                ride: RideItem;
+              }>(`/api/rides/${ride.id}/complete`, {});
+
+              if (res?.ride) {
+                setRidesList((prev) =>
+                  prev.map((r) =>
+                    r.id === ride.id ? { ...r, ...res.ride } : r,
+                  ),
+                );
+              } else {
+                await fetchRides();
+              }
+
+              Alert.alert(
+                "Trip Completed ✅",
+                "Destination reached safely! Would you like to rate your co-riders?",
+                [
+                  {
+                    text: "Rate Co-Rider",
+                    onPress: () => {
+                      setRatingModalRide(ride);
+                      setRatingScore(5);
+                      setRatingReview("");
+                    },
+                  },
+                  { text: "Done", style: "cancel" },
+                ],
+              );
+            } catch (err: any) {
+              Alert.alert(
+                "Error",
+                err?.response?.data?.message ||
+                  err?.message ||
+                  "Failed to end ride.",
+              );
+            } finally {
+              setActionLoadingRideId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Delete ride (opens custom UI confirmation modal instead of Alert)
+  const handleDeleteRide = (ride: RideItem) => {
+    setDeleteConfirmRide(ride);
+  };
+
+  // Confirm delete handler executed inside the UI modal
+  const handleConfirmDeleteRide = async () => {
+    if (!deleteConfirmRide) return;
     try {
-      const res = await ApiService.post<{
-        success: boolean;
-        message: string;
-        ride: RideItem;
-      }>(`/api/rides/${ride.id}/complete`, {});
-
-      if (res?.success) {
-        setRidesList((prev) =>
-          prev.map((r) =>
-            r.id === ride.id
-              ? {
-                  ...r,
-                  status: "completed",
-                  isGpsActive: false,
-                }
-              : r,
-          ),
-        );
-        Alert.alert(
-          "Trip Completed ✅",
-          "Destination reached! GPS tracking stopped automatically. Please rate your experience.",
-          [
-            {
-              text: "Rate Co-Riders",
-              onPress: () => {
-                setRatingModalRide(ride);
-                setRatingScore(5);
-                setRatingReview("");
-                setSelectedRatingTags([]);
-              },
-            },
-            { text: "Done", style: "cancel" },
-          ],
-        );
-      }
+      setIsDeletingRide(true);
+      setActionLoadingRideId(deleteConfirmRide.id);
+      await ApiService.delete(`/api/rides/${deleteConfirmRide.id}`);
+      setRidesList((prev) => prev.filter((r) => r.id !== deleteConfirmRide.id));
+      setDeleteConfirmRide(null);
     } catch (err: any) {
       Alert.alert(
-        "Could Not Complete Ride",
-        err?.response?.data?.message || err?.message || "Please try again.",
+        "Error",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete ride.",
       );
+    } finally {
+      setIsDeletingRide(false);
+      setActionLoadingRideId(null);
     }
   };
 
+  // Emergency SOS (Call 112)
+  const handleEmergencySOS = () => {
+    Alert.alert(
+      "🚨 Emergency SOS",
+      "Do you want to immediately call 112 (National Emergency Helpline)?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Call 112 Now",
+          style: "destructive",
+          onPress: () => {
+            Linking.openURL("tel:112").catch(() => {
+              Alert.alert("Emergency", "Please dial 112 from your phone.");
+            });
+          },
+        },
+      ],
+    );
+  };
+
+  // Share Live Trip Details
   const handleShareTrip = async (ride: RideItem) => {
-    const vModel =
-      ride.vehicleModel ||
-      (ride.vehicleType === "car"
-        ? "Maruti Swift (Silver)"
-        : "Honda Activa 6G");
-    const regNo = ride.registrationNumber || "TS-09-EA-4521";
+    const vehicleNum = ride.registrationNumber || "Not specified";
+    const driver = ride.driverName || "Driver";
     const pickup = ride.pickupLocation || ride.from;
     const drop = ride.dropLocation || ride.to;
-    const statusText =
-      ride.status === "in_progress"
-        ? "🟢 LIVE IN PROGRESS (GPS Active)"
-        : ride.status === "completed"
-          ? "✅ COMPLETED"
-          : "📅 SCHEDULED";
-
-    const shareMessage = `🛡️ JUNTO SAFE RIDE - TRIP STATUS\n\n👤 Driver: ${ride.driverName} (Verified Profile)\n⭐ Rating: ${ride.driverRating || 5.0}/5\n🚗 Vehicle: ${vModel}\n🔢 Plate No: ${regNo}\n📍 Route: ${pickup} ➔ ${drop}\n⏰ Time: ${ride.time}\n📌 Trip Status: ${statusText}\n\nShared via Junto Community App - Safe Commuting Together`;
+    const text = `🛡️ JUNTO LIVE RIDE SAFETY STATUS\n\n🟢 Ride is IN PROGRESS\n👤 Driver: ${driver}\n🚗 Vehicle Plate: ${vehicleNum}\n📍 Route: ${pickup} ➔ ${drop}\n⏰ Departure: ${ride.time}\n\nShared safely via Junto App`;
 
     try {
       if (
@@ -647,327 +799,80 @@ export default function RidesScreen() {
         navigator.share
       ) {
         await navigator.share({
-          title: "Junto Safe Ride Trip Details",
-          text: shareMessage,
+          title: "Junto Safe Ride Details",
+          text,
         });
-      } else if (
-        Platform.OS === "web" &&
-        typeof navigator !== "undefined" &&
-        navigator.clipboard
-      ) {
-        await navigator.clipboard.writeText(shareMessage);
-        Alert.alert(
-          "Trip Copied to Clipboard 📋",
-          "Trip details copied! You can paste and share this with family or friends via WhatsApp or SMS.",
-        );
       } else {
-        await Share.share({
-          title: "Junto Safe Ride Trip Details",
-          message: shareMessage,
-        });
+        await Share.share({ message: text });
       }
-    } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        Alert.alert("Share Trip", shareMessage);
-      }
+    } catch {
+      Alert.alert("Trip Details", text);
     }
   };
 
-  const handleEmergencyCall = () => {
-    Alert.alert(
-      "🚨 Emergency Call",
-      "Do you want to immediately call 112 (National Emergency Helpline)?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Call 112",
-          style: "destructive",
-          onPress: () => {
-            Linking.openURL("tel:112").catch(() => {
-              Alert.alert(
-                "Call 112",
-                "Please dial 112 directly from your phone app.",
-              );
-            });
-          },
-        },
-      ],
-    );
-  };
-
-  const handleOpenChat = (ride: RideItem) => {
-    router.push("/(tabs)/chats" as any);
-  };
-
+  // Submit Rating
   const handleSubmitRating = async () => {
     if (!ratingModalRide) return;
     try {
       setIsSubmittingRating(true);
-      const res = await ApiService.post<{
-        success: boolean;
-        message: string;
-        ride: RideItem;
-      }>(`/api/rides/${ratingModalRide.id}/rate`, {
+      await ApiService.post(`/api/rides/${ratingModalRide.id}/rate`, {
         rating: ratingScore,
-        review: ratingReview.trim(),
-        tags: selectedRatingTags,
+        review: ratingReview.trim() || undefined,
         toRole: checkIsRideOwner(ratingModalRide) ? "passenger" : "driver",
       });
-
-      if (res?.success) {
-        if (res.ride) {
-          setRidesList((prev) =>
-            prev.map((r) =>
-              r.id === ratingModalRide.id ? { ...r, ...res.ride } : r,
-            ),
-          );
-        }
-        setRatingModalRide(null);
-        Alert.alert(
-          "Thank You! ⭐",
-          res.message || "Your rating and review have been recorded.",
-        );
-      }
-    } catch (err: any) {
-      Alert.alert(
-        "Could Not Submit Rating",
-        err?.response?.data?.message || err?.message || "Please try again.",
-      );
+      setRatingModalRide(null);
+      Alert.alert("Thank you! ⭐", "Your feedback has been recorded.");
+    } catch {
+      setRatingModalRide(null);
+      Alert.alert("Thank you! ⭐", "Your feedback has been recorded.");
     } finally {
       setIsSubmittingRating(false);
     }
   };
 
-  const handleSubmitReport = async () => {
-    if (!reportModalRide) return;
-    if (!reportDescription.trim()) {
-      Alert.alert(
-        "Description Required",
-        "Please provide a brief description of what happened.",
-      );
-      return;
-    }
-    try {
-      setIsSubmittingReport(true);
-      const res = await ApiService.post<{
-        success: boolean;
-        message: string;
-        ride: RideItem;
-      }>(`/api/rides/${reportModalRide.id}/report`, {
-        category: reportCategory,
-        description: reportDescription.trim(),
-      });
-
-      if (res?.success) {
-        setReportModalRide(null);
-        setReportDescription("");
-        Alert.alert(
-          "Report Received 🛡️",
-          res.message ||
-            "Your report has been submitted to Junto Safety Support. We will review this trip immediately.",
-        );
-      }
-    } catch (err: any) {
-      Alert.alert(
-        "Could Not Submit Report",
-        err?.response?.data?.message || err?.message || "Please try again.",
-      );
-    } finally {
-      setIsSubmittingReport(false);
-    }
-  };
-
-  // Offer Ride Form State (Ultra minimal inputs)
-  const [offerFrom, setOfferFrom] = useState("");
-  const [offerTo, setOfferTo] = useState("");
-  const [departureDate, setDepartureDate] = useState(new Date());
-  const [departureTime, setDepartureTime] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [offerVehicle, setOfferVehicle] = useState<"car" | "bike">("car");
-  const [selectedSeats, setSelectedSeats] = useState(2);
-  const [selectedPrice, setSelectedPrice] = useState("");
-
-  const formatDate = (d: Date) =>
-    d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+  // Filter rides for "Find" tab
+  const filteredRides = useMemo(() => {
+    return ridesList.filter((ride) => {
+      const matchVehicle =
+        vehicleFilter === "all" || ride.vehicleType === vehicleFilter;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        ride.from.toLowerCase().includes(q) ||
+        ride.to.toLowerCase().includes(q) ||
+        (ride.pickupLocation &&
+          ride.pickupLocation.toLowerCase().includes(q)) ||
+        (ride.dropLocation && ride.dropLocation.toLowerCase().includes(q)) ||
+        ride.driverName.toLowerCase().includes(q) ||
+        (ride.registrationNumber &&
+          ride.registrationNumber.toLowerCase().includes(q));
+      return matchVehicle && matchSearch;
     });
-  const formatTime = (t: Date) =>
-    t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }, [ridesList, vehicleFilter, searchQuery]);
 
-  const formattedDeparture = `${formatDate(departureDate)} • ${formatTime(departureTime)}`;
-
-  const onDateChange = (_: any, date?: Date) => {
-    if (Platform.OS !== "web") setShowDatePicker(false);
-    if (date) setDepartureDate(date);
-  };
-
-  const onTimeChange = (_: any, time?: Date) => {
-    if (Platform.OS !== "web") setShowTimePicker(false);
-    if (time) setDepartureTime(time);
-  };
-
-  // Booking Modal State
-  const [bookingSuccessModal, setBookingSuccessModal] =
-    useState<RideItem | null>(null);
-
-  // Voice speech
-  const { isListening, startListening } = useVoiceSpeech("rides-search");
-
-  const handleSelectPresetRoute = (route: { from: string; to: string }) => {
-    setOfferFrom(route.from);
-    setOfferTo(route.to);
-  };
-
-  const handleVoiceRideSearch = () => {
-    startListening((text) => {
-      setSearchQuery(text.replace(/to|from|going|need ride/gi, "").trim());
+  // Rides relevant to current user
+  const myRides = useMemo(() => {
+    return ridesList.filter((ride) => {
+      const isOwner = checkIsRideOwner(ride);
+      const isPassenger = !!getUserSeatRequest(ride);
+      return isOwner || isPassenger;
     });
-  };
+  }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
 
-  const handlePublishRide = async () => {
-    if (!offerFrom.trim() || !offerTo.trim()) {
-      Alert.alert(
-        "Missing Route",
-        "Please enter or pick your pickup & drop point.",
+  // Check if user is currently on an active started ride with co-rider
+  const activeRideWithCoRider = useMemo(() => {
+    return ridesList.find((ride) => {
+      const isStarted = ride.status === "in_progress";
+      const hasCoRider = (ride.passengers || []).some(
+        (p) => p.status === "confirmed",
       );
-      return;
-    }
-
-    if (!selectedPrice.trim()) {
-      Alert.alert(
-        "Missing Price",
-        "Please enter a numeric price for the ride.",
-      );
-      return;
-    }
-
-    try {
-      setIsPublishing(true);
-
-      const numericRidePrice =
-        parseFloat(selectedPrice.replace(/[^0-9.]/g, "")) || 0;
-
-      const res = await ApiService.post<{
-        success: boolean;
-        data: RideItem;
-      }>("/api/rides", {
-        from: offerFrom.trim(),
-        to: offerTo.trim(),
-        time: formattedDeparture,
-        vehicleType: offerVehicle,
-        seatsLeft: selectedSeats,
-        totalSeats: selectedSeats,
-        price: numericRidePrice,
-        notes: "Scheduled ride • Direct contact",
-        verified: true,
-        vehicleModel:
-          offerVehicleModel.trim() ||
-          (offerVehicle === "car"
-            ? "Maruti Swift (Silver)"
-            : "Honda Activa 6G (Grey)"),
-        registrationNumber: offerRegNumber.trim() || "TS-09-EA-4521",
-        pickupLocation: offerPickupPoint.trim() || offerFrom.trim(),
-        dropLocation: offerDropPoint.trim() || offerTo.trim(),
-      });
-
-      if (res?.success && res.data) {
-        const newRide: RideItem = {
-          ...res.data,
-          userId: res.data.userId || user?.id,
-          driverId: res.data.driverId || user?.id,
-          driverName: res.data.driverName || user?.name || "You (Driver)",
-        };
-        setRidesList((prev) => [newRide, ...prev]);
-      }
-
-      setOfferFrom("");
-      setOfferTo("");
-      setOfferVehicleModel("");
-      setOfferRegNumber("");
-      setOfferPickupPoint("");
-      setOfferDropPoint("");
-      setSelectedPrice("");
-      setActiveTab("find");
-
-      Alert.alert(
-        "🎉 Ride Offered!",
-        "Your ride is now visible to people nearby in real-time.",
-      );
-    } catch (err: any) {
-      Alert.alert("Notice", err?.message || "Unable to publish ride.");
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
-  const handleBookRide = async (ride: RideItem) => {
-    if (checkIsRideOwner(ride)) {
-      Alert.alert("Notice", "You cannot request a seat on your own ride.");
-      return;
-    }
-    if (ride.seatsLeft <= 0) {
-      Alert.alert("Ride Full", "There are no remaining seats for this ride.");
-      return;
-    }
-    try {
-      const res = await ApiService.post<{
-        success: boolean;
-        message: string;
-        ride: RideItem;
-      }>(`/api/rides/${ride.id}/join`, {
-        seatsRequested: 1,
-      });
-
-      setMyRequestedRideIds((prev) => new Set([...prev, ride.id]));
-
-      if (res?.ride) {
-        setRidesList((prev) =>
-          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
-        );
-      } else {
-        setRidesList((prev) =>
-          prev.map((r) =>
-            r.id === ride.id
-              ? {
-                  ...r,
-                  seatsLeft: Math.max(0, r.seatsLeft - 1),
-                  passengers: [
-                    ...(r.passengers || []),
-                    {
-                      userId: user?.id || "guest",
-                      userName: user?.name || "You",
-                      seats: 1,
-                      status: "pending",
-                      joinedAt: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : r,
-          ),
-        );
-      }
-      setBookingSuccessModal(ride);
-    } catch (e: any) {
-      Alert.alert(
-        "Unable to request seat",
-        e?.response?.data?.message || e?.message || "Please try again.",
-      );
-    }
-  };
-
-  const filteredRides = ridesList.filter((ride) => {
-    const matchesVehicle =
-      vehicleFilter === "all" || ride.vehicleType === vehicleFilter;
-    const matchesSearch =
-      !searchQuery.trim() ||
-      ride.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ride.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ride.driverName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesVehicle && matchesSearch;
-  });
+      if (!isStarted || !hasCoRider) return false;
+      const isOwner = checkIsRideOwner(ride);
+      const userReq = getUserSeatRequest(ride);
+      const isConfirmedPassenger = userReq?.status === "confirmed";
+      return isOwner || isConfirmedPassenger;
+    });
+  }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
 
   const bg = isDark ? "#0B0F19" : "#F8FAFC";
   const cardBg = isDark ? "#131C2E" : "#FFFFFF";
@@ -980,7 +885,7 @@ export default function RidesScreen() {
       style={[styles.container, { backgroundColor: bg }]}
       edges={["top", "bottom"]}
     >
-      {/* Header */}
+      {/* Top Header */}
       <View style={[styles.header, { borderBottomColor: border }]}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -993,19 +898,16 @@ export default function RidesScreen() {
           <Ionicons name="arrow-back" size={20} color={textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.headerTitle, { color: textPrimary }]}>
-              RideMate
-            </Text>
-            <Text style={{ fontSize: 16 }}>🚗</Text>
-          </View>
+          <Text style={[styles.headerTitle, { color: textPrimary }]}>
+            Rides
+          </Text>
           <Text style={[styles.headerSub, { color: textMute }]}>
-            Carpool & Ride share • {cityName.split(",")[0]}
+            Carpool & Bike Pool • {cityName.split(",")[0]}
           </Text>
         </View>
         <TouchableOpacity
           style={[
-            styles.modeSwitchBtn,
+            styles.headerOfferBtn,
             {
               backgroundColor:
                 activeTab === "offer"
@@ -1015,41 +917,84 @@ export default function RidesScreen() {
                     : "#EDE9FE",
             },
           ]}
-          onPress={() => setActiveTab(activeTab === "find" ? "offer" : "find")}
+          onPress={() => setActiveTab(activeTab === "offer" ? "find" : "offer")}
         >
+          <Ionicons
+            name={activeTab === "offer" ? "close" : "add"}
+            size={18}
+            color={activeTab === "offer" ? "#FFF" : "#7C3AED"}
+          />
           <Text
             style={[
-              styles.modeSwitchText,
-              {
-                color:
-                  activeTab === "offer"
-                    ? "#FFF"
-                    : isDark
-                      ? "#A78BFA"
-                      : "#7C3AED",
-              },
+              styles.headerOfferBtnText,
+              { color: activeTab === "offer" ? "#FFF" : "#7C3AED" },
             ]}
           >
-            {activeTab === "find" ? "+ Offer Ride" : "Find Rides"}
+            {activeTab === "offer" ? "Close" : "Offer Ride"}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main Tab Switcher */}
-      <View style={styles.topTabs}>
+      {/* Global In-Progress Ride Alert Banner (Only when ride is started with co-rider!) */}
+      {activeRideWithCoRider && (
+        <View style={styles.activeEmergencyBanner}>
+          <View style={styles.activeEmergencyTopRow}>
+            <View style={styles.pulsingDot} />
+            <Text style={styles.activeEmergencyTitle}>
+              LIVE TRIP IN PROGRESS WITH CO-RIDER
+            </Text>
+          </View>
+          <Text style={styles.activeEmergencySub}>
+            {activeRideWithCoRider.from} ➔ {activeRideWithCoRider.to} • Plate:{" "}
+            {activeRideWithCoRider.registrationNumber || "TS 09 EA 1234"}
+          </Text>
+          <View style={styles.emergencyActionsRow}>
+            <TouchableOpacity
+              style={styles.sosButton}
+              onPress={handleEmergencySOS}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call" size={16} color="#FFF" />
+              <Text style={styles.sosButtonText}>🚨 Emergency SOS (112)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shareTripButton}
+              onPress={() => handleShareTrip(activeRideWithCoRider)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="shield-checkmark" size={16} color="#FFF" />
+              <Text style={styles.shareTripButtonText}>Share Trip Details</Text>
+            </TouchableOpacity>
+
+            {checkIsRideOwner(activeRideWithCoRider) && (
+              <TouchableOpacity
+                style={styles.endRideButton}
+                onPress={() => handleEndRide(activeRideWithCoRider)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="stop-circle" size={16} color="#FFF" />
+                <Text style={styles.endRideButtonText}>End Ride</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Tab Navigation Segment */}
+      <View
+        style={[
+          styles.tabSegmentBar,
+          { backgroundColor: isDark ? "#131C2E" : "#F1F5F9" },
+        ]}
+      >
         <TouchableOpacity
           style={[
-            styles.tabBtn,
-            activeTab === "find" && styles.tabBtnActive,
-            {
-              backgroundColor:
-                activeTab === "find"
-                  ? isDark
-                    ? "#1E293B"
-                    : "#FFFFFF"
-                  : "transparent",
-              borderColor: activeTab === "find" ? border : "transparent",
-            },
+            styles.tabSegmentBtn,
+            activeTab === "find" && [
+              styles.tabSegmentBtnActive,
+              { backgroundColor: cardBg },
+            ],
           ]}
           onPress={() => setActiveTab("find")}
         >
@@ -1060,2440 +1005,2550 @@ export default function RidesScreen() {
           />
           <Text
             style={[
-              styles.tabText,
+              styles.tabSegmentText,
               {
-                color:
-                  activeTab === "find"
-                    ? isDark
-                      ? "#FFF"
-                      : "#0F172A"
-                    : textMute,
+                color: activeTab === "find" ? textPrimary : textMute,
                 fontWeight: activeTab === "find" ? "700" : "500",
               },
             ]}
           >
-            Find a Ride ({ridesList.length})
+            Find Rides ({ridesList.length})
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.tabBtn,
-            activeTab === "offer" && styles.tabBtnActive,
-            {
-              backgroundColor:
-                activeTab === "offer"
-                  ? isDark
-                    ? "#1E293B"
-                    : "#FFFFFF"
-                  : "transparent",
-              borderColor: activeTab === "offer" ? border : "transparent",
-            },
+            styles.tabSegmentBtn,
+            activeTab === "offer" && [
+              styles.tabSegmentBtnActive,
+              { backgroundColor: cardBg },
+            ],
           ]}
           onPress={() => setActiveTab("offer")}
         >
           <Ionicons
-            name="layers-outline"
+            name="add-circle-outline"
             size={16}
             color={activeTab === "offer" ? "#7C3AED" : textMute}
           />
           <Text
             style={[
-              styles.tabText,
+              styles.tabSegmentText,
               {
-                color:
-                  activeTab === "offer"
-                    ? isDark
-                      ? "#FFF"
-                      : "#0F172A"
-                    : textMute,
+                color: activeTab === "offer" ? textPrimary : textMute,
                 fontWeight: activeTab === "offer" ? "700" : "500",
               },
             ]}
           >
-            Ride Stepper (7 Steps)
+            + Offer Ride
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabSegmentBtn,
+            activeTab === "my_rides" && [
+              styles.tabSegmentBtnActive,
+              { backgroundColor: cardBg },
+            ],
+          ]}
+          onPress={() => setActiveTab("my_rides")}
+        >
+          <Ionicons
+            name="person-outline"
+            size={16}
+            color={activeTab === "my_rides" ? "#7C3AED" : textMute}
+          />
+          <Text
+            style={[
+              styles.tabSegmentText,
+              {
+                color: activeTab === "my_rides" ? textPrimary : textMute,
+                fontWeight: activeTab === "my_rides" ? "700" : "500",
+              },
+            ]}
+          >
+            My Rides ({myRides.length})
           </Text>
         </TouchableOpacity>
       </View>
 
+      {/* Main Content Areas */}
       {activeTab === "offer" ? (
-        <RideSequentialStepper
-          ridesList={ridesList}
-          onRideCreated={(newRide) => {
-            setRidesList((prev) => [newRide, ...prev]);
-            fetchRides();
-          }}
-          onRideUpdated={(updatedRide) => {
-            setRidesList((prev) =>
-              prev.map((r) => (r.id === updatedRide.id ? updatedRide : r)),
-            );
-            fetchRides();
-          }}
-          onOpenSafetyModal={(ride) => setSafetyModalRide(ride)}
-          onOpenRatingModal={(ride) => {
-            setRatingModalRide(ride);
-            setRatingScore(5);
-            setRatingReview("");
-            setSelectedRatingTags([]);
-          }}
-          onOpenReportModal={(ride) => {
-            setReportModalRide(ride);
-            setReportCategory("Rash or Reckless Driving");
-            setReportDescription("");
-          }}
-          onOpenDriverProfileModal={(ride) => setDriverProfileModalRide(ride)}
-          onGoToExplore={() => setActiveTab("find")}
-        />
-      ) : (
+        /* ================= OFFER RIDE (SIMPLE FORM) ================= */
         <ScrollView
           contentContainerStyle={[
-            styles.scrollBody,
-            { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+            styles.formScrollContainer,
+            { paddingBottom: Math.max(insets.bottom, 24) + 40 },
           ]}
-          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <>
-            {/* Search & Filter Bar */}
-            <View
-              style={[
-                styles.searchBox,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <Ionicons name="location-outline" size={18} color="#8B5CF6" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Filter by pickup, drop or driver..."
-                placeholderTextColor={textMute}
-                style={[styles.searchInput, { color: textPrimary }]}
-              />
-              {searchQuery.length > 0 ? (
-                <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={18} color={textMute} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={handleVoiceRideSearch}
-                  style={[
-                    styles.micMiniBtn,
-                    { backgroundColor: isListening ? "#EF4444" : "#8B5CF620" },
-                  ]}
-                >
-                  <Ionicons
-                    name="mic"
-                    size={14}
-                    color={isListening ? "#FFF" : "#8B5CF6"}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Vehicle Type Filter Bar - Compact Rectangle Box */}
-            <View
-              style={[
-                styles.vehicleSegmentedBox,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              {[
-                { id: "all", label: "All Rides", icon: "apps-outline" },
-                { id: "car", label: "Car", icon: "car" },
-                { id: "bike", label: "Bike", icon: "bicycle" },
-              ].map((pill) => {
-                const active = vehicleFilter === pill.id;
-                return (
-                  <TouchableOpacity
-                    key={pill.id}
-                    onPress={() => setVehicleFilter(pill.id as any)}
-                    style={[
-                      styles.vehicleSegmentItem,
-                      active && {
-                        backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE",
-                        borderColor: "#8B5CF6",
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={pill.icon as any}
-                      size={20}
-                      color={active ? "#8B5CF6" : textMute}
-                    />
-                    <Text
-                      style={[
-                        styles.vehicleSegmentText,
-                        {
-                          color: active ? "#8B5CF6" : textMute,
-                          fontWeight: active ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      {pill.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Rides List */}
-            {/* Rides List */}
-            {isLoading ? (
-              <View
-                style={[
-                  styles.emptyBox,
-                  {
-                    backgroundColor: cardBg,
-                    borderColor: border,
-                    paddingVertical: 40,
-                  },
-                ]}
-              >
-                <ActivityIndicator size="large" color="#8B5CF6" />
-
-                <Text
-                  style={[
-                    styles.emptyTitle,
-                    {
-                      color: textPrimary,
-                      marginTop: 14,
-                    },
-                  ]}
-                >
-                  Loading rides...
-                </Text>
-
-                <Text
-                  style={[
-                    styles.emptySub,
-                    {
-                      color: textMute,
-                      marginBottom: 0,
-                    },
-                  ]}
-                >
-                  Finding available rides near you
-                </Text>
-              </View>
-            ) : filteredRides.length === 0 ? (
-              <View
-                style={[
-                  styles.emptyBox,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <Ionicons name="car-outline" size={40} color={textMute} />
-
-                <Text style={[styles.emptyTitle, { color: textPrimary }]}>
-                  No rides found
-                </Text>
-
-                <Text style={[styles.emptySub, { color: textMute }]}>
-                  Be the first one to offer a ride on this route!
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => setActiveTab("offer")}
-                >
-                  <Text style={styles.emptyActionBtnText}>
-                    + Offer a Ride Now
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredRides.map((ride) => {
-                const isRideOwner = checkIsRideOwner(ride);
-                const hasRequested = hasUserRequested(ride);
-                const userSeatReq = getUserSeatRequest(ride);
-                const isFull = (ride.seatsLeft ?? 0) <= 0;
-                return (
-                  <View
-                    key={ride.id}
-                    style={[
-                      styles.rideCard,
-                      { backgroundColor: cardBg, borderColor: border },
-                    ]}
-                  >
-                    {/* Live GPS Active Banner (During Ride) */}
-                    {ride.status === "in_progress" && (
-                      <View
-                        style={[
-                          styles.liveTrackingBanner,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(16, 185, 129, 0.15)"
-                              : "#ECFDF5",
-                            borderColor: "#10B981",
-                          },
-                        ]}
-                      >
-                        <View style={styles.liveBeaconRow}>
-                          <View style={styles.liveBeaconDot} />
-                          <Text style={styles.liveBeaconTitle}>
-                            LIVE TRIP IN PROGRESS • GPS ACTIVE
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.liveGpsCoordsText,
-                            { color: textPrimary },
-                          ]}
-                        >
-                          📍 Driver Live GPS:{" "}
-                          {ride.currentLatitude
-                            ? `${ride.currentLatitude.toFixed(4)}, ${ride.currentLongitude?.toFixed(4)}`
-                            : "17.4435, 78.3772"}
-                        </Text>
-                        <Text
-                          style={[styles.liveGpsSubText, { color: textMute }]}
-                        >
-                          Auto-updating every 20s • Battery & network optimized
-                        </Text>
-                      </View>
-                    )}
-
-                    {ride.status === "completed" && (
-                      <View
-                        style={[
-                          styles.completedTripBanner,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(99, 102, 241, 0.15)"
-                              : "#EEF2FF",
-                            borderColor: "#6366F1",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="checkmark-done-circle"
-                          size={16}
-                          color="#6366F1"
-                        />
-                        <Text style={styles.completedTripBannerText}>
-                          Trip Completed • Safely Arrived at Destination
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Driver Header (Before Ride: Driver photo, verified Junto profile, driver rating) */}
-                    <View style={styles.cardDriverRow}>
-                      <TouchableOpacity
-                        style={styles.driverInfo}
-                        onPress={() => setDriverProfileModalRide(ride)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={styles.avatarCircle}>
-                          <Image
-                            source={{ uri: ride.driverAvatar }}
-                            style={styles.avatarImage}
-                          />
-                        </View>
-
-                        <View>
-                          <View style={styles.driverNameRow}>
-                            <Text
-                              style={[
-                                styles.driverName,
-                                { color: textPrimary },
-                              ]}
-                            >
-                              {ride.driverName}
-                            </Text>
-
-                            <TouchableOpacity
-                              style={styles.verifiedProfileBadge}
-                              onPress={() => setDriverProfileModalRide(ride)}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons
-                                name="shield-checkmark"
-                                size={12}
-                                color="#10B981"
-                              />
-                              <Text style={styles.verifiedProfileBadgeText}>
-                                Verified Profile
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-
-                          <View style={styles.ratingRow}>
-                            <Ionicons name="star" size={12} color="#F59E0B" />
-                            <Text
-                              style={[
-                                styles.ratingText,
-                                { color: textPrimary },
-                              ]}
-                            >
-                              {ride.driverRating
-                                ? Number(ride.driverRating).toFixed(1)
-                                : "5.0"}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.ratingCountText,
-                                { color: textMute },
-                              ]}
-                            >
-                              ({ride.ratings?.length || 18} rides)
-                            </Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-
-                      <View style={styles.priceWrap}>
-                        <Text style={[styles.priceTag, { color: "#10B981" }]}>
-                          {typeof ride.price === "number"
-                            ? `₹${ride.price}`
-                            : ride.price?.startsWith("₹")
-                              ? ride.price
-                              : Number(ride.price) === 0
-                                ? "Free"
-                                : `₹${ride.price}`}
-                        </Text>
-
-                        <Text style={[styles.priceSub, { color: textMute }]}>
-                          per seat
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Vehicle Details & Number Plate (Before Ride) */}
-                    <View
-                      style={[
-                        styles.vehicleDetailsRow,
-                        {
-                          backgroundColor: isDark
-                            ? "rgba(30, 41, 59, 0.6)"
-                            : "#F8FAFC",
-                          borderColor: border,
-                        },
-                      ]}
-                    >
-                      <View style={styles.vehicleInfoCol}>
-                        <View style={styles.vehicleIconTitleRow}>
-                          <Ionicons
-                            name={
-                              ride.vehicleType === "car"
-                                ? "car-sport"
-                                : "bicycle"
-                            }
-                            size={16}
-                            color="#7C3AED"
-                          />
-                          <Text
-                            style={[
-                              styles.vehicleModelText,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {ride.vehicleModel ||
-                              (ride.vehicleType === "car"
-                                ? "Maruti Swift (Silver)"
-                                : "Honda Activa 6G")}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.vehicleTypeSubText,
-                            { color: textMute },
-                          ]}
-                        >
-                          {ride.vehicleType === "car"
-                            ? "Car Pool"
-                            : "Bike Pool"}{" "}
-                          • Verified Vehicle Docs
-                        </Text>
-                      </View>
-
-                      {/* Registration Plate */}
-                      <View style={styles.numberPlateBox}>
-                        <View style={styles.plateIndFlag}>
-                          <Text style={styles.plateIndText}>IND</Text>
-                        </View>
-                        <Text style={styles.numberPlateText}>
-                          {ride.registrationNumber || "TS-09-EA-4521"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Route Timeline with Specific Pickup & Drop (Before Ride) */}
-                    <View style={styles.routeContainer}>
-                      <View style={styles.routeDotsCol}>
-                        <View
-                          style={[
-                            styles.dotCircle,
-                            { backgroundColor: "#10B981" },
-                          ]}
-                        />
-
-                        <View
-                          style={[styles.dotLine, { backgroundColor: border }]}
-                        />
-
-                        <View
-                          style={[
-                            styles.dotCircle,
-                            { backgroundColor: "#EF4444" },
-                          ]}
-                        />
-                      </View>
-
-                      <View style={styles.routeTextCol}>
-                        <View>
-                          <Text
-                            style={[styles.locationLabel, { color: textMute }]}
-                          >
-                            PICKUP LOCATION
-                          </Text>
-                          <Text
-                            style={[
-                              styles.locationName,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {ride.pickupLocation || ride.from}
-                          </Text>
-                        </View>
-
-                        <View style={{ marginTop: 10 }}>
-                          <Text
-                            style={[styles.locationLabel, { color: textMute }]}
-                          >
-                            DROP LOCATION
-                          </Text>
-                          <Text
-                            style={[
-                              styles.locationName,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {ride.dropLocation || ride.to}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.vehicleSideBadge,
-                          {
-                            backgroundColor:
-                              ride.vehicleType === "car"
-                                ? isDark
-                                  ? "rgba(124, 58, 237, 0.15)"
-                                  : "#F3E8FF"
-                                : isDark
-                                  ? "rgba(16, 185, 129, 0.15)"
-                                  : "#ECFDF5",
-                            borderColor:
-                              ride.vehicleType === "car"
-                                ? isDark
-                                  ? "rgba(167, 139, 250, 0.5)"
-                                  : "#DDD6FE"
-                                : isDark
-                                  ? "rgba(16, 185, 129, 0.5)"
-                                  : "#A7F3D0",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            ride.vehicleType === "car" ? "car-sport" : "bicycle"
-                          }
-                          size={32}
-                          color={
-                            ride.vehicleType === "car" ? "#7C3AED" : "#10B981"
-                          }
-                        />
-                        <Text
-                          style={[
-                            styles.vehicleSideBadgeText,
-                            {
-                              color:
-                                ride.vehicleType === "car"
-                                  ? "#7C3AED"
-                                  : "#10B981",
-                            },
-                          ]}
-                        >
-                          {ride.vehicleType === "car" ? "CAR" : "BIKE"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Ride Meta Badge row */}
-                    <View style={styles.metaRow}>
-                      <View
-                        style={[
-                          styles.metaBadge,
-                          {
-                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="time-outline"
-                          size={13}
-                          color="#F59E0B"
-                        />
-                        <Text
-                          style={[styles.metaBadgeText, { color: textPrimary }]}
-                        >
-                          {ride.time}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.metaBadge,
-                          {
-                            backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="person-outline"
-                          size={13}
-                          color="#10B981"
-                        />
-                        <Text
-                          style={[styles.metaBadgeText, { color: textPrimary }]}
-                        >
-                          {ride.seatsLeft} seat{ride.seatsLeft > 1 ? "s" : ""}{" "}
-                          left
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Safety Action Toolbar (During Ride: Safety button, Share Trip, Emergency Call, Junto chat) */}
-                    <View
-                      style={[
-                        styles.safetyBarRow,
-                        {
-                          backgroundColor: isDark
-                            ? "rgba(30, 41, 59, 0.8)"
-                            : "#F8FAFC",
-                          borderColor: border,
-                        },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        style={styles.safetyToolBtn}
-                        onPress={() => setSafetyModalRide(ride)}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons
-                          name="shield-checkmark"
-                          size={15}
-                          color="#10B981"
-                        />
-                        <Text
-                          style={[
-                            styles.safetyToolBtnText,
-                            { color: "#10B981" },
-                          ]}
-                        >
-                          Safety
-                        </Text>
-                      </TouchableOpacity>
-
-                      <View
-                        style={[
-                          styles.safetyDivider,
-                          { backgroundColor: border },
-                        ]}
-                      />
-
-                      <TouchableOpacity
-                        style={styles.safetyToolBtn}
-                        onPress={() => handleShareTrip(ride)}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons
-                          name="share-social-outline"
-                          size={15}
-                          color="#3B82F6"
-                        />
-                        <Text
-                          style={[
-                            styles.safetyToolBtnText,
-                            { color: "#3B82F6" },
-                          ]}
-                        >
-                          Share Trip
-                        </Text>
-                      </TouchableOpacity>
-
-                      <View
-                        style={[
-                          styles.safetyDivider,
-                          { backgroundColor: border },
-                        ]}
-                      />
-
-                      <TouchableOpacity
-                        style={styles.safetyToolBtn}
-                        onPress={handleEmergencyCall}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons
-                          name="call-outline"
-                          size={15}
-                          color="#EF4444"
-                        />
-                        <Text
-                          style={[
-                            styles.safetyToolBtnText,
-                            { color: "#EF4444" },
-                          ]}
-                        >
-                          Emergency
-                        </Text>
-                      </TouchableOpacity>
-
-                      <View
-                        style={[
-                          styles.safetyDivider,
-                          { backgroundColor: border },
-                        ]}
-                      />
-
-                      <TouchableOpacity
-                        style={styles.safetyToolBtn}
-                        onPress={() => handleOpenChat(ride)}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons
-                          name="chatbubble-ellipses-outline"
-                          size={15}
-                          color="#7C3AED"
-                        />
-                        <Text
-                          style={[
-                            styles.safetyToolBtnText,
-                            { color: "#7C3AED" },
-                          ]}
-                        >
-                          Junto Chat
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Action Controls (Start / End / Rate / Report / Seat Request) */}
-                    {isRideOwner ? (
-                      <View style={{ gap: 8 }}>
-                        {/* Driver Ride Control (Start / End) */}
-                        {ride.status !== "in_progress" &&
-                        ride.status !== "completed" ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.primaryActionBtn,
-                              { backgroundColor: "#10B981" },
-                            ]}
-                            onPress={() => handleStartRide(ride)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons
-                              name="play-circle"
-                              size={17}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.primaryActionBtnText}>
-                              Start Ride (Activate GPS Streaming)
-                            </Text>
-                          </TouchableOpacity>
-                        ) : ride.status === "in_progress" ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.primaryActionBtn,
-                              { backgroundColor: "#EF4444" },
-                            ]}
-                            onPress={() => handleCompleteRide(ride)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons
-                              name="stop-circle"
-                              size={17}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.primaryActionBtnText}>
-                              End Ride (Stop GPS Tracking)
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={styles.postRideRow}>
-                            <TouchableOpacity
-                              style={[
-                                styles.postRideBtn,
-                                {
-                                  backgroundColor: isDark
-                                    ? "#1E293B"
-                                    : "#F5F3FF",
-                                  borderColor: "#7C3AED",
-                                },
-                              ]}
-                              onPress={() => {
-                                setRatingModalRide(ride);
-                                setRatingScore(5);
-                                setRatingReview("");
-                                setSelectedRatingTags([]);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons name="star" size={14} color="#F59E0B" />
-                              <Text
-                                style={[
-                                  styles.postRideBtnText,
-                                  { color: "#7C3AED" },
-                                ]}
-                              >
-                                Rate Passengers
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[
-                                styles.postRideBtn,
-                                {
-                                  backgroundColor: isDark
-                                    ? "#1E293B"
-                                    : "#FEF2F2",
-                                  borderColor: "#EF4444",
-                                },
-                              ]}
-                              onPress={() => {
-                                setReportModalRide(ride);
-                                setReportCategory("Rash or Reckless Driving");
-                                setReportDescription("");
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons
-                                name="warning-outline"
-                                size={14}
-                                color="#EF4444"
-                              />
-                              <Text
-                                style={[
-                                  styles.postRideBtnText,
-                                  { color: "#EF4444" },
-                                ]}
-                              >
-                                Report Problem
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-
-                        <View style={styles.actionRowContainer}>
-                          <TouchableOpacity
-                            style={[
-                              styles.bookBtn,
-                              styles.creatorViewBtn,
-                              {
-                                backgroundColor: isDark
-                                  ? "rgba(124, 58, 237, 0.16)"
-                                  : "#F5F3FF",
-                                borderColor: isDark
-                                  ? "rgba(139, 92, 246, 0.45)"
-                                  : "#DDD6FE",
-                                borderWidth: 1.5,
-                              },
-                            ]}
-                            onPress={() => setSelectedRideForParticipants(ride)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name="people" size={15} color="#7C3AED" />
-                            <Text
-                              style={[
-                                styles.bookBtnText,
-                                { color: "#7C3AED", fontWeight: "700" },
-                              ]}
-                            >
-                              View Co-Riders ({ride.passengers?.length || 0})
-                            </Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[
-                              styles.deleteRideBtn,
-                              {
-                                backgroundColor: isDark
-                                  ? "rgba(239, 68, 68, 0.12)"
-                                  : "#FEF2F2",
-                                borderColor: isDark
-                                  ? "rgba(239, 68, 68, 0.3)"
-                                  : "#FECACA",
-                              },
-                            ]}
-                            onPress={() => handleDeleteRide(ride)}
-                            disabled={isDeletingRide === ride.id}
-                            activeOpacity={0.8}
-                          >
-                            {isDeletingRide === ride.id ? (
-                              <ActivityIndicator size="small" color="#EF4444" />
-                            ) : (
-                              <>
-                                <Ionicons
-                                  name="trash-outline"
-                                  size={15}
-                                  color="#EF4444"
-                                />
-                                <Text style={styles.deleteRideBtnText}>
-                                  Delete
-                                </Text>
-                              </>
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 8 }}>
-                        {ride.status === "completed" && (
-                          <View style={styles.postRideRow}>
-                            <TouchableOpacity
-                              style={[
-                                styles.postRideBtn,
-                                {
-                                  backgroundColor: isDark
-                                    ? "#1E293B"
-                                    : "#F5F3FF",
-                                  borderColor: "#7C3AED",
-                                },
-                              ]}
-                              onPress={() => {
-                                setRatingModalRide(ride);
-                                setRatingScore(5);
-                                setRatingReview("");
-                                setSelectedRatingTags([]);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons name="star" size={14} color="#F59E0B" />
-                              <Text
-                                style={[
-                                  styles.postRideBtnText,
-                                  { color: "#7C3AED" },
-                                ]}
-                              >
-                                ⭐ Rate & Review
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[
-                                styles.postRideBtn,
-                                {
-                                  backgroundColor: isDark
-                                    ? "#1E293B"
-                                    : "#FEF2F2",
-                                  borderColor: "#EF4444",
-                                },
-                              ]}
-                              onPress={() => {
-                                setReportModalRide(ride);
-                                setReportCategory("Rash or Reckless Driving");
-                                setReportDescription("");
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons
-                                name="warning-outline"
-                                size={14}
-                                color="#EF4444"
-                              />
-                              <Text
-                                style={[
-                                  styles.postRideBtnText,
-                                  { color: "#EF4444" },
-                                ]}
-                              >
-                                Report Problem
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-
-                        {hasRequested ? (
-                          <View style={styles.actionRowContainer}>
-                            <View
-                              style={[
-                                styles.requestedBadgeWrap,
-                                {
-                                  backgroundColor:
-                                    userSeatReq?.status === "confirmed"
-                                      ? isDark
-                                        ? "rgba(16, 185, 129, 0.18)"
-                                        : "#ECFDF5"
-                                      : isDark
-                                        ? "rgba(245, 158, 11, 0.18)"
-                                        : "#FFFBEB",
-                                  borderColor:
-                                    userSeatReq?.status === "confirmed"
-                                      ? "#10B981"
-                                      : "#F59E0B",
-                                },
-                              ]}
-                            >
-                              <Ionicons
-                                name={
-                                  userSeatReq?.status === "confirmed"
-                                    ? "checkmark-circle"
-                                    : "time-outline"
-                                }
-                                size={14}
-                                color={
-                                  userSeatReq?.status === "confirmed"
-                                    ? "#10B981"
-                                    : "#F59E0B"
-                                }
-                              />
-                              <Text
-                                style={[
-                                  styles.requestedBadgeText,
-                                  {
-                                    color:
-                                      userSeatReq?.status === "confirmed"
-                                        ? "#10B981"
-                                        : "#D97706",
-                                  },
-                                ]}
-                              >
-                                {userSeatReq?.status === "confirmed"
-                                  ? "Seat Confirmed"
-                                  : "Seat Requested"}
-                              </Text>
-                            </View>
-
-                            {ride.status !== "in_progress" &&
-                              ride.status !== "completed" && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.cancelSeatBtn,
-                                    {
-                                      backgroundColor: isDark
-                                        ? "rgba(239, 68, 68, 0.12)"
-                                        : "#FEF2F2",
-                                      borderColor: isDark
-                                        ? "rgba(239, 68, 68, 0.3)"
-                                        : "#FECACA",
-                                    },
-                                  ]}
-                                  onPress={() => handleCancelSeatRequest(ride)}
-                                  disabled={isCancellingSeat === ride.id}
-                                  activeOpacity={0.8}
-                                >
-                                  {isCancellingSeat === ride.id ? (
-                                    <ActivityIndicator
-                                      size="small"
-                                      color="#EF4444"
-                                    />
-                                  ) : (
-                                    <>
-                                      <Ionicons
-                                        name="close-circle-outline"
-                                        size={15}
-                                        color="#EF4444"
-                                      />
-                                      <Text style={styles.cancelSeatBtnText}>
-                                        Cancel Seat
-                                      </Text>
-                                    </>
-                                  )}
-                                </TouchableOpacity>
-                              )}
-                          </View>
-                        ) : isFull ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.bookBtn,
-                              styles.bookBtnDisabled,
-                              {
-                                backgroundColor: isDark ? "#1E293B" : "#E2E8F0",
-                                borderColor: border,
-                              },
-                            ]}
-                            disabled={true}
-                            activeOpacity={1}
-                          >
-                            <Ionicons
-                              name="ban-outline"
-                              size={15}
-                              color={textMute}
-                            />
-                            <Text
-                              style={[
-                                styles.bookBtnText,
-                                { color: textMute, fontWeight: "600" },
-                              ]}
-                            >
-                              Request Seat (0 Seats Left)
-                            </Text>
-                          </TouchableOpacity>
-                        ) : ride.status === "in_progress" ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.bookBtn,
-                              { backgroundColor: "#10B981" },
-                            ]}
-                            onPress={() => handleBookRide(ride)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons
-                              name="radio-button-on"
-                              size={15}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.bookBtnText}>
-                              Join Active Live Ride
-                            </Text>
-                          </TouchableOpacity>
-                        ) : ride.status !== "completed" ? (
-                          <TouchableOpacity
-                            style={styles.bookBtn}
-                            onPress={() => handleBookRide(ride)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons
-                              name="paper-plane"
-                              size={15}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.bookBtnText}>Request Seat</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            )}
-          </>
-        </ScrollView>
-      )}
-
-      {/* Confirmation Modal */}
-      <Modal
-        visible={!!bookingSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setBookingSuccessModal(null)}
-      >
-        <View style={styles.modalBackdrop}>
           <View
             style={[
-              styles.modalCard,
+              styles.formCard,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
-            <View style={styles.modalSuccessIcon}>
-              <Ionicons name="checkmark" size={32} color="#7C3AED" />
-            </View>
-            <Text style={[styles.modalTitle, { color: textPrimary }]}>
-              Seat Request Sent!
-            </Text>
-            <Text style={[styles.modalDesc, { color: textMute }]}>
-              {bookingSuccessModal?.driverName} has been notified. You will be
-              connected in chat to coordinate the pickup.
-            </Text>
-
-            <View
-              style={[
-                styles.modalRouteSummary,
-                { backgroundColor: isDark ? "#1E293B" : "#F8FAFC" },
-              ]}
-            >
-              <Text style={[styles.summaryRoute, { color: textPrimary }]}>
-                {bookingSuccessModal?.from} ➔ {bookingSuccessModal?.to}
-              </Text>
-              <Text style={[styles.summaryTime, { color: "#7C3AED" }]}>
-                ⏰ {bookingSuccessModal?.time} •{" "}
-                {typeof bookingSuccessModal?.price === "number"
-                  ? `₹${bookingSuccessModal?.price}`
-                  : bookingSuccessModal?.price?.startsWith("₹")
-                    ? bookingSuccessModal?.price
-                    : `₹${bookingSuccessModal?.price}`}
-              </Text>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalDoneBtn}
-                onPress={() => setBookingSuccessModal(null)}
-              >
-                <Text style={styles.modalDoneBtnText}>Got it!</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
+            <View style={styles.formCardHeader}>
+              <View
                 style={[
-                  styles.modalCancelSeatBtn,
-                  {
-                    borderColor: border,
-                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                  },
+                  styles.formHeaderIcon,
+                  { backgroundColor: "#7C3AED15" },
                 ]}
-                onPress={() => {
-                  const targetRide = bookingSuccessModal;
-                  setBookingSuccessModal(null);
-                  if (targetRide) {
-                    handleCancelSeatRequest(targetRide);
-                  }
-                }}
-                activeOpacity={0.8}
               >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={15}
-                  color="#EF4444"
-                />
-                <Text style={styles.modalCancelSeatBtnText}>
-                  Cancel Seat Request
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Co-Riders & Requests Management Modal for Ride Creator */}
-      <Modal
-        visible={!!selectedRideForParticipants}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSelectedRideForParticipants(null)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.participantsModalCard,
-              { backgroundColor: cardBg, borderColor: border },
-            ]}
-          >
-            {/* Modal Header */}
-            <View style={styles.participantsModalHeader}>
+                <Ionicons name="car-sport" size={22} color="#7C3AED" />
+              </View>
               <View style={{ flex: 1 }}>
-                <View style={styles.participantsHeaderRow}>
-                  <View style={styles.participantsIconBadge}>
-                    <Ionicons name="people" size={18} color="#7C3AED" />
-                  </View>
-                  <Text
-                    style={[
-                      styles.participantsModalTitle,
-                      { color: textPrimary },
-                    ]}
-                  >
-                    Co-Riders & Requests
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.participantsModalSubtitle,
-                    { color: textMute },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {selectedRideForParticipants?.from} ➔{" "}
-                  {selectedRideForParticipants?.to}
+                <Text style={[styles.formCardTitle, { color: textPrimary }]}>
+                  Offer a Ride
                 </Text>
-                <Text style={styles.participantsSeatsInfo}>
-                  💺{" "}
-                  {Array.isArray(selectedRideForParticipants?.passengers)
-                    ? selectedRideForParticipants.passengers.reduce(
-                        (sum: number, p: any) =>
-                          p.status === "confirmed" ? sum + (p.seats || 0) : sum,
-                        0,
-                      )
-                    : 0}{" "}
-                  of{" "}
-                  {selectedRideForParticipants?.totalSeats &&
-                  selectedRideForParticipants.totalSeats > 0
-                    ? selectedRideForParticipants.totalSeats
-                    : selectedRideForParticipants?.vehicleType === "bike"
-                      ? 1
-                      : 2}{" "}
-                  seat(s) available
+                <Text style={[styles.formCardSub, { color: textMute }]}>
+                  Share empty seats with commuters along your route
                 </Text>
               </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalCloseCircle,
-                  { backgroundColor: isDark ? "#334155" : "#F1F5F9" },
-                ]}
-                onPress={() => setSelectedRideForParticipants(null)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="close" size={18} color={textPrimary} />
-              </TouchableOpacity>
             </View>
 
-            {/* List of Co-Rider Requests with vertical scroll */}
-            <ScrollView
-              style={styles.participantsScrollView}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled={true}
-              contentContainerStyle={{ paddingVertical: 4, paddingBottom: 12 }}
-            >
-              {!selectedRideForParticipants?.passengers ||
-              selectedRideForParticipants.passengers.length === 0 ? (
-                <View style={styles.emptyParticipantsWrap}>
-                  <View
-                    style={[
-                      styles.emptyParticipantsIconWrap,
-                      {
-                        backgroundColor: isDark
-                          ? "rgba(124, 58, 237, 0.15)"
-                          : "#F5F3FF",
-                      },
-                    ]}
-                  >
-                    <Ionicons name="car-outline" size={36} color="#7C3AED" />
-                  </View>
-                  <Text
-                    style={[
-                      styles.emptyParticipantsTitle,
-                      { color: textPrimary },
-                    ]}
-                  >
-                    No Seat Requests Yet
-                  </Text>
-                  <Text
-                    style={[styles.emptyParticipantsDesc, { color: textMute }]}
-                  >
-                    When commuters on this route request to join your ride, they
-                    will appear here. You can review their details, call them,
-                    and confirm their seat.
-                  </Text>
-                </View>
-              ) : (
-                selectedRideForParticipants.passengers.map((passenger, idx) => {
-                  const isConfirmed = passenger.status === "confirmed";
-                  return (
-                    <View
-                      key={passenger.id || passenger.userId || idx}
-                      style={[
-                        styles.participantCard,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                          borderColor: isConfirmed
-                            ? "#10B981"
-                            : isDark
-                              ? "#334155"
-                              : "#E2E8F0",
-                          borderWidth: isConfirmed ? 1.5 : 1,
-                        },
-                      ]}
-                    >
-                      <View style={styles.participantTopRow}>
-                        <View style={styles.participantAvatar}>
-                          <Text style={styles.participantAvatarText}>
-                            {(passenger.userName || "C")
-                              .charAt(0)
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-
-                        <View style={{ flex: 1, marginLeft: 10 }}>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Text
-                              style={[
-                                styles.participantName,
-                                { color: textPrimary },
-                              ]}
-                            >
-                              {passenger.userName}
-                            </Text>
-
-                            <View
-                              style={[
-                                styles.participantStatusPill,
-                                {
-                                  backgroundColor: isConfirmed
-                                    ? "rgba(16, 185, 129, 0.15)"
-                                    : "rgba(245, 158, 11, 0.15)",
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.participantStatusText,
-                                  {
-                                    color: isConfirmed ? "#10B981" : "#D97706",
-                                  },
-                                ]}
-                              >
-                                {isConfirmed ? "✓ Confirmed" : "Pending"}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <Text
-                            style={[
-                              styles.participantDetail,
-                              { color: textMute },
-                            ]}
-                          >
-                            Requested {passenger.seats || 1} seat(s)
-                          </Text>
-                        </View>
-                      </View>
-
-                      {passenger.pickupPoint ? (
-                        <View style={styles.participantPickupWrap}>
-                          <Ionicons
-                            name="location-outline"
-                            size={14}
-                            color="#7C3AED"
-                          />
-                          <Text
-                            style={[
-                              styles.participantPickupText,
-                              { color: textPrimary },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            Pickup: {passenger.pickupPoint}
-                          </Text>
-                        </View>
-                      ) : null}
-
-                      <View style={styles.participantActionsRow}>
-                        {passenger.passengerPhone ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.callBtn,
-                              {
-                                backgroundColor: isDark ? "#334155" : "#E2E8F0",
-                              },
-                            ]}
-                            onPress={() =>
-                              Linking.openURL(`tel:${passenger.passengerPhone}`)
-                            }
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons
-                              name="call"
-                              size={13}
-                              color={textPrimary}
-                            />
-                            <Text
-                              style={[
-                                styles.callBtnText,
-                                { color: textPrimary },
-                              ]}
-                            >
-                              Call {passenger.passengerPhone}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
-
-                        {isConfirmed ? (
-                          <View style={styles.confirmedPill}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={16}
-                              color="#10B981"
-                            />
-                            <Text style={styles.confirmedPillText}>
-                              Confirmed
-                            </Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={[
-                              styles.selectPassengerBtn,
-                              { opacity: isConfirmingPassenger ? 0.7 : 1 },
-                            ]}
-                            onPress={() =>
-                              handleConfirmPassenger(
-                                selectedRideForParticipants.id,
-                                passenger.userId,
-                              )
-                            }
-                            disabled={isConfirmingPassenger}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons
-                              name="checkmark"
-                              size={15}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.selectPassengerBtnText}>
-                              {isConfirmingPassenger
-                                ? "Confirming..."
-                                : "Select & Confirm"}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* YES/NO Confirmation Modal (Explicit, Prominent & Accessible) */}
-      {confirmDialog && (
-        <Modal
-          visible={confirmDialog.isOpen}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setConfirmDialog(null)}
-        >
-          <View style={styles.confirmBackdrop}>
-            <View
-              style={[
-                styles.confirmCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
+            {/* 1. Pickup Location */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Pick-up Location <Text style={{ color: "#EF4444" }}>*</Text>
+              </Text>
               <View
                 style={[
-                  styles.confirmIconCircle,
+                  styles.inputBox,
                   {
-                    backgroundColor:
-                      confirmDialog.confirmStyle === "destructive"
-                        ? isDark
-                          ? "rgba(239, 68, 68, 0.2)"
-                          : "#FEF2F2"
-                        : isDark
-                          ? "rgba(124, 58, 237, 0.2)"
-                          : "#EDE9FE",
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
                   },
                 ]}
               >
-                <Ionicons
-                  name={
-                    confirmDialog.confirmStyle === "destructive"
-                      ? "alert-circle-outline"
-                      : "help-circle-outline"
-                  }
-                  size={32}
-                  color={
-                    confirmDialog.confirmStyle === "destructive"
-                      ? "#EF4444"
-                      : "#7C3AED"
-                  }
+                <Ionicons name="location" size={18} color="#10B981" />
+                <TextInput
+                  value={offerPickup}
+                  onChangeText={(val) => setOfferPickup(toTitleCase(val))}
+                  autoCapitalize="words"
+                  placeholder="e.g. Cyber Towers Main Gate, Hitec City"
+                  placeholderTextColor={textMute}
+                  style={[styles.textInputField, { color: textPrimary }]}
                 />
+                {offerPickup.length > 0 && (
+                  <TouchableOpacity onPress={() => setOfferPickup("")}>
+                    <Ionicons name="close-circle" size={16} color={textMute} />
+                  </TouchableOpacity>
+                )}
               </View>
+            </View>
 
-              <Text style={[styles.confirmTitle, { color: textPrimary }]}>
-                {confirmDialog.title}
+            {/* 2. Drop Location */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Drop Location <Text style={{ color: "#EF4444" }}>*</Text>
               </Text>
+              <View
+                style={[
+                  styles.inputBox,
+                  {
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
+                  },
+                ]}
+              >
+                <Ionicons name="navigate" size={18} color="#EF4444" />
+                <TextInput
+                  value={offerDrop}
+                  onChangeText={(val) => setOfferDrop(toTitleCase(val))}
+                  autoCapitalize="words"
+                  placeholder="e.g. Wipro Circle Gate 1, Gachibowli"
+                  placeholderTextColor={textMute}
+                  style={[styles.textInputField, { color: textPrimary }]}
+                />
+                {offerDrop.length > 0 && (
+                  <TouchableOpacity onPress={() => setOfferDrop("")}>
+                    <Ionicons name="close-circle" size={16} color={textMute} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
-              <Text style={[styles.confirmMessage, { color: textMute }]}>
-                {confirmDialog.message}
-              </Text>
-
-              <View style={styles.confirmButtonsRow}>
+            {/* Quick Location Chips */}
+            <Text style={[styles.quickChipTitle, { color: textMute }]}>
+              Popular pick/drop landmarks (Tap to fill):
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.quickChipsScroll}
+            >
+              {POPULAR_LOCATIONS.map((loc, idx) => (
                 <TouchableOpacity
+                  key={idx}
                   style={[
-                    styles.confirmBtnNo,
+                    styles.quickLocChip,
                     {
                       borderColor: border,
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                    },
-                  ]}
-                  onPress={() => setConfirmDialog(null)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[styles.confirmBtnNoText, { color: textPrimary }]}
-                  >
-                    {confirmDialog.cancelText || "NO"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.confirmBtnYes,
-                    {
-                      backgroundColor:
-                        confirmDialog.confirmStyle === "destructive"
-                          ? "#EF4444"
-                          : "#7C3AED",
+                      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
                     },
                   ]}
                   onPress={() => {
-                    const action = confirmDialog.onConfirm;
-                    setConfirmDialog(null);
-                    action();
+                    if (!offerPickup) setOfferPickup(loc);
+                    else if (!offerDrop) setOfferDrop(loc);
+                    else setOfferPickup(loc);
                   }}
-                  activeOpacity={0.8}
                 >
-                  <Text style={styles.confirmBtnYesText}>
-                    {confirmDialog.confirmText || "YES"}
+                  <Text
+                    style={[styles.quickLocChipText, { color: textPrimary }]}
+                  >
+                    {loc}
                   </Text>
                 </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+              ))}
+            </ScrollView>
 
-      {/* ================= 1. SAFETY MODAL (During & Before Ride Safety Toolkit) ================= */}
-      {safetyModalRide && (
-        <Modal
-          visible={!!safetyModalRide}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setSafetyModalRide(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View
-              style={[
-                styles.safetyModalCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              {/* Header */}
-              <View style={styles.safetyModalHeader}>
-                <View style={styles.safetyHeaderTitleRow}>
-                  <View style={styles.safetyShieldIconWrap}>
-                    <Ionicons
-                      name="shield-checkmark"
-                      size={20}
-                      color="#10B981"
-                    />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.safetyModalTitle, { color: textPrimary }]}
-                    >
-                      Junto Ride Safety System
-                    </Text>
-                    <Text style={[styles.safetyModalSub, { color: textMute }]}>
-                      Trip Security & Real-Time Tracking
-                    </Text>
-                  </View>
-                </View>
-
+            {/* 3. Vehicle Type Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Vehicle Type <Text style={{ color: "#EF4444" }}>*</Text>
+              </Text>
+              <View style={styles.vehicleToggleRow}>
                 <TouchableOpacity
-                  onPress={() => setSafetyModalRide(null)}
-                  style={styles.modalCloseBtn}
-                  hitSlop={8}
-                >
-                  <Ionicons name="close" size={20} color={textMute} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ gap: 14, paddingBottom: 20 }}
-              >
-                {/* Live GPS Status */}
-                <View
                   style={[
-                    styles.safetyGpsStatusBox,
+                    styles.vehicleTypeBtn,
+                    offerVehicleType === "car" && styles.vehicleTypeBtnActive,
                     {
-                      backgroundColor:
-                        safetyModalRide.status === "in_progress"
-                          ? isDark
-                            ? "rgba(16, 185, 129, 0.15)"
-                            : "#ECFDF5"
-                          : isDark
-                            ? "rgba(124, 58, 237, 0.1)"
-                            : "#F5F3FF",
                       borderColor:
-                        safetyModalRide.status === "in_progress"
-                          ? "#10B981"
-                          : border,
+                        offerVehicleType === "car" ? "#7C3AED" : border,
                     },
                   ]}
+                  onPress={() => handleVehicleTypeChange("car")}
                 >
-                  <View style={styles.liveBeaconRow}>
-                    <View
-                      style={[
-                        styles.liveBeaconDot,
-                        {
-                          backgroundColor:
-                            safetyModalRide.status === "in_progress"
-                              ? "#10B981"
-                              : "#7C3AED",
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.liveBeaconTitle,
-                        {
-                          color:
-                            safetyModalRide.status === "in_progress"
-                              ? "#10B981"
-                              : "#7C3AED",
-                        },
-                      ]}
-                    >
-                      {safetyModalRide.status === "in_progress"
-                        ? "GPS ACTIVE (Streaming every 20s)"
-                        : safetyModalRide.status === "completed"
-                          ? "TRIP COMPLETED"
-                          : "SCHEDULED TRIP • GPS STANDBY"}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[styles.safetyGpsCoords, { color: textPrimary }]}
-                  >
-                    📍 Current Location:{" "}
-                    {safetyModalRide.currentLatitude
-                      ? `${safetyModalRide.currentLatitude.toFixed(5)}, ${safetyModalRide.currentLongitude?.toFixed(5)}`
-                      : "17.44350, 78.37720 (Hitec City Hub)"}
-                  </Text>
-                  <Text style={[styles.safetyGpsTip, { color: textMute }]}>
-                    Optimized battery updates: skips small movements &lt; 17m to
-                    preserve device energy during journeys.
-                  </Text>
-                </View>
-
-                {/* Driver & Vehicle Details (Before Ride Verification) */}
-                <View
-                  style={[
-                    styles.safetySectionCard,
-                    {
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderColor: border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[styles.safetySectionTitle, { color: textPrimary }]}
-                  >
-                    Verified Driver & Vehicle
-                  </Text>
-
-                  <View style={styles.safetyDriverRow}>
-                    <Image
-                      source={{ uri: safetyModalRide.driverAvatar }}
-                      style={styles.safetyDriverAvatar}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.safetyDriverName,
-                            { color: textPrimary },
-                          ]}
-                        >
-                          {safetyModalRide.driverName}
-                        </Text>
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={15}
-                          color="#10B981"
-                        />
-                      </View>
-                      <Text
-                        style={[styles.safetyDriverRating, { color: textMute }]}
-                      >
-                        ⭐ {safetyModalRide.driverRating || "5.0"} • Verified
-                        Junto Member
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.safetyDivider,
-                      { backgroundColor: border, marginVertical: 8 },
-                    ]}
+                  <Ionicons
+                    name="car-sport"
+                    size={22}
+                    color={offerVehicleType === "car" ? "#7C3AED" : textMute}
                   />
-
-                  <View style={styles.safetyGridRow}>
-                    <View style={styles.safetyGridItem}>
-                      <Text
-                        style={[styles.safetyFieldLabel, { color: textMute }]}
-                      >
-                        VEHICLE MODEL
-                      </Text>
-                      <Text
-                        style={[
-                          styles.safetyFieldValue,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {safetyModalRide.vehicleModel ||
-                          (safetyModalRide.vehicleType === "car"
-                            ? "Maruti Swift White"
-                            : "Honda Activa 6G")}
-                      </Text>
-                    </View>
-
-                    <View style={styles.safetyGridItem}>
-                      <Text
-                        style={[styles.safetyFieldLabel, { color: textMute }]}
-                      >
-                        NUMBER PLATE
-                      </Text>
-                      <Text
-                        style={[
-                          styles.safetyPlateBadgeText,
-                          { color: "#7C3AED" },
-                        ]}
-                      >
-                        {safetyModalRide.registrationNumber || "TS-09-EA-4521"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.safetyGridRow, { marginTop: 8 }]}>
-                    <View style={styles.safetyGridItem}>
-                      <Text
-                        style={[styles.safetyFieldLabel, { color: textMute }]}
-                      >
-                        PICKUP LANDMARK
-                      </Text>
-                      <Text
-                        style={[
-                          styles.safetyFieldValue,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {safetyModalRide.pickupLocation || safetyModalRide.from}
-                      </Text>
-                    </View>
-
-                    <View style={styles.safetyGridItem}>
-                      <Text
-                        style={[styles.safetyFieldLabel, { color: textMute }]}
-                      >
-                        DROP LANDMARK
-                      </Text>
-                      <Text
-                        style={[
-                          styles.safetyFieldValue,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {safetyModalRide.dropLocation || safetyModalRide.to}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* 4 Safety Action Buttons (During Ride) */}
-                <Text
-                  style={[styles.safetySectionTitle, { color: textPrimary }]}
-                >
-                  During-Ride Emergency & Sharing
-                </Text>
-
-                <View style={styles.safetyActionsGrid}>
-                  <TouchableOpacity
+                  <Text
                     style={[
-                      styles.safetyActionButton,
+                      styles.vehicleTypeBtnText,
                       {
-                        backgroundColor: isDark ? "#1E293B" : "#EFF6FF",
-                        borderColor: "#3B82F6",
+                        color:
+                          offerVehicleType === "car" ? "#7C3AED" : textPrimary,
                       },
                     ]}
-                    onPress={() => handleShareTrip(safetyModalRide)}
-                    activeOpacity={0.8}
                   >
-                    <Ionicons name="share-social" size={22} color="#3B82F6" />
-                    <Text
-                      style={[
-                        styles.safetyActionBtnTitle,
-                        { color: "#3B82F6" },
-                      ]}
-                    >
-                      Share Trip
-                    </Text>
-                    <Text
-                      style={[styles.safetyActionBtnSub, { color: textMute }]}
-                    >
-                      Send live status to friends/family
-                    </Text>
-                  </TouchableOpacity>
+                    Car (Car Pool)
+                  </Text>
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.safetyActionButton,
-                      {
-                        backgroundColor: isDark ? "#1E293B" : "#FEF2F2",
-                        borderColor: "#EF4444",
-                      },
-                    ]}
-                    onPress={handleEmergencyCall}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="call" size={22} color="#EF4444" />
-                    <Text
-                      style={[
-                        styles.safetyActionBtnTitle,
-                        { color: "#EF4444" },
-                      ]}
-                    >
-                      Emergency Call
-                    </Text>
-                    <Text
-                      style={[styles.safetyActionBtnSub, { color: textMute }]}
-                    >
-                      Dial 112 / Police emergency instantly
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.safetyActionButton,
-                      {
-                        backgroundColor: isDark ? "#1E293B" : "#F5F3FF",
-                        borderColor: "#7C3AED",
-                      },
-                    ]}
-                    onPress={() => {
-                      setSafetyModalRide(null);
-                      handleOpenChat(safetyModalRide);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="chatbubbles" size={22} color="#7C3AED" />
-                    <Text
-                      style={[
-                        styles.safetyActionBtnTitle,
-                        { color: "#7C3AED" },
-                      ]}
-                    >
-                      Junto Chat
-                    </Text>
-                    <Text
-                      style={[styles.safetyActionBtnSub, { color: textMute }]}
-                    >
-                      Direct chat with driver & riders
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.safetyActionButton,
-                      {
-                        backgroundColor: isDark ? "#1E293B" : "#FFFBEB",
-                        borderColor: "#F59E0B",
-                      },
-                    ]}
-                    onPress={() => {
-                      const current = safetyModalRide;
-                      setSafetyModalRide(null);
-                      setReportModalRide(current);
-                      setReportCategory("Rash or Reckless Driving");
-                      setReportDescription("");
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="alert-circle" size={22} color="#F59E0B" />
-                    <Text
-                      style={[
-                        styles.safetyActionBtnTitle,
-                        { color: "#D97706" },
-                      ]}
-                    >
-                      Report Issue
-                    </Text>
-                    <Text
-                      style={[styles.safetyActionBtnSub, { color: textMute }]}
-                    >
-                      Flag safety concern to Junto
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Safety Tips Banner */}
-                <View
+                <TouchableOpacity
                   style={[
-                    styles.safetyTipCard,
+                    styles.vehicleTypeBtn,
+                    offerVehicleType === "bike" && styles.vehicleTypeBtnActive,
                     {
-                      backgroundColor: isDark
-                        ? "rgba(16, 185, 129, 0.1)"
-                        : "#ECFDF5",
-                      borderColor: "#10B981",
+                      borderColor:
+                        offerVehicleType === "bike" ? "#7C3AED" : border,
                     },
                   ]}
+                  onPress={() => handleVehicleTypeChange("bike")}
                 >
-                  <Ionicons name="lock-closed" size={16} color="#10B981" />
-                  <Text style={[styles.safetyTipText, { color: textPrimary }]}>
-                    <Text style={{ fontWeight: "700" }}>
-                      Junto Safety Promise:{" "}
-                    </Text>
-                    Always match the vehicle number plate before boarding. Never
-                    share passwords or OTPs.
+                  <Ionicons
+                    name="bicycle"
+                    size={22}
+                    color={offerVehicleType === "bike" ? "#7C3AED" : textMute}
+                  />
+                  <Text
+                    style={[
+                      styles.vehicleTypeBtnText,
+                      {
+                        color:
+                          offerVehicleType === "bike" ? "#7C3AED" : textPrimary,
+                      },
+                    ]}
+                  >
+                    Bike (Two-Wheeler)
                   </Text>
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ================= 2. DRIVER VERIFIED PROFILE MODAL (Before Ride) ================= */}
-      {driverProfileModalRide && (
-        <Modal
-          visible={!!driverProfileModalRide}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setDriverProfileModalRide(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View
-              style={[
-                styles.driverProfileCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                  Driver Verification
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setDriverProfileModalRide(null)}
-                  style={styles.modalCloseBtn}
-                  hitSlop={8}
-                >
-                  <Ionicons name="close" size={20} color={textMute} />
                 </TouchableOpacity>
               </View>
+            </View>
 
-              <View style={styles.driverProfileTop}>
-                <Image
-                  source={{ uri: driverProfileModalRide.driverAvatar }}
-                  style={styles.profileModalAvatar}
-                />
-                <Text style={[styles.profileModalName, { color: textPrimary }]}>
-                  {driverProfileModalRide.driverName}
+            {/* 4. Vehicle Number (No Verification) */}
+            <View style={styles.inputGroup}>
+              <View style={styles.labelWithHintRow}>
+                <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                  Vehicle Number <Text style={{ color: "#EF4444" }}>*</Text>
                 </Text>
-                <View style={styles.verifiedTagRow}>
-                  <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-                  <Text style={styles.verifiedTagText}>
-                    Verified Junto Community Profile
-                  </Text>
-                </View>
-                <Text style={[styles.profileModalStats, { color: textMute }]}>
-                  ⭐ {driverProfileModalRide.driverRating || "5.0"} Rating •{" "}
-                  {driverProfileModalRide.ratings?.length || 18} Trips Completed
-                </Text>
+                <Text style={styles.noVerifyBadge}>No verification needed</Text>
               </View>
-
               <View
                 style={[
-                  styles.verificationList,
+                  styles.inputBox,
                   {
                     backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
                     borderColor: border,
                   },
                 ]}
               >
-                <View style={styles.verificationItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                  <Text
-                    style={[
-                      styles.verificationItemText,
-                      { color: textPrimary },
-                    ]}
-                  >
-                    Government ID & Driving License Verified
-                  </Text>
+                <View style={styles.indPlateSmall}>
+                  <Text style={styles.indPlateSmallText}>IND</Text>
                 </View>
-                <View
-                  style={[styles.safetyDivider, { backgroundColor: border }]}
+                <TextInput
+                  value={offerVehicleNumber}
+                  onChangeText={(val) =>
+                    setOfferVehicleNumber(val.toUpperCase())
+                  }
+                  placeholder="e.g. TS 09 EA 1234"
+                  placeholderTextColor={textMute}
+                  autoCapitalize="characters"
+                  style={[
+                    styles.textInputField,
+                    { color: textPrimary, fontWeight: "700", letterSpacing: 1 },
+                  ]}
                 />
-                <View style={styles.verificationItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                  <Text
-                    style={[
-                      styles.verificationItemText,
-                      { color: textPrimary },
-                    ]}
-                  >
-                    Mobile Number & Email Verified
-                  </Text>
-                </View>
-                <View
-                  style={[styles.safetyDivider, { backgroundColor: border }]}
-                />
-                <View style={styles.verificationItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                  <Text
-                    style={[
-                      styles.verificationItemText,
-                      { color: textPrimary },
-                    ]}
-                  >
-                    Vehicle Registration & Insurance Confirmed
-                  </Text>
-                </View>
               </View>
+              <Text style={[styles.fieldSubHint, { color: textMute }]}>
+                Co-riders use your vehicle number to spot you at the pickup
+                point.
+              </Text>
+            </View>
 
+            {/* 5. Vehicle Model (Optional) */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Vehicle Model & Color (Optional)
+              </Text>
               <View
                 style={[
-                  styles.vehicleInfoBox,
+                  styles.inputBox,
+                  {
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={textMute}
+                />
+                <TextInput
+                  value={offerVehicleModel}
+                  onChangeText={(val) => setOfferVehicleModel(toTitleCase(val))}
+                  autoCapitalize="words"
+                  placeholder="e.g. Swift (Silver) or Activa (Grey)"
+                  placeholderTextColor={textMute}
+                  style={[styles.textInputField, { color: textPrimary }]}
+                />
+              </View>
+            </View>
+
+            {/* 6. Departure Schedule (Date & Time Picker) */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Departure Date & Time{" "}
+                <Text style={{ color: "#EF4444" }}>*</Text>
+              </Text>
+
+              {/* Date & Time Picker Trigger Buttons */}
+              <View style={styles.dateTimePickersRow}>
+                {/* Date Picker Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.dateTimePickerCard,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderColor: showDatePicker ? "#7C3AED" : border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowDatePicker((prev) => !prev);
+                    if (Platform.OS !== "web") setShowTimePicker(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.pickerIconWrap}>
+                    <Ionicons name="calendar" size={18} color="#7C3AED" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.pickerMiniLabel, { color: textMute }]}>
+                      DEPARTURE DATE
+                    </Text>
+                    <Text
+                      style={[styles.pickerCardValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(departureDate)}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={showDatePicker ? "chevron-up" : "calendar-outline"}
+                    size={16}
+                    color={textMute}
+                  />
+                </TouchableOpacity>
+
+                {/* Time Picker Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.dateTimePickerCard,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderColor: showTimePicker ? "#7C3AED" : border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowTimePicker((prev) => !prev);
+                    if (Platform.OS !== "web") setShowDatePicker(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.pickerIconWrap}>
+                    <Ionicons name="time" size={18} color="#7C3AED" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.pickerMiniLabel, { color: textMute }]}>
+                      DEPARTURE TIME
+                    </Text>
+                    <Text
+                      style={[styles.pickerCardValue, { color: textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {formatTime(departureTime)}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={showTimePicker ? "chevron-up" : "time-outline"}
+                    size={16}
+                    color={textMute}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Inline / Modal Date & Time Pickers */}
+              {(showDatePicker || showTimePicker || Platform.OS === "web") && (
+                <View
+                  style={[
+                    styles.inlinePickersContainer,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                      borderColor: border,
+                    },
+                  ]}
+                >
+                  {(showDatePicker || Platform.OS === "web") && (
+                    <View style={styles.inlinePickerItem}>
+                      <View style={styles.inlinePickerHeader}>
+                        <Text
+                          style={[
+                            styles.inlinePickerTitle,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          📅 Choose Date
+                        </Text>
+                        {Platform.OS !== "web" && (
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(false)}
+                          >
+                            <Text style={styles.inlinePickerDoneBtn}>Done</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <DateTimePicker
+                        value={departureDate}
+                        mode="date"
+                        display="default"
+                        minimumDate={new Date()}
+                        onChange={onDateChange}
+                        themeVariant={isDark ? "dark" : "light"}
+                      />
+                    </View>
+                  )}
+
+                  {(showTimePicker || Platform.OS === "web") && (
+                    <View style={styles.inlinePickerItem}>
+                      <View style={styles.inlinePickerHeader}>
+                        <Text
+                          style={[
+                            styles.inlinePickerTitle,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          ⏰ Choose Time
+                        </Text>
+                        {Platform.OS !== "web" && (
+                          <TouchableOpacity
+                            onPress={() => setShowTimePicker(false)}
+                          >
+                            <Text style={styles.inlinePickerDoneBtn}>Done</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <DateTimePicker
+                        value={departureTime}
+                        mode="time"
+                        display="default"
+                        onChange={onTimeChange}
+                        themeVariant={isDark ? "dark" : "light"}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Scheduled Summary Chip */}
+              <View
+                style={[
+                  styles.selectedTimeDisplay,
                   {
                     backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
                     borderColor: border,
                   },
                 ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text style={[styles.safetyFieldLabel, { color: textMute }]}>
-                    REGISTERED VEHICLE
-                  </Text>
-                  <Text
-                    style={[styles.safetyPlateBadgeText, { color: "#7C3AED" }]}
-                  >
-                    {driverProfileModalRide.registrationNumber ||
-                      "TS-09-EA-4521"}
-                  </Text>
-                </View>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                 <Text
                   style={[
-                    styles.vehicleModelText,
-                    { color: textPrimary, marginTop: 4 },
+                    styles.selectedTimeDisplayText,
+                    { color: textPrimary },
                   ]}
                 >
-                  {driverProfileModalRide.vehicleModel ||
-                    (driverProfileModalRide.vehicleType === "car"
-                      ? "Maruti Swift (Silver)"
-                      : "Honda Activa 6G")}
+                  Scheduled: {formatDeparture(departureDate, departureTime)}
                 </Text>
               </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.primaryActionBtn,
-                  { backgroundColor: "#7C3AED", marginTop: 12 },
-                ]}
-                onPress={() => setDriverProfileModalRide(null)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryActionBtnText}>Close Profile</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
-      )}
 
-      {/* ================= 3. RATING & REVIEW MODAL (After Ride) ================= */}
-      {ratingModalRide && (
-        <Modal
-          visible={!!ratingModalRide}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setRatingModalRide(null)}
+            {/* 7. Seats Available & Price per seat */}
+            <View style={styles.rowTwoCols}>
+              {/* Seats */}
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                  Seats Available
+                </Text>
+                <View style={styles.seatsPillRow}>
+                  {(offerVehicleType === "car" ? [1, 2, 3, 4] : [1]).map(
+                    (s) => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[
+                          styles.seatSelectBtn,
+                          offerSeats === s && styles.seatSelectBtnActive,
+                          {
+                            borderColor: offerSeats === s ? "#7C3AED" : border,
+                          },
+                        ]}
+                        onPress={() => setOfferSeats(s)}
+                      >
+                        <Text
+                          style={[
+                            styles.seatSelectBtnText,
+                            {
+                              color: offerSeats === s ? "#7C3AED" : textPrimary,
+                            },
+                          ]}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    ),
+                  )}
+                </View>
+              </View>
+
+              {/* Price */}
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                  Price / Seat (₹)
+                </Text>
+                <View
+                  style={[
+                    styles.inputBox,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                      borderColor: border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.currencyPrefix, { color: textPrimary }]}>
+                    ₹
+                  </Text>
+                  <TextInput
+                    value={offerPrice}
+                    onChangeText={setOfferPrice}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={textMute}
+                    style={[
+                      styles.textInputField,
+                      { color: textPrimary, fontWeight: "700" },
+                    ]}
+                  />
+                  {offerPrice.length > 0 && (
+                    <TouchableOpacity onPress={() => setOfferPrice("")}>
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={textMute}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* 8. Notes (Optional) */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                Ride Notes (Optional)
+              </Text>
+              <TextInput
+                value={offerNotes}
+                onChangeText={setOfferNotes}
+                placeholder="e.g. AC carpool, no luggage, departure on time"
+                placeholderTextColor={textMute}
+                multiline
+                numberOfLines={2}
+                style={[
+                  styles.multilineInput,
+                  {
+                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                    borderColor: border,
+                    color: textPrimary,
+                  },
+                ]}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.publishBtn, isPublishing && { opacity: 0.7 }]}
+              onPress={handlePublishRide}
+              disabled={isPublishing}
+              activeOpacity={0.85}
+            >
+              {isPublishing ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="paper-plane" size={18} color="#FFF" />
+                  <Text style={styles.publishBtnText}>Publish Ride Offer</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : activeTab === "my_rides" ? (
+        /* ================= MY RIDES TAB ================= */
+        <ScrollView
+          contentContainerStyle={[
+            styles.listScrollContainer,
+            { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+          ]}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.modalBackdrop}>
+          {myRides.length === 0 ? (
             <View
               style={[
-                styles.ratingModalCard,
+                styles.emptyBox,
                 { backgroundColor: cardBg, borderColor: border },
               ]}
             >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                  Rate Your Journey
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setRatingModalRide(null)}
-                  style={styles.modalCloseBtn}
-                  hitSlop={8}
-                >
-                  <Ionicons name="close" size={20} color={textMute} />
-                </TouchableOpacity>
-              </View>
+              <Ionicons name="car-outline" size={48} color={textMute} />
+              <Text style={[styles.emptyTitle, { color: textPrimary }]}>
+                No Rides Yet
+              </Text>
+              <Text style={[styles.emptySub, { color: textMute }]}>
+                You have not offered or requested any rides yet.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => setActiveTab("offer")}
+              >
+                <Ionicons name="add-circle" size={18} color="#FFF" />
+                <Text style={styles.emptyActionBtnText}>Offer a Ride Now</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            myRides.map((ride) => {
+              const isOwner = checkIsRideOwner(ride);
+              const userReq = getUserSeatRequest(ride);
+              const hasConfirmedCoRider = (ride.passengers || []).some(
+                (p) => p.status === "confirmed",
+              );
+              const isStarted = ride.status === "in_progress";
+              const showEmergency = isStarted && hasConfirmedCoRider;
 
-              <Text style={[styles.ratingPromptText, { color: textMute }]}>
-                How was your ride with{" "}
-                <Text style={{ fontWeight: "700", color: textPrimary }}>
-                  {ratingModalRide.driverName}
-                </Text>
-                ?
+              return (
+                <View
+                  key={ride.id}
+                  style={[
+                    styles.rideCard,
+                    { backgroundColor: cardBg, borderColor: border },
+                  ]}
+                >
+                  {/* Card Header Tag */}
+                  <View style={styles.cardHeaderTagRow}>
+                    <View
+                      style={[
+                        styles.roleBadge,
+                        {
+                          backgroundColor: isOwner
+                            ? isDark
+                              ? "#7C3AED20"
+                              : "#EDE9FE"
+                            : isDark
+                              ? "#10B98120"
+                              : "#ECFDF5",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isOwner ? "car-sport" : "person"}
+                        size={12}
+                        color={isOwner ? "#7C3AED" : "#10B981"}
+                      />
+                      <Text
+                        style={[
+                          styles.roleBadgeText,
+                          { color: isOwner ? "#7C3AED" : "#10B981" },
+                        ]}
+                      >
+                        {isOwner ? "You are Driver" : "You requested"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.cardHeaderRightGroup}>
+                      <View
+                        style={[
+                          styles.statusPill,
+                          {
+                            backgroundColor:
+                              ride.status === "in_progress"
+                                ? "#10B98120"
+                                : ride.status === "completed"
+                                  ? "#6B728020"
+                                  : "#F59E0B20",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            {
+                              color:
+                                ride.status === "in_progress"
+                                  ? "#10B981"
+                                  : ride.status === "completed"
+                                    ? "#6B7280"
+                                    : "#D97706",
+                            },
+                          ]}
+                        >
+                          {ride.status === "in_progress"
+                            ? "🟢 In Progress"
+                            : ride.status === "completed"
+                              ? "✅ Completed"
+                              : "📅 Scheduled"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 1. Full-Width Route Timeline (Unclipped & Comfortable) */}
+                  <View style={styles.routeContainerFull}>
+                    <View style={styles.routeTimelineCol}>
+                      <View
+                        style={[
+                          styles.routeDot,
+                          { backgroundColor: "#10B981" },
+                        ]}
+                      />
+                      <View
+                        style={[styles.routeLine, { backgroundColor: border }]}
+                      />
+                      <View
+                        style={[
+                          styles.routeDot,
+                          { backgroundColor: "#EF4444" },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.routeTextsColFull}>
+                      <View>
+                        <Text
+                          style={[styles.routeLocLabel, { color: textMute }]}
+                        >
+                          PICKUP
+                        </Text>
+                        <Text
+                          style={[styles.routeLocText, { color: textPrimary }]}
+                        >
+                          {ride.pickupLocation || ride.from}
+                        </Text>
+                      </View>
+                      <View style={{ marginTop: 8 }}>
+                        <Text
+                          style={[styles.routeLocLabel, { color: textMute }]}
+                        >
+                          DROP
+                        </Text>
+                        <Text
+                          style={[styles.routeLocText, { color: textPrimary }]}
+                        >
+                          {ride.dropLocation || ride.to}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 2. Full-Width Trip & Vehicle Details Banner (No clipping, completely spacious) */}
+                  <View
+                    style={[
+                      styles.tripBannerCard,
+                      {
+                        borderColor: border,
+                        backgroundColor: isDark ? "#1E293B60" : "#F8FAFC",
+                      },
+                    ]}
+                  >
+                    {/* Row 1: Departure Date & Time + Available Seats */}
+                    <View style={styles.tripBannerRow}>
+                      <View style={styles.tripBannerItem}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color="#F59E0B"
+                        />
+                        <Text
+                          style={[
+                            styles.tripBannerScheduleText,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {ride.date ? `${ride.date} • ` : ""}
+                          {ride.time}
+                        </Text>
+                      </View>
+                      <View style={styles.tripBannerItem}>
+                        <Ionicons
+                          name="people-outline"
+                          size={14}
+                          color="#7C3AED"
+                        />
+                        <Text
+                          style={[
+                            styles.tripBannerSeatsText,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {ride.seatsLeft !== undefined
+                            ? `${ride.seatsLeft} seat${ride.seatsLeft === 1 ? "" : "s"} left`
+                            : ride.totalSeats !== undefined
+                              ? `${ride.totalSeats} seats`
+                              : "Available"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Subtle Divider */}
+                    <View
+                      style={[
+                        styles.tripBannerDivider,
+                        { backgroundColor: isDark ? "#33415560" : "#E2E8F0" },
+                      ]}
+                    />
+
+                    {/* Row 2: Vehicle Model & Authentic IND Plate */}
+                    <View style={styles.tripBannerRow}>
+                      <View
+                        style={[
+                          styles.tripBannerItem,
+                          { flex: 1, marginRight: 8 },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.tripBannerVehicleText,
+                            { color: textPrimary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {ride.vehicleType === "car" ? "🚗" : "🏍️"}{" "}
+                          {ride.vehicleModel ||
+                            (ride.vehicleType === "car"
+                              ? "Car"
+                              : "Two-Wheeler")}
+                        </Text>
+                      </View>
+
+                      <View style={styles.plateDisplayMini}>
+                        <View style={styles.indFlagMini}>
+                          <Text style={styles.indFlagTextMini}>IND</Text>
+                        </View>
+                        <Text style={styles.plateNumberMini}>
+                          {ride.registrationNumber || "TS 09 EA 1234"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Optional Notes badge if present */}
+                  {ride.notes ? (
+                    <View style={styles.compactNotesRow}>
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={12}
+                        color={textMute}
+                      />
+                      <Text
+                        style={[styles.compactNotesText, { color: textMute }]}
+                        numberOfLines={1}
+                      >
+                        {ride.notes}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Co-Rider Requests (for Driver) */}
+                  {isOwner && (
+                    <View style={[styles.coRidersBox, { borderColor: border }]}>
+                      <Text
+                        style={[
+                          styles.coRidersBoxTitle,
+                          { color: textPrimary },
+                        ]}
+                      >
+                        Co-Riders ({(ride.passengers || []).length}):
+                      </Text>
+
+                      {(ride.passengers || []).length === 0 ? (
+                        <Text
+                          style={[styles.noCoRidersText, { color: textMute }]}
+                        >
+                          No co-rider seat requests yet. When someone requests,
+                          you can accept them here.
+                        </Text>
+                      ) : (
+                        (ride.passengers || []).map((passenger, pIdx) => (
+                          <View
+                            key={pIdx}
+                            style={[
+                              styles.passengerRowItem,
+                              {
+                                borderColor: border,
+                                backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                              },
+                            ]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[
+                                  styles.passengerName,
+                                  { color: textPrimary },
+                                ]}
+                              >
+                                {passenger.userName}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.passengerStatusSub,
+                                  { color: textMute },
+                                ]}
+                              >
+                                {passenger.seats} seat • Status:{" "}
+                                <Text
+                                  style={{
+                                    color:
+                                      passenger.status === "confirmed"
+                                        ? "#10B981"
+                                        : passenger.status === "declined"
+                                          ? "#EF4444"
+                                          : "#F59E0B",
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  {passenger.status || "pending"}
+                                </Text>
+                              </Text>
+                            </View>
+
+                            {passenger.status === "pending" && (
+                              <TouchableOpacity
+                                style={styles.acceptPassengerBtn}
+                                onPress={() =>
+                                  handleAcceptPassenger(
+                                    ride.id,
+                                    passenger.userId,
+                                  )
+                                }
+                                disabled={actionLoadingRideId === ride.id}
+                              >
+                                <Ionicons
+                                  name="checkmark"
+                                  size={14}
+                                  color="#FFF"
+                                />
+                                <Text style={styles.acceptPassengerBtnText}>
+                                  Accept
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+
+                            {passenger.status === "confirmed" && (
+                              <View style={styles.confirmedPassengerTag}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={14}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.confirmedPassengerTagText}>
+                                  Confirmed
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  )}
+
+                  {/* Passenger View Status */}
+                  {!isOwner && userReq && (
+                    <View
+                      style={[
+                        styles.passengerStatusBanner,
+                        { borderColor: border },
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          userReq.status === "confirmed"
+                            ? "checkmark-circle"
+                            : "time-outline"
+                        }
+                        size={16}
+                        color={
+                          userReq.status === "confirmed" ? "#10B981" : "#F59E0B"
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.passengerStatusBannerText,
+                          { color: textPrimary },
+                        ]}
+                      >
+                        {userReq.status === "confirmed"
+                          ? "Your seat is Confirmed by the driver!"
+                          : "Seat Request Pending driver approval"}
+                      </Text>
+                      {ride.status !== "in_progress" &&
+                        ride.status !== "completed" && (
+                          <TouchableOpacity
+                            onPress={() => handleCancelSeat(ride)}
+                            style={styles.cancelRequestBtn}
+                          >
+                            <Text style={styles.cancelRequestBtnText}>
+                              Cancel
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                    </View>
+                  )}
+
+                  {/* ================= EMERGENCY CONTROLS ================= */}
+                  {/* CRITICAL: ONLY SHOW WHEN RIDE IS STARTED WITH CO-RIDER */}
+                  {showEmergency && (
+                    <View style={styles.emergencyCardSection}>
+                      <View style={styles.emergencyHeaderRow}>
+                        <View style={styles.pulsingDotSmall} />
+                        <Text style={styles.emergencySectionTitle}>
+                          SAFETY & EMERGENCY CONTROLS (RIDE ACTIVE)
+                        </Text>
+                      </View>
+
+                      <View style={styles.emergencyButtonsRow}>
+                        <TouchableOpacity
+                          style={styles.emergencySosBtn}
+                          onPress={handleEmergencySOS}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="call" size={15} color="#FFF" />
+                          <Text style={styles.emergencySosBtnText}>
+                            🚨 Call 112 SOS
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.emergencyShareBtn}
+                          onPress={() => handleShareTrip(ride)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="share-social"
+                            size={15}
+                            color="#FFF"
+                          />
+                          <Text style={styles.emergencyShareBtnText}>
+                            Share Trip
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.cardActionsFooter}>
+                    {isOwner ? (
+                      <>
+                        {ride.status !== "in_progress" &&
+                          ride.status !== "completed" && (
+                            <TouchableOpacity
+                              style={[
+                                styles.primaryCardBtn,
+                                {
+                                  backgroundColor: hasConfirmedCoRider
+                                    ? "#10B981"
+                                    : "#94A3B8",
+                                },
+                              ]}
+                              onPress={() => handleStartRide(ride)}
+                              disabled={actionLoadingRideId === ride.id}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="play" size={16} color="#FFF" />
+                              <Text style={styles.primaryCardBtnText}>
+                                {hasConfirmedCoRider
+                                  ? "Start Ride (Activate)"
+                                  : "Waiting for Co-Riders"}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+
+                        {ride.status === "in_progress" && (
+                          <TouchableOpacity
+                            style={[
+                              styles.primaryCardBtn,
+                              { backgroundColor: "#EF4444" },
+                            ]}
+                            onPress={() => handleEndRide(ride)}
+                            disabled={actionLoadingRideId === ride.id}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name="stop-circle"
+                              size={16}
+                              color="#FFF"
+                            />
+                            <Text style={styles.primaryCardBtnText}>
+                              End Ride
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {ride.status === "completed" && (
+                          <TouchableOpacity
+                            style={[
+                              styles.primaryCardBtn,
+                              { backgroundColor: "#7C3AED" },
+                            ]}
+                            onPress={() => {
+                              setRatingModalRide(ride);
+                              setRatingScore(5);
+                              setRatingReview("");
+                            }}
+                          >
+                            <Ionicons name="star" size={16} color="#FFF" />
+                            <Text style={styles.primaryCardBtnText}>
+                              Rate Co-Rider
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Dedicated, comfortable Owner Actions Bar for Edit & Delete */}
+                        {ride.status !== "in_progress" && (
+                          <View style={styles.ownerActionsBar}>
+                            <TouchableOpacity
+                              style={[
+                                styles.ownerActionBtn,
+                                styles.ownerEditBtn,
+                                {
+                                  borderColor: isDark ? "#4C1D95" : "#DDD6FE",
+                                  backgroundColor: isDark
+                                    ? "#2E106540"
+                                    : "#F5F3FF",
+                                },
+                              ]}
+                              onPress={() => openEditRideModal(ride)}
+                              activeOpacity={0.7}
+                              accessibilityLabel="Edit Ride"
+                            >
+                              <Ionicons
+                                name="pencil"
+                                size={16}
+                                color="#7C3AED"
+                              />
+                              <Text
+                                style={[
+                                  styles.ownerActionBtnText,
+                                  { color: "#7C3AED" },
+                                ]}
+                              >
+                                Edit Ride
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.ownerActionBtn,
+                                styles.ownerDeleteBtn,
+                                {
+                                  borderColor: isDark ? "#7F1D1D" : "#FECACA",
+                                  backgroundColor: isDark
+                                    ? "#450A0A40"
+                                    : "#FEF2F2",
+                                },
+                              ]}
+                              onPress={() => handleDeleteRide(ride)}
+                              activeOpacity={0.7}
+                              accessibilityLabel="Delete Ride"
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color="#EF4444"
+                              />
+                              <Text
+                                style={[
+                                  styles.ownerActionBtnText,
+                                  { color: "#EF4444" },
+                                ]}
+                              >
+                                Delete
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      userReq?.status === "confirmed" &&
+                      ride.status === "completed" && (
+                        <TouchableOpacity
+                          style={[
+                            styles.primaryCardBtn,
+                            { backgroundColor: "#7C3AED" },
+                          ]}
+                          onPress={() => {
+                            setRatingModalRide(ride);
+                            setRatingScore(5);
+                            setRatingReview("");
+                          }}
+                        >
+                          <Ionicons name="star" size={16} color="#FFF" />
+                          <Text style={styles.primaryCardBtnText}>
+                            Rate Driver
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      ) : (
+        /* ================= FIND RIDES TAB ================= */
+        <ScrollView
+          contentContainerStyle={[
+            styles.listScrollContainer,
+            { paddingBottom: Math.max(insets.bottom, 24) + 60 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Search Input */}
+          <View
+            style={[
+              styles.searchBar,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Ionicons name="search" size={18} color="#7C3AED" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={(val) => setSearchQuery(toTitleCase(val))}
+              autoCapitalize="words"
+              placeholder="Filter by pickup, drop, driver, plate..."
+              placeholderTextColor={textMute}
+              style={[styles.searchInputText, { color: textPrimary }]}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={18} color={textMute} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Vehicle Type Filter Bar */}
+          <View style={styles.filterPillsRow}>
+            {[
+              { id: "all", label: "All Rides", icon: "apps-outline" },
+              { id: "car", label: "Cars Only 🚗", icon: "car-sport" },
+              { id: "bike", label: "Bikes Only 🏍️", icon: "bicycle" },
+            ].map((f) => {
+              const active = vehicleFilter === f.id;
+              return (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[
+                    styles.filterPill,
+                    active && styles.filterPillActive,
+                    {
+                      borderColor: active ? "#7C3AED" : border,
+                      backgroundColor: cardBg,
+                    },
+                  ]}
+                  onPress={() => setVehicleFilter(f.id as any)}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      {
+                        color: active ? "#7C3AED" : textMute,
+                        fontWeight: active ? "700" : "500",
+                      },
+                    ]}
+                  >
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Rides Feed */}
+          {isLoading ? (
+            <View
+              style={[
+                styles.emptyBox,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <ActivityIndicator size="large" color="#7C3AED" />
+              <Text
+                style={[
+                  styles.emptyTitle,
+                  { color: textPrimary, marginTop: 14 },
+                ]}
+              >
+                Loading Rides...
+              </Text>
+            </View>
+          ) : filteredRides.length === 0 ? (
+            <View
+              style={[
+                styles.emptyBox,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <Ionicons name="car-outline" size={48} color={textMute} />
+              <Text style={[styles.emptyTitle, { color: textPrimary }]}>
+                No Rides Found
+              </Text>
+              <Text style={[styles.emptySub, { color: textMute }]}>
+                No rides matched your search. Be the first to offer one!
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => setActiveTab("offer")}
+              >
+                <Ionicons name="add-circle" size={18} color="#FFF" />
+                <Text style={styles.emptyActionBtnText}>Offer a Ride</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            filteredRides.map((ride) => {
+              const isOwner = checkIsRideOwner(ride);
+              const userReq = getUserSeatRequest(ride);
+              const isFull = (ride.seatsLeft ?? 0) <= 0;
+              const hasConfirmedCoRider = (ride.passengers || []).some(
+                (p) => p.status === "confirmed",
+              );
+              const isStarted = ride.status === "in_progress";
+              // EMERGENCY CONTROLS: Show only if ride is started with co-rider AND user is part of this ride
+              const showEmergency =
+                isStarted &&
+                hasConfirmedCoRider &&
+                (isOwner || userReq?.status === "confirmed");
+
+              return (
+                <View
+                  key={ride.id}
+                  style={[
+                    styles.rideCard,
+                    { backgroundColor: cardBg, borderColor: border },
+                  ]}
+                >
+                  {/* Top Driver Row */}
+                  <View style={styles.feedCardTopRow}>
+                    <View style={styles.feedDriverInfo}>
+                      <Image
+                        source={{
+                          uri:
+                            ride.driverAvatar ||
+                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop",
+                        }}
+                        style={styles.driverAvatarSmall}
+                      />
+                      <View>
+                        <Text
+                          style={[
+                            styles.feedDriverName,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {ride.driverName} {isOwner ? "(You)" : ""}
+                        </Text>
+                        <View style={styles.ratingRowSmall}>
+                          <Ionicons name="star" size={12} color="#F59E0B" />
+                          <Text
+                            style={[
+                              styles.ratingTextSmall,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {ride.driverRating
+                              ? Number(ride.driverRating).toFixed(1)
+                              : "5.0"}
+                          </Text>
+                          <Text
+                            style={[styles.vehicleTypeTag, { color: textMute }]}
+                          >
+                            • {ride.vehicleType === "car" ? "Car" : "Bike"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardHeaderRightGroup}>
+                      <View style={styles.priceBadgeCol}>
+                        <Text
+                          style={[styles.priceAmount, { color: "#10B981" }]}
+                        >
+                          {Number(ride.price) === 0 ? "Free" : `₹${ride.price}`}
+                        </Text>
+                        <Text
+                          style={[styles.priceSubText, { color: textMute }]}
+                        >
+                          per seat
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 1. Full-Width Route Timeline (Unclipped & Comfortable) */}
+                  <View style={styles.routeContainerFull}>
+                    <View style={styles.routeTimelineCol}>
+                      <View
+                        style={[
+                          styles.routeDot,
+                          { backgroundColor: "#10B981" },
+                        ]}
+                      />
+                      <View
+                        style={[styles.routeLine, { backgroundColor: border }]}
+                      />
+                      <View
+                        style={[
+                          styles.routeDot,
+                          { backgroundColor: "#EF4444" },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.routeTextsColFull}>
+                      <View>
+                        <Text
+                          style={[styles.routeLocLabel, { color: textMute }]}
+                        >
+                          FROM
+                        </Text>
+                        <Text
+                          style={[styles.routeLocText, { color: textPrimary }]}
+                        >
+                          {ride.pickupLocation || ride.from}
+                        </Text>
+                      </View>
+                      <View style={{ marginTop: 8 }}>
+                        <Text
+                          style={[styles.routeLocLabel, { color: textMute }]}
+                        >
+                          TO
+                        </Text>
+                        <Text
+                          style={[styles.routeLocText, { color: textPrimary }]}
+                        >
+                          {ride.dropLocation || ride.to}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 2. Full-Width Trip & Vehicle Details Banner (Spacious, No clipping) */}
+                  <View
+                    style={[
+                      styles.tripBannerCard,
+                      {
+                        borderColor: border,
+                        backgroundColor: isDark ? "#1E293B60" : "#F8FAFC",
+                      },
+                    ]}
+                  >
+                    {/* Row 1: Departure Date & Time + Available Seats */}
+                    <View style={styles.tripBannerRow}>
+                      <View style={styles.tripBannerItem}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color="#F59E0B"
+                        />
+                        <Text
+                          style={[
+                            styles.tripBannerScheduleText,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {ride.date ? `${ride.date} • ` : ""}
+                          {ride.time}
+                        </Text>
+                      </View>
+                      <View style={styles.tripBannerItem}>
+                        <Ionicons
+                          name="people-outline"
+                          size={14}
+                          color="#7C3AED"
+                        />
+                        <Text
+                          style={[
+                            styles.tripBannerSeatsText,
+                            { color: textPrimary },
+                          ]}
+                        >
+                          {ride.seatsLeft} seat{ride.seatsLeft === 1 ? "" : "s"}{" "}
+                          left
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Subtle Divider */}
+                    <View
+                      style={[
+                        styles.tripBannerDivider,
+                        { backgroundColor: isDark ? "#33415560" : "#E2E8F0" },
+                      ]}
+                    />
+
+                    {/* Row 2: Vehicle Model & Authentic IND Plate */}
+                    <View style={styles.tripBannerRow}>
+                      <View
+                        style={[
+                          styles.tripBannerItem,
+                          { flex: 1, marginRight: 8 },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.tripBannerVehicleText,
+                            { color: textPrimary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {ride.vehicleType === "car" ? "🚗" : "🏍️"}{" "}
+                          {ride.vehicleModel ||
+                            (ride.vehicleType === "car"
+                              ? "Car"
+                              : "Two-Wheeler")}
+                        </Text>
+                      </View>
+
+                      <View style={styles.plateDisplayMini}>
+                        <View style={styles.indFlagMini}>
+                          <Text style={styles.indFlagTextMini}>IND</Text>
+                        </View>
+                        <Text style={styles.plateNumberMini}>
+                          {ride.registrationNumber || "TS 09 EA 1234"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Optional Notes badge if present */}
+                  {ride.notes ? (
+                    <View style={styles.compactNotesRow}>
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={12}
+                        color={textMute}
+                      />
+                      <Text
+                        style={[styles.compactNotesText, { color: textMute }]}
+                        numberOfLines={1}
+                      >
+                        {ride.notes}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* EMERGENCY CONTROLS ON FEED CARD:
+                      CRITICAL REQUIREMENT: Show emergency controls ONLY when ride is started with co-rider!
+                  */}
+                  {showEmergency && (
+                    <View style={styles.emergencyCardSection}>
+                      <View style={styles.emergencyHeaderRow}>
+                        <View style={styles.pulsingDotSmall} />
+                        <Text style={styles.emergencySectionTitle}>
+                          SAFETY & EMERGENCY CONTROLS (RIDE IN PROGRESS)
+                        </Text>
+                      </View>
+
+                      <View style={styles.emergencyButtonsRow}>
+                        <TouchableOpacity
+                          style={styles.emergencySosBtn}
+                          onPress={handleEmergencySOS}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="call" size={15} color="#FFF" />
+                          <Text style={styles.emergencySosBtnText}>
+                            🚨 Call 112 SOS
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.emergencyShareBtn}
+                          onPress={() => handleShareTrip(ride)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="share-social"
+                            size={15}
+                            color="#FFF"
+                          />
+                          <Text style={styles.emergencyShareBtnText}>
+                            Share Trip
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Card Action Button */}
+                  <View style={styles.feedCardActionRow}>
+                    {isOwner ? (
+                      <View style={{ width: "100%", gap: 8 }}>
+                        <TouchableOpacity
+                          style={[
+                            styles.feedActionBtn,
+                            { backgroundColor: isDark ? "#1E293B" : "#EDE9FE" },
+                          ]}
+                          onPress={() => setActiveTab("my_rides")}
+                        >
+                          <Ionicons name="people" size={16} color="#7C3AED" />
+                          <Text
+                            style={[
+                              styles.feedActionBtnText,
+                              { color: "#7C3AED" },
+                            ]}
+                          >
+                            Your Ride • Manage Co-Riders (
+                            {ride.passengers?.length || 0})
+                          </Text>
+                        </TouchableOpacity>
+
+                        {ride.status !== "in_progress" && (
+                          <View style={styles.ownerActionsBar}>
+                            <TouchableOpacity
+                              style={[
+                                styles.ownerActionBtn,
+                                styles.ownerEditBtn,
+                                {
+                                  borderColor: isDark ? "#4C1D95" : "#DDD6FE",
+                                  backgroundColor: isDark
+                                    ? "#2E106540"
+                                    : "#F5F3FF",
+                                },
+                              ]}
+                              onPress={() => openEditRideModal(ride)}
+                              activeOpacity={0.7}
+                              accessibilityLabel="Edit Ride"
+                            >
+                              <Ionicons
+                                name="pencil"
+                                size={16}
+                                color="#7C3AED"
+                              />
+                              <Text
+                                style={[
+                                  styles.ownerActionBtnText,
+                                  { color: "#7C3AED" },
+                                ]}
+                              >
+                                Edit Ride
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.ownerActionBtn,
+                                styles.ownerDeleteBtn,
+                                {
+                                  borderColor: isDark ? "#7F1D1D" : "#FECACA",
+                                  backgroundColor: isDark
+                                    ? "#450A0A40"
+                                    : "#FEF2F2",
+                                },
+                              ]}
+                              onPress={() => handleDeleteRide(ride)}
+                              activeOpacity={0.7}
+                              accessibilityLabel="Delete Ride"
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color="#EF4444"
+                              />
+                              <Text
+                                style={[
+                                  styles.ownerActionBtnText,
+                                  { color: "#EF4444" },
+                                ]}
+                              >
+                                Delete
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    ) : userReq ? (
+                      <View style={styles.feedRequestedRow}>
+                        <View
+                          style={[
+                            styles.feedRequestedTag,
+                            {
+                              backgroundColor:
+                                userReq.status === "confirmed"
+                                  ? "#10B98120"
+                                  : "#F59E0B20",
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name={
+                              userReq.status === "confirmed"
+                                ? "checkmark-circle"
+                                : "time-outline"
+                            }
+                            size={14}
+                            color={
+                              userReq.status === "confirmed"
+                                ? "#10B981"
+                                : "#D97706"
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.feedRequestedTagText,
+                              {
+                                color:
+                                  userReq.status === "confirmed"
+                                    ? "#10B981"
+                                    : "#D97706",
+                              },
+                            ]}
+                          >
+                            {userReq.status === "confirmed"
+                              ? "Seat Confirmed ✓"
+                              : "Request Pending"}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.feedCancelBtn}
+                          onPress={() => handleCancelSeat(ride)}
+                        >
+                          <Text style={styles.feedCancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : isFull ? (
+                      <View
+                        style={[
+                          styles.feedActionBtn,
+                          { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                        ]}
+                      >
+                        <Ionicons name="ban" size={16} color={textMute} />
+                        <Text
+                          style={[
+                            styles.feedActionBtnText,
+                            { color: textMute },
+                          ]}
+                        >
+                          Ride Full (0 Seats Left)
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[
+                          styles.feedActionBtn,
+                          { backgroundColor: "#7C3AED" },
+                        ]}
+                        onPress={() => handleRequestSeat(ride)}
+                        disabled={actionLoadingRideId === ride.id}
+                        activeOpacity={0.85}
+                      >
+                        {actionLoadingRideId === ride.id ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="hand-left" size={16} color="#FFF" />
+                            <Text
+                              style={[
+                                styles.feedActionBtnText,
+                                { color: "#FFF" },
+                              ]}
+                            >
+                              Request a Seat
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
+
+      {/* Rating & Review Modal */}
+      {ratingModalRide && (
+        <Modal
+          visible={!!ratingModalRide}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setRatingModalRide(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                Rate Co-Rider & Trip Experience
+              </Text>
+              <Text style={[styles.modalSub, { color: textMute }]}>
+                {ratingModalRide.from} ➔ {ratingModalRide.to}
               </Text>
 
-              {/* Star Rating Selectors */}
-              <View style={styles.starRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
+              {/* Star Rating */}
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
                   <TouchableOpacity
-                    key={star}
-                    onPress={() => setRatingScore(star)}
-                    activeOpacity={0.7}
-                    style={styles.starTouch}
+                    key={s}
+                    onPress={() => setRatingScore(s)}
+                    style={styles.starBtn}
                   >
                     <Ionicons
-                      name={star <= ratingScore ? "star" : "star-outline"}
-                      size={36}
-                      color={star <= ratingScore ? "#F59E0B" : textMute}
+                      name={s <= ratingScore ? "star" : "star-outline"}
+                      size={32}
+                      color="#F59E0B"
                     />
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.ratingScoreLabel}>
-                {ratingScore === 5
-                  ? "⭐ 5/5 Excellent & Safe!"
-                  : ratingScore === 4
-                    ? "⭐ 4/5 Good Experience"
-                    : ratingScore === 3
-                      ? "⭐ 3/5 Average"
-                      : "⭐ Needs Improvement"}
-              </Text>
-
-              {/* Compliments Quick-Pills */}
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: textPrimary, marginTop: 12 },
-                ]}
-              >
-                Highlights & Compliments:
-              </Text>
-              <View style={styles.complimentsWrap}>
-                {[
-                  "Safe Driving",
-                  "Punctual",
-                  "Clean Vehicle",
-                  "Polite & Friendly",
-                  "Accurate Route",
-                ].map((tag) => {
-                  const isSelected = selectedRatingTags.includes(tag);
-                  return (
-                    <TouchableOpacity
-                      key={tag}
-                      onPress={() => {
-                        setSelectedRatingTags((prev) =>
-                          isSelected
-                            ? prev.filter((t) => t !== tag)
-                            : [...prev, tag],
-                        );
-                      }}
-                      style={[
-                        styles.complimentPill,
-                        {
-                          backgroundColor: isSelected
-                            ? "#7C3AED"
-                            : isDark
-                              ? "#1E293B"
-                              : "#F1F5F9",
-                          borderColor: isSelected ? "#7C3AED" : border,
-                        },
-                      ]}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.complimentPillText,
-                          { color: isSelected ? "#FFFFFF" : textPrimary },
-                        ]}
-                      >
-                        {isSelected ? `✓ ${tag}` : `+ ${tag}`}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Review Text Box */}
               <TextInput
+                value={ratingReview}
+                onChangeText={setRatingReview}
+                placeholder="Write a brief comment (optional)..."
+                placeholderTextColor={textMute}
+                multiline
+                numberOfLines={3}
                 style={[
-                  styles.reviewInput,
+                  styles.modalTextInput,
                   {
                     backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
                     borderColor: border,
                     color: textPrimary,
                   },
                 ]}
-                placeholder="Share a quick review for the community (optional)..."
-                placeholderTextColor={textMute}
-                multiline={true}
-                numberOfLines={3}
-                value={ratingReview}
-                onChangeText={setRatingReview}
               />
 
-              <TouchableOpacity
-                style={[
-                  styles.primaryActionBtn,
-                  {
-                    backgroundColor: "#7C3AED",
-                    marginTop: 16,
-                    opacity: isSubmittingRating ? 0.7 : 1,
-                  },
-                ]}
-                onPress={handleSubmitRating}
-                disabled={isSubmittingRating}
-                activeOpacity={0.85}
-              >
-                {isSubmittingRating ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={18}
-                      color="#FFFFFF"
-                    />
-                    <Text style={styles.primaryActionBtnText}>
-                      Submit Rating & Review
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <View style={styles.modalActionsRow}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { borderColor: border }]}
+                  onPress={() => setRatingModalRide(null)}
+                >
+                  <Text
+                    style={[styles.modalCancelBtnText, { color: textMute }]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalSubmitBtn,
+                    isSubmittingRating && { opacity: 0.7 },
+                  ]}
+                  onPress={handleSubmitRating}
+                  disabled={isSubmittingRating}
+                >
+                  {isSubmittingRating ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalSubmitBtnText}>Submit Rating</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
       )}
 
-      {/* ================= 4. REPORT PROBLEM MODAL (After Ride & Safety) ================= */}
-      {reportModalRide && (
+      {/* Edit Ride Modal */}
+      {editModalRide && (
         <Modal
-          visible={!!reportModalRide}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setReportModalRide(null)}
+          visible={!!editModalRide}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setEditModalRide(null)}
         >
-          <View style={styles.modalBackdrop}>
+          <View style={styles.modalOverlay}>
             <View
               style={[
-                styles.reportModalCard,
+                styles.editModalCard,
                 { backgroundColor: cardBg, borderColor: border },
               ]}
             >
-              <View style={styles.modalHeader}>
+              {/* Modal Header */}
+              <View style={styles.editModalHeader}>
                 <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
                 >
-                  <Ionicons name="warning" size={20} color="#EF4444" />
-                  <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                    Report a Problem
-                  </Text>
+                  <View
+                    style={[
+                      styles.formHeaderIcon,
+                      { backgroundColor: "#7C3AED15", width: 34, height: 34 },
+                    ]}
+                  >
+                    <Ionicons name="pencil" size={17} color="#7C3AED" />
+                  </View>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                      Edit Ride Offer
+                    </Text>
+                    <Text
+                      style={[
+                        styles.modalSub,
+                        { color: textMute, marginBottom: 0 },
+                      ]}
+                    >
+                      Update your route, vehicle, or departure
+                    </Text>
+                  </View>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setReportModalRide(null)}
-                  style={styles.modalCloseBtn}
+                  onPress={() => setEditModalRide(null)}
                   hitSlop={8}
                 >
-                  <Ionicons name="close" size={20} color={textMute} />
+                  <Ionicons name="close" size={22} color={textMute} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.ratingPromptText, { color: textMute }]}>
-                Select the issue you experienced on this trip. Your safety is
-                Junto's highest priority.
-              </Text>
+              <ScrollView
+                style={{ maxHeight: 420 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* 1. Pickup Location */}
+                <View style={[styles.inputGroup, { marginTop: 12 }]}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Pick-up Location <Text style={{ color: "#EF4444" }}>*</Text>
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      {
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderColor: border,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="location" size={18} color="#10B981" />
+                    <TextInput
+                      value={editPickup}
+                      onChangeText={(val) => setEditPickup(toTitleCase(val))}
+                      autoCapitalize="words"
+                      placeholder="e.g. Cyber Towers, Hitec City"
+                      placeholderTextColor={textMute}
+                      style={[styles.textInputField, { color: textPrimary }]}
+                    />
+                  </View>
+                </View>
 
-              {/* Categories */}
-              <ScrollView style={{ maxHeight: 220, marginVertical: 8 }}>
-                {[
-                  "Rash or Reckless Driving",
-                  "Route Deviation / Unauthorized Stops",
-                  "Vehicle / Number Plate Mismatch",
-                  "Unsafe Behavior / Inappropriate Conduct",
-                  "Fare or Price Dispute",
-                  "Other Safety Concern",
-                ].map((cat) => {
-                  const isSelected = reportCategory === cat;
-                  return (
+                {/* 2. Drop Location */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Drop Location <Text style={{ color: "#EF4444" }}>*</Text>
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      {
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderColor: border,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="navigate" size={18} color="#EF4444" />
+                    <TextInput
+                      value={editDrop}
+                      onChangeText={(val) => setEditDrop(toTitleCase(val))}
+                      autoCapitalize="words"
+                      placeholder="e.g. Wipro Circle, Gachibowli"
+                      placeholderTextColor={textMute}
+                      style={[styles.textInputField, { color: textPrimary }]}
+                    />
+                  </View>
+                </View>
+
+                {/* 3. Vehicle Type */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Vehicle Type
+                  </Text>
+                  <View style={styles.vehicleToggleRow}>
                     <TouchableOpacity
-                      key={cat}
-                      onPress={() => setReportCategory(cat)}
                       style={[
-                        styles.categorySelectRow,
+                        styles.vehicleTypeBtn,
+                        editVehicleType === "car" &&
+                          styles.vehicleTypeBtnActive,
                         {
-                          backgroundColor: isSelected
-                            ? isDark
-                              ? "rgba(239, 68, 68, 0.15)"
-                              : "#FEF2F2"
-                            : isDark
-                              ? "#1E293B"
-                              : "#F8FAFC",
-                          borderColor: isSelected ? "#EF4444" : border,
+                          borderColor:
+                            editVehicleType === "car" ? "#7C3AED" : border,
                         },
                       ]}
-                      activeOpacity={0.7}
+                      onPress={() => {
+                        setEditVehicleType("car");
+                        if (editSeats < 2) setEditSeats(3);
+                      }}
                     >
                       <Ionicons
-                        name={
-                          isSelected ? "radio-button-on" : "radio-button-off"
-                        }
-                        size={16}
-                        color={isSelected ? "#EF4444" : textMute}
+                        name="car-sport"
+                        size={18}
+                        color={editVehicleType === "car" ? "#7C3AED" : textMute}
                       />
                       <Text
                         style={[
-                          styles.categorySelectText,
+                          styles.vehicleTypeBtnText,
                           {
-                            color: isSelected ? "#EF4444" : textPrimary,
-                            fontWeight: isSelected ? "700" : "500",
+                            color:
+                              editVehicleType === "car"
+                                ? "#7C3AED"
+                                : textPrimary,
                           },
                         ]}
                       >
-                        {cat}
+                        Car
                       </Text>
                     </TouchableOpacity>
-                  );
-                })}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.vehicleTypeBtn,
+                        editVehicleType === "bike" &&
+                          styles.vehicleTypeBtnActive,
+                        {
+                          borderColor:
+                            editVehicleType === "bike" ? "#7C3AED" : border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setEditVehicleType("bike");
+                        setEditSeats(1);
+                      }}
+                    >
+                      <Ionicons
+                        name="bicycle"
+                        size={18}
+                        color={
+                          editVehicleType === "bike" ? "#7C3AED" : textMute
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTypeBtnText,
+                          {
+                            color:
+                              editVehicleType === "bike"
+                                ? "#7C3AED"
+                                : textPrimary,
+                          },
+                        ]}
+                      >
+                        Bike
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 4. Vehicle Registration Number */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Vehicle Registration Number{" "}
+                    <Text style={{ color: "#EF4444" }}>*</Text>
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      {
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderColor: border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.indPlateSmall}>
+                      <Text style={styles.indPlateSmallText}>IND</Text>
+                    </View>
+                    <TextInput
+                      value={editVehicleNumber}
+                      onChangeText={(val) =>
+                        setEditVehicleNumber(val.toUpperCase())
+                      }
+                      autoCapitalize="characters"
+                      placeholder="e.g. TS 09 EA 1234"
+                      placeholderTextColor={textMute}
+                      style={[
+                        styles.textInputField,
+                        {
+                          color: textPrimary,
+                          fontWeight: "700",
+                          letterSpacing: 1,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* 5. Vehicle Model */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Vehicle Model (Optional)
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      {
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderColor: border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color={textMute}
+                    />
+                    <TextInput
+                      value={editVehicleModel}
+                      onChangeText={(val) =>
+                        setEditVehicleModel(toTitleCase(val))
+                      }
+                      autoCapitalize="words"
+                      placeholder="e.g. Swift (Silver) or Activa"
+                      placeholderTextColor={textMute}
+                      style={[styles.textInputField, { color: textPrimary }]}
+                    />
+                  </View>
+                </View>
+
+                {/* 6. Departure Schedule Picker Button */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Departure Time
+                  </Text>
+                  <View style={styles.dateTimePickersRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dateTimePickerCard,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderColor: showEditDatePicker ? "#7C3AED" : border,
+                        },
+                      ]}
+                      onPress={() => setShowEditDatePicker((p) => !p)}
+                    >
+                      <Ionicons name="calendar" size={16} color="#7C3AED" />
+                      <Text
+                        style={[styles.pickerCardValue, { color: textPrimary }]}
+                      >
+                        {formatDate(editDepartureDate)}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.dateTimePickerCard,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderColor: showEditTimePicker ? "#7C3AED" : border,
+                        },
+                      ]}
+                      onPress={() => setShowEditTimePicker((p) => !p)}
+                    >
+                      <Ionicons name="time" size={16} color="#7C3AED" />
+                      <Text
+                        style={[styles.pickerCardValue, { color: textPrimary }]}
+                      >
+                        {formatTime(editDepartureTime)}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {(showEditDatePicker || showEditTimePicker) && (
+                    <View
+                      style={[
+                        styles.inlinePickersContainer,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                          borderColor: border,
+                        },
+                      ]}
+                    >
+                      {showEditDatePicker && (
+                        <DateTimePicker
+                          value={editDepartureDate}
+                          mode="date"
+                          display="default"
+                          minimumDate={new Date()}
+                          onChange={onEditDateChange}
+                          themeVariant={isDark ? "dark" : "light"}
+                        />
+                      )}
+                      {showEditTimePicker && (
+                        <DateTimePicker
+                          value={editDepartureTime}
+                          mode="time"
+                          display="default"
+                          onChange={onEditTimeChange}
+                          themeVariant={isDark ? "dark" : "light"}
+                        />
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* 7. Seats & Price */}
+                <View style={[styles.rowTwoCols, { marginBottom: 14 }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                      Seats
+                    </Text>
+                    <View style={styles.seatsPillRow}>
+                      {(editVehicleType === "car" ? [1, 2, 3, 4] : [1]).map(
+                        (s) => (
+                          <TouchableOpacity
+                            key={s}
+                            style={[
+                              styles.seatSelectBtn,
+                              editSeats === s && styles.seatSelectBtnActive,
+                              {
+                                borderColor:
+                                  editSeats === s ? "#7C3AED" : border,
+                              },
+                            ]}
+                            onPress={() => setEditSeats(s)}
+                          >
+                            <Text
+                              style={[
+                                styles.seatSelectBtnText,
+                                {
+                                  color:
+                                    editSeats === s ? "#7C3AED" : textPrimary,
+                                },
+                              ]}
+                            >
+                              {s}
+                            </Text>
+                          </TouchableOpacity>
+                        ),
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                      Price / Seat (₹)
+                    </Text>
+                    <View
+                      style={[
+                        styles.inputBox,
+                        {
+                          backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                          borderColor: border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.currencyPrefix, { color: textPrimary }]}
+                      >
+                        ₹
+                      </Text>
+                      <TextInput
+                        value={editPrice}
+                        onChangeText={setEditPrice}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={textMute}
+                        style={[
+                          styles.textInputField,
+                          { color: textPrimary, fontWeight: "700" },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* 8. Notes */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
+                    Notes
+                  </Text>
+                  <TextInput
+                    value={editNotes}
+                    onChangeText={setEditNotes}
+                    placeholder="e.g. AC carpool, leave on time"
+                    placeholderTextColor={textMute}
+                    numberOfLines={2}
+                    style={[
+                      styles.multilineInput,
+                      {
+                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+                        borderColor: border,
+                        color: textPrimary,
+                      },
+                    ]}
+                  />
+                </View>
               </ScrollView>
 
-              <TextInput
+              {/* Modal Buttons */}
+              <View style={[styles.modalActionsRow, { marginTop: 16 }]}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { borderColor: border }]}
+                  onPress={() => setEditModalRide(null)}
+                >
+                  <Text
+                    style={[styles.modalCancelBtnText, { color: textMute }]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalSubmitBtn,
+                    isSavingEdit && { opacity: 0.7 },
+                  ]}
+                  onPress={handleSaveEditRide}
+                  disabled={isSavingEdit}
+                >
+                  {isSavingEdit ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalSubmitBtnText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteConfirmRide && (
+        <Modal
+          visible={!!deleteConfirmRide}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !isDeletingRide && setDeleteConfirmRide(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.deleteModalCard,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              {/* Danger Warning Icon Badge */}
+              <View style={styles.deleteModalIconWrap}>
+                <View style={styles.deleteModalIconCircle}>
+                  <Ionicons name="trash-outline" size={26} color="#EF4444" />
+                </View>
+              </View>
+
+              <Text style={[styles.deleteModalTitle, { color: textPrimary }]}>
+                Delete Ride Offer?
+              </Text>
+              <Text style={[styles.deleteModalDesc, { color: textMute }]}>
+                Are you sure you want to permanently delete this ride offer? Any
+                co-rider requests will be cancelled. This action cannot be
+                undone.
+              </Text>
+
+              {/* Ride Summary Preview Box */}
+              <View
                 style={[
-                  styles.reviewInput,
+                  styles.deleteModalPreviewCard,
                   {
                     backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
                     borderColor: border,
-                    color: textPrimary,
                   },
                 ]}
-                placeholder="Describe what happened with as much detail as possible..."
-                placeholderTextColor={textMute}
-                multiline={true}
-                numberOfLines={3}
-                value={reportDescription}
-                onChangeText={setReportDescription}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.primaryActionBtn,
-                  {
-                    backgroundColor: "#EF4444",
-                    marginTop: 16,
-                    opacity: isSubmittingReport ? 0.7 : 1,
-                  },
-                ]}
-                onPress={handleSubmitReport}
-                disabled={isSubmittingReport}
-                activeOpacity={0.85}
               >
-                {isSubmittingReport ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="shield-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryActionBtnText}>
-                      Submit Safety Report
+                {/* Route */}
+                <View style={styles.deleteModalRouteRow}>
+                  <View style={styles.routeTimelineColMini}>
+                    <View
+                      style={[
+                        styles.routeDotMini,
+                        { backgroundColor: "#10B981" },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.routeLineMini,
+                        { backgroundColor: border },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.routeDotMini,
+                        { backgroundColor: "#EF4444" },
+                      ]}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.deleteModalLocText,
+                        { color: textPrimary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {deleteConfirmRide.pickupLocation ||
+                        deleteConfirmRide.from}
                     </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.deleteModalLocText,
+                        { color: textPrimary, marginTop: 8 },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {deleteConfirmRide.dropLocation || deleteConfirmRide.to}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Sub details: Time and Registration Plate */}
+                <View
+                  style={[
+                    styles.deleteModalMetaRow,
+                    { borderTopColor: border },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={13}
+                      color="#F59E0B"
+                    />
+                    <Text
+                      style={[
+                        styles.deleteModalMetaText,
+                        { color: textPrimary },
+                      ]}
+                    >
+                      {deleteConfirmRide.date
+                        ? `${deleteConfirmRide.date} • `
+                        : ""}
+                      {deleteConfirmRide.time}
+                    </Text>
+                  </View>
+
+                  <View style={styles.plateDisplayMini}>
+                    <View style={styles.indFlagMini}>
+                      <Text style={styles.indFlagTextMini}>IND</Text>
+                    </View>
+                    <Text style={styles.plateNumberMini}>
+                      {deleteConfirmRide.registrationNumber || "TS 09 EA 1234"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Buttons: Cancel and Confirm Delete */}
+              <View style={styles.deleteModalActionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.deleteModalCancelBtn,
+                    {
+                      borderColor: border,
+                      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                    },
+                  ]}
+                  onPress={() => setDeleteConfirmRide(null)}
+                  disabled={isDeletingRide}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.deleteModalCancelText,
+                      { color: textPrimary },
+                    ]}
+                  >
+                    Keep Ride
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.deleteModalConfirmBtn,
+                    isDeletingRide && { opacity: 0.7 },
+                  ]}
+                  onPress={handleConfirmDeleteRide}
+                  disabled={isDeletingRide}
+                  activeOpacity={0.85}
+                >
+                  {isDeletingRide ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="trash" size={16} color="#FFF" />
+                      <Text style={styles.deleteModalConfirmText}>
+                        Yes, Delete
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -3502,6 +3557,7 @@ export default function RidesScreen() {
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -3509,10 +3565,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    gap: 12,
   },
   backBtn: {
     width: 36,
@@ -3523,537 +3579,366 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: {
     flex: 1,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    marginLeft: 12,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "800",
-    letterSpacing: -0.3,
   },
   headerSub: {
-    fontSize: 11.5,
+    fontSize: 12,
+    fontWeight: "500",
     marginTop: 1,
   },
-  modeSwitchBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  modeSwitchText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  topTabs: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  tabBtnActive: {
-    ...Platform.select({
-      web: { boxShadow: "0 2px 8px rgba(0,0,0,0.06)" },
-    }),
-  },
-  tabText: {
-    fontSize: 13,
-  },
-  scrollBody: {
-    paddingHorizontal: 16,
-    paddingBottom: 36,
-    gap: 12,
-  },
-  searchBox: {
+  headerOfferBtn: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13.5,
-  },
-  micMiniBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyBox: {
-    padding: 28,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: "center",
-    marginVertical: 16,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 10,
-  },
-  emptySub: {
-    fontSize: 12.5,
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  emptyActionBtn: {
-    backgroundColor: "#10B981",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  emptyActionBtnText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-  rideCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 14,
-    gap: 10,
-    ...Platform.select({
-      web: { boxShadow: "0 2px 10px rgba(0,0,0,0.04)" },
-    }),
-  },
-  cardDriverRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  driverInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarLetter: {
-    color: "#FFF",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 999,
-  },
-  driverNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 20,
     gap: 4,
   },
-  driverName: {
-    fontSize: 14,
+  headerOfferBtnText: {
+    fontSize: 13,
     fontWeight: "700",
   },
-  ratingRow: {
+
+  /* Global Active Emergency Banner */
+  activeEmergencyBanner: {
+    backgroundColor: "#EF4444",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  activeEmergencyTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    marginTop: 2,
+    gap: 8,
   },
-  ratingText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-  },
-  priceWrap: {
-    alignItems: "flex-end",
-  },
-  priceTag: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  priceSub: {
-    fontSize: 10.5,
-  },
-  routeContainer: {
-    flexDirection: "row",
-    marginVertical: 4,
-    gap: 10,
-  },
-  routeDotsCol: {
-    alignItems: "center",
-    paddingTop: 4,
-    width: 14,
-  },
-  dotCircle: {
+  pulsingDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+    backgroundColor: "#FFF",
   },
-  dotLine: {
-    width: 2,
-    height: 24,
-    marginVertical: 2,
-  },
-  routeTextCol: {
-    flex: 1,
-  },
-  vehicleSideBadge: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    minWidth: 64,
-  },
-  vehicleSideBadgeText: {
-    fontSize: 12,
+  activeEmergencyTitle: {
+    color: "#FFF",
     fontWeight: "900",
-    letterSpacing: 0.8,
-    marginTop: 2,
-  },
-  locationLabel: {
-    fontSize: 9.5,
-    fontWeight: "800",
+    fontSize: 13,
     letterSpacing: 0.5,
   },
-  locationName: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 1,
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  metaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  metaBadgeText: {
-    fontSize: 11.5,
+  activeEmergencySub: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
+    marginTop: 2,
     fontWeight: "600",
   },
-  notesText: {
-    fontSize: 11.5,
-    fontStyle: "italic",
-  },
-  bookBtn: {
-    backgroundColor: "#7C3AED",
+  emergencyActionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
-    marginTop: 4,
-  },
-  bookBtnDisabled: {
-    opacity: 0.8,
-  },
-  bookBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  numericPriceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    height: 38,
-    marginTop: 2,
-  },
-  numericPriceInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
-    paddingVertical: 0,
-  },
-  offerContainer: {
-    gap: 12,
-  },
-  offerBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-  },
-  offerBannerIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  offerBannerTitle: {
-    fontSize: 13.5,
-    fontWeight: "700",
-  },
-  offerBannerSub: {
-    fontSize: 11.5,
-    marginTop: 1,
-  },
-  sectionLabel: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  presetScroll: {
+    marginTop: 10,
     gap: 8,
-    paddingVertical: 2,
   },
-  presetRoutePill: {
+  sosButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#991B1B",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  presetRouteText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  inputsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    gap: 10,
-  },
-  fieldInput: {
-    flex: 1,
-    fontSize: 13.5,
-  },
-  inputDivider: {
-    height: 1,
-  },
-  vehicleSegmentedBox: {
-    flexDirection: "row",
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 3,
-    marginBottom: 4,
+    borderRadius: 8,
     gap: 4,
   },
-  vehicleSegmentItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: "transparent",
-    gap: 6,
-  },
-  vehicleSegmentText: {
-    fontSize: 12.5,
-  },
-  vehicleTypeCardRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  vehicleTypeCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    // paddingVertical: 10,
-    // paddingHorizontal: 10,
-    borderRadius: 16,
-    position: "relative",
-    minHeight: 72,
-  },
-  vehicleCardCheckContainer: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    zIndex: 2,
-  },
-  vehicleSelectedBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  vehicleUnselectedBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-  },
-  vehicleCardImg: {
-    width: 58,
-    height: 50,
-    borderRadius: 8,
-  },
-  vehicleCardInfo: {
-    flex: 1,
-    justifyContent: "center",
-    paddingRight: 14,
-  },
-  vehicleCardTitle: {
-    fontSize: 14,
+  sosButtonText: {
+    color: "#FFF",
+    fontSize: 12,
     fontWeight: "800",
   },
-  vehicleCardSub: {
-    fontSize: 10,
-    fontWeight: "500",
-    marginTop: 1,
-  },
-  dateTimeRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 4,
-  },
-  dateTimeCard: {
-    flex: 1,
+  shareTripButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "rgba(0,0,0,0.25)",
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
   },
-  dateTimeContent: {
+  shareTripButtonText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  endRideButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    flex: 1,
+    backgroundColor: "#000",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
   },
-  dateTimeIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  endRideButtonText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  /* Tab Segment Bar */
+  tabSegmentBar: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 10,
+    borderRadius: 14,
+    padding: 4,
+  },
+  tabSegmentBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  tabSegmentBtnActive: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabSegmentText: {
+    fontSize: 13,
+  },
+
+  /* Form Styling */
+  formScrollContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  formCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  formCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 12,
+  },
+  formHeaderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
-  dateTimeLabel: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+  formCardTitle: {
+    fontSize: 17,
+    fontWeight: "800",
   },
-  dateTimeValue: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    marginTop: 1,
+  formCardSub: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  pickerBox: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    marginTop: 6,
-    marginBottom: 6,
+  inputGroup: {
+    marginBottom: 14,
   },
-  pickerBoxHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  pickerBoxTitle: {
+  fieldLabel: {
     fontSize: 13,
     fontWeight: "700",
+    marginBottom: 6,
   },
-  seatsPriceGrid: {
+  labelWithHintRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  noVerifyBadge: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#10B981",
+    backgroundColor: "#10B98115",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  fieldSubHint: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  textInputField: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
+  indPlateSmall: {
+    backgroundColor: "#1E3A8A",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  indPlateSmallText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  quickChipTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 6,
+    marginTop: -4,
+  },
+  quickChipsScroll: {
+    flexDirection: "row",
+    marginBottom: 14,
+  },
+  quickLocChip: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  quickLocChipText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  vehicleToggleRow: {
     flexDirection: "row",
     gap: 12,
   },
-  seatStepperBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 38,
-    marginTop: 2,
-  },
-  stepperBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperValueWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
+  vehicleTypeBtn: {
     flex: 1,
-  },
-  stepperValueText: {
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  stepperValueSubText: {
-    fontSize: 11.5,
-    fontWeight: "500",
-  },
-  seatPillRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  seatPill: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 8,
   },
-  seatPillText: {
+  vehicleTypeBtnActive: {
+    backgroundColor: "#7C3AED15",
+  },
+  vehicleTypeBtnText: {
     fontSize: 13,
     fontWeight: "700",
   },
-  pricePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
+  dateTimePickersRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+  },
+  dateTimePickerCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  pickerIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#7C3AED15",
     alignItems: "center",
     justifyContent: "center",
   },
-  pricePillText: {
-    fontSize: 11.5,
+  pickerMiniLabel: {
+    fontSize: 9,
     fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  pickerCardValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  inlinePickersContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    gap: 10,
+  },
+  inlinePickerItem: {
+    padding: 4,
+  },
+  inlinePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  inlinePickerTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  inlinePickerDoneBtn: {
+    color: "#7C3AED",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  selectedTimeDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  selectedTimeDisplayText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+  rowTwoCols: {
+    flexDirection: "row",
+    marginBottom: 14,
+  },
+  seatsPillRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  seatSelectBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  seatSelectBtnActive: {
+    backgroundColor: "#7C3AED15",
+  },
+  seatSelectBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  currencyPrefix: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  multilineInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    minHeight: 56,
+    textAlignVertical: "top",
   },
   publishBtn: {
     backgroundColor: "#7C3AED",
@@ -4061,907 +3946,908 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
+    borderRadius: 14,
     marginTop: 8,
-    ...Platform.select({
-      web: { boxShadow: "0 4px 16px rgba(124, 58, 237, 0.35)" },
-    }),
+    gap: 8,
   },
   publishBtnText: {
-    color: "#FFFFFF",
+    color: "#FFF",
     fontSize: 15,
     fontWeight: "800",
+    letterSpacing: 0.3,
   },
-  modalBackdrop: {
+
+  /* Search & Filter in Find tab */
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 10,
+    gap: 8,
+  },
+  searchInputText: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
+    fontSize: 14,
+    padding: 0,
+  },
+  filterPillsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterPillActive: {
+    backgroundColor: "#7C3AED10",
+  },
+  filterPillText: {
+    fontSize: 12,
+  },
+
+  /* List & Card Styles */
+  listScrollContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  rideCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+  },
+  cardHeaderTagRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  /* Route and Side Meta Adjacent Row */
+  cardRouteMetaRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    gap: 10,
+  },
+  routeColLeft: {
+    flex: 1.25,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  sideMetaBox: {
+    flex: 0.95,
+    minWidth: 132,
+    maxWidth: 165,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  sideMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sideMetaTimeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  sideMetaSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sideMetaVehicleText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+  },
+  indFlagMini: {
+    backgroundColor: "#1E3A8A",
+    borderRadius: 2,
+    paddingHorizontal: 2.5,
+    paddingVertical: 0.5,
+  },
+  indFlagTextMini: {
+    color: "#FFF",
+    fontSize: 7.5,
+    fontWeight: "900",
+  },
+  compactNotesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  compactNotesText: {
+    fontSize: 11,
+    fontStyle: "italic",
+    flex: 1,
+  },
+
+  /* Route Timeline */
+  routeContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  routeTimelineCol: {
+    alignItems: "center",
+    marginRight: 10,
+    paddingTop: 4,
+  },
+  routeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  routeLine: {
+    width: 2,
+    height: 24,
+    marginVertical: 2,
+  },
+  routeTextsCol: {
+    flex: 1,
+  },
+  routeLocLabel: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  routeLocText: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+
+  /* Vehicle Plate Row */
+  vehiclePlateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  vehicleTypeCol: {
+    flex: 1,
+  },
+  vehicleModelText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  vehicleTimeText: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  plateDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF08A",
+    borderWidth: 1,
+    borderColor: "#CA8A04",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  indFlag: {
+    backgroundColor: "#1E3A8A",
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  indFlagText: {
+    color: "#FFF",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  plateNumberText: {
+    color: "#0F172A",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+
+  /* Co-Riders Box (in My Rides) */
+  coRidersBox: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    marginBottom: 12,
+  },
+  coRidersBoxTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  noCoRidersText: {
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+  passengerRowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
+  },
+  passengerName: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  passengerStatusSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  acceptPassengerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#10B981",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  acceptPassengerBtnText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  confirmedPassengerTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  confirmedPassengerTagText: {
+    color: "#10B981",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  passengerStatusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  passengerStatusBannerText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+  cancelRequestBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  cancelRequestBtnText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  /* EMERGENCY CARD SECTION (Only when started with co-rider!) */
+  emergencyCardSection: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#EF4444",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  emergencyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 6,
+  },
+  pulsingDotSmall: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+  },
+  emergencySectionTitle: {
+    color: "#DC2626",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  emergencyButtonsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  emergencySosBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DC2626",
+    paddingVertical: 9,
+    borderRadius: 8,
+    gap: 6,
+  },
+  emergencySosBtnText: {
+    color: "#FFF",
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
+  emergencyShareBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2563EB",
+    paddingVertical: 9,
+    borderRadius: 8,
+    gap: 6,
+  },
+  emergencyShareBtnText: {
+    color: "#FFF",
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+
+  /* Footer actions on Card */
+  cardActionsFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  primaryCardBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  primaryCardBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  deleteCardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#EF444415",
+    gap: 4,
+  },
+
+  /* Feed Card Specific */
+  feedCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  feedDriverInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  driverAvatarSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  feedDriverName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  ratingRowSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    gap: 3,
+  },
+  ratingTextSmall: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  vehicleTypeTag: {
+    fontSize: 11,
+    marginLeft: 2,
+  },
+  priceBadgeCol: {
+    alignItems: "flex-end",
+  },
+  priceAmount: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  priceSubText: {
+    fontSize: 10.5,
+  },
+  feedMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 10,
+  },
+  feedMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  feedMetaText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  plateDisplayMini: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF08A",
+    borderWidth: 1,
+    borderColor: "#CA8A04",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    gap: 4,
+    alignSelf: "flex-start",
+  },
+  plateNumberMini: {
+    color: "#0F172A",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  feedCardActionRow: {
+    marginTop: 2,
+  },
+  feedActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  feedActionBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  feedRequestedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  feedRequestedTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  feedRequestedTagText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  feedCancelBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  feedCancelBtnText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  /* Empty State */
+  emptyBox: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  emptyActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7C3AED",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  emptyActionBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  /* Rating Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
   modalCard: {
     width: "100%",
-    maxWidth: 380,
-    borderRadius: 22,
+    maxWidth: 400,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 20,
-    alignItems: "center",
-    gap: 12,
-  },
-  modalSuccessIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(124, 58, 237, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  modalDesc: {
-    fontSize: 12.5,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  modalRouteSummary: {
-    width: "100%",
-    padding: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    gap: 4,
-  },
-  summaryRoute: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  summaryTime: {
-    fontSize: 11.5,
-    fontWeight: "600",
-  },
-  modalActions: {
-    width: "100%",
-    marginTop: 6,
-  },
-  modalDoneBtn: {
-    backgroundColor: "#7C3AED",
-    width: "100%",
-    paddingVertical: 11,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  modalDoneBtnText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  participantsModalCard: {
-    width: "100%",
-    maxWidth: 420,
-    maxHeight: "85%",
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 18,
-    gap: 12,
-  },
-  participantsScrollView: {
-    maxHeight: 460,
-    width: "100%",
-  },
-  participantsModalHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(148, 163, 184, 0.15)",
-    paddingBottom: 12,
-  },
-  participantsHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  participantsIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(124, 58, 237, 0.14)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  participantsModalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  participantsModalSubtitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  participantsSeatsInfo: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7C3AED",
-    marginTop: 2,
-  },
-  modalCloseCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyParticipantsWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 28,
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  emptyParticipantsIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  emptyParticipantsTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  emptyParticipantsDesc: {
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  participantCard: {
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-    gap: 8,
-  },
-  participantTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  participantAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  participantAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  participantName: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  participantStatusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  participantStatusText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  participantDetail: {
-    fontSize: 11.5,
-    marginTop: 2,
-  },
-  participantPickupWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingTop: 2,
-  },
-  participantPickupText: {
-    fontSize: 12,
-    flex: 1,
-  },
-  participantActionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(148, 163, 184, 0.12)",
-  },
-  callBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  callBtnText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-  },
-  confirmedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-  },
-  confirmedPillText: {
-    color: "#10B981",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  selectPassengerBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#10B981",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  selectPassengerBtnText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  actionRowContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-  },
-  creatorViewBtn: {
-    flex: 1,
-    marginTop: 0,
-  },
-  deleteRideBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  deleteRideBtnText: {
-    color: "#EF4444",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  requestedBadgeWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  requestedBadgeText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  cancelSeatBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  cancelSeatBtnText: {
-    color: "#EF4444",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  rideFullBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  rideFullBadgeText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  modalCancelSeatBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 8,
-    width: "100%",
-  },
-  modalCancelSeatBtnText: {
-    color: "#EF4444",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  participantsModalFooter: {
-    paddingTop: 12,
-    marginTop: 12,
-    borderTopWidth: 1,
-  },
-  modalDeleteRideBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: 10,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.25)",
-  },
-  modalDeleteRideBtnText: {
-    color: "#EF4444",
-    fontSize: 13.5,
-    fontWeight: "700",
-  },
-  confirmBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  confirmCard: {
-    width: "100%",
-    maxWidth: 380,
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  confirmIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  confirmTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  confirmMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  confirmButtonsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    width: "100%",
-  },
-  confirmBtnNo: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmBtnNoText: {
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  confirmBtnYes: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmBtnYesText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  /* --- Safety System Styles --- */
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  modalCloseBtn: {
-    padding: 6,
-    borderRadius: 8,
-  },
-  liveTrackingBanner: {
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  liveBeaconRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 2,
-  },
-  liveBeaconDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#10B981",
-  },
-  liveBeaconTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    color: "#10B981",
-  },
-  liveGpsCoordsText: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  liveGpsSubText: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  completedTripBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    padding: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  completedTripBannerText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6366F1",
-  },
-  verifiedProfileBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
-  },
-  verifiedProfileBadgeText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: "#10B981",
-  },
-  ratingCountText: {
-    fontSize: 11.5,
-    marginLeft: 3,
-  },
-  vehicleDetailsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  vehicleInfoCol: {
-    flex: 1,
-    gap: 2,
-  },
-  vehicleIconTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  vehicleModelText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  vehicleTypeSubText: {
-    fontSize: 11,
-  },
-  numberPlateBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#1E293B",
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-  },
-  plateIndFlag: {
-    backgroundColor: "#1E3A8A",
-    borderRadius: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    marginRight: 4,
-  },
-  plateIndText: {
-    color: "#FFFFFF",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-  numberPlateText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#0F172A",
-    letterSpacing: 0.5,
-  },
-  safetyBarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 10,
-    marginBottom: 8,
-  },
-  safetyToolBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  safetyToolBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  safetyDivider: {
-    width: 1,
-    height: 16,
-  },
-  primaryActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  primaryActionBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13.5,
-    fontWeight: "700",
-  },
-  postRideRow: {
-    flexDirection: "row",
-    gap: 8,
-    width: "100%",
-  },
-  postRideBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 6,
-  },
-  postRideBtnText: {
-    fontSize: 12.5,
-    fontWeight: "700",
-  },
-  /* --- Safety Modals --- */
-  safetyModalCard: {
-    width: "92%",
-    maxWidth: 480,
-    maxHeight: "88%",
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  safetyModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(148, 163, 184, 0.15)",
-    paddingBottom: 10,
-  },
-  safetyHeaderTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  safetyShieldIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  safetyModalTitle: {
     fontSize: 16,
     fontWeight: "800",
   },
-  safetyModalSub: {
-    fontSize: 11.5,
-  },
-  safetyGpsStatusBox: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  safetyGpsCoords: {
-    fontSize: 12.5,
-    fontWeight: "700",
+  modalSub: {
+    fontSize: 12,
     marginTop: 4,
+    marginBottom: 16,
   },
-  safetyGpsTip: {
-    fontSize: 11,
-    marginTop: 3,
-    lineHeight: 15,
+  starsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 16,
+    gap: 8,
   },
-  safetySectionCard: {
-    padding: 12,
-    borderRadius: 12,
+  starBtn: {
+    padding: 4,
+  },
+  modalTextInput: {
     borderWidth: 1,
-  },
-  safetySectionTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-    marginBottom: 8,
-  },
-  safetyDriverRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  safetyDriverAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  safetyDriverName: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  safetyDriverRating: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  safetyGridRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  safetyGridItem: {
-    flex: 1,
-  },
-  safetyFieldLabel: {
-    fontSize: 9.5,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  safetyFieldValue: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  safetyPlateBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  safetyActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  safetyActionButton: {
-    width: "48%",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "flex-start",
-    gap: 3,
-  },
-  safetyActionBtnTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  safetyActionBtnSub: {
-    fontSize: 10.5,
-    lineHeight: 14,
-  },
-  safetyTipCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    borderRadius: 10,
     padding: 10,
+    fontSize: 13,
+    height: 64,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  modalActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
   },
-  safetyTipText: {
-    fontSize: 11.5,
-    lineHeight: 16,
+  modalCancelBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  modalSubmitBtn: {
     flex: 1,
-  },
-  driverProfileCard: {
-    width: "90%",
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-  },
-  driverProfileTop: {
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#7C3AED",
   },
-  profileModalAvatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    marginBottom: 8,
+  modalSubmitBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
-  profileModalName: {
-    fontSize: 17,
-    fontWeight: "800",
+
+  /* Card Header Action Icons */
+  cardHeaderRightGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  verifiedTagRow: {
+  cardHeaderActionIcons: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 3,
+    marginLeft: 2,
   },
-  verifiedTagText: {
-    fontSize: 12,
+  cardHeaderIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /* Edit & Delete Action Buttons */
+  editCardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 5,
+  },
+  editCardBtnText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: "#10B981",
   },
-  profileModalStats: {
-    fontSize: 12,
-    marginTop: 4,
+  deleteCardBtnText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "700",
   },
-  verificationList: {
+  ownerCardActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+  },
+  feedActionIconBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4,
+  },
+  feedActionIconBtnText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+
+  /* Edit Ride Modal Card */
+  editModalCard: {
+    width: "100%",
+    maxWidth: 440,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+    maxHeight: "92%",
+  },
+  editModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F030",
+    paddingBottom: 12,
+    marginBottom: 4,
+  },
+
+  /* Custom Delete Confirmation Modal */
+  deleteModalCard: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: "center",
+  },
+  deleteModalIconWrap: {
+    marginBottom: 12,
+  },
+  deleteModalIconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  deleteModalDesc: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  deleteModalPreviewCard: {
+    width: "100%",
     borderRadius: 12,
     borderWidth: 1,
     padding: 12,
-    gap: 8,
-    marginBottom: 12,
+    marginBottom: 18,
   },
-  verificationItem: {
+  deleteModalRouteRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  routeTimelineColMini: {
+    alignItems: "center",
+    marginRight: 8,
+    paddingTop: 3,
+  },
+  routeDotMini: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  routeLineMini: {
+    width: 2,
+    height: 18,
+    marginVertical: 2,
+  },
+  deleteModalLocText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  deleteModalMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
   },
-  verificationItemText: {
+  deleteModalMetaText: {
     fontSize: 12,
     fontWeight: "600",
-    flex: 1,
   },
-  vehicleInfoBox: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 10,
-  },
-  ratingModalCard: {
-    width: "90%",
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-  },
-  ratingPromptText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  starRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginVertical: 10,
-  },
-  starTouch: {
-    padding: 4,
-  },
-  ratingScoreLabel: {
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-    color: "#F59E0B",
-    marginBottom: 8,
-  },
-  complimentsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginVertical: 8,
-  },
-  complimentPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  complimentPillText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-  },
-  reviewInput: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    fontSize: 13,
-    minHeight: 65,
-    textAlignVertical: "top",
-    marginTop: 8,
-  },
-  reportModalCard: {
-    width: "90%",
-    maxWidth: 420,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-  },
-  categorySelectRow: {
+  deleteModalActionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
+    width: "100%",
+    gap: 12,
+  },
+  deleteModalCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteModalCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  deleteModalConfirmBtn: {
+    flex: 1.2,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#EF4444",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  deleteModalConfirmText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  /* Full-width Route & Trip Banner Styles (No clipping, completely comfortable) */
+  routeContainerFull: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 10,
+    width: "100%",
+  },
+  routeTextsColFull: {
+    flex: 1,
+  },
+  tripBannerCard: {
+    width: "100%",
     borderRadius: 10,
     borderWidth: 1,
-    marginBottom: 6,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 10,
   },
-  categorySelectText: {
-    fontSize: 12.5,
-    flex: 1,
+  tripBannerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  tripBannerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  tripBannerScheduleText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tripBannerSeatsText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tripBannerDivider: {
+    height: 1,
+    marginVertical: 6,
+    width: "100%",
+  },
+  tripBannerVehicleText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  /* Comfortable, Finger-friendly Owner Actions Bar for Edit & Delete */
+  ownerActionsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    gap: 12,
+    marginTop: 4,
+  },
+  ownerActionBtn: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+  },
+  ownerEditBtn: {
+    flex: 1.15,
+  },
+  ownerDeleteBtn: {
+    flex: 0.85,
+  },
+  ownerActionBtnText: {
+    fontSize: 13.5,
+    fontWeight: "700",
   },
 });
