@@ -495,15 +495,12 @@ export default function RidesScreen() {
 
       try {
         lastCoords = { lat: latitude, lng: longitude };
-        await ApiService.post(
-          `/api/rides/${activeDriverRide.id}/location`,
-          {
-            latitude,
-            longitude,
-            speed,
-            heading,
-          },
-        );
+        await ApiService.post(`/api/rides/${activeDriverRide.id}/location`, {
+          latitude,
+          longitude,
+          speed,
+          heading,
+        });
       } catch (err) {
         console.log("GPS sync non-fatal blip:", err);
       }
@@ -871,8 +868,7 @@ export default function RidesScreen() {
           (offerVehicle === "car"
             ? "Maruti Swift (Silver)"
             : "Honda Activa 6G (Grey)"),
-        registrationNumber:
-          offerRegNumber.trim() || "TS-09-EA-4521",
+        registrationNumber: offerRegNumber.trim() || "TS-09-EA-4521",
         pickupLocation: offerPickupPoint.trim() || offerFrom.trim(),
         dropLocation: offerDropPoint.trim() || offerTo.trim(),
       });
@@ -1115,7 +1111,7 @@ export default function RidesScreen() {
               },
             ]}
           >
-            Ride Stepper (8 Steps)
+            Ride Stepper (7 Steps)
           </Text>
         </TouchableOpacity>
       </View>
@@ -1503,7 +1499,10 @@ export default function RidesScreen() {
                             { color: textMute },
                           ]}
                         >
-                          {ride.vehicleType === "car" ? "Car Pool" : "Bike Pool"} • Verified Vehicle Docs
+                          {ride.vehicleType === "car"
+                            ? "Car Pool"
+                            : "Bike Pool"}{" "}
+                          • Verified Vehicle Docs
                         </Text>
                       </View>
 
@@ -1660,7 +1659,8 @@ export default function RidesScreen() {
                         <Text
                           style={[styles.metaBadgeText, { color: textPrimary }]}
                         >
-                          {ride.seatsLeft} seat{ride.seatsLeft > 1 ? "s" : ""} left
+                          {ride.seatsLeft} seat{ride.seatsLeft > 1 ? "s" : ""}{" "}
+                          left
                         </Text>
                       </View>
                     </View>
@@ -1840,11 +1840,7 @@ export default function RidesScreen() {
                               }}
                               activeOpacity={0.8}
                             >
-                              <Ionicons
-                                name="star"
-                                size={14}
-                                color="#F59E0B"
-                              />
+                              <Ionicons name="star" size={14} color="#F59E0B" />
                               <Text
                                 style={[
                                   styles.postRideBtnText,
@@ -1867,9 +1863,7 @@ export default function RidesScreen() {
                               ]}
                               onPress={() => {
                                 setReportModalRide(ride);
-                                setReportCategory(
-                                  "Rash or Reckless Driving",
-                                );
+                                setReportCategory("Rash or Reckless Driving");
                                 setReportDescription("");
                               }}
                               activeOpacity={0.8}
@@ -1909,11 +1903,7 @@ export default function RidesScreen() {
                             onPress={() => setSelectedRideForParticipants(ride)}
                             activeOpacity={0.8}
                           >
-                            <Ionicons
-                              name="people"
-                              size={15}
-                              color="#7C3AED"
-                            />
+                            <Ionicons name="people" size={15} color="#7C3AED" />
                             <Text
                               style={[
                                 styles.bookBtnText,
@@ -1941,10 +1931,7 @@ export default function RidesScreen() {
                             activeOpacity={0.8}
                           >
                             {isDeletingRide === ride.id ? (
-                              <ActivityIndicator
-                                size="small"
-                                color="#EF4444"
-                              />
+                              <ActivityIndicator size="small" color="#EF4444" />
                             ) : (
                               <>
                                 <Ionicons
@@ -1982,11 +1969,7 @@ export default function RidesScreen() {
                               }}
                               activeOpacity={0.8}
                             >
-                              <Ionicons
-                                name="star"
-                                size={14}
-                                color="#F59E0B"
-                              />
+                              <Ionicons name="star" size={14} color="#F59E0B" />
                               <Text
                                 style={[
                                   styles.postRideBtnText,
@@ -2009,9 +1992,7 @@ export default function RidesScreen() {
                               ]}
                               onPress={() => {
                                 setReportModalRide(ride);
-                                setReportCategory(
-                                  "Rash or Reckless Driving",
-                                );
+                                setReportCategory("Rash or Reckless Driving");
                                 setReportDescription("");
                               }}
                               activeOpacity={0.8}
@@ -2128,9 +2109,7 @@ export default function RidesScreen() {
                               styles.bookBtn,
                               styles.bookBtnDisabled,
                               {
-                                backgroundColor: isDark
-                                  ? "#1E293B"
-                                  : "#E2E8F0",
+                                backgroundColor: isDark ? "#1E293B" : "#E2E8F0",
                                 borderColor: border,
                               },
                             ]}
@@ -2180,9 +2159,7 @@ export default function RidesScreen() {
                               size={15}
                               color="#FFFFFF"
                             />
-                            <Text style={styles.bookBtnText}>
-                              Request Seat
-                            </Text>
+                            <Text style={styles.bookBtnText}>Request Seat</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>
@@ -2192,666 +2169,8 @@ export default function RidesScreen() {
               })
             )}
           </>
-        ) : (
-          /* ================= OFFER RIDE (Zero Friction / Minimal Clicks) ================= */
-          <View style={styles.offerContainer}>
-            <View
-              style={[
-                styles.offerBanner,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(124, 58, 237, 0.12)"
-                    : "#F5F3FF",
-                  borderColor: isDark ? "rgba(139, 92, 246, 0.35)" : "#DDD6FE",
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.offerBannerIconWrap,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(139, 92, 246, 0.25)"
-                      : "#EDE9FE",
-                  },
-                ]}
-              >
-                <Ionicons name="flash" size={18} color="#7C3AED" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.offerBannerTitle,
-                    { color: isDark ? "#DDD6FE" : "#6D28D9" },
-                  ]}
-                >
-                  Post in 10 Seconds
-                </Text>
-                <Text
-                  style={[
-                    styles.offerBannerSub,
-                    { color: isDark ? "rgba(255,255,255,0.7)" : "#7C3AED" },
-                  ]}
-                >
-                  Tap popular routes below or type quickly. No long forms!
-                </Text>
-              </View>
-            </View>
-
-            {/* Quick Popular Routes Presets */}
-            <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              ⚡ Popular Routes (1-Tap):
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.presetScroll}
-            >
-              {PRESET_ROUTES.map((route, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => handleSelectPresetRoute(route)}
-                  style={[
-                    styles.presetRoutePill,
-                    {
-                      backgroundColor:
-                        offerFrom === route.from && offerTo === route.to
-                          ? "#7C3AED"
-                          : isDark
-                            ? "#1E293B"
-                            : "#FFFFFF",
-                      borderColor:
-                        offerFrom === route.from && offerTo === route.to
-                          ? "#7C3AED"
-                          : border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.presetRouteText,
-                      {
-                        color:
-                          offerFrom === route.from && offerTo === route.to
-                            ? "#FFFFFF"
-                            : textPrimary,
-                      },
-                    ]}
-                  >
-                    {route.from} ➔ {route.to}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Pickup & Drop Inputs */}
-            <View
-              style={[
-                styles.inputsCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <View style={styles.inputRow}>
-                <Ionicons name="radio-button-on" size={16} color="#7C3AED" />
-                <TextInput
-                  value={offerFrom}
-                  onChangeText={setOfferFrom}
-                  placeholder="Pickup Location (e.g. Hitec City Metro)"
-                  placeholderTextColor={textMute}
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-              <View
-                style={[styles.inputDivider, { backgroundColor: border }]}
-              />
-              <View style={styles.inputRow}>
-                <Ionicons name="location" size={16} color="#EC4899" />
-                <TextInput
-                  value={offerTo}
-                  onChangeText={setOfferTo}
-                  placeholder="Drop Location (e.g. DLF Gachibowli)"
-                  placeholderTextColor={textMute}
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-            </View>
-
-            {/* Vehicle Type - Distinct Car / Bike Selection Cards */}
-            <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              Vehicle Type:
-            </Text>
-            <View style={styles.vehicleTypeCardRow}>
-              {/* Car Card */}
-              <TouchableOpacity
-                onPress={() => {
-                  setOfferVehicle("car");
-                  if (selectedSeats === 1) setSelectedSeats(3);
-                }}
-                style={[
-                  styles.vehicleTypeCard,
-                  {
-                    backgroundColor:
-                      offerVehicle === "car"
-                        ? isDark
-                          ? `${t.primary}26`
-                          : "#F5F3FF"
-                        : isDark
-                          ? "#151D2D"
-                          : cardBg,
-
-                    borderColor:
-                      offerVehicle === "car"
-                        ? t.primary
-                        : isDark
-                          ? "#263249"
-                          : border,
-
-                    borderWidth: offerVehicle === "car" ? 1.5 : 1,
-                  },
-                ]}
-                activeOpacity={0.85}
-              >
-                <View style={styles.vehicleCardCheckContainer}>
-                  {offerVehicle === "car" ? (
-                    <View style={styles.vehicleSelectedBadge}>
-                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.vehicleUnselectedBadge,
-                        { borderColor: border },
-                      ]}
-                    />
-                  )}
-                </View>
-
-                <Image
-                  source={CAR_ICON_IMG}
-                  style={styles.vehicleCardImg}
-                  resizeMode="contain"
-                />
-
-                <View style={styles.vehicleCardInfo}>
-                  <Text
-                    style={[
-                      styles.vehicleCardTitle,
-                      {
-                        color:
-                          offerVehicle === "car"
-                            ? isDark
-                              ? "#DDD6FE"
-                              : "#6D28D9"
-                            : textPrimary,
-                      },
-                    ]}
-                  >
-                    Car
-                  </Text>
-                  <Text
-                    style={[styles.vehicleCardSub, { color: textMute }]}
-                    numberOfLines={1}
-                  >
-                    Comfort • AC • Multi-seater
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Bike Card */}
-              <TouchableOpacity
-                onPress={() => {
-                  setOfferVehicle("bike");
-                  setSelectedSeats(1);
-                }}
-                style={[
-                  styles.vehicleTypeCard,
-                  {
-                    backgroundColor:
-                      offerVehicle === "bike"
-                        ? isDark
-                          ? `${t.primary}26`
-                          : "#F5F3FF"
-                        : isDark
-                          ? "#151D2D"
-                          : cardBg,
-
-                    borderColor:
-                      offerVehicle === "bike"
-                        ? t.primary
-                        : isDark
-                          ? "#263249"
-                          : border,
-
-                    borderWidth: offerVehicle === "bike" ? 1.5 : 1,
-                  },
-                ]}
-                activeOpacity={0.85}
-              >
-                <View style={styles.vehicleCardCheckContainer}>
-                  {offerVehicle === "bike" ? (
-                    <View style={styles.vehicleSelectedBadge}>
-                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.vehicleUnselectedBadge,
-                        { borderColor: border },
-                      ]}
-                    />
-                  )}
-                </View>
-
-                <Image
-                  source={BIKE_ICON_IMG}
-                  style={styles.vehicleCardImg}
-                  resizeMode="contain"
-                />
-
-                <View style={styles.vehicleCardInfo}>
-                  <Text
-                    style={[
-                      styles.vehicleCardTitle,
-                      {
-                        color:
-                          offerVehicle === "bike"
-                            ? isDark
-                              ? "#DDD6FE"
-                              : "#6D28D9"
-                            : textPrimary,
-                      },
-                    ]}
-                  >
-                    Bike
-                  </Text>
-                  <Text
-                    style={[styles.vehicleCardSub, { color: textMute }]}
-                    numberOfLines={1}
-                  >
-                    Fast • Fuel Efficient • 1 Seat
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Scheduled Departure Date & Time Picker */}
-            <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-              Scheduled Departure Date & Time:
-            </Text>
-            <View style={styles.dateTimeRow}>
-              {/* Departure Date Selector */}
-              <TouchableOpacity
-                style={[
-                  styles.dateTimeCard,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-                onPress={() => setShowDatePicker(!showDatePicker)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.dateTimeContent}>
-                  <View
-                    style={[
-                      styles.dateTimeIconCircle,
-                      { backgroundColor: isDark ? "#8B5CF625" : "#EDE9FE" },
-                    ]}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={18}
-                      color="#8B5CF6"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
-                      Departure Date
-                    </Text>
-                    <Text
-                      style={[styles.dateTimeValue, { color: textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {formatDate(departureDate)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-down" size={16} color={textMute} />
-              </TouchableOpacity>
-
-              {/* Departure Time Selector */}
-              <TouchableOpacity
-                style={[
-                  styles.dateTimeCard,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-                onPress={() => setShowTimePicker(!showTimePicker)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.dateTimeContent}>
-                  <View
-                    style={[
-                      styles.dateTimeIconCircle,
-                      { backgroundColor: isDark ? "#F59E0B25" : "#FEF3C7" },
-                    ]}
-                  >
-                    <Ionicons name="time-outline" size={18} color="#F59E0B" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
-                      Departure Time
-                    </Text>
-                    <Text
-                      style={[styles.dateTimeValue, { color: textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {formatTime(departureTime)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-down" size={16} color={textMute} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Date Picker Modal / Inline Controls */}
-            {(showDatePicker || Platform.OS === "web") && (
-              <View
-                style={[
-                  styles.pickerBox,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <View style={styles.pickerBoxHeader}>
-                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
-                    📅 Select Departure Date
-                  </Text>
-                  {Platform.OS !== "web" && (
-                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <DateTimePicker
-                  value={departureDate}
-                  mode="date"
-                  display="default"
-                  onChange={onDateChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-            )}
-
-            {/* Time Picker Modal / Inline Controls */}
-            {(showTimePicker || Platform.OS === "web") && (
-              <View
-                style={[
-                  styles.pickerBox,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <View style={styles.pickerBoxHeader}>
-                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
-                    ⏰ Select Departure Time
-                  </Text>
-                  {Platform.OS !== "web" && (
-                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                      <Text style={{ color: "#8B5CF6", fontWeight: "700" }}>
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <DateTimePicker
-                  value={departureTime}
-                  mode="time"
-                  display="default"
-                  onChange={onTimeChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-            )}
-
-            {/* Available Seats & Price */}
-            <View style={styles.seatsPriceGrid}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                  Available Seats:
-                </Text>
-                {offerVehicle === "car" ? (
-                  <View
-                    style={[
-                      styles.seatStepperBox,
-                      { backgroundColor: cardBg, borderColor: border },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      onPress={() =>
-                        setSelectedSeats((prev) => Math.max(1, prev - 1))
-                      }
-                      disabled={selectedSeats <= 1}
-                      style={[
-                        styles.stepperBtn,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                          borderColor: border,
-                          opacity: selectedSeats <= 1 ? 0.35 : 1,
-                        },
-                      ]}
-                      hitSlop={6}
-                    >
-                      <Ionicons
-                        name="remove"
-                        size={16}
-                        color={selectedSeats <= 1 ? textMute : textPrimary}
-                      />
-                    </TouchableOpacity>
-
-                    <View style={styles.stepperValueWrap}>
-                      <Text
-                        style={[
-                          styles.stepperValueText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {selectedSeats}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.stepperValueSubText,
-                          { color: textMute },
-                        ]}
-                      >
-                        {selectedSeats === 1 ? "seat" : "seats"}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      onPress={() =>
-                        setSelectedSeats((prev) => Math.min(8, prev + 1))
-                      }
-                      disabled={selectedSeats >= 8}
-                      style={[
-                        styles.stepperBtn,
-                        {
-                          backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                          borderColor: border,
-                          opacity: selectedSeats >= 8 ? 0.35 : 1,
-                        },
-                      ]}
-                      hitSlop={6}
-                    >
-                      <Ionicons
-                        name="add"
-                        size={16}
-                        color={selectedSeats >= 8 ? textMute : textPrimary}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View
-                    style={[
-                      styles.seatStepperBox,
-                      { backgroundColor: cardBg, borderColor: border },
-                    ]}
-                  >
-                    <View style={styles.stepperValueWrap}>
-                      <Text
-                        style={[
-                          styles.stepperValueText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        1
-                      </Text>
-                      <Text
-                        style={[
-                          styles.stepperValueSubText,
-                          { color: textMute },
-                        ]}
-                      >
-                        seat
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              <View style={{ flex: 1.2 }}>
-                <Text style={[styles.sectionLabel, { color: textPrimary }]}>
-                  Price (₹):
-                </Text>
-                <View
-                  style={[
-                    styles.numericPriceContainer,
-                    {
-                      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                      borderColor: border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "800",
-                      color: "#7C3AED",
-                      marginRight: 4,
-                    }}
-                  >
-                    ₹
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.numericPriceInput,
-                      {
-                        color: textPrimary,
-                      },
-                    ]}
-                    placeholder="e.g. 40"
-                    placeholderTextColor={textMute}
-                    keyboardType="numeric"
-                    value={selectedPrice}
-                    onChangeText={(text) =>
-                      setSelectedPrice(text.replace(/[^0-9]/g, ""))
-                    }
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Vehicle & Landmark Details (Before Ride Safety Verification) */}
-            <Text
-              style={[
-                styles.sectionLabel,
-                { color: textPrimary, marginTop: 4 },
-              ]}
-            >
-              Vehicle & Landmarks (Safety Verification):
-            </Text>
-            <View
-              style={[
-                styles.inputsCard,
-                { backgroundColor: cardBg, borderColor: border },
-              ]}
-            >
-              <View style={styles.inputRow}>
-                <Ionicons name="car-sport-outline" size={16} color="#7C3AED" />
-                <TextInput
-                  value={offerVehicleModel}
-                  onChangeText={setOfferVehicleModel}
-                  placeholder={
-                    offerVehicle === "car"
-                      ? "Vehicle Model (e.g. Maruti Swift White)"
-                      : "Vehicle Model (e.g. Honda Activa 6G)"
-                  }
-                  placeholderTextColor={textMute}
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-              <View
-                style={[styles.inputDivider, { backgroundColor: border }]}
-              />
-              <View style={styles.inputRow}>
-                <Ionicons name="card-outline" size={16} color="#10B981" />
-                <TextInput
-                  value={offerRegNumber}
-                  onChangeText={setOfferRegNumber}
-                  placeholder="Number Plate (e.g. TS-09-EA-4521)"
-                  placeholderTextColor={textMute}
-                  autoCapitalize="characters"
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-              <View
-                style={[styles.inputDivider, { backgroundColor: border }]}
-              />
-              <View style={styles.inputRow}>
-                <Ionicons
-                  name="navigate-circle-outline"
-                  size={16}
-                  color="#F59E0B"
-                />
-                <TextInput
-                  value={offerPickupPoint}
-                  onChangeText={setOfferPickupPoint}
-                  placeholder="Exact Pickup Landmark (e.g. Pillar 14 Metro)"
-                  placeholderTextColor={textMute}
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-              <View
-                style={[styles.inputDivider, { backgroundColor: border }]}
-              />
-              <View style={styles.inputRow}>
-                <Ionicons name="flag-outline" size={16} color="#EC4899" />
-                <TextInput
-                  value={offerDropPoint}
-                  onChangeText={setOfferDropPoint}
-                  placeholder="Exact Drop Landmark (e.g. Gate 2, DLF Cyber)"
-                  placeholderTextColor={textMute}
-                  style={[styles.fieldInput, { color: textPrimary }]}
-                />
-              </View>
-            </View>
-
-            {/* One-Tap Publish Button */}
-            <TouchableOpacity
-              style={styles.publishBtn}
-              onPress={handlePublishRide}
-              disabled={isPublishing}
-              activeOpacity={0.88}
-            >
-              <Ionicons
-                name={isPublishing ? "hourglass-outline" : "checkmark-circle"}
-                size={20}
-                color="#FFFFFF"
-              />
-
-              <Text style={styles.publishBtnText}>
-                {isPublishing ? "Publishing..." : "Publish Ride in 1-Tap"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Confirmation Modal */}
       <Modal
@@ -3502,7 +2821,10 @@ export default function RidesScreen() {
                         VEHICLE MODEL
                       </Text>
                       <Text
-                        style={[styles.safetyFieldValue, { color: textPrimary }]}
+                        style={[
+                          styles.safetyFieldValue,
+                          { color: textPrimary },
+                        ]}
                       >
                         {safetyModalRide.vehicleModel ||
                           (safetyModalRide.vehicleType === "car"
@@ -3536,7 +2858,10 @@ export default function RidesScreen() {
                         PICKUP LANDMARK
                       </Text>
                       <Text
-                        style={[styles.safetyFieldValue, { color: textPrimary }]}
+                        style={[
+                          styles.safetyFieldValue,
+                          { color: textPrimary },
+                        ]}
                       >
                         {safetyModalRide.pickupLocation || safetyModalRide.from}
                       </Text>
@@ -3549,7 +2874,10 @@ export default function RidesScreen() {
                         DROP LANDMARK
                       </Text>
                       <Text
-                        style={[styles.safetyFieldValue, { color: textPrimary }]}
+                        style={[
+                          styles.safetyFieldValue,
+                          { color: textPrimary },
+                        ]}
                       >
                         {safetyModalRide.dropLocation || safetyModalRide.to}
                       </Text>
@@ -3747,11 +3075,7 @@ export default function RidesScreen() {
                   {driverProfileModalRide.driverName}
                 </Text>
                 <View style={styles.verifiedTagRow}>
-                  <Ionicons
-                    name="shield-checkmark"
-                    size={14}
-                    color="#10B981"
-                  />
+                  <Ionicons name="shield-checkmark" size={14} color="#10B981" />
                   <Text style={styles.verifiedTagText}>
                     Verified Junto Community Profile
                   </Text>
@@ -3772,11 +3096,7 @@ export default function RidesScreen() {
                 ]}
               >
                 <View style={styles.verificationItem}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color="#10B981"
-                  />
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                   <Text
                     style={[
                       styles.verificationItemText,
@@ -3790,11 +3110,7 @@ export default function RidesScreen() {
                   style={[styles.safetyDivider, { backgroundColor: border }]}
                 />
                 <View style={styles.verificationItem}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color="#10B981"
-                  />
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                   <Text
                     style={[
                       styles.verificationItemText,
@@ -3808,11 +3124,7 @@ export default function RidesScreen() {
                   style={[styles.safetyDivider, { backgroundColor: border }]}
                 />
                 <View style={styles.verificationItem}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color="#10B981"
-                  />
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                   <Text
                     style={[
                       styles.verificationItemText,
@@ -3843,10 +3155,7 @@ export default function RidesScreen() {
                     REGISTERED VEHICLE
                   </Text>
                   <Text
-                    style={[
-                      styles.safetyPlateBadgeText,
-                      { color: "#7C3AED" },
-                    ]}
+                    style={[styles.safetyPlateBadgeText, { color: "#7C3AED" }]}
                   >
                     {driverProfileModalRide.registrationNumber ||
                       "TS-09-EA-4521"}
@@ -4178,11 +3487,7 @@ export default function RidesScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons
-                      name="shield-outline"
-                      size={18}
-                      color="#FFFFFF"
-                    />
+                    <Ionicons name="shield-outline" size={18} color="#FFFFFF" />
                     <Text style={styles.primaryActionBtnText}>
                       Submit Safety Report
                     </Text>

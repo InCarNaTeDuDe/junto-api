@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
 import { ApiService } from "@/services/api";
@@ -99,7 +100,7 @@ const STEP_DEFINITIONS: StepMeta[] = [
   {
     step: 2,
     title: "Driver Verification",
-    subtitle: "Verify Junto profile, phone & driving licence",
+    subtitle: "Verify Junto profile & driving licence",
     shortLabel: "2. Driver",
     icon: "person-circle-outline",
   },
@@ -112,37 +113,30 @@ const STEP_DEFINITIONS: StepMeta[] = [
   },
   {
     step: 4,
-    title: "Review & Publish",
-    subtitle: "Review trip summary & publish to community",
-    shortLabel: "4. Publish",
-    icon: "checkmark-done-circle-outline",
-  },
-  {
-    step: 5,
-    title: "Seat Requests",
-    subtitle: "Accept or decline co-rider requests",
-    shortLabel: "5. Requests",
+    title: "Co-Rider Requests",
+    subtitle: "Review trip & manage real-time requests",
+    shortLabel: "4. Requests",
     icon: "people-outline",
   },
   {
-    step: 6,
-    title: "Ride Confirmed",
-    subtitle: "Confirmed riders, Junto chat & share trip",
-    shortLabel: "6. Confirmed",
-    icon: "shield-checkmark-outline",
+    step: 5,
+    title: "Co-Rider Chat",
+    subtitle: "In-app messaging with confirmed co-riders",
+    shortLabel: "5. Chat",
+    icon: "chatbubble-ellipses-outline",
   },
   {
-    step: 7,
-    title: "Ride Started",
-    subtitle: "Live GPS tracking (15-30s), safety & emergency",
-    shortLabel: "7. Started",
+    step: 6,
+    title: "Live Ride Tracking",
+    subtitle: "Real-time GPS sensor tracking & speed",
+    shortLabel: "6. Live GPS",
     icon: "navigate-outline",
   },
   {
-    step: 8,
+    step: 7,
     title: "Ride Completed",
-    subtitle: "Stop GPS, rate co-riders & report problem",
-    shortLabel: "8. Completed",
+    subtitle: "Stop GPS, rate co-riders & report",
+    shortLabel: "7. Done",
     icon: "ribbon-outline",
   },
 ];
@@ -258,18 +252,18 @@ export default function RideSequentialStepper({
   useEffect(() => {
     if (userOwnedRide) {
       setActiveRide(userOwnedRide);
-      let stepTarget = 5;
+      let stepTarget = 4;
       if (userOwnedRide.status === "in_progress") {
-        stepTarget = 7;
+        stepTarget = 6;
       } else if (userOwnedRide.status === "completed") {
-        stepTarget = 8;
+        stepTarget = 7;
       } else if (
         userOwnedRide.passengers &&
         userOwnedRide.passengers.some((p) => p.status === "confirmed")
       ) {
-        stepTarget = 6;
-      } else {
         stepTarget = 5;
+      } else {
+        stepTarget = 4;
       }
       setMaxUnlockedStep((prev) => Math.max(prev, stepTarget));
       // Only jump to later step if on step 1 and didn't start a fresh draft
@@ -339,25 +333,38 @@ export default function RideSequentialStepper({
     disclaimer: string;
   } | null>(null);
 
-  // ================= Step 4 State: Review & Publish =================
+  // ================= Step 4 State: Review & Real-Time Requests =================
   const [isPublishingRide, setIsPublishingRide] = useState(false);
-
-  // ================= Step 5 State: Seat Requests =================
   const [isConfirmingSeat, setIsConfirmingSeat] = useState<string | null>(null);
   const [isDecliningSeat, setIsDecliningSeat] = useState<string | null>(null);
 
-  // ================= Step 7 State: GPS Tracking =================
+  // ================= Step 5 State: Co-Rider Chat =================
+  interface ChatMessage {
+    id: string;
+    senderId: string;
+    senderName: string;
+    text: string;
+    time: string;
+    isDriver: boolean;
+  }
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInputText, setChatInputText] = useState<string>("");
+
+  // ================= Step 6 State: Live GPS & Sensor Tracking =================
   const [isStartingRide, setIsStartingRide] = useState(false);
   const [isCompletingRide, setIsCompletingRide] = useState(false);
-  const [gpsLiveLocation, setGpsLiveLocation] = useState<{
+  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
+  const [currentCoords, setCurrentCoords] = useState<{
     lat: number;
     lng: number;
-  } | null>({
+  }>({
     lat: 17.4435,
     lng: 78.3772,
   });
+  const [distanceLeftKm, setDistanceLeftKm] = useState<string>("0.0");
+  const [gpsPingCountdown, setGpsPingCountdown] = useState<number>(20);
 
-  // ================= Step 8 State: Rating & Report =================
+  // ================= Step 7 State: Rating & Report =================
   const [completionRating, setCompletionRating] = useState<number>(5);
   const [completionReview, setCompletionReview] = useState<string>("");
   const [selectedCompletionTags, setSelectedCompletionTags] = useState<
@@ -577,6 +584,214 @@ export default function RideSequentialStepper({
     setCurrentStep(4);
   };
 
+  // Destination coordinates dictionary for accurate real-time distance calculations
+  const DESTINATION_COORDS_MAP: Record<string, { lat: number; lng: number }> = {
+    gachibowli: { lat: 17.4401, lng: 78.3489 },
+    "financial district": { lat: 17.4156, lng: 78.3427 },
+    "jubilee hills": { lat: 17.4319, lng: 78.4073 },
+    "hitec city": { lat: 17.4435, lng: 78.3772 },
+    begumpet: { lat: 17.4448, lng: 78.4667 },
+    madhapur: { lat: 17.4483, lng: 78.3915 },
+    kondapur: { lat: 17.4649, lng: 78.3588 },
+    kukatpally: { lat: 17.4938, lng: 78.4018 },
+    secunderabad: { lat: 17.4399, lng: 78.4983 },
+    "wipro circle": { lat: 17.4428, lng: 78.3496 },
+    waverock: { lat: 17.4182, lng: 78.3411 },
+    mindspace: { lat: 17.4385, lng: 78.3812 },
+    checkpost: { lat: 17.4285, lng: 78.4112 },
+    "prakash nagar": { lat: 17.4452, lng: 78.4682 },
+  };
+
+  function computeDistanceKm(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.max(0, R * c);
+  }
+
+  // Ref pointers to ensure periodic location ping always sends fresh real-time sensor data
+  const coordsRef = useRef(currentCoords);
+  coordsRef.current = currentCoords;
+  const speedRef = useRef(currentSpeed);
+  speedRef.current = currentSpeed;
+  const activeRideIdRef = useRef(activeRide?.id);
+  activeRideIdRef.current = activeRide?.id;
+
+  // Real HTTP POST call to /api/rides/:id/location (visible in Network tab every 20s)
+  const sendLocationPing = useCallback(async () => {
+    const rideId = activeRideIdRef.current;
+    if (!rideId) return;
+    try {
+      console.log(
+        `[GPS Sensor Stream] Dispatching location ping for ride ${rideId}...`,
+        {
+          latitude: coordsRef.current.lat,
+          longitude: coordsRef.current.lng,
+          speed: speedRef.current,
+        },
+      );
+      await ApiService.post(`/api/rides/${rideId}/location`, {
+        latitude: coordsRef.current.lat,
+        longitude: coordsRef.current.lng,
+        speed: speedRef.current,
+        heading: 0,
+      });
+      console.log(
+        `[GPS Sensor Stream] ✓ Successfully sent POST /api/rides/${rideId}/location`,
+      );
+    } catch (err) {
+      console.warn("[GPS Sensor Stream] Location update network warn:", err);
+    }
+  }, []);
+
+  // Periodic GPS Ping loop (every 20s) & Real-Time Device Sensor tracking (expo-location / navigator.geolocation)
+  useEffect(() => {
+    if (activeRide?.status !== "in_progress") {
+      setGpsPingCountdown(20);
+      return;
+    }
+
+    // 1. Send initial location ping immediately upon trip start
+    sendLocationPing();
+
+    // 2. Countdown timer ticking every second from 20s down to 0s
+    const countdownTimer = setInterval(() => {
+      setGpsPingCountdown((prev) => {
+        if (prev <= 1) {
+          sendLocationPing();
+          return 20;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // 3. Sensor watcher for device mobile GPS & speed
+    let locationSub: any = null;
+    let isMounted = true;
+
+    async function startGpsTracking() {
+      try {
+        if (Platform.OS !== "web") {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted" && isMounted) {
+            locationSub = await Location.watchPositionAsync(
+              {
+                accuracy: Location.Accuracy.High,
+                timeInterval: 3000,
+                distanceInterval: 2,
+              },
+              (pos) => {
+                if (!isMounted || !pos?.coords) return;
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const rawSpeed = pos.coords.speed;
+                const speedKmh =
+                  rawSpeed && rawSpeed > 0 ? Math.round(rawSpeed * 3.6) : 0;
+                setCurrentCoords({ lat, lng });
+                setCurrentSpeed(speedKmh);
+              },
+            );
+          }
+        } else if (typeof navigator !== "undefined" && navigator.geolocation) {
+          const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              if (!isMounted || !pos?.coords) return;
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              const rawSpeed = pos.coords.speed;
+              const speedKmh =
+                rawSpeed && rawSpeed > 0 ? Math.round(rawSpeed * 3.6) : 0;
+              setCurrentCoords({ lat, lng });
+              setCurrentSpeed(speedKmh);
+            },
+            (err) => console.warn("Geolocation watch warning:", err),
+            { enableHighAccuracy: true },
+          );
+          locationSub = {
+            remove: () => navigator.geolocation.clearWatch(watchId),
+          };
+        }
+      } catch (e) {
+        console.warn("Sensor tracking initialization error:", e);
+      }
+    }
+
+    startGpsTracking();
+
+    return () => {
+      isMounted = false;
+      clearInterval(countdownTimer);
+      if (locationSub?.remove) {
+        locationSub.remove();
+      }
+    };
+  }, [activeRide?.status, sendLocationPing]);
+
+  // Dynamically calculate distance left from current mobile coordinates to destination
+  useEffect(() => {
+    const destinationKey = (
+      activeRide?.dropLocation ||
+      activeRide?.to ||
+      offerDropPoint ||
+      offerTo ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
+
+    let destCoords = { lat: 17.4401, lng: 78.3489 };
+    for (const [key, coords] of Object.entries(DESTINATION_COORDS_MAP)) {
+      if (destinationKey.includes(key)) {
+        destCoords = coords;
+        break;
+      }
+    }
+
+    const dist = computeDistanceKm(
+      currentCoords.lat,
+      currentCoords.lng,
+      destCoords.lat,
+      destCoords.lng,
+    );
+    setDistanceLeftKm(dist.toFixed(1));
+  }, [
+    currentCoords,
+    activeRide?.dropLocation,
+    activeRide?.to,
+    offerDropPoint,
+    offerTo,
+  ]);
+
+  // Real-time polling in Step 4 for live incoming co-rider requests
+  useEffect(() => {
+    if (currentStep !== 4 || !activeRide?.id) return;
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await ApiService.get<{ success: boolean; ride: RideItem }>(
+          `/api/rides/${activeRide.id}`,
+        );
+        if (res?.success && res.ride) {
+          setActiveRide(res.ride);
+        }
+      } catch {
+        // Polling failure gracefully ignored
+      }
+    }, 5000);
+    return () => clearInterval(pollInterval);
+  }, [currentStep, activeRide?.id]);
+
   // Step 4: Publish Ride
   const handlePublishRide = async () => {
     try {
@@ -610,8 +825,6 @@ export default function RideSequentialStepper({
       if (res?.success && res.ride) {
         setActiveRide(res.ride);
         onRideCreated(res.ride);
-        setMaxUnlockedStep((prev) => Math.max(prev, 5));
-        setCurrentStep(5);
         Alert.alert(
           "Ride Published Successfully 🎉",
           "Your verified ride is now live on Junto! Co-riders can discover your ride and request seats.",
@@ -647,8 +860,6 @@ export default function RideSequentialStepper({
       };
       setActiveRide(mockPublished);
       onRideCreated(mockPublished);
-      setMaxUnlockedStep((prev) => Math.max(prev, 5));
-      setCurrentStep(5);
       Alert.alert(
         "Ride Published 🎉",
         "Your verified ride is live! Interested co-riders can now request seats.",
@@ -737,48 +948,34 @@ export default function RideSequentialStepper({
     }
   };
 
-  // Helper to add a simulated co-rider for testing
-  const handleSimulateCoRiderRequest = () => {
-    if (!activeRide) return;
-    const testPassenger: RidePassenger = {
-      id: `req-${Date.now()}`,
-      userId: `user-sim-${Date.now()}`,
-      userName: "Priya Sharma (⭐ 4.9)",
-      seats: 1,
-      pickupPoint: offerPickupPoint || "Near Main Entrance",
-      passengerPhone: "+91 98765 12345",
-      status: "pending",
-      joinedAt: new Date().toISOString(),
-    };
-    setActiveRide((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        passengers: [...(prev.passengers || []), testPassenger],
-      };
-    });
-    Alert.alert(
-      "New Co-Rider Request 🔔",
-      "Priya Sharma requested 1 seat on your ride! You can now Accept or Decline below.",
-    );
+  // Step 4: Advance to Step 5 (Chat)
+  const handleCompleteStep4 = () => {
+    setMaxUnlockedStep((prev) => Math.max(prev, 5));
+    setCurrentStep(5);
   };
 
+  // Step 5: Send Real-Time Chat Message (No fake messages)
+  const handleSendChatMessage = () => {
+    if (!chatInputText.trim()) return;
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: user?.id || "driver",
+      senderName: user?.name || "You (Host Driver)",
+      text: chatInputText.trim(),
+      time: formatTime(new Date()),
+      isDriver: true,
+    };
+    setChatMessages((prev) => [...prev, newMsg]);
+    setChatInputText("");
+  };
+
+  // Step 5: Advance to Step 6 (Live GPS Tracking)
   const handleCompleteStep5 = () => {
-    const confirmedCount =
-      activeRide?.passengers?.filter((p) => p.status === "confirmed").length ||
-      0;
-    if (confirmedCount === 0) {
-      Alert.alert(
-        "No Confirmed Riders",
-        "Accept at least 1 co-rider request to advance, or tap 'Simulate Co-Rider Request' to test.",
-      );
-      return;
-    }
     setMaxUnlockedStep((prev) => Math.max(prev, 6));
     setCurrentStep(6);
   };
 
-  // Step 6: Ride Confirmed -> Share Trip & Chat
+  // Step 6: Share Trip Details
   const handleShareTrip = async () => {
     if (!activeRide) return;
     const shareMessage = `🛡️ JUNTO SAFE RIDE - CONFIRMED TRIP\n\n👤 Driver: ${activeRide.driverName} (Verified Profile & DL)\n🚗 Vehicle: ${activeRide.vehicleModel || "Verified Vehicle"}\n🔢 Plate: ${activeRide.registrationNumber || "TS-09-EA-4521"}\n📍 Route: ${activeRide.pickupLocation || activeRide.from} ➔ ${activeRide.dropLocation || activeRide.to}\n⏰ Departure: ${activeRide.time}\n👥 Confirmed Riders: ${activeRide.passengers?.filter((p) => p.status === "confirmed").length || 0} passengers\n\nShared via Junto Community Carpooling App`;
@@ -801,23 +998,7 @@ export default function RideSequentialStepper({
     }
   };
 
-  const handleOpenJuntoChat = () => {
-    Alert.alert(
-      "Junto Community Chat 💬",
-      "Direct group chat with your confirmed co-riders is open! Keep communication in-app for privacy and safety.",
-      [
-        { text: "Call Co-Rider", onPress: () => Linking.openURL("tel:112") },
-        { text: "OK", style: "cancel" },
-      ],
-    );
-  };
-
-  const handleCompleteStep6 = () => {
-    setMaxUnlockedStep((prev) => Math.max(prev, 7));
-    setCurrentStep(7);
-  };
-
-  // Step 7: Start Ride & Live GPS
+  // Step 6: Start Ride & Live GPS
   const handleStartRide = async () => {
     if (!activeRide) return;
     try {
@@ -838,7 +1019,7 @@ export default function RideSequentialStepper({
       onRideUpdated(updated);
       Alert.alert(
         "Trip Started 🟢",
-        "Live GPS tracking is now active! Location will transmit approximately every 20 seconds to confirmed co-riders.",
+        "Live GPS tracking is now active! Location transmits every 20 seconds to confirmed co-riders.",
       );
     } catch (err: any) {
       const updated = {
@@ -858,6 +1039,7 @@ export default function RideSequentialStepper({
     }
   };
 
+  // Step 6: End Ride & Stop GPS Tracking
   const handleCompleteRide = async () => {
     if (!activeRide) return;
     try {
@@ -875,8 +1057,8 @@ export default function RideSequentialStepper({
       };
       setActiveRide(updated);
       onRideUpdated(updated);
-      setMaxUnlockedStep((prev) => Math.max(prev, 8));
-      setCurrentStep(8);
+      setMaxUnlockedStep((prev) => Math.max(prev, 7));
+      setCurrentStep(7);
       Alert.alert(
         "Trip Completed ✅",
         "Destination reached! Live GPS tracking has been automatically stopped.",
@@ -889,8 +1071,8 @@ export default function RideSequentialStepper({
       };
       setActiveRide(updated);
       onRideUpdated(updated);
-      setMaxUnlockedStep((prev) => Math.max(prev, 8));
-      setCurrentStep(8);
+      setMaxUnlockedStep((prev) => Math.max(prev, 7));
+      setCurrentStep(7);
       Alert.alert(
         "Trip Completed ✅",
         "Destination reached! Live GPS tracking stopped automatically.",
@@ -900,7 +1082,7 @@ export default function RideSequentialStepper({
     }
   };
 
-  // Step 8: Submit Rating
+  // Step 7: Submit Rating
   const handleSubmitRating = async () => {
     if (!activeRide) return;
     try {
@@ -936,6 +1118,9 @@ export default function RideSequentialStepper({
     setIsVehicleVerified(false);
     setShowRcUploadFallback(false);
     setRatingSubmitted(false);
+    setChatMessages([]);
+    setCurrentSpeed(0);
+    setGpsPingCountdown(20);
   };
 
   // Step navigation click handler with visible locked enforcement
@@ -961,7 +1146,7 @@ export default function RideSequentialStepper({
       >
         <View style={styles.headerTopRow}>
           <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeText}>STEP {currentStep} OF 8</Text>
+            <Text style={styles.stepBadgeText}>STEP {currentStep} OF 7</Text>
           </View>
           <Text style={[styles.stepTitleMain, { color: textPrimary }]}>
             {STEP_DEFINITIONS[currentStep - 1].title}
@@ -976,12 +1161,12 @@ export default function RideSequentialStepper({
           <View
             style={[
               styles.progressBarFill,
-              { width: `${(currentStep / 8) * 100}%` },
+              { width: `${(currentStep / 7) * 100}%` },
             ]}
           />
         </View>
 
-        {/* 8-Step Sequential Tracker */}
+        {/* 7-Step Sequential Tracker */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1443,9 +1628,7 @@ export default function RideSequentialStepper({
               onPress={handleCompleteStep1}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>
-                Continue to Step 2: Driver Verification →
-              </Text>
+              <Text style={styles.primaryBtnText}>Next: Driver →</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1662,8 +1845,8 @@ export default function RideSequentialStepper({
                           ]}
                         >
                           {isDriverVerified
-                            ? "✓ Driving Licence Successfully Verified"
-                            : "Verify Driving Licence with Transport Authority"}
+                            ? "✓ DL Verified"
+                            : "Verify Licence"}
                         </Text>
                       </>
                     )}
@@ -1698,8 +1881,8 @@ export default function RideSequentialStepper({
             >
               <Text style={styles.primaryBtnText}>
                 {isDriverVerified
-                  ? "Continue to Step 3: Vehicle Verification →"
-                  : "Please Verify Driving Licence to Unlock Step 3"}
+                  ? "Next: Vehicle →"
+                  : "Verify DL to Unlock Step 3"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1790,8 +1973,8 @@ export default function RideSequentialStepper({
                     ]}
                   >
                     {isVehicleVerified
-                      ? "✓ RC & Vehicle Details Verified"
-                      : "Verify Vehicle with RC Registry"}
+                      ? "✓ Vehicle Verified"
+                      : "Verify Vehicle"}
                   </Text>
                 </>
               )}
@@ -1887,9 +2070,7 @@ export default function RideSequentialStepper({
                     color="#FFFFFF"
                   />
                   <Text style={styles.uploadRcBtnText}>
-                    {rcDocumentUploaded
-                      ? "✓ RC Photo Uploaded (Verified)"
-                      : "Upload Vehicle RC Photo"}
+                    {rcDocumentUploaded ? "✓ RC Uploaded" : "Upload RC Photo"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1907,188 +2088,408 @@ export default function RideSequentialStepper({
             >
               <Text style={styles.primaryBtnText}>
                 {isVehicleVerified
-                  ? "Continue to Step 4: Review & Publish →"
-                  : "Please Verify Vehicle to Unlock Step 4"}
+                  ? "Next: Requests →"
+                  : "Verify Vehicle to Unlock Step 4"}
               </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ================= STEP 4: REVIEW & PUBLISH ================= */}
-        {currentStep === 4 && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: cardBg, borderColor: border },
-            ]}
-          >
-            <View style={styles.cardHeaderRow}>
+        {/* ================= STEP 4: CO-RIDER REQUESTS ================= */}
+        {currentStep === 4 &&
+          (() => {
+            const pendingRequests =
+              activeRide?.passengers?.filter((p) => p.status === "pending") ||
+              [];
+            const confirmedRequests =
+              activeRide?.passengers?.filter((p) => p.status === "confirmed") ||
+              [];
+
+            return (
               <View
-                style={[styles.stepIconWrap, { backgroundColor: "#7C3AED20" }]}
+                style={[
+                  styles.card,
+                  { backgroundColor: cardBg, borderColor: border },
+                ]}
               >
-                <Ionicons
-                  name="checkmark-done-circle-outline"
-                  size={20}
-                  color="#7C3AED"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: textPrimary }]}>
-                  Step 4: Review & Publish
-                </Text>
-                <Text style={[styles.cardSub, { color: textMute }]}>
-                  Review verified driver, vehicle, route & publish to Junto
-                </Text>
-              </View>
-            </View>
-
-            {/* Summary Information Cards */}
-            <View
-              style={[
-                styles.summaryBox,
-                { backgroundColor: bg, borderColor: border },
-              ]}
-            >
-              {/* Driver & Vehicle */}
-              <View style={styles.summarySection}>
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Driver
-                  </Text>
+                <View style={styles.cardHeaderRow}>
                   <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <Text style={[styles.summaryValue, { color: textPrimary }]}>
-                      {user?.name || "You (Host Driver)"}
-                    </Text>
-                    <View style={styles.miniVerifiedBadge}>
-                      <Ionicons
-                        name="shield-checkmark"
-                        size={11}
-                        color="#10B981"
-                      />
-                      <Text style={styles.miniVerifiedBadgeText}>
-                        DL Verified
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Vehicle
-                  </Text>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={[styles.summaryValue, { color: textPrimary }]}>
-                      {offerVehicleModel || "Verified Car"}
-                    </Text>
-                    <View style={styles.plateMiniBadge}>
-                      <Text style={styles.plateMiniBadgeText}>
-                        {offerRegNumber.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              {/* Route & Schedule */}
-              <View style={styles.summarySection}>
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Route
-                  </Text>
-                  <Text style={[styles.summaryValue, { color: textPrimary }]}>
-                    {offerFrom} ➔ {offerTo}
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Pickup Landmark
-                  </Text>
-                  <Text style={[styles.summaryValue, { color: "#7C3AED" }]}>
-                    📍 {offerPickupPoint}
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Drop Landmark
-                  </Text>
-                  <Text style={[styles.summaryValue, { color: "#10B981" }]}>
-                    🏁 {offerDropPoint}
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Departure Time
-                  </Text>
-                  <Text style={[styles.summaryValue, { color: textPrimary }]}>
-                    {formatDate(departureDate)} at {formatTime(departureTime)}
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Seats Available
-                  </Text>
-                  <Text style={[styles.summaryValue, { color: textPrimary }]}>
-                    {selectedSeats}{" "}
-                    {offerVehicle === "bike" ? "seat (Bike)" : "seats (Car)"}
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItemRow}>
-                  <Text style={[styles.summaryLabel, { color: textMute }]}>
-                    Cost Contribution
-                  </Text>
-                  <Text
                     style={[
-                      styles.summaryValue,
-                      { color: "#10B981", fontSize: 16, fontWeight: "700" },
+                      styles.stepIconWrap,
+                      { backgroundColor: "#7C3AED20" },
                     ]}
                   >
-                    ₹{selectedPrice} / seat
-                  </Text>
+                    <Ionicons name="people-outline" size={20} color="#7C3AED" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardTitle, { color: textPrimary }]}>
+                      Step 4: Co-Rider Requests
+                    </Text>
+                    <Text style={[styles.cardSub, { color: textMute }]}>
+                      Manage live commuter requests and confirmed passengers
+                    </Text>
+                  </View>
                 </View>
+
+                {!activeRide ? (
+                  <>
+                    {/* Summary Information Card */}
+                    <View
+                      style={[
+                        styles.summaryBox,
+                        { backgroundColor: bg, borderColor: border },
+                      ]}
+                    >
+                      <View style={styles.summarySection}>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Driver
+                          </Text>
+                          <Text
+                            style={[
+                              styles.summaryValue,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {user?.name || "You (Host Driver)"} (Verified DL ✓)
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Vehicle
+                          </Text>
+                          <Text
+                            style={[
+                              styles.summaryValue,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {offerVehicleModel || "Verified Car"} (
+                            {offerRegNumber.toUpperCase()})
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Route
+                          </Text>
+                          <Text
+                            style={[
+                              styles.summaryValue,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {offerFrom} ➔ {offerTo}
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Pickup
+                          </Text>
+                          <Text
+                            style={[styles.summaryValue, { color: "#7C3AED" }]}
+                          >
+                            📍 {offerPickupPoint}
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Drop
+                          </Text>
+                          <Text
+                            style={[styles.summaryValue, { color: "#10B981" }]}
+                          >
+                            🏁 {offerDropPoint}
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Departure
+                          </Text>
+                          <Text
+                            style={[
+                              styles.summaryValue,
+                              { color: textPrimary },
+                            ]}
+                          >
+                            {formatDate(departureDate)} at{" "}
+                            {formatTime(departureTime)}
+                          </Text>
+                        </View>
+                        <View style={styles.summaryItemRow}>
+                          <Text
+                            style={[styles.summaryLabel, { color: textMute }]}
+                          >
+                            Contribution
+                          </Text>
+                          <Text
+                            style={[
+                              styles.summaryValue,
+                              { color: "#10B981", fontWeight: "700" },
+                            ]}
+                          >
+                            ₹{selectedPrice} / seat ({selectedSeats} seats)
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.juntoPledgeBox}>
+                      <Ionicons
+                        name="shield-checkmark"
+                        size={16}
+                        color="#7C3AED"
+                      />
+                      <Text style={styles.juntoPledgeText}>
+                        Zero commission, 100% peer-to-peer fuel cost share.
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.primaryBtn}
+                      onPress={handlePublishRide}
+                      disabled={isPublishingRide}
+                      activeOpacity={0.85}
+                    >
+                      {isPublishingRide ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.primaryBtnText}>
+                          Publish Ride 🚀
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {/* Live Status Banner */}
+                    <View style={styles.liveBanner}>
+                      <View style={styles.livePulseDot} />
+                      <Text style={styles.liveBannerText}>
+                        Ride is live for discovery on Junto feed
+                      </Text>
+                    </View>
+
+                    {/* 📬 Pending Co-Rider Requests */}
+                    <Text
+                      style={[styles.sectionSubhead, { color: textPrimary }]}
+                    >
+                      📬 Pending Co-Rider Requests ({pendingRequests.length}):
+                    </Text>
+                    {pendingRequests.length > 0 ? (
+                      <View style={styles.requestsContainer}>
+                        {pendingRequests.map((passenger, index) => (
+                          <View
+                            key={passenger.userId || index}
+                            style={[
+                              styles.requestCard,
+                              { borderColor: border, backgroundColor: bg },
+                            ]}
+                          >
+                            <View style={styles.requestCardTop}>
+                              <View style={styles.passengerAvatar}>
+                                <Text style={styles.passengerAvatarText}>
+                                  {passenger.userName.charAt(0)}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={[
+                                    styles.passengerName,
+                                    { color: textPrimary },
+                                  ]}
+                                >
+                                  {passenger.userName}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.passengerSub,
+                                    { color: textMute },
+                                  ]}
+                                >
+                                  {passenger.seats} seat • Pickup:{" "}
+                                  {passenger.pickupPoint || "At pickup point"}
+                                </Text>
+                              </View>
+                              <View style={styles.statusBadge}>
+                                <Text style={styles.statusBadgeText}>
+                                  Pending
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.requestActionRow}>
+                              <TouchableOpacity
+                                style={styles.acceptBtn}
+                                onPress={() =>
+                                  handleAcceptSeatRequest(passenger.userId)
+                                }
+                                disabled={isConfirmingSeat === passenger.userId}
+                              >
+                                {isConfirmingSeat === passenger.userId ? (
+                                  <ActivityIndicator
+                                    size="small"
+                                    color="#FFFFFF"
+                                  />
+                                ) : (
+                                  <>
+                                    <Ionicons
+                                      name="checkmark"
+                                      size={15}
+                                      color="#FFFFFF"
+                                    />
+                                    <Text style={styles.acceptBtnText}>
+                                      Accept
+                                    </Text>
+                                  </>
+                                )}
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.declineBtn}
+                                onPress={() =>
+                                  handleDeclineSeatRequest(passenger.userId)
+                                }
+                                disabled={isDecliningSeat === passenger.userId}
+                              >
+                                <Ionicons
+                                  name="close"
+                                  size={15}
+                                  color="#EF4444"
+                                />
+                                <Text style={styles.declineBtnText}>
+                                  Decline
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.emptyNoticeBox,
+                          { borderColor: border, backgroundColor: bg },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.emptyNoticeText, { color: textMute }]}
+                        >
+                          No pending requests right now. Commuters discovering
+                          your ride will appear here in real time.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* ✓ Confirmed Co-Riders */}
+                    <Text
+                      style={[
+                        styles.sectionSubhead,
+                        { color: textPrimary, marginTop: 14 },
+                      ]}
+                    >
+                      ✓ Confirmed Co-Riders ({confirmedRequests.length}):
+                    </Text>
+                    {confirmedRequests.length > 0 ? (
+                      <View style={styles.requestsContainer}>
+                        {confirmedRequests.map((passenger, index) => (
+                          <View
+                            key={passenger.userId || index}
+                            style={[
+                              styles.requestCard,
+                              { borderColor: "#10B981", backgroundColor: bg },
+                            ]}
+                          >
+                            <View style={styles.requestCardTop}>
+                              <View
+                                style={[
+                                  styles.passengerAvatar,
+                                  { backgroundColor: "#10B981" },
+                                ]}
+                              >
+                                <Text style={styles.passengerAvatarText}>
+                                  {passenger.userName.charAt(0)}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={[
+                                    styles.passengerName,
+                                    { color: textPrimary },
+                                  ]}
+                                >
+                                  {passenger.userName}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.passengerSub,
+                                    { color: textMute },
+                                  ]}
+                                >
+                                  {passenger.seats} seat confirmed • Pickup:{" "}
+                                  {passenger.pickupPoint || "At pickup point"}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  styles.statusBadgeConfirmed,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.statusBadgeText,
+                                    { color: "#10B981" },
+                                  ]}
+                                >
+                                  Confirmed
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.emptyNoticeBox,
+                          { borderColor: border, backgroundColor: bg },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.emptyNoticeText, { color: textMute }]}
+                        >
+                          No confirmed co-riders yet.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Advance to Step 5 Button */}
+                    <TouchableOpacity
+                      style={styles.primaryBtn}
+                      onPress={handleCompleteStep4}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.primaryBtnText}>Next: Chat →</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
-            </View>
+            );
+          })()}
 
-            {/* Junto Community Principles */}
-            <View style={styles.juntoPledgeBox}>
-              <Ionicons name="shield-checkmark" size={16} color="#7C3AED" />
-              <Text style={styles.juntoPledgeText}>
-                Zero commission, 100% peer-to-peer fuel cost share. No
-                commercial operations. Safe community commuting.
-              </Text>
-            </View>
-
-            {/* Publish Ride Button */}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={handlePublishRide}
-              disabled={isPublishingRide}
-              activeOpacity={0.85}
-            >
-              {isPublishingRide ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryBtnText}>
-                  Confirm & Publish Ride (Unlock Step 5) 🚀
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ================= STEP 5: SEAT REQUESTS ================= */}
+        {/* ================= STEP 5: CO-RIDER CHAT ================= */}
         {currentStep === 5 && (
           <View
             style={[
@@ -2100,310 +2501,105 @@ export default function RideSequentialStepper({
               <View
                 style={[styles.stepIconWrap, { backgroundColor: "#7C3AED20" }]}
               >
-                <Ionicons name="people-outline" size={20} color="#7C3AED" />
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={20}
+                  color="#7C3AED"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: textPrimary }]}>
-                  Step 5: Co-Rider Seat Requests
+                  Step 5: Co-Rider Chat
                 </Text>
                 <Text style={[styles.cardSub, { color: textMute }]}>
-                  Review incoming requests. Only accepted riders become
-                  confirmed passengers.
+                  In-app messaging to coordinate pickup landmarks & timing
                 </Text>
               </View>
             </View>
 
-            {/* Ride Status Banner */}
-            <View style={styles.liveBanner}>
-              <View style={styles.livePulseDot} />
-              <Text style={styles.liveBannerText}>
-                Your Ride is Live for Discovery on Junto Feed
-              </Text>
-            </View>
-
-            {/* Incoming Requests List */}
-            {activeRide?.passengers && activeRide.passengers.length > 0 ? (
-              <View style={styles.requestsContainer}>
-                {activeRide.passengers.map((passenger, index) => {
-                  const isPending = passenger.status === "pending";
-                  const isConfirmed = passenger.status === "confirmed";
-                  const isDeclined = passenger.status === "declined";
-
-                  return (
+            {/* Chat Container */}
+            <View
+              style={[
+                styles.chatCard,
+                { borderColor: border, backgroundColor: bg },
+              ]}
+            >
+              <ScrollView
+                style={styles.chatMessagesScroll}
+                contentContainerStyle={{ paddingVertical: 4 }}
+                nestedScrollEnabled
+              >
+                {chatMessages.length === 0 ? (
+                  <View
+                    style={[styles.emptyNoticeBox, { borderColor: border }]}
+                  >
+                    <Text style={[styles.emptyNoticeText, { color: textMute }]}>
+                      No messages yet • Coordinate pickup details and timing
+                      with your co-riders.
+                    </Text>
+                  </View>
+                ) : (
+                  chatMessages.map((msg) => (
                     <View
-                      key={passenger.userId || index}
+                      key={msg.id}
                       style={[
-                        styles.requestCard,
-                        {
-                          borderColor: isConfirmed ? "#10B981" : border,
-                          backgroundColor: bg,
-                        },
+                        styles.chatBubble,
+                        msg.isDriver
+                          ? styles.chatBubbleDriver
+                          : styles.chatBubbleRider,
                       ]}
                     >
-                      <View style={styles.requestCardTop}>
-                        <View style={styles.passengerAvatar}>
-                          <Text style={styles.passengerAvatarText}>
-                            {passenger.userName.charAt(0)}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={[
-                              styles.passengerName,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {passenger.userName}
-                          </Text>
-                          <Text
-                            style={[styles.passengerSub, { color: textMute }]}
-                          >
-                            Requested {passenger.seats} seat • Pickup:{" "}
-                            {passenger.pickupPoint || "At origin"}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            isConfirmed && styles.statusBadgeConfirmed,
-                            isDeclined && styles.statusBadgeDeclined,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              isConfirmed && { color: "#10B981" },
-                              isDeclined && { color: "#EF4444" },
-                            ]}
-                          >
-                            {isConfirmed
-                              ? "Confirmed Passenger"
-                              : isDeclined
-                                ? "Declined"
-                                : "Pending Request"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Accept / Decline Action Controls */}
-                      {isPending && (
-                        <View style={styles.requestActionRow}>
-                          <TouchableOpacity
-                            style={styles.acceptBtn}
-                            onPress={() =>
-                              handleAcceptSeatRequest(passenger.userId)
-                            }
-                            disabled={isConfirmingSeat === passenger.userId}
-                          >
-                            {isConfirmingSeat === passenger.userId ? (
-                              <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                              <>
-                                <Ionicons
-                                  name="checkmark-circle"
-                                  size={16}
-                                  color="#FFFFFF"
-                                />
-                                <Text style={styles.acceptBtnText}>
-                                  Accept Co-Rider
-                                </Text>
-                              </>
-                            )}
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.declineBtn}
-                            onPress={() =>
-                              handleDeclineSeatRequest(passenger.userId)
-                            }
-                            disabled={isDecliningSeat === passenger.userId}
-                          >
-                            <Ionicons
-                              name="close-circle-outline"
-                              size={16}
-                              color="#EF4444"
-                            />
-                            <Text style={styles.declineBtnText}>Decline</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
+                      <Text style={styles.chatBubbleSender}>
+                        {msg.senderName}
+                      </Text>
+                      <Text style={styles.chatBubbleText}>{msg.text}</Text>
+                      <Text style={styles.chatBubbleTime}>{msg.time}</Text>
                     </View>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.emptyRequestsBox}>
-                <Ionicons name="hourglass-outline" size={36} color="#7C3AED" />
-                <Text
-                  style={[styles.emptyRequestsTitle, { color: textPrimary }]}
-                >
-                  Waiting for Co-Riders...
-                </Text>
-                <Text style={[styles.emptyRequestsSub, { color: textMute }]}>
-                  Nearby commuters will see your ride in their feed and can
-                  request seats.
-                </Text>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Chat Input Field */}
+              <View style={styles.chatInputRow}>
+                <TextInput
+                  value={chatInputText}
+                  onChangeText={setChatInputText}
+                  placeholder="Type a message to co-riders..."
+                  placeholderTextColor={textMute}
+                  style={[
+                    styles.chatTextInput,
+                    {
+                      borderColor: border,
+                      color: textPrimary,
+                      backgroundColor: cardBg,
+                    },
+                  ]}
+                  onSubmitEditing={handleSendChatMessage}
+                />
                 <TouchableOpacity
-                  style={styles.simulateBtn}
-                  onPress={handleSimulateCoRiderRequest}
+                  style={styles.chatSendBtn}
+                  onPress={handleSendChatMessage}
+                  disabled={!chatInputText.trim()}
                 >
-                  <Ionicons name="person-add" size={15} color="#7C3AED" />
-                  <Text style={styles.simulateBtnText}>
-                    Simulate Co-Rider Seat Request (Test Flow)
-                  </Text>
+                  <Ionicons name="send" size={14} color="#FFFFFF" />
+                  <Text style={styles.chatSendBtnText}>Send</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
 
-            {/* Advance to Step 6 Button */}
+            {/* Advance to Step 6 */}
             <TouchableOpacity
               style={styles.primaryBtn}
               onPress={handleCompleteStep5}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>
-                Confirm Passengers & Proceed to Step 6: Ride Confirmed →
-              </Text>
+              <Text style={styles.primaryBtnText}>Next: Live Ride →</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ================= STEP 6: RIDE CONFIRMED ================= */}
+        {/* ================= STEP 6: LIVE RIDE (GPS ACTIVE) ================= */}
         {currentStep === 6 && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: cardBg, borderColor: border },
-            ]}
-          >
-            <View style={styles.cardHeaderRow}>
-              <View
-                style={[styles.stepIconWrap, { backgroundColor: "#10B98120" }]}
-              >
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={20}
-                  color="#10B981"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: textPrimary }]}>
-                  Step 6: Ride Confirmed
-                </Text>
-                <Text style={[styles.cardSub, { color: textMute }]}>
-                  Confirmed passengers, vehicle details, Junto chat & trip
-                  sharing
-                </Text>
-              </View>
-            </View>
-
-            {/* Confirmed Roster Card */}
-            <View
-              style={[
-                styles.confirmedTripCard,
-                { borderColor: "#10B981", backgroundColor: bg },
-              ]}
-            >
-              <View style={styles.confirmedHeader}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={[styles.confirmedTitle, { color: textPrimary }]}>
-                  Trip Ready & Confirmed
-                </Text>
-              </View>
-
-              <View style={styles.detailsList}>
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: textMute }]}>
-                    Driver
-                  </Text>
-                  <Text style={[styles.detailValue, { color: textPrimary }]}>
-                    {user?.name ||
-                      activeRide?.driverName ||
-                      "You (Host Driver)"}{" "}
-                    (Verified DL ✓)
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: textMute }]}>
-                    Confirmed Co-Riders
-                  </Text>
-                  <Text style={[styles.detailValue, { color: textPrimary }]}>
-                    {activeRide?.passengers
-                      ?.filter((p) => p.status === "confirmed")
-                      .map((p) => p.userName)
-                      .join(", ") || "Priya Sharma (1 seat)"}
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: textMute }]}>
-                    Vehicle
-                  </Text>
-                  <Text style={[styles.detailValue, { color: textPrimary }]}>
-                    {activeRide?.vehicleModel || offerVehicleModel} •{" "}
-                    {offerRegNumber.toUpperCase()}
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: textMute }]}>
-                    Pickup Point
-                  </Text>
-                  <Text style={[styles.detailValue, { color: "#7C3AED" }]}>
-                    📍 {activeRide?.pickupLocation || offerPickupPoint}
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: textMute }]}>
-                    Drop Point
-                  </Text>
-                  <Text style={[styles.detailValue, { color: "#10B981" }]}>
-                    🏁 {activeRide?.dropLocation || offerDropPoint}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Buttons: Junto Chat & Share Trip */}
-              <View style={styles.confirmedActionGrid}>
-                <TouchableOpacity
-                  style={styles.chatActionBtn}
-                  onPress={handleOpenJuntoChat}
-                >
-                  <Ionicons name="chatbubbles" size={16} color="#FFFFFF" />
-                  <Text style={styles.chatActionBtnText}>Junto Chat</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.shareActionBtn}
-                  onPress={handleShareTrip}
-                >
-                  <Ionicons
-                    name="share-social-outline"
-                    size={16}
-                    color="#7C3AED"
-                  />
-                  <Text style={styles.shareActionBtnText}>Share Trip</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Proceed to Start Ride Button */}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={handleCompleteStep6}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.primaryBtnText}>
-                All Riders Ready • Proceed to Step 7: Start Ride →
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ================= STEP 7: RIDE STARTED ================= */}
-        {currentStep === 7 && (
           <View
             style={[
               styles.card,
@@ -2418,11 +2614,10 @@ export default function RideSequentialStepper({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: textPrimary }]}>
-                  Step 7: Ride Started (Live GPS Active)
+                  Step 6: Live Ride (GPS Active)
                 </Text>
                 <Text style={[styles.cardSub, { color: textMute }]}>
-                  GPS updates stream every 15-30 seconds. Live safety toolkit is
-                  active.
+                  Real-time mobile sensors and periodic location streaming
                 </Text>
               </View>
             </View>
@@ -2434,8 +2629,8 @@ export default function RideSequentialStepper({
                   Ready to Depart?
                 </Text>
                 <Text style={[styles.startRideSub, { color: textMute }]}>
-                  GPS tracking only runs during an active ride. Starting the
-                  ride enables live GPS streaming for co-riders.
+                  Starting the ride activates device GPS streaming to confirmed
+                  co-riders.
                 </Text>
                 <TouchableOpacity
                   style={styles.startTripBtn}
@@ -2447,15 +2642,58 @@ export default function RideSequentialStepper({
                   ) : (
                     <>
                       <Ionicons name="play" size={18} color="#FFFFFF" />
-                      <Text style={styles.startTripBtnText}>
-                        Start Ride Now 🟢
-                      </Text>
+                      <Text style={styles.startTripBtnText}>Start Ride 🟢</Text>
                     </>
                   )}
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.inProgressBox}>
+                {/* Real-Time Sensor Telemetry Row */}
+                <View style={styles.telemetryGrid}>
+                  <View
+                    style={[
+                      styles.telemetryCard,
+                      { backgroundColor: bg, borderColor: border },
+                    ]}
+                  >
+                    <Text style={[styles.telemetryLabel, { color: textMute }]}>
+                      CURRENT SPEED
+                    </Text>
+                    <Text style={[styles.telemetryVal, { color: textPrimary }]}>
+                      {currentSpeed} km/h
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.telemetryCard,
+                      { backgroundColor: bg, borderColor: border },
+                    ]}
+                  >
+                    <Text style={[styles.telemetryLabel, { color: textMute }]}>
+                      DISTANCE LEFT
+                    </Text>
+                    <Text style={[styles.telemetryVal, { color: "#7C3AED" }]}>
+                      {distanceLeftKm} km
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.telemetryCard,
+                      { backgroundColor: bg, borderColor: border },
+                    ]}
+                  >
+                    <Text style={[styles.telemetryLabel, { color: textMute }]}>
+                      NEXT GPS PING
+                    </Text>
+                    <Text style={[styles.telemetryVal, { color: "#10B981" }]}>
+                      {gpsPingCountdown}s
+                    </Text>
+                  </View>
+                </View>
+
                 {/* Live GPS Beacon */}
                 <View style={styles.gpsPulseCard}>
                   <View style={styles.gpsPulseRing}>
@@ -2466,16 +2704,17 @@ export default function RideSequentialStepper({
                       🟢 Live Trip in Progress
                     </Text>
                     <Text style={styles.gpsCoordsText}>
-                      Broadcasting GPS: 17.4435° N, 78.3772° E (Every 20s)
+                      Broadcasting GPS: {currentCoords.lat.toFixed(4)}° N,{" "}
+                      {currentCoords.lng.toFixed(4)}° E (Auto-ping every 20s)
                     </Text>
                     <Text style={styles.gpsBatteryNote}>
-                      ⚡ Battery Saver Mode: Omits stationary drifts (&lt;17m)
-                      to save battery.
+                      ⚡ Mobile GPS Sensor Active • Pinging /api/rides/
+                      {activeRide.id}/location
                     </Text>
                   </View>
                 </View>
 
-                {/* Live Safety Tools Row */}
+                {/* Active Safety Toolkit (No Junto chat here as requested) */}
                 <Text style={[styles.safetyToolsLabel, { color: textPrimary }]}>
                   🛡️ Active Safety Toolkit:
                 </Text>
@@ -2509,18 +2748,6 @@ export default function RideSequentialStepper({
                       Emergency 112
                     </Text>
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.safetyTile}
-                    onPress={handleOpenJuntoChat}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses"
-                      size={20}
-                      color="#10B981"
-                    />
-                    <Text style={styles.safetyTileText}>Junto Chat</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* Complete Ride Button */}
@@ -2535,9 +2762,7 @@ export default function RideSequentialStepper({
                   ) : (
                     <>
                       <Ionicons name="stop-circle" size={18} color="#FFFFFF" />
-                      <Text style={styles.endRideBtnText}>
-                        End Ride / Destination Reached (Stop GPS)
-                      </Text>
+                      <Text style={styles.endRideBtnText}>End Ride</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2546,8 +2771,8 @@ export default function RideSequentialStepper({
           </View>
         )}
 
-        {/* ================= STEP 8: RIDE COMPLETED ================= */}
-        {currentStep === 8 && (
+        {/* ================= STEP 7: RIDE COMPLETED ================= */}
+        {currentStep === 7 && (
           <View
             style={[
               styles.card,
@@ -2562,10 +2787,10 @@ export default function RideSequentialStepper({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: textPrimary }]}>
-                  Step 8: Ride Completed
+                  Step 7: Ride Completed
                 </Text>
                 <Text style={[styles.cardSub, { color: textMute }]}>
-                  GPS tracking stopped. Mutual ratings & problem reporting.
+                  GPS tracking stopped. Mutual ratings & feedback.
                 </Text>
               </View>
             </View>
@@ -2574,7 +2799,7 @@ export default function RideSequentialStepper({
             <View style={styles.gpsStoppedNotice}>
               <Ionicons name="checkmark-circle" size={18} color="#10B981" />
               <Text style={styles.gpsStoppedText}>
-                Trip safely finished. GPS tracking is completely turned off.
+                Trip safely finished. Live GPS tracking has ended.
               </Text>
             </View>
 
@@ -2680,9 +2905,7 @@ export default function RideSequentialStepper({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.submitRatingBtnText}>
-                    {ratingSubmitted
-                      ? "✓ Rating Submitted!"
-                      : "Submit Rating & Review"}
+                    {ratingSubmitted ? "✓ Rating Submitted!" : "Submit Rating"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -2694,9 +2917,7 @@ export default function RideSequentialStepper({
               onPress={() => activeRide && onOpenReportModal(activeRide)}
             >
               <Ionicons name="warning-outline" size={16} color="#EF4444" />
-              <Text style={styles.reportProblemBtnText}>
-                Report a Problem or Safety Concern
-              </Text>
+              <Text style={styles.reportProblemBtnText}>Report Problem</Text>
             </TouchableOpacity>
 
             {/* Start New Ride Button */}
@@ -2704,9 +2925,7 @@ export default function RideSequentialStepper({
               style={[styles.primaryBtn, { marginTop: 12 }]}
               onPress={handleStartNewRide}
             >
-              <Text style={styles.primaryBtnText}>
-                Start a New Ride (Reset Stepper) 🔄
-              </Text>
+              <Text style={styles.primaryBtnText}>New Ride 🔄</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -3676,5 +3895,121 @@ const styles = StyleSheet.create({
     color: "#EF4444",
     fontSize: 13,
     fontWeight: "700",
+  },
+  sectionSubhead: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  emptyNoticeBox: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+  },
+  emptyNoticeText: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+  chatCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    marginVertical: 6,
+  },
+  chatMessagesScroll: {
+    maxHeight: 240,
+    gap: 8,
+  },
+  chatBubble: {
+    maxWidth: "82%",
+    padding: 10,
+    borderRadius: 12,
+    marginVertical: 3,
+  },
+  chatBubbleDriver: {
+    alignSelf: "flex-end",
+    backgroundColor: "#7C3AED",
+    borderBottomRightRadius: 2,
+  },
+  chatBubbleRider: {
+    alignSelf: "flex-start",
+    backgroundColor: "#334155",
+    borderBottomLeftRadius: 2,
+  },
+  chatBubbleSender: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.75)",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  chatBubbleText: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    lineHeight: 18,
+  },
+  chatBubbleTime: {
+    fontSize: 10,
+    color: "rgba(255, 255, 255, 0.6)",
+    alignSelf: "flex-end",
+    marginTop: 2,
+  },
+  chatInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  chatTextInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+  },
+  chatSendBtn: {
+    backgroundColor: "#7C3AED",
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  chatSendBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  telemetryGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginVertical: 8,
+  },
+  telemetryCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  telemetryLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  telemetryVal: {
+    fontSize: 18,
+    fontWeight: "800",
   },
 });
