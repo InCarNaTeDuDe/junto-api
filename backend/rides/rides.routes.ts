@@ -8,6 +8,7 @@ import {
   updateRideHandler,
   getMyRidesHandler,
   confirmPassengerHandler,
+  declinePassengerHandler,
   cancelSeatRequestHandler,
   deleteRideHandler,
   startRideHandler,
@@ -52,6 +53,11 @@ router.post(
   "/:id/passengers/:passengerUserId/confirm",
   authenticate,
   confirmPassengerHandler,
+);
+router.post(
+  "/:id/passengers/:passengerUserId/decline",
+  authenticate,
+  declinePassengerHandler,
 );
 router.patch(
   "/:id",

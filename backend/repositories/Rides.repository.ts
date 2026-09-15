@@ -80,74 +80,7 @@ export interface RideRecord {
 // In-memory fallback store when PostgreSQL is not configured or offline
 const inMemoryRides = new Map<string, RideRecord>();
 
-const initialSeedRides: RideRecord[] = [
-  {
-    id: "ride-hyd-01",
-    userId: "usr-commuter-default",
-    driverName: "You (Host Driver)",
-    driverRating: 5.0,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-    from: "Hitec City Cyber Towers",
-    to: "Gachibowli Financial District",
-    time: "Today at 09:30 AM",
-    vehicleType: "car",
-    seatsLeft: 3,
-    totalSeats: 3,
-    price: 40,
-    verified: true,
-    locationName: "Hitec City",
-    locationState: "Telangana",
-    latitude: 17.4435,
-    longitude: 78.3772,
-    status: "active",
-    passengers: [],
-    vehicleModel: "Maruti Suzuki Swift (White)",
-    registrationNumber: "TS-09-EA-4521",
-    pickupLocation: "Pillar 14, Hitec City Metro",
-    dropLocation: "Gate 2, DLF Cyber City",
-    currentLatitude: 17.4435,
-    currentLongitude: 78.3772,
-    isGpsActive: false,
-    ratings: [],
-    reports: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "ride-hyd-02",
-    userId: "usr-driver-2",
-    driverName: "Arjun Reddy",
-    driverRating: 4.9,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-    from: "Kondapur RTO",
-    to: "Mindspace IT Park",
-    time: "Today at 10:15 AM",
-    vehicleType: "bike",
-    seatsLeft: 1,
-    totalSeats: 1,
-    price: 25,
-    verified: true,
-    locationName: "Kondapur",
-    locationState: "Telangana",
-    latitude: 17.4682,
-    longitude: 78.3582,
-    status: "active",
-    passengers: [],
-    vehicleModel: "Honda Activa 6G (Matte Black)",
-    registrationNumber: "TS-08-KL-7821",
-    pickupLocation: "Near Harsha Toyota",
-    dropLocation: "Building 12B, Mindspace",
-    currentLatitude: 17.4682,
-    currentLongitude: 78.3582,
-    isGpsActive: false,
-    ratings: [],
-    reports: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const initialSeedRides: RideRecord[] = [];
 
 for (const r of initialSeedRides) {
   inMemoryRides.set(r.id, r);
@@ -561,6 +494,70 @@ export class RideRepository extends BaseRepository<Ride> {
         ride.seatsLeft = Math.max(0, ride.seatsLeft - seatsToDeduct);
         targetPassenger.status = "confirmed";
       }
+      ride.passengers = currentPassengers;
+      ride.updatedAt = new Date();
+      const savedRide = await this.repo.save(ride);
+      const rec = this.toRideRecord(savedRide);
+      inMemoryRides.set(rec.id, rec);
+      return rec;
+    } catch (e: any) {
+      const inMem = inMemoryRides.get(rideId);
+      if (inMem) return inMem;
+      throw e;
+    }
+  }
+
+  /**
+   * Decline a passenger request for a ride
+   */
+  async declinePassenger(
+    rideId: string,
+    driverId: string,
+    passengerUserId: string,
+  ): Promise<RideRecord> {
+    if (!this.isConnected) {
+      const ride = inMemoryRides.get(rideId);
+      if (!ride) throw new Error("Ride not found");
+      const currentPassengers = Array.isArray(ride.passengers)
+        ? [...ride.passengers]
+        : [];
+      const target = currentPassengers.find(
+        (p) => p.userId === passengerUserId,
+      );
+      if (!target) throw new Error("Passenger request not found.");
+      if (target.status === "confirmed") {
+        const maxSeats =
+          ride.totalSeats || (ride.vehicleType === "bike" ? 1 : 3);
+        ride.seatsLeft = Math.min(
+          maxSeats,
+          ride.seatsLeft + (target.seats || 1),
+        );
+      }
+      target.status = "declined";
+      ride.passengers = currentPassengers;
+      ride.updatedAt = new Date().toISOString();
+      return ride;
+    }
+
+    try {
+      const ride = await this.repo.findOne({ where: { id: rideId } });
+      if (!ride) throw new Error("Ride not found");
+      const currentPassengers = Array.isArray(ride.passengers)
+        ? [...ride.passengers]
+        : [];
+      const targetPassenger = currentPassengers.find(
+        (p) => p.userId === passengerUserId,
+      );
+      if (!targetPassenger) throw new Error("Passenger request not found.");
+      if (targetPassenger.status === "confirmed") {
+        const maxSeats =
+          ride.totalSeats || (ride.vehicleType === "bike" ? 1 : 3);
+        ride.seatsLeft = Math.min(
+          maxSeats,
+          ride.seatsLeft + (targetPassenger.seats || 1),
+        );
+      }
+      targetPassenger.status = "declined";
       ride.passengers = currentPassengers;
       ride.updatedAt = new Date();
       const savedRide = await this.repo.save(ride);

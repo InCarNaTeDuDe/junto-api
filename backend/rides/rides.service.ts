@@ -282,6 +282,43 @@ export async function confirmRidePassenger(
 }
 
 /**
+ * Driver declines a co-rider passenger request
+ */
+export async function declineRidePassenger(
+  rideId: string,
+  passengerUserId: string,
+  driver: User,
+) {
+  if (!driver?.id) {
+    throw new Error("Authenticated user is required.");
+  }
+
+  const updatedRide = await rideRepository.declinePassenger(
+    rideId,
+    driver.id,
+    passengerUserId,
+  );
+
+  // Notify connected clients
+  const io = getSocketServer();
+  if (io) {
+    io.emit("ride_updated", updatedRide);
+    io.to(`user:${passengerUserId}`).emit("ride_declined", {
+      rideId: updatedRide.id,
+      driverName: updatedRide.driverName,
+    });
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  return {
+    success: true,
+    message: "Passenger request has been declined.",
+    ride: updatedRide,
+  };
+}
+
+/**
  * Update a ride
  */
 export async function updateRide(

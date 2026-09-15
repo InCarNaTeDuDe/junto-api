@@ -7,6 +7,7 @@ import {
   updateRide,
   getMyRides,
   confirmRidePassenger,
+  declineRidePassenger,
   cancelSeatRequest,
   deleteRide,
   startRide,
@@ -158,6 +159,20 @@ export async function confirmPassengerHandler(
   try {
     const { id, passengerUserId } = req.params;
     const result = await confirmRidePassenger(id, passengerUserId, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function declinePassengerHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id, passengerUserId } = req.params;
+    const result = await declineRidePassenger(id, passengerUserId, req.user!);
     return res.status(200).json(result);
   } catch (err) {
     next(err);
