@@ -90,6 +90,37 @@ export interface RideRecord {
   updatedAt: string;
 }
 
+export interface CreateRideData {
+  driverId: string;
+  driverName: string;
+  driverRating?: number;
+  driverAvatar?: string;
+  driverAvatarBg?: string;
+
+  from: string;
+  to: string;
+  time: Date | string;
+
+  vehicleType: string;
+  seatsLeft: number;
+  totalSeats: number;
+  price: number;
+
+  verified?: boolean;
+  notes?: string;
+
+  locationName?: string;
+  locationState?: string;
+  latitude?: number;
+  longitude?: number;
+
+  vehicleModel?: string;
+  registrationNumber?: string;
+
+  pickupLocation?: string;
+  dropLocation?: string;
+}
+
 // In-memory fallback store when PostgreSQL is not configured or offline
 const inMemoryRides = new Map<string, RideRecord>();
 
@@ -179,104 +210,46 @@ export class RideRepository extends BaseRepository<Ride> {
   /**
    * Create ride
    */
-  async createRide(data: {
-    driverId: string;
-    driverName: string;
-    driverRating?: number;
-    driverAvatar?: string;
-    driverAvatarBg?: string;
-
-    from: string;
-    to: string;
-    time: string;
-
-    vehicleType: "car" | "bike";
-
-    seatsLeft: number;
-    totalSeats: number;
-
-    price: number | string;
-    verified?: boolean;
-    notes?: string;
-
-    locationName?: string;
-    locationState?: string;
-    latitude?: number;
-    longitude?: number;
-
-    vehicleModel?: string;
-    registrationNumber?: string;
-    pickupLocation?: string;
-    dropLocation?: string;
-  }): Promise<RideRecord> {
-    const numericPrice =
-      typeof data.price === "string"
-        ? parseFloat(data.price.replace(/[^0-9.]/g, "")) || 0
-        : Number(data.price) || 0;
-
-    // A ride must always belong to a real authenticated user.
-    if (!data.driverId) {
-      throw new Error("Driver ID is required");
-    }
-
-    // Do NOT create fallback/in-memory rides.
+  async createRide(data: CreateRideData): Promise<RideRecord> {
     if (!this.isConnected) {
       throw new Error("Database is not connected");
     }
 
-    try {
-      const newRide = this.repo.create({
-        userId: data.driverId,
+    const newRide = await this.create({
+      userId: data.driverId,
+      driverName: data.driverName,
+      driverRating: data.driverRating ?? 5.0,
+      driverAvatar: data.driverAvatar,
+      driverAvatarBg: data.driverAvatarBg,
+      from: data.from,
+      to: data.to,
+      time: data.time,
+      vehicleType: data.vehicleType,
+      seatsLeft: data.seatsLeft,
+      totalSeats: data.totalSeats,
+      price: Number(data.price),
+      verified: data.verified ?? true,
+      notes: data.notes,
+      locationName: data.locationName,
+      locationState: data.locationState,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      vehicleModel: data.vehicleModel,
+      registrationNumber: data.registrationNumber,
+      pickupLocation: data.pickupLocation || data.from,
+      dropLocation: data.dropLocation || data.to,
+      currentLatitude: data.latitude,
+      currentLongitude: data.longitude,
+      isGpsActive: false,
+      status: "active",
+      isDriverTravelling: false,
+      passengers: [],
+      ratings: [],
+      reports: [],
+      isDeleted: 0,
+    } as any);
 
-        driverName: data.driverName,
-        driverRating: data.driverRating ?? 5.0,
-        driverAvatar: data.driverAvatar,
-        driverAvatarBg: data.driverAvatarBg,
-
-        from: data.from,
-        to: data.to,
-        time: data.time,
-
-        vehicleType: data.vehicleType,
-
-        seatsLeft: data.seatsLeft,
-        totalSeats: data.totalSeats,
-
-        price: numericPrice,
-        verified: data.verified ?? true,
-        notes: data.notes,
-
-        locationName: data.locationName,
-        locationState: data.locationState,
-        latitude: data.latitude,
-        longitude: data.longitude,
-
-        vehicleModel: data.vehicleModel,
-        registrationNumber: data.registrationNumber,
-        pickupLocation: data.pickupLocation || data.from,
-        dropLocation: data.dropLocation || data.to,
-
-        currentLatitude: data.latitude,
-        currentLongitude: data.longitude,
-
-        isGpsActive: false,
-        status: "active",
-        isDriverTravelling: false,
-
-        passengers: [],
-        ratings: [],
-        reports: [],
-
-        isDeleted: 0,
-      } as any);
-
-      const savedRide = await this.repo.save(newRide);
-
-      return this.toRideRecord(savedRide);
-    } catch (error) {
-      console.error("[RideRepository] Failed to create ride:", error);
-      throw error;
-    }
+    return this.toRideRecord(newRide);
   }
 
   /**

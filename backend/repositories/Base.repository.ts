@@ -123,12 +123,17 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     criteria: string | number | FindOptionsWhere<T>,
     data: any,
   ): Promise<UpdateResult> {
+    if (!this.isConnected) {
+      throw new Error("Database is not connected");
+    }
+
     if (typeof criteria === "string" || typeof criteria === "number") {
       return this.repo.update(
         { id: criteria } as unknown as FindOptionsWhere<T>,
         data,
       );
     }
+
     return this.repo.update(criteria, data);
   }
 
@@ -164,23 +169,18 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   async softDelete(
     criteria: string | number | FindOptionsWhere<T>,
   ): Promise<boolean> {
-    if (!this.isConnected) return false;
-    try {
-      const targetWhere =
-        typeof criteria === "string" || typeof criteria === "number"
-          ? ({ id: criteria } as unknown as FindOptionsWhere<T>)
-          : criteria;
-
-      await this.repo.update(targetWhere, { isDeleted: 1 } as any);
-      return true;
-    } catch {
-      try {
-        await this.delete(criteria);
-        return true;
-      } catch {
-        return false;
-      }
+    if (!this.isConnected) {
+      throw new Error("Database is not connected");
     }
+
+    const targetWhere =
+      typeof criteria === "string" || typeof criteria === "number"
+        ? ({ id: criteria } as unknown as FindOptionsWhere<T>)
+        : criteria;
+
+    const result = await this.repo.update(targetWhere, { isDeleted: 1 } as any);
+
+    return (result.affected ?? 0) > 0;
   }
 
   /**
