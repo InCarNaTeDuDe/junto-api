@@ -58,7 +58,9 @@ export async function exploreByArea(
     const activePinsInLocation = await exploreByLatLong(req.body);
 
     res.status(200).json(activePinsInLocation || []);
-  } catch (error) {}
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function postTicket(
@@ -68,10 +70,18 @@ export async function postTicket(
 ) {
   try {
     const d = await addTicketForSale(req.body, req.user!);
-    console.log("-->>>", d);
 
-    res.status(201).json(d || {});
-  } catch (error) {}
+    console.log("-->>> Ticket created:", d);
+
+    return res.status(201).json(d || {});
+  } catch (error) {
+    console.error("❌ postTicket error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to post ticket",
+    });
+  }
 }
 
 export async function getJuntoNowStatsHandler(

@@ -416,7 +416,6 @@ const createStyles = (t: any) => {
 
 const SellTicketForm: React.FC<SellTicketFormProps> = ({
   colors: propColors,
-  selectedLocation = "Downtown Cinema",
   onSubmitSuccess,
   onBack,
   onClose,
@@ -483,7 +482,6 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
         sellingPrice,
         quantity,
         note,
-        locationName: selectedLocation,
         type: "SELL_TICKET",
       };
 

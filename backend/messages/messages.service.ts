@@ -164,76 +164,137 @@ export async function fetchDealMessages(
   }));
 }
 
-export async function createAndSaveMessage(
-  activityId: string,
-  senderId: string,
-  content: string,
-  participantIdInput?: string | null,
-  image?: string | null,
-) {
-  const [senderUser, activity] = await Promise.all([
-    userRepo.findById(senderId).catch(() => null),
-    activityRepo.findById(activityId).catch(() => null),
-  ]);
+export async function createAndSaveMessage({
+  entityId,
+  entityType,
+  senderId,
+  content,
+  participantId,
+  image,
+}: {
+  entityId: string;
+  entityType: "ACTIVITY" | "LOCAL_DEALS";
+  senderId: string;
+  content?: string;
+  participantId?: string | null;
+  image?: string | null;
+}) {
+  const senderUser = await userRepo.findById(senderId).catch(() => null);
 
-  let computedParticipantId = participantIdInput || null;
+  let computedParticipantId = participantId || null;
 
-  if (activity) {
-    if (senderId !== activity.organizerId) {
-      const parts = activity.participantIds || [];
-      if (!parts.includes(senderId)) {
-        const updatedParts = [...parts, senderId];
-        await activityRepo
-          .update(activity.id, { participantIds: updatedParts })
-          .catch(() => {});
-        activity.participantIds = updatedParts;
+  let activity: any = null;
+  let deal: any = null;
+
+  // -----------------------------------------
+  // ACTIVITY CHAT
+  // -----------------------------------------
+  if (entityType === "ACTIVITY") {
+    activity = await activityRepo.findById(entityId).catch(() => null);
+
+    if (activity) {
+      if (senderId !== activity.organizerId) {
+        const parts = activity.participantIds || [];
+
+        if (!parts.includes(senderId)) {
+          const updatedParts = [...parts, senderId];
+
+          await activityRepo
+            .update(activity.id, {
+              participantIds: updatedParts,
+            })
+            .catch(() => {});
+
+          activity.participantIds = updatedParts;
+        }
       }
-    }
 
-    if (!computedParticipantId) {
-      if (activity.organizerId !== senderId) {
-        computedParticipantId = activity.organizerId;
-      } else if (activity.participantIds?.length) {
-        computedParticipantId =
-          activity.participantIds.find((id) => id !== senderId) || null;
+      if (!computedParticipantId) {
+        if (activity.organizerId !== senderId) {
+          computedParticipantId = activity.organizerId;
+        } else if (activity.participantIds?.length) {
+          computedParticipantId =
+            activity.participantIds.find((id: string) => id !== senderId) ||
+            null;
+        }
       }
     }
   }
 
+  // -----------------------------------------
+  // LOCAL DEAL CHAT
+  // -----------------------------------------
+  if (entityType === "LOCAL_DEALS") {
+    deal = await dealsRepository.findById(entityId).catch(() => null);
+
+    if (deal && !computedParticipantId) {
+      if (deal.userId !== senderId) {
+        computedParticipantId = deal.userId;
+      }
+    }
+  }
+
+  // -----------------------------------------
+  // SAVE MESSAGE
+  // -----------------------------------------
   const savedMsg = await messageRepo.createMessage({
-    activityId,
+    activityId: entityType === "ACTIVITY" ? entityId : null,
+
+    dealId: entityType === "LOCAL_DEALS" ? entityId : null,
+
     senderId,
+
     participantId: computedParticipantId,
+
     content: content || (image ? "📷 Photo" : ""),
+
     image: image || null,
   });
 
-  if (computedParticipantId && computedParticipantId !== senderId && activity) {
+  // -----------------------------------------
+  // PUSH NOTIFICATION
+  // -----------------------------------------
+  if (computedParticipantId && computedParticipantId !== senderId) {
     sendPushNotification(
       computedParticipantId,
       "New Message",
       content || (image ? "📷 Photo" : "New message"),
       "message",
       {
-        chatId: activityId,
+        entityId,
+        entityType,
         senderId,
         participantId: computedParticipantId,
       },
     ).catch(() => {});
   }
 
+  // -----------------------------------------
+  // RESPONSE
+  // -----------------------------------------
   return {
     id: savedMsg.id,
-    activityId: savedMsg.activityId,
+
+    activityId: savedMsg.activityId || null,
+
+    dealId: savedMsg.dealId || null,
+
     senderId: savedMsg.senderId,
+
     participantId: savedMsg.participantId ?? null,
+
     sender: {
       id: senderUser?.id || senderId,
+
       name: senderUser?.name || "Junto User",
+
       avatar: senderUser?.avatar || DEFAULT_AVATAR,
     },
+
     content: savedMsg.content,
+
     image: savedMsg.image || image || null,
+
     timestamp: savedMsg.timestamp,
   };
 }

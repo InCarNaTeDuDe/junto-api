@@ -16,6 +16,7 @@ import {
 import { Alert } from "react-native";
 
 const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
+const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
 
@@ -115,33 +116,53 @@ async function request<T>(
     fetchOptions.body = JSON.stringify(requestBody);
   }
 
-  const response = await fetch(buildUrl(endpoint), fetchOptions);
+  const controller = new AbortController();
 
-  /* ---------------- Parse Response ---------------- */
-
-  let body: any = null;
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, DEFAULT_TIMEOUT_MS);
 
   try {
-    body = await response.json();
-  } catch {
-    // Ignore non-JSON responses
+    const response = await fetch(buildUrl(endpoint), {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+
+    /* ---------------- Parse Response ---------------- */
+
+    let body: any = null;
+
+    try {
+      body = await response.json();
+    } catch {
+      // Ignore non-JSON responses
+    }
+
+    /* ---------------- Error Handling ---------------- */
+
+    if (response.status === 401) {
+      await removeJwtToken();
+      throw new UnauthorizedError(body?.error ?? "Unauthorized");
+    }
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        body?.error ?? body?.message ?? "Something went wrong.",
+      );
+    }
+
+    return body as T;
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new ApiError(408, "Request timed out. Please try again.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  /* ---------------- Error Handling ---------------- */
-
-  if (response.status === 401) {
-    await removeJwtToken();
-    throw new UnauthorizedError(body?.error ?? "Unauthorized");
-  }
-
-  if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      body?.error ?? body?.message ?? "Something went wrong.",
-    );
-  }
-
-  return body as T;
+  /* ---------------- Parse Response ---------------- */
 }
 
 export const ApiService = {

@@ -34,15 +34,18 @@ export function initializeSocket(server: HttpServer) {
     socket.on("send_message", async (data) => {
       console.log("SERVER RECEIVED MESSAGE:", data);
 
-      const savedMessage = await createAndSaveMessage(
-        data.chatId,
-        data.senderId,
-        data.content,
-        data.participantId,
-      );
-
-      // Deliver message strictly to both parties involved in the conversation
+      const savedMessage = await createAndSaveMessage({
+        entityId: data.entityId || data.chatId,
+        entityType: data.entityType || "ACTIVITY",
+        senderId: data.senderId,
+        content: data.content,
+        participantId: data.participantId,
+        image: data.image,
+      });
+      // Deliver message strictly to both parties involved
+      // in the conversation
       io.to(`user:${data.senderId}`).emit("receive_message", savedMessage);
+
       if (
         savedMessage.participantId &&
         savedMessage.participantId !== data.senderId
