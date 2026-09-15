@@ -28,7 +28,13 @@ export interface RideRecord {
   latitude?: number;
   longitude?: number;
 
-  status: "active" | "in_progress" | "completed" | "cancelled";
+  status:
+    | "active"
+    | "both_travelling"
+    | "in_progress"
+    | "completed"
+    | "cancelled";
+  isDriverTravelling?: boolean;
 
   passengers: Array<{
     id?: string;
@@ -38,6 +44,7 @@ export interface RideRecord {
     pickupPoint?: string;
     passengerPhone?: string;
     status?: "pending" | "confirmed" | "declined";
+    isTravelling?: boolean;
     joinedAt: string;
   }>;
 
@@ -62,6 +69,7 @@ export interface RideRecord {
     rating: number;
     review?: string;
     tags?: string[];
+    imageUrl?: string;
     createdAt: string;
   }>;
   reports?: Array<{
@@ -70,6 +78,7 @@ export interface RideRecord {
     reportedByName: string;
     category: string;
     description: string;
+    imageUrl?: string;
     createdAt: string;
   }>;
 
@@ -658,11 +667,26 @@ export class RideRepository extends BaseRepository<Ride> {
       price: number | string;
       verified: boolean;
       notes: string;
-      status: "active" | "in_progress" | "completed" | "cancelled";
+      status:
+        | "active"
+        | "both_travelling"
+        | "in_progress"
+        | "completed"
+        | "cancelled";
       locationName: string;
       locationState: string;
       latitude: number;
       longitude: number;
+      isDriverTravelling: boolean;
+      isGpsActive: boolean;
+      currentLatitude: number;
+      currentLongitude: number;
+      lastGpsUpdatedAt: string;
+      vehicleModel: string;
+      registrationNumber: string;
+      pickupLocation: string;
+      dropLocation: string;
+      passengers: any[];
     }>,
   ): Promise<RideRecord | null> {
     const inMem = inMemoryRides.get(id);
@@ -767,6 +791,7 @@ export class RideRepository extends BaseRepository<Ride> {
       rating: number;
       review?: string;
       tags?: string[];
+      imageUrl?: string;
     },
   ): Promise<RideRecord> {
     const inMem = inMemoryRides.get(id);
@@ -778,6 +803,7 @@ export class RideRepository extends BaseRepository<Ride> {
       rating: ratingData.rating,
       review: ratingData.review,
       tags: ratingData.tags || [],
+      imageUrl: ratingData.imageUrl,
       createdAt: new Date().toISOString(),
     };
     if (inMem) {
@@ -819,6 +845,7 @@ export class RideRepository extends BaseRepository<Ride> {
       reportedByName: string;
       category: string;
       description: string;
+      imageUrl?: string;
     },
   ): Promise<RideRecord> {
     const inMem = inMemoryRides.get(id);
@@ -828,6 +855,7 @@ export class RideRepository extends BaseRepository<Ride> {
       reportedByName: reportData.reportedByName,
       category: reportData.category,
       description: reportData.description,
+      imageUrl: reportData.imageUrl,
       createdAt: new Date().toISOString(),
     };
     if (inMem) {
@@ -857,6 +885,62 @@ export class RideRepository extends BaseRepository<Ride> {
       if (inMem) return inMem;
       throw new Error("Ride not found");
     }
+  }
+
+  /**
+   * Signal user has started travelling (driver or confirmed co-rider).
+   * When both driver and confirmed co-rider are travelling, status switches to 'both_travelling'.
+   */
+  async startTravelling(
+    rideId: string,
+    userId: string,
+    isDriver: boolean,
+  ): Promise<RideRecord> {
+    const ride = await this.findById(rideId);
+    if (!ride) throw new Error("Ride not found");
+
+    let isDriverTravelling = ride.isDriverTravelling || false;
+    if (isDriver || ride.userId === userId) {
+      isDriverTravelling = true;
+    }
+
+    const currentPassengers = Array.isArray(ride.passengers)
+      ? [...ride.passengers]
+      : [];
+
+    let passengerStarted = false;
+    for (const p of currentPassengers) {
+      if (p.userId === userId) {
+        p.isTravelling = true;
+      }
+      if (p.status === "confirmed" && p.isTravelling) {
+        passengerStarted = true;
+      }
+    }
+
+    const hasConfirmedPassengers = currentPassengers.some(
+      (p) => p.status === "confirmed",
+    );
+    const bothTravelling =
+      isDriverTravelling && (hasConfirmedPassengers ? passengerStarted : true);
+
+    const updatePayload: any = {
+      isDriverTravelling,
+      passengers: currentPassengers,
+    };
+
+    if (
+      bothTravelling &&
+      ride.status !== "in_progress" &&
+      ride.status !== "completed"
+    ) {
+      updatePayload.status = "both_travelling";
+      updatePayload.isGpsActive = true;
+    }
+
+    const updated = await this.updateRide(rideId, updatePayload);
+    if (!updated) throw new Error("Could not update ride travelling status");
+    return updated;
   }
 
   /**

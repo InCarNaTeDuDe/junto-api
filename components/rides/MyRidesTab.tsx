@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,8 +6,18 @@ import {
   ScrollView,
   StyleSheet,
   Image,
+  Alert,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { RideStatusStepper, RideLifecycleState } from "./RideStatusStepper";
+import { RideSafetySection } from "./RideSafetySection";
+import {
+  RideCompletedRatingModal,
+  CompletedRatingData,
+  ProblemReportData,
+} from "./RideCompletedRatingModal";
+import { RideChatModal } from "./RideChatModal";
 
 export interface RidePassenger {
   id?: string;
@@ -20,6 +30,7 @@ export interface RidePassenger {
   phone?: string;
   status?: "pending" | "confirmed" | "rejected" | "cancelled" | "declined";
   joinedAt: string;
+  isTravelling?: boolean;
 }
 
 export interface RideItem {
@@ -45,12 +56,22 @@ export interface RideItem {
   registrationNumber?: string;
   pickupLocation?: string;
   dropLocation?: string;
-  status?: "active" | "in_progress" | "completed" | "cancelled";
+  status?:
+    | "active"
+    | "both_travelling"
+    | "in_progress"
+    | "completed"
+    | "cancelled";
   reviewsCount?: number;
   isPopular?: boolean;
   isEcoFriendly?: boolean;
   departureTimeFormatted?: string;
   arrivalTimeFormatted?: string;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastGpsUpdatedAt?: string;
+  isGpsActive?: boolean;
+  isDriverTravelling?: boolean;
 }
 
 interface MyRidesTabProps {
@@ -68,6 +89,19 @@ interface MyRidesTabProps {
   onBack: () => void;
   onOpenFilter?: () => void;
   getUserSeatRequest: (ride: RideItem) => RidePassenger | any;
+  onStartTravelling?: (ride: RideItem) => Promise<void> | void;
+  onStartRide?: (ride: RideItem) => Promise<void> | void;
+  onCompleteRide?: (ride: RideItem) => Promise<void> | void;
+  onRateRideSubmit?: (
+    rideId: string,
+    data: CompletedRatingData,
+  ) => Promise<void>;
+  onReportRideSubmit?: (
+    rideId: string,
+    data: ProblemReportData,
+  ) => Promise<void>;
+  checkIsRideOwner?: (ride: RideItem) => boolean;
+  currentUserId?: string;
   isDark?: boolean;
 }
 
@@ -91,10 +125,86 @@ export default function MyRidesTab({
   onBack,
   onOpenFilter,
   getUserSeatRequest,
+  onStartTravelling,
+  onStartRide,
+  onCompleteRide,
+  onRateRideSubmit,
+  onReportRideSubmit,
+  checkIsRideOwner,
+  currentUserId = "me",
+  isDark = true,
 }: MyRidesTabProps) {
+  // Modal states for rating and chat
+  const [ratingModalRide, setRatingModalRide] = useState<RideItem | null>(null);
+  const [chatModalRide, setChatModalRide] = useState<RideItem | null>(null);
+
+  // Helper to determine if current user is owner
+  const isOwner = (ride: RideItem) => {
+    if (checkIsRideOwner) {
+      return checkIsRideOwner(ride);
+    }
+    return ride.userId === currentUserId;
+  };
+
+  // Helper to derive ride lifecycle state
+  const getRideState = (
+    ride: RideItem,
+    isCoRiderView: boolean = false,
+  ): RideLifecycleState => {
+    const rawStatus = (ride.status || "active").toLowerCase();
+    if (rawStatus === "completed") return "completed";
+    if (rawStatus === "in_progress") return "in_progress";
+    if (rawStatus === "both_travelling") return "both_travelling";
+
+    // Check if both have started travelling
+    const hasConfirmedCoRider = (ride.passengers || []).some(
+      (p) => p.status === "confirmed",
+    );
+    const coRiderTravelling = (ride.passengers || []).some(
+      (p) => p.status === "confirmed" && p.isTravelling,
+    );
+    if (ride.isDriverTravelling && coRiderTravelling) {
+      return "both_travelling";
+    }
+
+    if (hasConfirmedCoRider) {
+      return "confirmed";
+    }
+
+    return "pending";
+  };
+
+  // Only show confirmed joined rides after the owner accepts the seat request
+  const confirmedJoinedRides = joinedRides.filter((ride) => {
+    const userReq = getUserSeatRequest(ride);
+    return userReq && userReq.status === "confirmed";
+  });
+
+  const handleOpenEmergencySOS = () => {
+    Alert.alert(
+      "🚨 Emergency Call (112)",
+      "Do you want to immediately call 112 (National Emergency Helpline)?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Call 112 Now",
+          style: "destructive",
+          onPress: () => {
+            Linking.openURL("tel:112").catch(() => {
+              Alert.alert(
+                "Notice",
+                "Please dial 112 directly from your phone keypad.",
+              );
+            });
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* 1. Header Bar matching Screen 2 in mockup */}
+      {/* 1. Header Bar */}
       <View style={styles.headerBar}>
         <TouchableOpacity
           onPress={onBack}
@@ -108,7 +218,7 @@ export default function MyRidesTab({
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>My Rides</Text>
           <Text style={styles.headerSubtitle}>
-            Your posted and joined rides
+            Your posted and confirmed joined rides
           </Text>
         </View>
 
@@ -156,7 +266,7 @@ export default function MyRidesTab({
               subTab === "joined" && styles.subTabTextActive,
             ]}
           >
-            Joined Rides ({joinedRides.length})
+            Joined Rides ({confirmedJoinedRides.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -176,7 +286,7 @@ export default function MyRidesTab({
               <Text style={styles.emptyTitle}>No Posted Rides Yet</Text>
               <Text style={styles.emptySubtitle}>
                 Offer empty seats in your car or bike along your daily commute
-                to save costs and connect with others.
+                to save costs, reduce traffic, and connect with neighbors.
               </Text>
               <TouchableOpacity
                 style={styles.emptyActionBtn}
@@ -190,6 +300,14 @@ export default function MyRidesTab({
           ) : (
             postedRides.map((ride) => {
               const seatsCount = ride.totalSeats || ride.seatsLeft || 3;
+              const rideState = getRideState(ride, false);
+              const isSafetyActive =
+                rideState === "both_travelling" || rideState === "in_progress";
+              const isCompleted = rideState === "completed";
+              const hasConfirmedCoRider = (ride.passengers || []).some(
+                (p) => p.status === "confirmed",
+              );
+              const driverIsTravelling = !!ride.isDriverTravelling;
 
               return (
                 <View key={ride.id} style={styles.rideCard}>
@@ -197,13 +315,44 @@ export default function MyRidesTab({
                   <View style={styles.cardHeaderRow}>
                     <View style={styles.postedBadge}>
                       <Ionicons name="pin" size={12} color="#C084FC" />
-                      <Text style={styles.postedBadgeText}>Posted</Text>
+                      <Text style={styles.postedBadgeText}>Driver • Host</Text>
                     </View>
 
                     <View style={styles.cardHeaderRight}>
-                      <View style={styles.activeDotBadge}>
-                        <View style={styles.greenPulsingDot} />
-                        <Text style={styles.activeDotText}>Active</Text>
+                      <View
+                        style={[
+                          styles.activeDotBadge,
+                          isCompleted && {
+                            backgroundColor: "rgba(100, 116, 139, 0.2)",
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.greenPulsingDot,
+                            isCompleted && { backgroundColor: "#64748B" },
+                            rideState === "both_travelling" && {
+                              backgroundColor: "#8B5CF6",
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.activeDotText,
+                            isCompleted && { color: "#94A3B8" },
+                            rideState === "both_travelling" && {
+                              color: "#A78BFA",
+                            },
+                          ]}
+                        >
+                          {rideState === "completed"
+                            ? "Completed"
+                            : rideState === "both_travelling"
+                              ? "Both Travelling"
+                              : rideState === "in_progress"
+                                ? "In Progress"
+                                : "Active"}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -221,7 +370,7 @@ export default function MyRidesTab({
                       color="#8FA0B8"
                     />
                     <Text style={styles.metaText}>
-                      {ride.date || "Sep 12, 2026"} • {ride.time || "8:49 PM"}
+                      {ride.date || "Today"} • {ride.time || "Scheduled"}
                     </Text>
                   </View>
 
@@ -234,7 +383,70 @@ export default function MyRidesTab({
                     </Text>
                   </View>
 
-                  {/* Action Buttons Row */}
+                  {/* 5-State Sequential Lifecycle Stepper */}
+                  <RideStatusStepper
+                    currentStatus={rideState}
+                    isDark={isDark}
+                    driverTravelling={driverIsTravelling}
+                    passengerTravelling={
+                      ride.passengers?.some((p) => p.isTravelling) || false
+                    }
+                  />
+
+                  {/* If Both Travelling or In Progress: Activate Ride Safety Section */}
+                  {isSafetyActive ? (
+                    <RideSafetySection
+                      ride={ride}
+                      isDriver={true}
+                      isCoRider={false}
+                      onOpenChat={() => setChatModalRide(ride)}
+                      onShareTrip={() => onShareRide(ride)}
+                      onEmergencyCall={handleOpenEmergencySOS}
+                      onStartRide={
+                        onStartRide ? () => onStartRide(ride) : undefined
+                      }
+                      onCompleteRide={
+                        onCompleteRide
+                          ? () => onCompleteRide(ride)
+                          : () => setRatingModalRide(ride)
+                      }
+                      isDark={isDark}
+                    />
+                  ) : null}
+
+                  {/* Travelling Action for Driver if Confirmed and not yet travelling */}
+                  {rideState === "confirmed" &&
+                    !driverIsTravelling &&
+                    onStartTravelling && (
+                      <TouchableOpacity
+                        style={styles.startTravellingActionBtn}
+                        onPress={() => onStartTravelling(ride)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="navigate" size={15} color="#FFFFFF" />
+                        <Text style={styles.startTravellingActionText}>
+                          🚗 I'm Travelling to Pickup Point
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                  {/* Completed Ride Actions */}
+                  {isCompleted && (
+                    <View style={styles.completedActionsBox}>
+                      <TouchableOpacity
+                        style={styles.rateRideBtn}
+                        onPress={() => setRatingModalRide(ride)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="star" size={15} color="#FFFFFF" />
+                        <Text style={styles.rateRideBtnText}>
+                          Rate Co-Rider & Feedback ⭐
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Bottom Action Buttons Row (Edit/Delete ONLY on rides created by current user) */}
                   <View style={styles.actionsRow}>
                     {onManageCoRiders && (
                       <TouchableOpacity
@@ -258,18 +470,21 @@ export default function MyRidesTab({
                       </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity
-                      style={styles.actionBtnSecondary}
-                      onPress={() => onEditRide(ride)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="pencil-outline"
-                        size={14}
-                        color="#F8FAFC"
-                      />
-                      <Text style={styles.actionBtnText}>Edit</Text>
-                    </TouchableOpacity>
+                    {/* Edit button: only appears on rides created by current user */}
+                    {isOwner(ride) && (
+                      <TouchableOpacity
+                        style={styles.actionBtnSecondary}
+                        onPress={() => onEditRide(ride)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name="pencil-outline"
+                          size={14}
+                          color="#F8FAFC"
+                        />
+                        <Text style={styles.actionBtnText}>Edit</Text>
+                      </TouchableOpacity>
+                    )}
 
                     <TouchableOpacity
                       style={styles.actionBtnSecondary}
@@ -284,33 +499,36 @@ export default function MyRidesTab({
                       <Text style={styles.actionBtnText}>Share</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.actionBtnDanger}
-                      onPress={() => onCancelRide(ride)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={14}
-                        color="#EF4444"
-                      />
-                      <Text style={styles.actionBtnDangerText}>Cancel</Text>
-                    </TouchableOpacity>
+                    {/* Delete/Cancel button: only appears on rides created by current user */}
+                    {isOwner(ride) && (
+                      <TouchableOpacity
+                        style={styles.actionBtnDanger}
+                        onPress={() => onCancelRide(ride)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={14}
+                          color="#EF4444"
+                        />
+                        <Text style={styles.actionBtnDangerText}>Cancel</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
             })
           )
         ) : /* ================= JOINED RIDES LIST ================= */
-        joinedRides.length === 0 ? (
+        confirmedJoinedRides.length === 0 ? (
           <View style={styles.emptyStateCard}>
             <View style={styles.emptyIconCircle}>
               <Ionicons name="people-outline" size={36} color="#38BDF8" />
             </View>
-            <Text style={styles.emptyTitle}>No Joined Rides Yet</Text>
+            <Text style={styles.emptyTitle}>No Confirmed Joined Rides</Text>
             <Text style={styles.emptySubtitle}>
-              You haven't requested to join any rides yet. Browse available
-              rides and book your seat!
+              Only rides where the driver has accepted your seat request appear
+              here. Browse available rides to find your match!
             </Text>
             <TouchableOpacity
               style={[styles.emptyActionBtn, { backgroundColor: "#0284C7" }]}
@@ -322,17 +540,27 @@ export default function MyRidesTab({
             </TouchableOpacity>
           </View>
         ) : (
-          joinedRides.map((ride) => {
+          confirmedJoinedRides.map((ride) => {
             const userReq = getUserSeatRequest(ride);
-            const isConfirmed = userReq?.status === "confirmed";
+            const rideState = getRideState(ride, true);
+            const isSafetyActive =
+              rideState === "both_travelling" || rideState === "in_progress";
+            const isCompleted = rideState === "completed";
+            const passengerIsTravelling = !!userReq?.isTravelling;
 
             return (
               <View key={ride.id} style={styles.rideCard}>
                 {/* Header Row */}
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.joinedBadge}>
-                    <Ionicons name="car-sport" size={12} color="#38BDF8" />
-                    <Text style={styles.joinedBadgeText}>Joined</Text>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={12}
+                      color="#38BDF8"
+                    />
+                    <Text style={styles.joinedBadgeText}>
+                      Confirmed Co-Rider
+                    </Text>
                   </View>
 
                   <View style={styles.cardHeaderRight}>
@@ -340,9 +568,7 @@ export default function MyRidesTab({
                       style={[
                         styles.statusPill,
                         {
-                          backgroundColor: isConfirmed
-                            ? "rgba(16, 185, 129, 0.15)"
-                            : "rgba(245, 158, 11, 0.15)",
+                          backgroundColor: "rgba(16, 185, 129, 0.15)",
                         },
                       ]}
                     >
@@ -350,9 +576,7 @@ export default function MyRidesTab({
                         style={[
                           styles.statusDot,
                           {
-                            backgroundColor: isConfirmed
-                              ? "#10B981"
-                              : "#F59E0B",
+                            backgroundColor: "#10B981",
                           },
                         ]}
                       />
@@ -360,11 +584,11 @@ export default function MyRidesTab({
                         style={[
                           styles.statusPillText,
                           {
-                            color: isConfirmed ? "#10B981" : "#F59E0B",
+                            color: "#10B981",
                           },
                         ]}
                       >
-                        {toTitleCase(userReq?.status || "Confirmed")}
+                        Seat Confirmed
                       </Text>
                     </View>
                   </View>
@@ -392,8 +616,76 @@ export default function MyRidesTab({
                   </Text>
                 </View>
 
-                {/* Action Buttons */}
+                {/* 5-State Sequential Lifecycle Stepper */}
+                <RideStatusStepper
+                  currentStatus={rideState}
+                  isDark={isDark}
+                  driverTravelling={!!ride.isDriverTravelling}
+                  passengerTravelling={passengerIsTravelling}
+                />
+
+                {/* If Both Travelling or In Progress: Activate Ride Safety Section */}
+                {isSafetyActive ? (
+                  <RideSafetySection
+                    ride={ride}
+                    isDriver={false}
+                    isCoRider={true}
+                    onOpenChat={() => setChatModalRide(ride)}
+                    onShareTrip={() => onShareRide(ride)}
+                    onEmergencyCall={handleOpenEmergencySOS}
+                    isDark={isDark}
+                  />
+                ) : null}
+
+                {/* Travelling Action for Co-Rider if Confirmed and not yet travelling */}
+                {rideState === "confirmed" &&
+                  !passengerIsTravelling &&
+                  onStartTravelling && (
+                    <TouchableOpacity
+                      style={styles.startTravellingActionBtn}
+                      onPress={() => onStartTravelling(ride)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="walk" size={15} color="#FFFFFF" />
+                      <Text style={styles.startTravellingActionText}>
+                        🚶‍♂️ I'm Travelling to Pickup Point
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                {/* Completed Ride Actions for Co-Rider */}
+                {isCompleted && (
+                  <View style={styles.completedActionsBox}>
+                    <TouchableOpacity
+                      style={styles.rateRideBtn}
+                      onPress={() => setRatingModalRide(ride)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="star" size={15} color="#FFFFFF" />
+                      <Text style={styles.rateRideBtnText}>
+                        Rate Driver & Feedback ⭐
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Action Buttons: Note that Edit and Delete NEVER appear on joined rides */}
                 <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionBtnSecondary, { flex: 1 }]}
+                    onPress={() => setChatModalRide(ride)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="chatbubbles-outline"
+                      size={14}
+                      color="#8B5CF6"
+                    />
+                    <Text style={[styles.actionBtnText, { color: "#C084FC" }]}>
+                      Chat
+                    </Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={[styles.actionBtnSecondary, { flex: 1 }]}
                     onPress={() => onShareRide(ride)}
@@ -407,26 +699,76 @@ export default function MyRidesTab({
                     <Text style={styles.actionBtnText}>Share Trip</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtnDanger, { flex: 1 }]}
-                    onPress={() => onCancelSeat(ride)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={14}
-                      color="#EF4444"
-                    />
-                    <Text style={styles.actionBtnDangerText}>
-                      Cancel Request
-                    </Text>
-                  </TouchableOpacity>
+                  {!isCompleted && (
+                    <TouchableOpacity
+                      style={[styles.actionBtnDanger, { flex: 1 }]}
+                      onPress={() => onCancelSeat(ride)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="close-circle-outline"
+                        size={14}
+                        color="#EF4444"
+                      />
+                      <Text style={styles.actionBtnDangerText}>
+                        Cancel Seat
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
           })
         )}
       </ScrollView>
+
+      {/* Completion Rating & Report Problem Popup / Modal */}
+      {ratingModalRide && (
+        <RideCompletedRatingModal
+          visible={!!ratingModalRide}
+          onClose={() => setRatingModalRide(null)}
+          rideId={ratingModalRide.id}
+          fromLocation={ratingModalRide.from}
+          toLocation={ratingModalRide.to}
+          driverName={ratingModalRide.driverName}
+          otherPartyName={
+            isOwner(ratingModalRide)
+              ? ratingModalRide.passengers?.[0]?.userName || "Co-Rider"
+              : ratingModalRide.driverName
+          }
+          isDriver={isOwner(ratingModalRide)}
+          onSubmitRating={async (data) => {
+            if (onRateRideSubmit) {
+              await onRateRideSubmit(ratingModalRide.id, data);
+            }
+          }}
+          onSubmitReport={async (data) => {
+            if (onReportRideSubmit) {
+              await onReportRideSubmit(ratingModalRide.id, data);
+            }
+          }}
+          isDark={isDark}
+        />
+      )}
+
+      {/* Junto Co-Rider Chat Modal */}
+      {chatModalRide && (
+        <RideChatModal
+          visible={!!chatModalRide}
+          onClose={() => setChatModalRide(null)}
+          rideId={chatModalRide.id}
+          fromLocation={chatModalRide.from}
+          toLocation={chatModalRide.to}
+          counterpartName={
+            isOwner(chatModalRide)
+              ? chatModalRide.passengers?.[0]?.userName || "Co-Rider"
+              : chatModalRide.driverName
+          }
+          isDriver={isOwner(chatModalRide)}
+          currentUserId={currentUserId}
+          isDark={isDark}
+        />
+      )}
     </View>
   );
 }
@@ -508,7 +850,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 50,
   },
   rideCard: {
     backgroundColor: "#0D162A",
@@ -581,9 +923,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#10B981",
   },
-  moreOptionsBtn: {
-    padding: 4,
-  },
   routeTitle: {
     fontSize: 16.5,
     fontWeight: "800",
@@ -601,44 +940,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#8FA0B8",
   },
-  socialStatsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 14,
-    marginBottom: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.06)",
-  },
-  avatarGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  miniAvatar: {
-    width: 24,
-    height: 24,
+  startTravellingActionBtn: {
+    backgroundColor: "#7C3AED",
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#0D162A",
-  },
-  interestedCountText: {
-    fontSize: 12,
-    color: "#8FA0B8",
-    marginLeft: 8,
-    fontWeight: "500",
-  },
-  viewsCountWrap: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginVertical: 10,
   },
-  viewsCountText: {
-    fontSize: 12,
-    color: "#8FA0B8",
+  startTravellingActionText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  completedActionsBox: {
+    marginVertical: 10,
+  },
+  rateRideBtn: {
+    backgroundColor: "#059669",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  rateRideBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
   actionsRow: {
     flexDirection: "row",
     gap: 8,
+    marginTop: 8,
+  },
+  actionBtnPrimary: {
+    flex: 1,
+    height: 40,
+    backgroundColor: "#6D28D9",
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
   actionBtnSecondary: {
     flex: 1,

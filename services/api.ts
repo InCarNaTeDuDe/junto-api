@@ -15,10 +15,7 @@ import {
 } from "@/utils/secureStorage";
 import { Alert } from "react-native";
 
-const BASE_URL =
-  typeof window !== "undefined"
-    ? ""
-    : Env.API_BASE_URL || "http://localhost:3000";
+const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
 
 const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
 
@@ -56,8 +53,6 @@ async function request<T>(
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
-  } else {
-    headers.Authorization = `Bearer preview-dev-token`;
   }
 
   /* ---------------- Request Body ---------------- */

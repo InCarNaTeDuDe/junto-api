@@ -47,7 +47,13 @@ export const JoinRideSchema = z.object({
 
 export const UpdateRideSchema = z.object({
   status: z
-    .enum(["active", "in_progress", "completed", "cancelled"])
+    .enum([
+      "active",
+      "both_travelling",
+      "in_progress",
+      "completed",
+      "cancelled",
+    ])
     .optional(),
   from: z.string().trim().min(2).max(120).optional(),
   to: z.string().trim().min(2).max(120).optional(),
@@ -79,11 +85,13 @@ export const RideRatingSchema = z.object({
   review: z.string().trim().max(500).optional(),
   tags: z.array(z.string()).optional(),
   toRole: z.enum(["driver", "passenger"]).optional(),
+  imageUrl: z.string().optional(),
 });
 
 export const ReportProblemSchema = z.object({
   category: z.string().trim().min(2).max(100),
   description: z.string().trim().min(3).max(1000),
+  imageUrl: z.string().optional(),
 });
 
 export type CreateRideInput = z.infer<typeof CreateRideSchema>;

@@ -12,6 +12,7 @@ import {
   cancelSeatRequestHandler,
   deleteRideHandler,
   startRideHandler,
+  startTravellingHandler,
   completeRideHandler,
   updateLocationHandler,
   rateRideHandler,
@@ -68,9 +69,16 @@ router.patch(
 router.put("/:id", authenticate, validate(UpdateRideSchema), updateRideHandler);
 
 // Safety, Live GPS Tracking, Ratings & Reports endpoints
+router.post("/:id/start-travelling", authenticate, startTravellingHandler);
 router.post("/:id/start", authenticate, startRideHandler);
 router.post("/:id/complete", authenticate, completeRideHandler);
 router.post(
+  "/:id/location",
+  authenticate,
+  validate(UpdateLocationSchema),
+  updateLocationHandler,
+);
+router.put(
   "/:id/location",
   authenticate,
   validate(UpdateLocationSchema),

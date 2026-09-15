@@ -15,6 +15,7 @@ import {
   updateRideGpsLocation,
   rateRide,
   reportRideProblem,
+  startTravellingRide,
   verifyVehicleService,
   verifyDriverService,
 } from "./rides.service";
@@ -212,6 +213,19 @@ export async function startRideHandler(
 ) {
   try {
     const result = await startRide(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function startTravellingHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await startTravellingRide(req.params.id, req.user!);
     return res.status(200).json(result);
   } catch (err) {
     next(err);

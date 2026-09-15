@@ -292,10 +292,7 @@ export default function LocalDealsScreen() {
       const res = await pickAndUploadImage("deals");
       if (res?.url) {
         setDealCustomImage(res.url);
-        Alert.alert(
-          "Image Attached",
-          "Product photo uploaded to Cloudinary (deals/)",
-        );
+        Alert.alert("Image Attached", "Product photo uploaded to (deals/)");
       }
     } catch (err: any) {
       Alert.alert("Upload Notice", err?.message || "Could not upload image");
@@ -327,10 +324,7 @@ export default function LocalDealsScreen() {
       const res = await pickAndUploadImage("deals");
       if (res?.url) {
         setEditDealImage(res.url);
-        Alert.alert(
-          "Image Attached",
-          "Product photo uploaded to Cloudinary (deals/)",
-        );
+        Alert.alert("Image Attached", "Product photo uploaded to (deals/)");
       }
     } catch (err: any) {
       Alert.alert("Upload Notice", err?.message || "Could not upload image");
@@ -2096,7 +2090,7 @@ export default function LocalDealsScreen() {
                               color: textPrimary,
                             }}
                           >
-                            Uploading image to Cloudinary...
+                            Uploading image ...
                           </Text>
                         </>
                       ) : (
@@ -2484,7 +2478,7 @@ export default function LocalDealsScreen() {
                     Edit Deal Listing
                   </Text>
                   <Text style={{ fontSize: 13, marginTop: 2, color: textMute }}>
-                    Update price, condition, or photos in Cloudinary (deals/)
+                    Update price, condition, or photos in (deals/)
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2797,7 +2791,7 @@ export default function LocalDealsScreen() {
                       { color: textMute, marginBottom: 4 },
                     ]}
                   >
-                    Item Image (Cloudinary deals/ folder):
+                    Item Image ( deals/ folder):
                   </Text>
                   {editDealImage ? (
                     <View

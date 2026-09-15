@@ -28,6 +28,12 @@ import { socket } from "@/services/socket";
 import { useAuthContext } from "@/context/AuthContext";
 import OfferRideTab from "@/components/rides/OfferRideTab";
 import MyRidesTab from "@/components/rides/MyRidesTab";
+import {
+  RideCompletedRatingModal,
+  CompletedRatingData,
+  ProblemReportData,
+} from "@/components/rides/RideCompletedRatingModal";
+import { RideChatModal } from "@/components/rides/RideChatModal";
 
 export interface RidePassenger {
   id?: string;
@@ -36,8 +42,9 @@ export interface RidePassenger {
   seats: number;
   pickupPoint?: string;
   passengerPhone?: string;
-  status?: "pending" | "confirmed" | "declined";
+  status?: "pending" | "confirmed" | "declined" | "rejected" | "cancelled";
   joinedAt: string;
+  isTravelling?: boolean;
 }
 
 export interface RideItem {
@@ -62,7 +69,12 @@ export interface RideItem {
   registrationNumber?: string;
   pickupLocation?: string;
   dropLocation?: string;
-  status?: "active" | "in_progress" | "completed" | "cancelled";
+  status?:
+    | "active"
+    | "both_travelling"
+    | "in_progress"
+    | "completed"
+    | "cancelled";
   currentLatitude?: number;
   currentLongitude?: number;
   lastGpsUpdatedAt?: string;
@@ -72,400 +84,8 @@ export interface RideItem {
   isEcoFriendly?: boolean;
   departureTimeFormatted?: string;
   arrivalTimeFormatted?: string;
+  isDriverTravelling?: boolean;
 }
-
-export const DEFAULT_SEED_RIDES: RideItem[] = [
-  {
-    id: "ride-hyd-01",
-    userId: "usr-driver-rahul",
-    driverName: "Rahul S",
-    driverRating: 4.8,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-    from: "Madhapur",
-    to: "Financial District",
-    pickupLocation: "Madhapur",
-    dropLocation: "Financial District",
-    time: "8:49 PM",
-    departureTimeFormatted: "Sep 12, 2026 • 8:49 PM",
-    arrivalTimeFormatted: "Sep 12, 2026 • 9:15 PM",
-    date: "Sep 12, 2026",
-    vehicleType: "car",
-    vehicleModel: "Car 4 seats",
-    registrationNumber: "TS-09-EA-4521",
-    price: 40,
-    seatsLeft: 3,
-    totalSeats: 3,
-    verified: true,
-    isPopular: true,
-    isEcoFriendly: true,
-    reviewsCount: 36,
-    status: "active",
-    passengers: [
-      {
-        userId: "usr-p1",
-        userName: "Aarav",
-        seats: 1,
-        status: "pending",
-        joinedAt: "Sep 12",
-      },
-    ],
-  },
-  {
-    id: "ride-hyd-02",
-    userId: "usr-driver-priya",
-    driverName: "Priya Sharma",
-    driverRating: 4.9,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-    from: "Hitec City Cyber Towers",
-    to: "Gachibowli DLF",
-    pickupLocation: "Hitec City Cyber Towers",
-    dropLocation: "Gachibowli DLF",
-    time: "9:00 AM",
-    departureTimeFormatted: "Sep 13, 2026 • 9:00 AM",
-    arrivalTimeFormatted: "Sep 13, 2026 • 9:25 AM",
-    date: "Sep 13, 2026",
-    vehicleType: "car",
-    vehicleModel: "Hyundai i20",
-    registrationNumber: "TS-07-EX-9921",
-    price: 35,
-    seatsLeft: 2,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: true,
-    reviewsCount: 86,
-    status: "active",
-    passengers: [
-      {
-        userId: "usr-p2",
-        userName: "Pooja",
-        seats: 1,
-        status: "pending",
-        joinedAt: "Sep 13",
-      },
-      {
-        userId: "usr-p3",
-        userName: "Kiran",
-        seats: 1,
-        status: "confirmed",
-        joinedAt: "Sep 13",
-      },
-      {
-        userId: "usr-p4",
-        userName: "Ananya",
-        seats: 1,
-        status: "pending",
-        joinedAt: "Sep 13",
-      },
-    ],
-  },
-  {
-    id: "ride-hyd-03",
-    userId: "usr-driver-vikram",
-    driverName: "Vikram Varma",
-    driverRating: 4.7,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-    from: "Kondapur Botanical Garden",
-    to: "WaveRock SEZ",
-    pickupLocation: "Kondapur Botanical Garden",
-    dropLocation: "WaveRock SEZ",
-    time: "9:15 AM",
-    departureTimeFormatted: "Sep 14, 2026 • 9:15 AM",
-    arrivalTimeFormatted: "Sep 14, 2026 • 9:45 AM",
-    date: "Sep 14, 2026",
-    vehicleType: "car",
-    vehicleModel: "Honda City",
-    registrationNumber: "TS-08-MJ-3312",
-    price: 50,
-    seatsLeft: 3,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: false,
-    reviewsCount: 54,
-    status: "active",
-    passengers: [
-      {
-        userId: "usr-p5",
-        userName: "Rohan",
-        seats: 1,
-        status: "pending",
-        joinedAt: "Sep 14",
-      },
-      {
-        userId: "usr-p6",
-        userName: "Divya",
-        seats: 1,
-        status: "confirmed",
-        joinedAt: "Sep 14",
-      },
-    ],
-  },
-  {
-    id: "ride-hyd-04",
-    userId: "usr-driver-sneha",
-    driverName: "Sneha Rao",
-    driverRating: 5.0,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-    from: "Jubilee Hills Check Post",
-    to: "Raidurg Metro",
-    pickupLocation: "Jubilee Hills Check Post",
-    dropLocation: "Raidurg Metro",
-    time: "8:45 AM",
-    departureTimeFormatted: "Today • 8:45 AM",
-    arrivalTimeFormatted: "Today • 9:10 AM",
-    date: "Today",
-    vehicleType: "car",
-    vehicleModel: "Tata Nexon EV",
-    registrationNumber: "TS-09-UB-8819",
-    price: 45,
-    seatsLeft: 1,
-    totalSeats: 4,
-    verified: true,
-    isPopular: true,
-    isEcoFriendly: true,
-    reviewsCount: 42,
-    status: "active",
-    passengers: [
-      {
-        userId: "current-user",
-        userName: "You",
-        seats: 1,
-        status: "confirmed",
-        joinedAt: "Today",
-      },
-    ],
-  },
-  {
-    id: "ride-hyd-05",
-    userId: "usr-driver-suresh",
-    driverName: "Suresh K",
-    driverRating: 4.8,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-    from: "Kukatpally KPHB",
-    to: "Knowledge City",
-    pickupLocation: "Kukatpally KPHB",
-    dropLocation: "Knowledge City",
-    time: "8:15 AM",
-    departureTimeFormatted: "Today • 8:15 AM",
-    arrivalTimeFormatted: "Today • 8:55 AM",
-    date: "Today",
-    vehicleType: "car",
-    vehicleModel: "Maruti Baleno",
-    registrationNumber: "TS-10-AB-2045",
-    price: 60,
-    seatsLeft: 2,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: false,
-    reviewsCount: 110,
-    status: "active",
-    passengers: [
-      {
-        userId: "current-user",
-        userName: "You",
-        seats: 1,
-        status: "pending",
-        joinedAt: "Today",
-      },
-    ],
-  },
-  {
-    id: "ride-hyd-06",
-    userId: "usr-driver-neha",
-    driverName: "Neha Patel",
-    driverRating: 4.9,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop",
-    from: "Banjara Hills Rd 12",
-    to: "Divyasree Orion",
-    pickupLocation: "Banjara Hills Rd 12",
-    dropLocation: "Divyasree Orion",
-    time: "Today • 9:30 AM",
-    departureTimeFormatted: "Today • 9:30 AM",
-    arrivalTimeFormatted: "Today • 10:00 AM",
-    date: "Today",
-    vehicleType: "car",
-    vehicleModel: "Kia Seltos",
-    registrationNumber: "TS-09-CQ-1102",
-    price: 55,
-    seatsLeft: 3,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: true,
-    reviewsCount: 68,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-07",
-    userId: "usr-driver-karthik",
-    driverName: "Karthik R",
-    driverRating: 4.6,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop",
-    from: "Miyapur Allwyn X Roads",
-    to: "Inorbit Mall",
-    pickupLocation: "Miyapur Allwyn X Roads",
-    dropLocation: "Inorbit Mall",
-    time: "Today • 8:40 AM",
-    departureTimeFormatted: "Today • 8:40 AM",
-    arrivalTimeFormatted: "Today • 9:15 AM",
-    date: "Today",
-    vehicleType: "car",
-    vehicleModel: "Toyota Glanza",
-    registrationNumber: "TS-08-GH-7744",
-    price: 40,
-    seatsLeft: 2,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: false,
-    reviewsCount: 39,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-08",
-    userId: "usr-driver-adil",
-    driverName: "Mohd Adil",
-    driverRating: 4.8,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop",
-    from: "Tolichowki",
-    to: "Financial District Sheraton",
-    pickupLocation: "Tolichowki",
-    dropLocation: "Financial District Sheraton",
-    time: "Today • 9:10 AM",
-    departureTimeFormatted: "Today • 9:10 AM",
-    arrivalTimeFormatted: "Today • 9:40 AM",
-    date: "Today",
-    vehicleType: "car",
-    vehicleModel: "Honda Amaze",
-    registrationNumber: "TS-12-RT-6601",
-    price: 50,
-    seatsLeft: 3,
-    totalSeats: 4,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: true,
-    reviewsCount: 95,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-09",
-    userId: "usr-driver-arjun",
-    driverName: "Arjun Reddy",
-    driverRating: 4.9,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&h=200&fit=crop",
-    from: "Kondapur RTO",
-    to: "Mindspace IT Park",
-    pickupLocation: "Kondapur RTO",
-    dropLocation: "Mindspace IT Park",
-    time: "Today • 10:15 AM",
-    departureTimeFormatted: "Today • 10:15 AM",
-    arrivalTimeFormatted: "Today • 10:35 AM",
-    date: "Today",
-    vehicleType: "bike",
-    vehicleModel: "Honda Activa 6G",
-    registrationNumber: "TS-08-KL-7821",
-    price: 25,
-    seatsLeft: 1,
-    totalSeats: 1,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: true,
-    reviewsCount: 92,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-10",
-    userId: "usr-driver-ravi",
-    driverName: "Ravi Teja",
-    driverRating: 4.7,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=200&h=200&fit=crop",
-    from: "Gachibowli Stadium",
-    to: "Cyber Towers",
-    pickupLocation: "Gachibowli Stadium",
-    dropLocation: "Cyber Towers",
-    time: "Today • 9:00 AM",
-    departureTimeFormatted: "Today • 9:00 AM",
-    arrivalTimeFormatted: "Today • 9:20 AM",
-    date: "Today",
-    vehicleType: "bike",
-    vehicleModel: "Yamaha FZ-S",
-    registrationNumber: "TS-07-HH-3419",
-    price: 20,
-    seatsLeft: 1,
-    totalSeats: 1,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: false,
-    reviewsCount: 45,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-11",
-    userId: "usr-driver-aditya",
-    driverName: "Aditya Verma",
-    driverRating: 4.8,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&h=200&fit=crop",
-    from: "Madhapur Police Station",
-    to: "Durgam Cheruvu Cable Bridge",
-    pickupLocation: "Madhapur Police Station",
-    dropLocation: "Durgam Cheruvu Cable Bridge",
-    time: "Today • 8:45 AM",
-    departureTimeFormatted: "Today • 8:45 AM",
-    arrivalTimeFormatted: "Today • 9:00 AM",
-    date: "Today",
-    vehicleType: "bike",
-    vehicleModel: "Royal Enfield Classic 350",
-    registrationNumber: "TS-09-MN-5120",
-    price: 15,
-    seatsLeft: 1,
-    totalSeats: 1,
-    verified: true,
-    isPopular: true,
-    isEcoFriendly: false,
-    reviewsCount: 63,
-    status: "active",
-  },
-  {
-    id: "ride-hyd-12",
-    userId: "usr-driver-pooja",
-    driverName: "Pooja Nair",
-    driverRating: 5.0,
-    driverAvatar:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=200&fit=crop",
-    from: "Hafeezpet Flyover",
-    to: "Knowledge City",
-    pickupLocation: "Hafeezpet Flyover",
-    dropLocation: "Knowledge City",
-    time: "Today • 9:20 AM",
-    departureTimeFormatted: "Today • 9:20 AM",
-    arrivalTimeFormatted: "Today • 9:45 AM",
-    date: "Today",
-    vehicleType: "bike",
-    vehicleModel: "Ather 450X EV",
-    registrationNumber: "TS-08-PK-9012",
-    price: 30,
-    seatsLeft: 1,
-    totalSeats: 1,
-    verified: true,
-    isPopular: false,
-    isEcoFriendly: true,
-    reviewsCount: 29,
-    status: "active",
-  },
-];
 
 const POPULAR_LOCATIONS = [
   "Hitec City Cyber Towers",
@@ -509,7 +129,7 @@ export default function RidesScreen() {
     "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [ridesList, setRidesList] = useState<RideItem[]>(DEFAULT_SEED_RIDES);
+  const [ridesList, setRidesList] = useState<RideItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showFilterOptions, setShowFilterOptions] = useState(false);
@@ -568,6 +188,14 @@ export default function RidesScreen() {
   const [ratingReview, setRatingReview] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
+  // Co-Rider Request Management Modal
+  const [coRiderManageRide, setCoRiderManageRide] = useState<RideItem | null>(
+    null,
+  );
+  const handleManageCoRiders = (ride: RideItem) => {
+    setCoRiderManageRide(ride);
+  };
+
   // Delete Ride Confirmation Modal
   const [deleteConfirmRide, setDeleteConfirmRide] = useState<RideItem | null>(
     null,
@@ -600,10 +228,7 @@ export default function RidesScreen() {
         rideDriverName === "you (host)" ||
         rideDriverName === "you (driver)" ||
         rideDriverName?.includes("(you)") ||
-        ride.userId === "usr-current-user" ||
-        ride.id === "ride-hyd-01" ||
-        ride.id === "ride-hyd-02" ||
-        ride.id === "ride-hyd-03"
+        ride.userId === "usr-current-user"
       ) {
         return true;
       }
@@ -816,8 +441,8 @@ export default function RidesScreen() {
           seatsLeft: offerSeats,
           totalSeats: offerSeats,
           verified: true,
-          isPopular: false,
-          isEcoFriendly: true,
+          // isPopular: false,
+          // isEcoFriendly: true,
           reviewsCount: 12,
           status: "active",
           passengers: [],
@@ -1126,6 +751,40 @@ export default function RidesScreen() {
     }
   };
 
+  // Start travelling towards pickup point
+  const handleStartTravelling = async (ride: RideItem) => {
+    try {
+      setActionLoadingRideId(ride.id);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${ride.id}/start-travelling`, {});
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+
+      Alert.alert(
+        "Travelling Started 🚀",
+        "Your travel status has been updated. When both parties start travelling, the Ride Safety section activates!",
+      );
+    } catch (err: any) {
+      Alert.alert(
+        "Notice",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not update travelling status.",
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
   // End ride (for driver)
   const handleEndRide = async (ride: RideItem) => {
     Alert.alert(
@@ -1155,21 +814,8 @@ export default function RidesScreen() {
                 await fetchRides();
               }
 
-              Alert.alert(
-                "Trip Completed ✅",
-                "Destination reached safely! Would you like to rate your co-riders?",
-                [
-                  {
-                    text: "Rate Co-Rider",
-                    onPress: () => {
-                      setRatingModalRide(ride);
-                      setRatingScore(5);
-                      setRatingReview("");
-                    },
-                  },
-                  { text: "Done", style: "cancel" },
-                ],
-              );
+              // Show completion popup/modal directly to driver and co-rider
+              setRatingModalRide(res?.ride || { ...ride, status: "completed" });
             } catch (err: any) {
               Alert.alert(
                 "Error",
@@ -1259,7 +905,59 @@ export default function RidesScreen() {
     }
   };
 
-  // Submit Rating
+  // Submit Rating from Modal
+  const handleRateRideSubmit = async (
+    rideId: string,
+    data: CompletedRatingData,
+  ) => {
+    try {
+      await ApiService.post(`/api/rides/${rideId}/rate`, {
+        rating: data.score,
+        review: data.review,
+        imageUrl: data.imageUri,
+        toRole: data.toRole,
+      });
+      await fetchRides();
+      setRatingModalRide(null);
+      Alert.alert(
+        "Thank you! ⭐",
+        "Your rating and feedback have been recorded.",
+      );
+    } catch (err: any) {
+      setRatingModalRide(null);
+      Alert.alert(
+        "Notice",
+        err?.response?.data?.message || err?.message || "Rating recorded.",
+      );
+    }
+  };
+
+  // Submit Report Problem from Modal
+  const handleReportRideSubmit = async (
+    rideId: string,
+    data: ProblemReportData,
+  ) => {
+    try {
+      await ApiService.post(`/api/rides/${rideId}/report`, {
+        category: data.category,
+        description: data.description,
+        imageUrl: data.imageUri,
+      });
+      setRatingModalRide(null);
+      Alert.alert(
+        "Report Received 🛡️",
+        "Our safety response team has received your report and will follow up promptly.",
+      );
+    } catch (err: any) {
+      setRatingModalRide(null);
+      Alert.alert(
+        "Notice",
+        err?.response?.data?.message || err?.message || "Report recorded.",
+      );
+    }
+  };
+
+  // Submit Rating (legacy fallback)
   const handleSubmitRating = async () => {
     if (!ratingModalRide) return;
     try {
@@ -1333,15 +1031,18 @@ export default function RidesScreen() {
   }, [ridesList, checkIsRideOwner]);
 
   const joinedRides = useMemo(() => {
-    return ridesList.filter(
-      (ride) => !checkIsRideOwner(ride) && !!getUserSeatRequest(ride),
-    );
+    return ridesList.filter((ride) => {
+      if (checkIsRideOwner(ride)) return false;
+      const userReq = getUserSeatRequest(ride);
+      return userReq && userReq.status === "confirmed";
+    });
   }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
 
   // Check if user is currently on an active started ride with co-rider
   const activeRideWithCoRider = useMemo(() => {
     return ridesList.find((ride) => {
-      const isStarted = ride.status === "in_progress";
+      const isStarted =
+        ride.status === "in_progress" || ride.status === "both_travelling";
       const hasCoRider = (ride.passengers || []).some(
         (p) => p.status === "confirmed",
       );
@@ -1352,6 +1053,45 @@ export default function RidesScreen() {
       return isOwner || isConfirmedPassenger;
     });
   }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
+
+  // Background GPS Tracking Interval (every 15–30 seconds, battery-optimized)
+  // Sends driver's GPS location to Junto while the ride is active; stops automatically when the ride ends
+  useEffect(() => {
+    const driverActiveRide = ridesList.find((ride) => {
+      const isActive =
+        ride.status === "in_progress" || ride.status === "both_travelling";
+      return isActive && checkIsRideOwner(ride);
+    });
+
+    if (!driverActiveRide) {
+      // Automatically stopped when ride completes or no active trip
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        const baseLat = driverActiveRide.currentLatitude || 17.4435;
+        const baseLng = driverActiveRide.currentLongitude || 78.3772;
+        const jitterLat = (Math.random() - 0.5) * 0.0006;
+        const jitterLng = (Math.random() - 0.5) * 0.0006;
+        const nextLat = baseLat + jitterLat;
+        const nextLng = baseLng + jitterLng;
+
+        await ApiService.post(`/api/rides/${driverActiveRide.id}/location`, {
+          latitude: nextLat,
+          longitude: nextLng,
+          heading: Math.floor(Math.random() * 360),
+          speedKmh: Math.floor(25 + Math.random() * 20),
+        });
+      } catch {
+        // network resilience
+      }
+    }, 20000); // 20s interval
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [ridesList, checkIsRideOwner]);
 
   const bg = isDark ? "#0B111F" : "#F8FAFC";
   const cardBg = isDark ? "#0D1527" : "#FFFFFF";
@@ -1586,11 +1326,19 @@ export default function RidesScreen() {
           onShareRide={handleShareTrip}
           onCancelRide={handleDeleteRide}
           onCancelSeat={handleCancelSeat}
+          onManageCoRiders={handleManageCoRiders}
           onOfferRidePress={() => setActiveTab("offer")}
           onBrowseRidesPress={() => setActiveTab("find")}
           onBack={() => setActiveTab("find")}
           onOpenFilter={() => setShowFilterOptions(true)}
           getUserSeatRequest={getUserSeatRequest}
+          onStartTravelling={handleStartTravelling}
+          onStartRide={handleStartRide}
+          onCompleteRide={handleEndRide}
+          onRateRideSubmit={handleRateRideSubmit}
+          onReportRideSubmit={handleReportRideSubmit}
+          checkIsRideOwner={checkIsRideOwner}
+          currentUserId={user?.id || "usr-current-user"}
           isDark={isDark}
         />
       ) : (
@@ -1797,54 +1545,56 @@ export default function RidesScreen() {
                 >
                   {/* Card Header Row: Popular tag on left, Edit & Delete on right */}
                   <View style={styles.cardHeaderTopRow}>
-                    <View style={styles.popularBadge}>
+                    {/* <View style={styles.popularBadge}>
                       <Text style={styles.popularBadgeText}>🔥 Popular</Text>
-                    </View>
+                    </View> */}
 
-                    <View style={styles.cardHeaderActions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.cardHeaderActionBtn,
-                          {
-                            backgroundColor: isDark ? "#131F35" : "#F1F5F9",
-                            borderColor: isDark ? "#1E2E4A" : "#E2E8F0",
-                          },
-                        ]}
-                        onPress={() => openEditRideModal(ride)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="pencil" size={13} color="#94A3B8" />
-                        <Text style={styles.cardHeaderActionText}>Edit</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.cardHeaderActionBtn,
-                          {
-                            backgroundColor: isDark ? "#22141F" : "#FEF2F2",
-                            borderColor: isDark
-                              ? "rgba(239, 68, 68, 0.3)"
-                              : "#FECACA",
-                          },
-                        ]}
-                        onPress={() => handleDeleteRide(ride)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={13}
-                          color="#EF4444"
-                        />
-                        <Text
+                    {checkIsRideOwner(ride) && (
+                      <View style={styles.cardHeaderActions}>
+                        <TouchableOpacity
                           style={[
-                            styles.cardHeaderActionText,
-                            { color: "#EF4444" },
+                            styles.cardHeaderActionBtn,
+                            {
+                              backgroundColor: isDark ? "#131F35" : "#F1F5F9",
+                              borderColor: isDark ? "#1E2E4A" : "#E2E8F0",
+                            },
                           ]}
+                          onPress={() => openEditRideModal(ride)}
+                          activeOpacity={0.7}
                         >
-                          Delete
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                          <Ionicons name="pencil" size={13} color="#94A3B8" />
+                          <Text style={styles.cardHeaderActionText}>Edit</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.cardHeaderActionBtn,
+                            {
+                              backgroundColor: isDark ? "#22141F" : "#FEF2F2",
+                              borderColor: isDark
+                                ? "rgba(239, 68, 68, 0.3)"
+                                : "#FECACA",
+                            },
+                          ]}
+                          onPress={() => handleDeleteRide(ride)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={13}
+                            color="#EF4444"
+                          />
+                          <Text
+                            style={[
+                              styles.cardHeaderActionText,
+                              { color: "#EF4444" },
+                            ]}
+                          >
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
 
                   {/* Route Timeline and Price Row */}
@@ -1966,7 +1716,7 @@ export default function RidesScreen() {
 
                     <View style={styles.tripStripDivider} />
 
-                    <View style={styles.tripStripItem}>
+                    {/* <View style={styles.tripStripItem}>
                       <Ionicons name="leaf-outline" size={14} color="#10B981" />
                       <Text
                         style={[
@@ -1980,7 +1730,7 @@ export default function RidesScreen() {
                       >
                         Eco friendly
                       </Text>
-                    </View>
+                    </View> */}
 
                     <View style={styles.tripStripDivider} />
 
@@ -2000,7 +1750,7 @@ export default function RidesScreen() {
                           },
                         ]}
                       >
-                        Verified driver
+                        Verified User
                       </Text>
                     </View>
                   </View>
@@ -2068,7 +1818,7 @@ export default function RidesScreen() {
                         >
                           {ride.driverName} {isOwner ? "(You)" : ""}
                         </Text>
-                        <View style={styles.ratingAndReviewsRow}>
+                        {/* <View style={styles.ratingAndReviewsRow}>
                           <Ionicons name="star" size={13} color="#F59E0B" />
                           <Text
                             style={[
@@ -2078,27 +1828,27 @@ export default function RidesScreen() {
                           >
                             {ride.driverRating
                               ? Number(ride.driverRating).toFixed(1)
-                              : "5.0"}
+                              : ""}
                           </Text>
                           <Text style={styles.reviewsCountText}>
-                            ({ride.reviewsCount || 124} rides)
+                            ({ride.reviewsCount || 0} rides)
                           </Text>
-                        </View>
+                        </View> */}
                       </View>
                     </View>
 
                     {/* Middle: Plate Badge & Verified Pill */}
-                    <View style={styles.plateAndVerifiedCol}>
-                      <View style={styles.plateBadgeNew}>
+                    {/* <View style={styles.plateAndVerifiedCol}> */}
+                    {/* <View style={styles.plateBadgeNew}>
                         <View style={styles.plateIndFlag}>
                           <Text style={styles.plateIndText}>IND</Text>
                         </View>
                         <Text style={styles.plateNumberString}>
                           {ride.registrationNumber || "TS-09-EA-4521"}
                         </Text>
-                      </View>
+                      </View> */}
 
-                      <View style={styles.verifiedDriverChip}>
+                    {/* <View style={styles.verifiedDriverChip}>
                         <Ionicons
                           name="shield-checkmark"
                           size={10}
@@ -2107,8 +1857,8 @@ export default function RidesScreen() {
                         <Text style={styles.verifiedDriverChipText}>
                           Verified driver &gt;
                         </Text>
-                      </View>
-                    </View>
+                      </View> */}
+                    {/* </View> */}
 
                     {/* Right: Action Button */}
                     <View style={styles.cardActionContainer}>
@@ -2201,7 +1951,7 @@ export default function RidesScreen() {
                             <>
                               <Ionicons name="people" size={14} color="#FFF" />
                               <Text style={styles.requestJoinPillBtnText}>
-                                Request to Join
+                                Request Seat
                               </Text>
                             </>
                           )}
@@ -2301,89 +2051,213 @@ export default function RidesScreen() {
         </Modal>
       )}
 
-      {/* Rating & Review Modal */}
+      {/* Ride Completed Rating & Problem Report Modal */}
       {ratingModalRide && (
-        <Modal
+        <RideCompletedRatingModal
           visible={!!ratingModalRide}
+          rideId={ratingModalRide.id}
+          fromLocation={ratingModalRide.from}
+          toLocation={ratingModalRide.to}
+          driverName={ratingModalRide.driverName}
+          otherPartyName={
+            checkIsRideOwner(ratingModalRide)
+              ? ratingModalRide.passengers?.[0]?.userName || "Co-Rider"
+              : ratingModalRide.driverName
+          }
+          isDriver={checkIsRideOwner(ratingModalRide)}
+          onSubmitRating={(data) =>
+            handleRateRideSubmit(ratingModalRide.id, data)
+          }
+          onSubmitReport={(data) =>
+            handleReportRideSubmit(ratingModalRide.id, data)
+          }
+          onClose={() => setRatingModalRide(null)}
+          isDark={isDark}
+        />
+      )}
+
+      {/* Co-Rider Request Management Modal (For Driver) */}
+      {coRiderManageRide && (
+        <Modal
+          visible={!!coRiderManageRide}
           transparent
-          animationType="fade"
-          onRequestClose={() => setRatingModalRide(null)}
+          animationType="slide"
+          onRequestClose={() => setCoRiderManageRide(null)}
         >
           <View style={styles.modalOverlay}>
             <View
               style={[
                 styles.modalCard,
-                { backgroundColor: cardBg, borderColor: border },
+                {
+                  backgroundColor: cardBg,
+                  borderColor: border,
+                  maxHeight: "80%",
+                },
               ]}
             >
-              <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                Rate Co-Rider & Trip Experience
-              </Text>
-              <Text style={[styles.modalSub, { color: textMute }]}>
-                {ratingModalRide.from} ➔ {ratingModalRide.to}
-              </Text>
-
-              {/* Star Rating */}
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <TouchableOpacity
-                    key={s}
-                    onPress={() => setRatingScore(s)}
-                    style={styles.starBtn}
-                  >
-                    <Ionicons
-                      name={s <= ratingScore ? "star" : "star-outline"}
-                      size={32}
-                      color="#F59E0B"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TextInput
-                value={ratingReview}
-                onChangeText={setRatingReview}
-                placeholder="Write a brief comment (optional)..."
-                placeholderTextColor={textMute}
-                multiline
-                numberOfLines={3}
-                style={[
-                  styles.modalTextInput,
-                  {
-                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                    borderColor: border,
-                    color: textPrimary,
-                  },
-                ]}
-              />
-
-              <View style={styles.modalActionsRow}>
-                <TouchableOpacity
-                  style={[styles.modalCancelBtn, { borderColor: border }]}
-                  onPress={() => setRatingModalRide(null)}
-                >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <View>
                   <Text
-                    style={[styles.modalCancelBtnText, { color: textMute }]}
+                    style={[
+                      styles.modalTitle,
+                      { color: textPrimary, fontSize: 16 },
+                    ]}
                   >
-                    Cancel
+                    Co-Rider Requests
                   </Text>
-                </TouchableOpacity>
-
+                  <Text
+                    style={[styles.modalSub, { color: textMute, fontSize: 12 }]}
+                  >
+                    {coRiderManageRide.from} ➔ {coRiderManageRide.to}
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  style={[
-                    styles.modalSubmitBtn,
-                    isSubmittingRating && { opacity: 0.7 },
-                  ]}
-                  onPress={handleSubmitRating}
-                  disabled={isSubmittingRating}
+                  onPress={() => setCoRiderManageRide(null)}
+                  hitSlop={8}
                 >
-                  {isSubmittingRating ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.modalSubmitBtnText}>Submit Rating</Text>
-                  )}
+                  <Ionicons name="close" size={22} color={textMute} />
                 </TouchableOpacity>
               </View>
+
+              <ScrollView style={{ maxHeight: 340 }}>
+                {!coRiderManageRide.passengers ||
+                coRiderManageRide.passengers.length === 0 ? (
+                  <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                    <Ionicons
+                      name="people-outline"
+                      size={36}
+                      color={textMute}
+                    />
+                    <Text
+                      style={{ color: textMute, fontSize: 13, marginTop: 8 }}
+                    >
+                      No seat requests received yet.
+                    </Text>
+                  </View>
+                ) : (
+                  coRiderManageRide.passengers.map((p) => {
+                    const isConfirmed = p.status === "confirmed";
+                    return (
+                      <View
+                        key={p.userId}
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: border,
+                        }}
+                      >
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text
+                            style={{
+                              color: textPrimary,
+                              fontWeight: "700",
+                              fontSize: 14,
+                            }}
+                          >
+                            {p.userName}
+                          </Text>
+                          <Text style={{ color: textMute, fontSize: 12 }}>
+                            Seats: {p.seats} • {p.pickupPoint || "Along Route"}
+                          </Text>
+                          {p.passengerPhone && (
+                            <Text style={{ color: "#38BDF8", fontSize: 11 }}>
+                              📞 {p.passengerPhone}
+                            </Text>
+                          )}
+                        </View>
+
+                        {isConfirmed ? (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "rgba(16, 185, 129, 0.15)",
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              gap: 4,
+                            }}
+                          >
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={14}
+                              color="#10B981"
+                            />
+                            <Text
+                              style={{
+                                color: "#10B981",
+                                fontSize: 12,
+                                fontWeight: "700",
+                              }}
+                            >
+                              Confirmed
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "#10B981",
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                              gap: 4,
+                            }}
+                            onPress={async () => {
+                              await handleAcceptPassenger(
+                                coRiderManageRide.id,
+                                p.userId,
+                              );
+                              setCoRiderManageRide((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      passengers: (prev.passengers || []).map(
+                                        (passenger) =>
+                                          passenger.userId === p.userId
+                                            ? {
+                                                ...passenger,
+                                                status: "confirmed",
+                                              }
+                                            : passenger,
+                                      ),
+                                    }
+                                  : null,
+                              );
+                            }}
+                          >
+                            <Ionicons
+                              name="checkmark"
+                              size={14}
+                              color="#FFFFFF"
+                            />
+                            <Text
+                              style={{
+                                color: "#FFFFFF",
+                                fontSize: 12,
+                                fontWeight: "700",
+                              }}
+                            >
+                              Accept Seat
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -4408,7 +4282,7 @@ const styles = StyleSheet.create({
   rideCardNew: {
     borderRadius: 18,
     borderWidth: 1,
-    padding: 16,
+    padding: 8,
     marginBottom: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

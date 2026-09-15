@@ -300,7 +300,6 @@ export async function declineRidePassenger(
   );
 
   // Notify connected clients
-  const io = getSocketServer();
   if (io) {
     io.emit("ride_updated", updatedRide);
     io.to(`user:${passengerUserId}`).emit("ride_declined", {
@@ -709,6 +708,7 @@ export async function rateRide(
     rating: input.rating,
     review: input.review,
     tags: input.tags,
+    imageUrl: input.imageUrl,
   });
 
   if (io) {
@@ -719,6 +719,64 @@ export async function rateRide(
   return {
     success: true,
     message: "Thank you! Your rating and feedback have been submitted.",
+    ride: updatedRide,
+  };
+}
+
+/**
+ * Signal user has started travelling (driver or co-rider)
+ * When both driver and confirmed co-rider have started travelling, state advances to 'both_travelling'
+ */
+export async function startTravellingRide(
+  rideId: string,
+  user: User,
+): Promise<{
+  success: boolean;
+  message: string;
+  ride: RideRecord;
+}> {
+  if (!user?.id) {
+    throw new Error(
+      "Authenticated user is required to update travelling status.",
+    );
+  }
+
+  const ride = await rideRepository.findById(rideId);
+  if (!ride) {
+    throw new Error("Ride not found.");
+  }
+
+  const isDriver = ride.userId === user.id;
+  const isPassenger = (ride.passengers || []).some((p) => p.userId === user.id);
+
+  if (!isDriver && !isPassenger) {
+    throw new Error(
+      "Only the ride host or a confirmed co-rider can start travelling.",
+    );
+  }
+
+  const updatedRide = await rideRepository.startTravelling(
+    rideId,
+    user.id,
+    isDriver,
+  );
+
+  if (io) {
+    io.emit("ride_travelling_started", {
+      rideId,
+      userId: user.id,
+      userName: user.name,
+      isDriver,
+      status: updatedRide.status,
+    });
+    io.emit("ride_updated", updatedRide);
+  }
+
+  return {
+    success: true,
+    message: isDriver
+      ? "Driver travel status updated."
+      : "Co-rider travel status updated.",
     ride: updatedRide,
   };
 }
@@ -749,6 +807,7 @@ export async function reportRideProblem(
     reportedByName: user.name || "Junto Neighbor",
     category: input.category,
     description: input.description,
+    imageUrl: input.imageUrl,
   });
 
   if (io) {
