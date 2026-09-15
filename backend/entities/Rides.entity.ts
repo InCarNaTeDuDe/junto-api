@@ -31,14 +31,14 @@ export class Ride {
   userId!: string;
 
   @ManyToOne(() => User, {
-    nullable: false,
+    nullable: true,
     onDelete: "SET NULL",
   })
   @JoinColumn({
     name: "userId",
     referencedColumnName: "id",
   })
-  user!: User;
+  user?: User;
 
   @Column({
     type: "varchar",
@@ -165,11 +165,23 @@ export class Ride {
   longitude?: number;
 
   @Column({
-    type: "enum",
-    enum: ["active", "in_progress", "completed", "cancelled"],
+    type: "varchar",
+    length: 50,
     default: "active",
   })
-  status!: "active" | "in_progress" | "completed" | "cancelled";
+  status!:
+    | "active"
+    | "both_travelling"
+    | "in_progress"
+    | "completed"
+    | "cancelled"
+    | string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+  })
+  isDriverTravelling?: boolean;
 
   /**
    * For now passengers are stored directly
@@ -270,6 +282,13 @@ export class Ride {
     description: string;
     createdAt: string;
   }>;
+
+  @Index()
+  @Column({
+    type: "smallint",
+    default: 0,
+  })
+  isDeleted!: number;
 
   @CreateDateColumn({
     type: "timestamp",

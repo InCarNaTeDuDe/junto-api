@@ -1816,7 +1816,8 @@ export default function RidesScreen() {
                             { color: textPrimary },
                           ]}
                         >
-                          {ride.driverName} {isOwner ? "(You)" : ""}
+                          {ride.driverName.slice(0, 15) + ".."}{" "}
+                          {isOwner ? "(You)" : ""}
                         </Text>
                         {/* <View style={styles.ratingAndReviewsRow}>
                           <Ionicons name="star" size={13} color="#F59E0B" />
@@ -4432,8 +4433,8 @@ const styles = StyleSheet.create({
     flex: 1.2,
   },
   driverAvatarPhoto: {
-    width: 38,
-    height: 38,
+    width: 24,
+    height: 24,
     borderRadius: 19,
   },
   driverNameLabel: {

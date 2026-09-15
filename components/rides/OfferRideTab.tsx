@@ -65,6 +65,34 @@ export const formatMockupDateTime = (date: Date, time: Date): string => {
   return `${m} ${d}, ${y} • ${hours}:${minStr} ${ampm}`;
 };
 
+const formatDateOnly = (date: Date) => {
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+};
+
+const formatTimeOnly = (time: Date) => {
+  let hours = time.getHours();
+  const minutes = time.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minStr = minutes < 10 ? `0${minutes}` : minutes;
+  return `${hours}:${minStr} ${ampm}`;
+};
+
 export default function OfferRideTab({
   offerPickup,
   setOfferPickup,
@@ -92,14 +120,46 @@ export default function OfferRideTab({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
 
-  const onDateChange = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== "web") setShowDatePicker(false);
-    if (selectedDate) setDepartureDate(selectedDate);
+  const onDateChange = (_event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+
+    if (selectedDate) {
+      setDepartureDate(selectedDate);
+    }
   };
 
-  const onTimeChange = (_: any, selectedTime?: Date) => {
-    if (Platform.OS !== "web") setShowTimePicker(false);
-    if (selectedTime) setDepartureTime(selectedTime);
+  const onTimeChange = (_event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+
+    if (selectedTime) {
+      setDepartureTime(selectedTime);
+    }
+  };
+
+  const openDatePicker = () => {
+    setShowTimePicker(false);
+    setShowDatePicker(true);
+  };
+
+  const openTimePicker = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(true);
+  };
+
+  const toggleDatePicker = () => {
+    setShowDatePicker((prev) => {
+      const next = !prev;
+      if (next) setShowTimePicker(false);
+      return next;
+    });
+  };
+
+  const toggleTimePicker = () => {
+    setShowTimePicker((prev) => {
+      const next = !prev;
+      if (next) setShowDatePicker(false);
+      return next;
+    });
   };
 
   const handleDecreaseSeats = () => {
@@ -250,21 +310,23 @@ export default function OfferRideTab({
           </View>
         </View>
 
-        {/* 4. Date Card */}
+        {/* Date */}
         <TouchableOpacity
           style={styles.cardContainerRow}
-          onPress={() => setShowDatePicker((prev) => !prev)}
+          onPress={openDatePicker}
           activeOpacity={0.8}
         >
           <View style={styles.purpleIconSquare}>
             <Ionicons name="calendar" size={18} color="#C084FC" />
           </View>
+
           <View style={styles.middleTextWrap}>
             <Text style={styles.cardLabel}>Date</Text>
             <Text style={styles.cardValueText}>
-              {formatMockupDateTime(departureDate, departureTime)}
+              {formatDateOnly(departureDate)}
             </Text>
           </View>
+
           <Ionicons
             name={showDatePicker ? "chevron-up" : "chevron-forward"}
             size={18}
@@ -272,33 +334,49 @@ export default function OfferRideTab({
           />
         </TouchableOpacity>
 
-        {/* Interactive Date & Time Picker */}
-        {(showDatePicker || showTimePicker || Platform.OS === "web") && (
-          <View style={styles.pickerSection}>
-            <View style={styles.pickerRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.pickerMiniHeading}>Select Date</Text>
-                <DateTimePicker
-                  value={departureDate}
-                  mode="date"
-                  display="default"
-                  minimumDate={new Date()}
-                  onChange={onDateChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.pickerMiniHeading}>Select Time</Text>
-                <DateTimePicker
-                  value={departureTime}
-                  mode="time"
-                  display="default"
-                  onChange={onTimeChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-            </View>
+        {showDatePicker && Platform.OS !== "web" && (
+          <DateTimePicker
+            value={departureDate}
+            mode="date"
+            display="default"
+            minimumDate={new Date()}
+            onChange={onDateChange}
+            themeVariant={isDark ? "dark" : "light"}
+          />
+        )}
+
+        {/* Time */}
+        <TouchableOpacity
+          style={styles.cardContainerRow}
+          onPress={openTimePicker}
+          activeOpacity={0.8}
+        >
+          <View style={styles.purpleIconSquare}>
+            <Ionicons name="time-outline" size={18} color="#C084FC" />
           </View>
+
+          <View style={styles.middleTextWrap}>
+            <Text style={styles.cardLabel}>Departure Time</Text>
+            <Text style={styles.cardValueText}>
+              {formatTimeOnly(departureTime)}
+            </Text>
+          </View>
+
+          <Ionicons
+            name={showTimePicker ? "chevron-up" : "chevron-forward"}
+            size={18}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+
+        {showTimePicker && Platform.OS !== "web" && (
+          <DateTimePicker
+            value={departureTime}
+            mode="time"
+            display="default"
+            onChange={onTimeChange}
+            themeVariant={isDark ? "dark" : "light"}
+          />
         )}
 
         {/* 5. Vehicle Type Card */}

@@ -67,58 +67,64 @@ export async function createRide(
     throw new Error("Authenticated user is required to create a ride.");
   }
 
-  const ride = await rideRepository.createRide({
-    driverId: user.id,
+  try {
+    const ride = await rideRepository.createRide({
+      driverId: user.id,
 
-    driverName: user.name || "Neighbor Driver",
+      driverName: user.name || "Neighbor Driver",
 
-    driverRating: 5.0,
+      driverRating: 5.0,
 
-    driverAvatar:
-      user.avatar ||
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+      driverAvatar:
+        user.avatar ||
+        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
 
-    driverAvatarBg: "#2563EB",
+      driverAvatarBg: "#2563EB",
 
-    from: input.from,
-    to: input.to,
-    time: input.time,
+      from: input.from,
+      to: input.to,
+      time: input.time,
 
-    vehicleType: input.vehicleType,
+      vehicleType: input.vehicleType,
 
-    seatsLeft: input.seatsLeft,
-    totalSeats:
-      input.totalSeats ||
-      input.seatsLeft ||
-      (input.vehicleType === "bike" ? 1 : 2),
+      seatsLeft: input.seatsLeft,
+      totalSeats:
+        input.totalSeats ||
+        input.seatsLeft ||
+        (input.vehicleType === "bike" ? 1 : 2),
 
-    price: input.price,
+      price: input.price,
 
-    verified: input.verified ?? true,
+      verified: input.verified ?? true,
 
-    notes: input.notes,
+      notes: input.notes,
 
-    locationName: input.locationName,
-    locationState: input.locationState,
-    latitude: input.latitude,
-    longitude: input.longitude,
+      locationName: input.locationName,
+      locationState: input.locationState,
+      latitude: input.latitude,
+      longitude: input.longitude,
 
-    vehicleModel: input.vehicleModel,
-    registrationNumber: input.registrationNumber,
-    pickupLocation: input.pickupLocation,
-    dropLocation: input.dropLocation,
-  });
+      vehicleModel: input.vehicleModel,
+      registrationNumber: input.registrationNumber,
+      pickupLocation: input.pickupLocation,
+      dropLocation: input.dropLocation,
+    });
 
-  // Notify connected clients
-  if (io) {
-    io.emit("ride_created", ride);
+    // Notify connected clients
+    if (io) {
+      io.emit("ride_created", ride);
 
-    const rides = await rideRepository.findAll();
+      const rides = await rideRepository.findAll();
 
-    io.emit("rides_updated", rides);
+      io.emit("rides_updated", rides);
+    }
+
+    return ride;
+  } catch (error) {
+    return Promise.reject(
+      new Error("Failed to create ride: " + (error as Error).message),
+    );
   }
-
-  return ride;
 }
 
 /**

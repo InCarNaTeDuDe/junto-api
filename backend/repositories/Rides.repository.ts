@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { BaseRepository } from "./Base.repository";
 import { Ride } from "../entities/Rides.entity";
 
@@ -9,6 +10,7 @@ export interface RideRecord {
   driverName: string;
   driverRating: number;
   driverAvatar?: string;
+  driverAvatarBg?: string;
 
   from: string;
   to: string;
@@ -82,6 +84,8 @@ export interface RideRecord {
     createdAt: string;
   }>;
 
+  isDeleted?: number;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -136,6 +140,8 @@ export class RideRepository extends BaseRepository<Ride> {
       longitude: ride.longitude,
 
       status: ride.status,
+      isDriverTravelling: ride.isDriverTravelling ?? false,
+      isDeleted: Number(ride.isDeleted || 0),
 
       passengers: (ride.passengers || []).map((passenger: any) => ({
         id: passenger.id,
@@ -208,68 +214,68 @@ export class RideRepository extends BaseRepository<Ride> {
         ? parseFloat(data.price.replace(/[^0-9.]/g, "")) || 0
         : Number(data.price) || 0;
 
-    const id = `ride-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    // A ride must always belong to a real authenticated user.
+    if (!data.driverId) {
+      throw new Error("Driver ID is required");
+    }
 
-    const fallbackRecord: RideRecord = {
-      id,
-      userId: data.driverId,
-      driverName: data.driverName,
-      driverRating: data.driverRating ?? 5.0,
-      driverAvatar:
-        data.driverAvatar ||
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-      from: data.from,
-      to: data.to,
-      time: data.time,
-      vehicleType: data.vehicleType,
-      seatsLeft: data.seatsLeft,
-      totalSeats: data.totalSeats,
-      price: numericPrice,
-      verified: data.verified ?? true,
-      notes: data.notes,
-      locationName: data.locationName,
-      locationState: data.locationState,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      vehicleModel:
-        data.vehicleModel ||
-        (data.vehicleType === "car"
-          ? "Maruti Swift (Silver)"
-          : "Honda Activa (Black)"),
-      registrationNumber:
-        data.registrationNumber ||
-        `TS-${Math.floor(10 + Math.random() * 89)}-EA-${Math.floor(1000 + Math.random() * 9000)}`,
-      pickupLocation: data.pickupLocation || data.from,
-      dropLocation: data.dropLocation || data.to,
-      currentLatitude: data.latitude,
-      currentLongitude: data.longitude,
-      isGpsActive: false,
-      status: "active",
-      passengers: [],
-      ratings: [],
-      reports: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
+    // Do NOT create fallback/in-memory rides.
     if (!this.isConnected) {
-      inMemoryRides.set(id, fallbackRecord);
-      return fallbackRecord;
+      throw new Error("Database is not connected");
     }
 
     try {
-      const ride = this.repo.create({
-        ...fallbackRecord,
+      const newRide = this.repo.create({
         userId: data.driverId,
+
+        driverName: data.driverName,
+        driverRating: data.driverRating ?? 5.0,
+        driverAvatar: data.driverAvatar,
+        driverAvatarBg: data.driverAvatarBg,
+
+        from: data.from,
+        to: data.to,
+        time: data.time,
+
+        vehicleType: data.vehicleType,
+
+        seatsLeft: data.seatsLeft,
+        totalSeats: data.totalSeats,
+
         price: numericPrice,
+        verified: data.verified ?? true,
+        notes: data.notes,
+
+        locationName: data.locationName,
+        locationState: data.locationState,
+        latitude: data.latitude,
+        longitude: data.longitude,
+
+        vehicleModel: data.vehicleModel,
+        registrationNumber: data.registrationNumber,
+        pickupLocation: data.pickupLocation || data.from,
+        dropLocation: data.dropLocation || data.to,
+
+        currentLatitude: data.latitude,
+        currentLongitude: data.longitude,
+
+        isGpsActive: false,
+        status: "active",
+        isDriverTravelling: false,
+
+        passengers: [],
+        ratings: [],
+        reports: [],
+
+        isDeleted: 0,
       } as any);
-      const savedRide = await this.repo.save(ride as any);
-      const rec = this.toRideRecord(savedRide as Ride);
-      inMemoryRides.set(rec.id, rec);
-      return rec;
-    } catch {
-      inMemoryRides.set(id, fallbackRecord);
-      return fallbackRecord;
+
+      const savedRide = await this.repo.save(newRide);
+
+      return this.toRideRecord(savedRide);
+    } catch (error) {
+      console.error("[RideRepository] Failed to create ride:", error);
+      throw error;
     }
   }
 
@@ -278,7 +284,9 @@ export class RideRepository extends BaseRepository<Ride> {
    */
   override async findAll<R = RideRecord>(options?: any): Promise<R[]> {
     if (!this.isConnected) {
-      return Array.from(inMemoryRides.values()) as unknown as R[];
+      return Array.from(inMemoryRides.values()).filter(
+        (r) => !r.isDeleted || r.isDeleted === 0,
+      ) as unknown as R[];
     }
     try {
       if (
@@ -286,18 +294,27 @@ export class RideRepository extends BaseRepository<Ride> {
         typeof options === "object" &&
         ("where" in options || "relations" in options || "order" in options)
       ) {
-        const rides = await this.repo.find(options);
+        const whereClause = Array.isArray(options.where)
+          ? options.where.map((w: any) => ({ ...w, isDeleted: 0 }))
+          : { ...(options.where || {}), isDeleted: 0 };
+        const rides = await this.repo.find({ ...options, where: whereClause });
         return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
       }
       const rides = await this.repo.find({
-        where: [{ status: "active" }, { status: "in_progress" }],
+        where: [
+          { status: "active", isDeleted: 0 },
+          { status: "both_travelling", isDeleted: 0 },
+          { status: "in_progress", isDeleted: 0 },
+        ],
         order: {
           createdAt: "DESC",
         },
       });
       return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
     } catch {
-      return Array.from(inMemoryRides.values()) as unknown as R[];
+      return Array.from(inMemoryRides.values()).filter(
+        (r) => !r.isDeleted || r.isDeleted === 0,
+      ) as unknown as R[];
     }
   }
 
@@ -310,21 +327,33 @@ export class RideRepository extends BaseRepository<Ride> {
   ): Promise<R | null> {
     const stringId = String(id);
     if (!this.isConnected) {
-      return (inMemoryRides.get(stringId) || null) as unknown as R | null;
+      const inMem = inMemoryRides.get(stringId);
+      if (inMem && (!inMem.isDeleted || inMem.isDeleted === 0)) {
+        return inMem as unknown as R;
+      }
+      return null;
     }
     try {
       const ride = await this.repo.findOne({
-        where: { id: stringId },
+        where: { id: stringId, isDeleted: 0 },
         ...(options || {}),
       });
 
       if (!ride) {
-        return (inMemoryRides.get(stringId) || null) as unknown as R | null;
+        const inMem = inMemoryRides.get(stringId);
+        if (inMem && (!inMem.isDeleted || inMem.isDeleted === 0)) {
+          return inMem as unknown as R;
+        }
+        return null;
       }
 
       return this.toRideRecord(ride) as unknown as R;
     } catch {
-      return (inMemoryRides.get(stringId) || null) as unknown as R | null;
+      const inMem = inMemoryRides.get(stringId);
+      if (inMem && (!inMem.isDeleted || inMem.isDeleted === 0)) {
+        return inMem as unknown as R;
+      }
+      return null;
     }
   }
 
@@ -334,18 +363,18 @@ export class RideRepository extends BaseRepository<Ride> {
   async findByDriverId(driverId: string): Promise<RideRecord[]> {
     if (!this.isConnected) {
       return Array.from(inMemoryRides.values()).filter(
-        (r) => r.userId === driverId,
+        (r) => r.userId === driverId && (!r.isDeleted || r.isDeleted === 0),
       );
     }
     try {
       const rides = await this.repo.find({
-        where: { userId: driverId },
+        where: { userId: driverId, isDeleted: 0 },
         order: { createdAt: "DESC" },
       });
       return rides.map((ride) => this.toRideRecord(ride));
     } catch {
       return Array.from(inMemoryRides.values()).filter(
-        (r) => r.userId === driverId,
+        (r) => r.userId === driverId && (!r.isDeleted || r.isDeleted === 0),
       );
     }
   }
@@ -357,7 +386,10 @@ export class RideRepository extends BaseRepository<Ride> {
     if (!this.isConnected) {
       return Array.from(inMemoryRides.values()).filter(
         (r) =>
-          r.status === "active" &&
+          (!r.isDeleted || r.isDeleted === 0) &&
+          (r.status === "active" ||
+            r.status === "both_travelling" ||
+            r.status === "in_progress") &&
           (r.locationName?.toLowerCase().includes(locationName.toLowerCase()) ||
             r.from.toLowerCase().includes(locationName.toLowerCase()) ||
             r.to.toLowerCase().includes(locationName.toLowerCase())),
@@ -365,14 +397,21 @@ export class RideRepository extends BaseRepository<Ride> {
     }
     try {
       const rides = await this.repo.find({
-        where: { locationName, status: "active" },
+        where: [
+          { locationName, status: "active", isDeleted: 0 },
+          { locationName, status: "both_travelling", isDeleted: 0 },
+          { locationName, status: "in_progress", isDeleted: 0 },
+        ],
         order: { createdAt: "DESC" },
       });
       return rides.map((ride) => this.toRideRecord(ride));
     } catch {
       return Array.from(inMemoryRides.values()).filter(
         (r) =>
-          r.status === "active" &&
+          (!r.isDeleted || r.isDeleted === 0) &&
+          (r.status === "active" ||
+            r.status === "both_travelling" ||
+            r.status === "in_progress") &&
           (r.locationName?.toLowerCase().includes(locationName.toLowerCase()) ||
             r.from.toLowerCase().includes(locationName.toLowerCase()) ||
             r.to.toLowerCase().includes(locationName.toLowerCase())),
@@ -944,16 +983,27 @@ export class RideRepository extends BaseRepository<Ride> {
   }
 
   /**
-   * Delete ride
+   * Soft delete ride (sets isDeleted flag to 1 in DB)
    */
   async deleteRide(id: string) {
-    inMemoryRides.delete(id);
+    const inMem = inMemoryRides.get(id);
+    if (inMem) {
+      inMem.isDeleted = 1;
+      inMem.status = "cancelled";
+      inMem.updatedAt = new Date().toISOString();
+    }
     if (!this.isConnected) {
       return { affected: 1 };
     }
     try {
-      return await this.repo.delete(id);
-    } catch {
+      await this.repo.update(id, {
+        isDeleted: 1,
+        status: "cancelled",
+        updatedAt: new Date(),
+      } as any);
+      return { affected: 1 };
+    } catch (err) {
+      console.error("Soft delete in DB failed:", err);
       return { affected: 1 };
     }
   }
@@ -963,12 +1013,15 @@ export class RideRepository extends BaseRepository<Ride> {
    */
   async findByPassengerId(userId: string): Promise<RideRecord[]> {
     if (!this.isConnected) {
-      return Array.from(inMemoryRides.values()).filter((r) =>
-        r.passengers?.some((p) => p.userId === userId),
+      return Array.from(inMemoryRides.values()).filter(
+        (r) =>
+          (!r.isDeleted || r.isDeleted === 0) &&
+          r.passengers?.some((p) => p.userId === userId),
       );
     }
     try {
       const rides = await this.repo.find({
+        where: { isDeleted: 0 },
         order: {
           createdAt: "DESC",
         },
@@ -980,8 +1033,10 @@ export class RideRepository extends BaseRepository<Ride> {
 
       return passengerRides.map((ride) => this.toRideRecord(ride));
     } catch {
-      return Array.from(inMemoryRides.values()).filter((r) =>
-        r.passengers?.some((p) => p.userId === userId),
+      return Array.from(inMemoryRides.values()).filter(
+        (r) =>
+          (!r.isDeleted || r.isDeleted === 0) &&
+          r.passengers?.some((p) => p.userId === userId),
       );
     }
   }
