@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 12,
   },
   circleBackBtn: {
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.08)",
     marginHorizontal: 16,
     marginBottom: 14,
-    padding: 16,
+    padding: 8,
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#7C3AED",
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#059669",
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1002,7 +1002,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionBtnText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: "#F8FAFC",
   },
@@ -1019,7 +1019,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionBtnDangerText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: "#EF4444",
   },

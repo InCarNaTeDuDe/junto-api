@@ -1404,13 +1404,13 @@ export default function RidesScreen() {
               },
               {
                 id: "car",
-                label: "Cars Only",
+                label: "Cars",
                 count: carsCount,
                 icon: "car-sport",
               },
               {
                 id: "bike",
-                label: "Bikes Only",
+                label: "Bikes",
                 count: bikesCount,
                 icon: "bicycle",
               },
@@ -1816,7 +1816,9 @@ export default function RidesScreen() {
                             { color: textPrimary },
                           ]}
                         >
-                          {ride.driverName.slice(0, 15) + ".."}{" "}
+                          {ride.driverName.length > 15
+                            ? `${ride.driverName.substring(0, 15)}..`
+                            : ride.driverName}{" "}
                           {isOwner ? "(You)" : ""}
                         </Text>
                         {/* <View style={styles.ratingAndReviewsRow}>

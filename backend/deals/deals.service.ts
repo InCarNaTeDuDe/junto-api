@@ -7,6 +7,7 @@ import {
 } from "./deals.schema";
 import { io } from "../socket/socket";
 import { dealsRepository } from "../repositories/Deals.repository";
+import { messageRepository } from "../repositories";
 
 export interface DealRecord {
   id: string;
@@ -60,19 +61,57 @@ function isValidUuid(val?: string): boolean {
 export async function listDeals(
   query: Partial<QueryDealsInput> = {},
 ): Promise<DealRecord[]> {
-  const deals = await dealsRepository.findAll();
+  const deals = await dealsRepository.findAll({
+    relations: {
+      user: true,
+    },
+    select: {
+      // LocalDeal fields...
+      id: true,
+      userId: true,
+      title: true,
+      description: true,
+      businessName: true,
+      sellerName: true,
+      sellerPhone: true,
+      sellerAvatarBg: true,
+      sellerRating: true,
+      category: true,
+      price: true,
+      originalPrice: true,
+      dealPrice: true,
+      condition: true,
+      locationName: true,
+      distance: true,
+      latitude: true,
+      longitude: true,
+      image: true,
+      verified: true,
+      views: true,
+      status: true,
+      inquiries: true,
+      createdAt: true,
+      updatedAt: true,
+
+      user: {
+        userHandle: true,
+      },
+    },
+  });
+
   let records = deals.map((d) => dealsRepository.toRecord(d));
 
   records = records.filter((d) => d.status === "available");
 
   if (query.category && query.category !== "All") {
-    records = records.filter(
-      (d) => d.category.toLowerCase() === query.category.toLowerCase(),
-    );
+    const category = query.category.toLowerCase();
+
+    records = records.filter((d) => d.category.toLowerCase() === category);
   }
 
   if (query.search) {
     const term = query.search.toLowerCase();
+
     records = records.filter(
       (d) =>
         d.title.toLowerCase().includes(term) ||
@@ -86,9 +125,9 @@ export async function listDeals(
     records = records.filter((d) => d.condition === query.condition);
   }
 
-  return records.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  // No sort here.
+  // dealsRepository.findAll() already returns createdAt DESC.
+  return records;
 }
 
 export async function getDealById(id: string): Promise<DealRecord | null> {
@@ -151,16 +190,34 @@ export async function createDeal(
   return newDeal;
 }
 
-export async function contactSeller(dealId: string, input: ContactSellerInput) {
+export async function contactSeller(
+  dealId: string,
+  input: ContactSellerInput,
+  user: User,
+): Promise<{
+  success: boolean;
+  message: string;
+  inquiry: any;
+}> {
   const deal = await dealsRepository.findById(dealId);
+
   if (!deal) {
     throw new Error("Deal not found");
   }
 
+  console.log("Creating deal message:", {
+    dealId: deal.id,
+    senderId: user.id,
+    participantId: deal.userId,
+    content: input.message,
+  });
+
   const inquiry = {
     id: `inq_${Date.now()}`,
+    buyerId: user.id,
     buyerName: input.buyerName,
     buyerPhone: input.buyerPhone,
+    buyerAvatar: user.avatar || user.profileImage || "",
     message: input.message,
     offeredPrice: input.offeredPrice,
     createdAt: new Date().toISOString(),
@@ -169,11 +226,49 @@ export async function contactSeller(dealId: string, input: ContactSellerInput) {
   const currentInquiries = Array.isArray(deal.inquiries)
     ? [...deal.inquiries]
     : [];
+
   currentInquiries.push(inquiry);
 
-  await dealsRepository.update(deal.id, { inquiries: currentInquiries });
+  console.log("Saving inquiries:", {
+    dealId: deal.id,
+    count: currentInquiries.length,
+    inquiries: currentInquiries,
+  });
 
-  const record = dealsRepository.toRecord(deal);
+  const updateResult = await dealsRepository.update(deal.id, {
+    inquiries: currentInquiries,
+  });
+
+  console.log("Inquiry update result:", {
+    dealId: deal.id,
+    affected: updateResult.affected,
+  });
+
+  const updatedDeal = await dealsRepository.findById(deal.id);
+
+  console.log("Deal after inquiry update:", {
+    dealId: deal.id,
+    inquiryCount: updatedDeal?.inquiries?.length,
+    inquiries: updatedDeal?.inquiries,
+  });
+
+  // First chat message for this LocalDeal
+  const chatContent = [
+    `Hey, I'm interested in buying your ${deal.title}`,
+    input.offeredPrice ? `for ${input.offeredPrice}` : "",
+    input.message?.match(/Preferred pickup:.*$/i)?.[0] || "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  await messageRepository.createMessage({
+    dealId: deal.id,
+    senderId: user.id,
+    participantId: deal.userId,
+    content: chatContent,
+  });
+
+  const record = dealsRepository.toRecord(updatedDeal || deal);
 
   if (io) {
     io.to(`user:${record.sellerId}`).emit("deal_inquiry", {

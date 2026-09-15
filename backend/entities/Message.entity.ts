@@ -12,23 +12,37 @@ import {
 
 import { User } from "./User.entity";
 import { Activity } from "./Activity.entity";
-
+import { LocalDeal } from "./LocalDeals.entity";
 @Entity("messages")
 export class Message {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
   @Index()
-  @Column({ type: "uuid" })
-  activityId!: string;
+  @Column({ type: "uuid", nullable: true })
+  activityId?: string | null;
 
   @ManyToOne(() => Activity, (activity) => activity.messages, {
     onDelete: "CASCADE",
+    nullable: true,
   })
   @JoinColumn({
     name: "activityId",
   })
-  activity!: Activity;
+  activity?: Activity | null;
+
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  dealId?: string | null;
+
+  @ManyToOne(() => LocalDeal, {
+    onDelete: "CASCADE",
+    nullable: true,
+  })
+  @JoinColumn({
+    name: "dealId",
+  })
+  deal?: LocalDeal | null;
 
   @Index()
   @Column({ type: "uuid" })

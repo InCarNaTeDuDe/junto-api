@@ -1,9 +1,14 @@
 import { z } from "zod";
 
-export const GetMessagesSchema = z.object({
-  activityId: z.string().min(1, "activityId is required"),
-  participantId: z.string().optional(),
-});
+export const GetMessagesSchema = z
+  .object({
+    activityId: z.string().min(1).optional(),
+    dealId: z.string().min(1).optional(),
+    participantId: z.string().optional(),
+  })
+  .refine((data) => !!data.activityId || !!data.dealId, {
+    message: "Either activityId or dealId is required",
+  });
 
 export const SendMessageSchema = z
   .object({

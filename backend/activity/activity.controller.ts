@@ -10,6 +10,7 @@ import {
   deleteActivity,
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
+import { dealsRepository } from "../repositories";
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
@@ -110,13 +111,27 @@ export async function getActivityById(
 ) {
   try {
     const { id } = req.params;
-    const activity = await activityRepository.findById(id);
-    if (!activity) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Activity not found" });
+    const { entityType = "ACTIVITY" } = req.query;
+
+    let entity;
+
+    if (entityType === "LOCAL_DEALS") {
+      entity = await dealsRepository.findById(id);
+    } else {
+      entity = await activityRepository.findById(id);
     }
-    return res.status(200).json({ success: true, activity });
+
+    if (!entity) {
+      return res.status(404).json({
+        success: false,
+        message: `${entityType} not found`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      entity,
+    });
   } catch (error) {
     next(error);
   }

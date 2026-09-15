@@ -114,8 +114,10 @@ export class LocalDeal {
   })
   inquiries!: Array<{
     id: string;
+    buyerId: string;
     buyerName: string;
     buyerPhone: string;
+    buyerAvatar?: string;
     message: string;
     offeredPrice?: string;
     createdAt: string;

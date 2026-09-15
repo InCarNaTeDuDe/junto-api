@@ -38,8 +38,13 @@ import AskNearbyScreen from "../(screens)/ask-nearby";
 
 /* ---------------- Types & data ---------------- */
 
-type OptionId = "day_mates" | "sell_ticket" | "host_event" | "ask_nearby";
-type PaletteKey = "dayMate" | "ticket" | "event" | "question";
+type OptionId =
+  | "day_mates"
+  | "sell_ticket"
+  | "host_event"
+  | "ask_nearby"
+  | "ride_mates";
+type PaletteKey = "dayMate" | "ticket" | "event" | "question" | "rideMate";
 
 type OptionDef = {
   id: OptionId;
@@ -64,13 +69,20 @@ const OPTIONS: OptionDef[] = [
     icon: "ticket",
     key: "ticket",
   },
-  {
-    id: "host_event",
-    title: "Host Event",
-    description: "Organize pub crawls, turf games, or community mixers.",
-    icon: "sparkles",
-    key: "event",
-  },
+  // {
+  //   id: "host_event",
+  //   title: "Host Event",
+  //   description: "Organize pub crawls, turf games, or community mixers.",
+  //   icon: "sparkles",
+  //   key: "event",
+  // },
+  // {
+  //   id: "ride_mates",
+  //   title: "Find Ride Mates",
+  //   description: "Share rides and save money with people heading the same way.",
+  //   icon: "car",
+  //   key: "rideMate",
+  // },
   {
     id: "ask_nearby",
     title: "Ask Something Nearby",
@@ -118,6 +130,12 @@ function getPalettes(t: Theme, isDark: boolean) {
       icon: t.error,
       arrow: t.error,
     },
+    // rideMate: {
+    //   bg: soft(t.error, 0.14),
+    //   circle: soft(t.error, 0.28),
+    //   icon: t.error,
+    //   arrow: t.error,
+    // },
     question: {
       bg: soft(t.info),
       circle: soft(t.info, 0.25),

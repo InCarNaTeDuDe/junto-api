@@ -29,8 +29,12 @@ interface Message {
 
 export default function ActivityChatScreen() {
   const params = useLocalSearchParams<{
+    entityId?: string;
+    entityType?: string;
+
     activityId?: string;
     id?: string;
+
     title?: string;
     user?: string;
     userId?: string;
@@ -45,27 +49,43 @@ export default function ActivityChatScreen() {
     activityEmoji?: string;
     emoji?: string;
     image?: string;
+    inquiryId?: string;
   }>();
 
   const { user } = useAuthContext();
   const { theme: t, isDark } = useTheme();
   const s = React.useMemo(() => createStyles(t, isDark), [t, isDark]);
 
-  const chatId = params.activityId || params.id;
+  const entityId = params.entityId || params.activityId || params.id;
+
+  const entityType = params.entityType || params.type || "ACTIVITY";
+
+  const chatId = entityId; // For now, we use the entityId as the chatId. In future, this can be a separate chatId if needed.
   const [activityDetail, setActivityDetail] = useState<any>(null);
 
   useEffect(() => {
-    if (!chatId) return;
-    ApiService.get<any>(`/api/activity/${chatId}`)
-      .then((res) => {
+    if (!entityId) return;
+
+    const loadEntity = async () => {
+      try {
+        console.log("🔎 Loading chat entity:", entityId, entityType);
+
+        const res = await ApiService.get<any>(
+          `/api/activity/${entityId}?entityType=${encodeURIComponent(entityType)}`,
+        );
+
+        console.log("🔎 Chat entity response:", res);
+
         if (res?.success && res.activity) {
           setActivityDetail(res.activity);
         }
-      })
-      .catch((err) => {
-        // Safe fallback if not found in db or is mock
-      });
-  }, [chatId]);
+      } catch (err) {
+        console.log("Failed to load chat entity:", err);
+      }
+    };
+
+    loadEntity();
+  }, [entityId, entityType]);
 
   const organizerId =
     params.organizerId ||
@@ -142,9 +162,15 @@ export default function ActivityChatScreen() {
       const targetPartnerId =
         params.participantId ||
         (organizerId && organizerId !== user?.id ? organizerId : undefined);
+
+      const queryParam =
+        entityType === "LOCAL_DEALS"
+          ? `dealId=${entityId}`
+          : `activityId=${entityId}`;
+
       const query = targetPartnerId
-        ? `/api/messages?activityId=${chatId}&participantId=${targetPartnerId}`
-        : `/api/messages?activityId=${chatId}`;
+        ? `/api/messages?${queryParam}&participantId=${targetPartnerId}`
+        : `/api/messages?${queryParam}`;
       const res = await ApiService.get<any>(query);
       const mapped = res.messages.map((m: any) => ({
         id: m.id,

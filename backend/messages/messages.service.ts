@@ -4,6 +4,7 @@ import { ActivityRepository } from "../repositories/Activity.repository";
 import { ActivityCategory } from "../entities/Activity.entity";
 import { User } from "../entities/User.entity";
 import { sendPushNotification } from "../notifications/notifications.service";
+import { dealsRepository } from "../repositories";
 
 const messageRepo = new MessageRepository();
 const userRepo = new UserRepository();
@@ -100,6 +101,63 @@ export async function fetchMessages(
       name: msg.sender?.name || "Junto User",
       avatar: msg.sender?.avatar || DEFAULT_AVATAR,
     },
+    content: msg.content,
+    image: msg.image || null,
+    timestamp: msg.timestamp,
+  }));
+}
+
+export async function fetchDealMessages(
+  dealId: string,
+  userId?: string,
+  targetParticipantId?: string | null,
+) {
+  const msgs = await messageRepo.findByDealId(dealId);
+
+  if (!userId || userId === "guest-user") {
+    return msgs.map((msg) => ({
+      id: msg.id,
+      dealId: msg.dealId,
+      senderId: msg.senderId,
+      participantId: msg.participantId || null,
+
+      sender: {
+        id: msg.sender?.id || msg.senderId || "unknown",
+        name: msg.sender?.name || "Junto User",
+        avatar: msg.sender?.avatar || DEFAULT_AVATAR,
+      },
+
+      content: msg.content,
+      image: msg.image || null,
+      timestamp: msg.timestamp,
+    }));
+  }
+
+  const partnerId = targetParticipantId;
+
+  const filtered = msgs.filter((msg) => {
+    if (!partnerId) {
+      return msg.senderId === userId || msg.participantId === userId;
+    }
+
+    return (
+      (msg.senderId === userId && msg.participantId === partnerId) ||
+      (msg.senderId === partnerId && msg.participantId === userId)
+    );
+  });
+
+  return filtered.map((msg) => ({
+    id: msg.id,
+    dealId: msg.dealId,
+    senderId: msg.senderId,
+    participantId: msg.participantId || null,
+
+    sender: {
+      id: msg.sender?.id || msg.senderId || "unknown",
+      name: msg.sender?.name || "Junto User",
+      avatar: msg.sender?.avatar || DEFAULT_AVATAR,
+    },
+
     content: msg.content,
     image: msg.image || null,
     timestamp: msg.timestamp,
@@ -209,176 +267,162 @@ function formatCategoryLabel(
 
 export async function fetchUserChannels(userId: string) {
   try {
-    const allActivities = await activityRepo.findAll();
-    const activityMap = new Map<string, any>();
-    allActivities.forEach((act) => activityMap.set(act.id, act));
+    const messages = await messageRepo.findChannelMessages(userId);
 
-    // Get all messages where userId was sender or recipient
-    const userMessages = await messageRepo
-      .findUserMessages(userId)
-      .catch(() => []);
-
-    // Also get messages for activities organized by userId
-    const myOrganizedActivities = allActivities.filter(
-      (a) => a.organizerId === userId,
-    );
-    const organizedActivityMessages = await Promise.all(
-      myOrganizedActivities.map((act) =>
-        messageRepo.findByActivityId(act.id).catch(() => []),
-      ),
-    );
-
-    // Merge and deduplicate all candidate messages
-    const allRelevantMsgsMap = new Map<string, any>();
-    userMessages.forEach((m) => allRelevantMsgsMap.set(m.id, m));
-    organizedActivityMessages
-      .flat()
-      .forEach((m) => allRelevantMsgsMap.set(m.id, m));
-    const allCandidateMsgs = Array.from(allRelevantMsgsMap.values());
-
-    const userCache = new Map<string, User | null>();
-    const getUser = async (id: string): Promise<User | null> => {
-      if (!id) return null;
-      if (userCache.has(id)) return userCache.get(id)!;
-      const user = await userRepo.findById(id).catch(() => null);
-      userCache.set(id, user);
-      return user;
-    };
-
-    // Group messages into distinct 2-party conversations: convKey = `${act.id}:${partnerId}`
-    const conversationMap = new Map<
+    const conversations = new Map<
       string,
       {
-        activity: any;
+        entity: any;
+        entityType: "ACTIVITY" | "LOCAL_DEALS";
         partnerId: string;
         messages: any[];
       }
     >();
 
-    for (const msg of allCandidateMsgs) {
-      const act = activityMap.get(msg.activityId);
-      if (!act) continue;
+    for (const message of messages) {
+      const isDeal = !!message.dealId;
 
-      let partnerId: string | null = null;
-      if (msg.senderId === userId) {
-        partnerId =
-          msg.participantId ||
-          (act.organizerId !== userId ? act.organizerId : null);
-      } else {
-        // Message sent by another user: only relevant if addressed to userId or userId is the organizer
-        if (msg.participantId && msg.participantId !== userId) {
-          continue; // Private to someone else!
-        }
-        if (act.organizerId === userId || msg.participantId === userId) {
-          partnerId = msg.senderId;
-        }
-      }
+      const entity = isDeal ? message.deal : message.activity;
+
+      if (!entity) continue;
+
+      const ownerId = isDeal ? entity.userId : entity.organizerId;
+
+      const partnerId =
+        message.senderId === userId
+          ? message.participantId || ownerId
+          : message.senderId;
 
       if (!partnerId || partnerId === userId) continue;
 
-      const convKey = `${act.id}:${partnerId}`;
-      if (!conversationMap.has(convKey)) {
-        conversationMap.set(convKey, {
-          activity: act,
+      const entityType = isDeal ? "LOCAL_DEALS" : "ACTIVITY";
+
+      const key = `${entityType}:${entity.id}:${partnerId}`;
+
+      if (!conversations.has(key)) {
+        conversations.set(key, {
+          entity,
+          entityType,
           partnerId,
           messages: [],
         });
       }
-      conversationMap.get(convKey)!.messages.push(msg);
+
+      conversations.get(key)!.messages.push(message);
     }
 
-    // For activities the user joined as a participant but hasn't chatted yet, allow a fresh channel with organizer
-    for (const act of allActivities) {
-      if (
-        act.participantIds?.includes(userId) &&
-        act.organizerId &&
-        act.organizerId !== userId
-      ) {
-        const convKey = `${act.id}:${act.organizerId}`;
-        if (!conversationMap.has(convKey)) {
-          conversationMap.set(convKey, {
-            activity: act,
-            partnerId: act.organizerId,
-            messages: [],
-          });
-        }
-      }
-    }
+    return Array.from(conversations.values()).map(
+      ({ entity, entityType, partnerId, messages }) => {
+        // find newest message
+        const lastMessage = messages.reduce((latest, current) => {
+          if (!latest) return current;
 
-    // Build channel list from the conversations
-    const channels = await Promise.all(
-      Array.from(conversationMap.values()).map(
-        async ({ activity: act, partnerId, messages }) => {
-          const partnerUser = await getUser(partnerId);
-          messages.sort(
-            (a, b) =>
-              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-          );
-          const lastMsg =
-            messages.length > 0 ? messages[messages.length - 1] : null;
+          return new Date(current.timestamp).getTime() >
+            new Date(latest.timestamp).getTime()
+            ? current
+            : latest;
+        }, messages[0]);
 
-          const lastRead =
-            readChannelsStore.get(`${userId}:${act.id}:${partnerId}`) ||
-            readChannelsStore.get(`${userId}:${act.id}`) ||
-            0;
+        const partner =
+          lastMessage.senderId === userId
+            ? lastMessage.participant
+            : lastMessage.sender;
 
-          const unread = messages.filter(
-            (m) =>
-              m.senderId !== userId &&
-              new Date(m.timestamp).getTime() > lastRead,
-          ).length;
+        const partnerName = partner?.name || "Neighbor";
 
-          const emoji =
-            act.activityEmoji || getDefaultEmoji(act.category, act.title);
-          const partnerName = partnerUser?.name || "Neighbor";
-          const partnerAvatar = partnerUser?.avatar || null;
-          const logoAvatar =
-            partnerAvatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName)}&background=8B5CF6&color=fff`;
+        const partnerAvatar = partner?.avatar || null;
 
-          return {
-            id: act.id,
-            channelId: `${act.id}_${partnerId}`,
-            activityId: act.id,
-            name: act.title,
-            activityEmoji: emoji,
-            avatar: logoAvatar,
+        const avatar =
+          partnerAvatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
             partnerName,
-            partnerAvatar: partnerAvatar || logoAvatar,
-            partnerUrl: partnerAvatar || logoAvatar,
-            participantId: partnerId,
-            type: formatCategoryLabel(act.category),
-            category: formatCategoryLabel(act.category),
-            subtitle: lastMsg
-              ? lastMsg.content ||
-                (lastMsg.image ? "📷 Photo" : "Tap to open chat")
-              : "Tap to open chat",
-            lastMessage: lastMsg
-              ? lastMsg.content ||
-                (lastMsg.image ? "📷 Photo" : "Tap to open chat")
-              : "Tap to open chat",
-            lastTime: lastMsg
-              ? new Date(lastMsg.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "Active",
-            lastTimestamp: lastMsg ? new Date(lastMsg.timestamp).getTime() : 0,
-            organizerId: act.organizerId,
-            participantIds: act.participantIds || [],
-            locationName: act.locationName,
-            image: act.image || null,
-            unreadCount: unread,
-            isOnline: true,
-          };
-        },
-      ),
-    );
+          )}&background=8B5CF6&color=fff`;
 
-    // Sort by latest message descending
-    return channels.sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+        const isDeal = entityType === "LOCAL_DEALS";
+
+        const unreadCount = messages.filter(
+          (message) => message.senderId !== userId,
+        ).length;
+
+        /**
+         * IMPORTANT:
+         * Local Deals must NEVER inherit entity.category.
+         *
+         * A deal may have category values such as DAY_MATES,
+         * but that does not mean the conversation is a Day Mate.
+         */
+        const channelType = isDeal
+          ? "Local Deals"
+          : formatCategoryLabel(entity.category || "Activity");
+
+        return {
+          id: entity.id,
+
+          channelId: `${entityType}_${entity.id}_${partnerId}`,
+
+          // Canonical universal-chat fields
+          entityId: entity.id,
+          entityType,
+
+          // Keep this only for old frontend code.
+          // Do NOT use a deal ID as activityId.
+          activityId: isDeal ? undefined : entity.id,
+
+          name: entity.title,
+
+          activityEmoji: isDeal
+            ? "🏷️"
+            : entity.activityEmoji ||
+              getDefaultEmoji(entity.category, entity.title),
+
+          avatar,
+
+          partnerName,
+          partnerAvatar: partnerAvatar || avatar,
+          partnerUrl: partnerAvatar || avatar,
+
+          participantId: partnerId,
+
+          // Correct category for the conversation
+          type: channelType,
+          category: channelType,
+
+          subtitle:
+            lastMessage?.content ||
+            (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
+
+          lastMessage:
+            lastMessage?.content ||
+            (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
+
+          lastTime: lastMessage
+            ? new Date(lastMessage.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Active",
+
+          lastTimestamp: lastMessage
+            ? new Date(lastMessage.timestamp).getTime()
+            : 0,
+
+          organizerId: isDeal ? entity.userId : entity.organizerId,
+
+          participantIds: isDeal ? [] : entity.participantIds || [],
+
+          locationName: entity.locationName,
+
+          image: entity.image || null,
+
+          unreadCount,
+
+          isOnline: true,
+        };
+      },
+    );
   } catch (err) {
-    console.error("Error building user activity channels:", err);
+    console.error("Error building user channels:", err);
+
     return [];
   }
 }

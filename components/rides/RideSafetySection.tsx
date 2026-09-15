@@ -274,7 +274,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
         </TouchableOpacity>
 
         {/* 4. Junto Chat */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={[
             styles.secondaryControlBtn,
             { backgroundColor: bgInner, borderColor },
@@ -295,7 +295,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
               Driver & Co-Rider Chat
             </Text>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* State Transitions: Start Trip or Complete Ride */}
@@ -422,8 +422,8 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
-    borderWidth: 1.5,
-    padding: 14,
+    // borderWidth: 1.5,
+    // padding: 14,
     marginVertical: 10,
   },
   topStatusBanner: {

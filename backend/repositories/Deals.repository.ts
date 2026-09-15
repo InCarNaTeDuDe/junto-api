@@ -19,34 +19,51 @@ export class DealsRepository extends BaseRepository<LocalDeal> {
       id: deal.id,
       sellerId: deal.userId || deal.id,
       userId: deal.userId,
+
       title: deal.title,
       category: (deal.category || "General") as any,
+
       price: deal.price || (deal.dealPrice ? `₹${deal.dealPrice}` : "₹0"),
+
       originalPrice: deal.originalPrice ? `₹${deal.originalPrice}` : undefined,
+
       condition: (deal.condition || "Like New") as any,
+
       location: deal.locationName || "Local Area",
       distance: deal.distance || "",
-      sellerName: deal.sellerName || deal.businessName || "Local Neighbor",
+
+      sellerName:
+        deal.user?.name ||
+        deal.sellerName ||
+        deal.businessName ||
+        "Local Neighbor",
+
       sellerRating: Number(deal.sellerRating || 5.0),
       sellerPhone: deal.sellerPhone || "",
       sellerAvatarBg: deal.sellerAvatarBg || "#3B82F6",
+
       verified: deal.verified ?? true,
+
       postedTime: deal.createdAt
         ? new Date(deal.createdAt).toLocaleDateString()
         : "Recently",
+
       image:
         deal.image ||
         "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500",
+
       description: deal.description || "",
       views: Number(deal.views || 1),
+
       status: (deal.status || "available") as any,
+
       inquiries: deal.inquiries || [],
+
       createdAt: deal.createdAt
         ? new Date(deal.createdAt).toISOString()
         : new Date().toISOString(),
     };
   }
-
   override async findAll(
     options?: FindManyOptions<LocalDeal>,
   ): Promise<LocalDeal[]> {

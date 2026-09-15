@@ -79,6 +79,7 @@ export async function contactSellerHandler(
     const result = await contactSeller(
       req.params.id,
       req.body as ContactSellerInput,
+      req.user,
     );
     return res.status(200).json(result);
   } catch (err) {

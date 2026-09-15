@@ -297,8 +297,8 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
 const styles = StyleSheet.create({
   fullContainer: {
     borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
+    // borderWidth: 1,
+    // padding: 8,
     marginVertical: 8,
   },
   highlightBanner: {

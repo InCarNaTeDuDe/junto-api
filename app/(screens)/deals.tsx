@@ -162,6 +162,11 @@ export default function LocalDealsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
 
+  const [offerSuccess, setOfferSuccess] = useState<{
+    deal: DealItem;
+    inquiry?: any;
+  } | null>(null);
+
   const checkIsDealOwner = useCallback(
     (deal: DealItem) => {
       if (!deal) return false;
@@ -199,33 +204,14 @@ export default function LocalDealsScreen() {
   const fetchDeals = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await ApiService.get<{ success: boolean; data: any[] }>(
-        "/api/deals",
-      );
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped: DealItem[] = res.data.map((d) => ({
-          id: d.id,
-          sellerId: d.sellerId || d.userId,
-          userId: d.userId || d.sellerId,
-          title: d.title,
-          category: d.category,
-          price: d.price,
-          originalPrice: d.originalPrice,
-          condition: d.condition || "Like New",
-          location: d.location || "Madhapur, Hyderabad",
-          distance: d.distance || "1.2 km away",
-          sellerName: d.sellerName || "Local Neighbor",
-          sellerRating: d.sellerRating || 4.9,
-          sellerPhone: d.sellerPhone || "+91 98480 23456",
-          sellerAvatarBg: d.sellerAvatarBg || "#3B82F6",
-          verified: d.verified ?? true,
-          postedTime: d.postedTime || "Recently",
-          image:
-            d.image || CATEGORY_IMAGES[d.category] || CATEGORY_IMAGES.General,
-          description: d.description || "",
-          views: d.views || 1,
-        }));
-        setDealsList(mapped);
+
+      const res = await ApiService.get<{
+        success: boolean;
+        data: DealItem[];
+      }>("/api/deals");
+
+      if (res?.success && Array.isArray(res.data)) {
+        setDealsList(res.data);
       }
     } catch (err) {
       console.log("Using cached deals:", err);
@@ -883,39 +869,57 @@ export default function LocalDealsScreen() {
   };
 
   const handleSendOffer = async () => {
-    if (selectedDealForAction) {
-      if (checkIsDealOwner(selectedDealForAction)) {
-        Alert.alert("Notice", "You are the seller of this listing.");
-        setSelectedDealForAction(null);
-        return;
-      }
-      try {
-        await ApiService.post(
-          `/api/deals/${selectedDealForAction.id}/contact`,
-          {
-            buyerName: "You (Neighbor)",
-            buyerPhone: "+91 98765 00000",
-            message: `I'm interested in ${selectedDealForAction.title}. Preferred pickup: ${formattedPickup}.`,
-            offeredPrice: offerPrice || selectedDealForAction.price,
-            preferredPickupTime: formattedPickup,
-          },
-        );
-      } catch (err) {
-        console.log("Offer dispatched optimistically");
-      }
-    }
-    setOfferSuccessModal(true);
-  };
+    if (!selectedDealForAction) return;
 
+    if (checkIsDealOwner(selectedDealForAction)) {
+      Alert.alert("Notice", "You are the seller of this listing.");
+      setSelectedDealForAction(null);
+      return;
+    }
+
+    const deal = selectedDealForAction;
+
+    try {
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        inquiry?: any;
+      }>(`/api/deals/${deal.id}/contact`, {
+        buyerName: "You (Neighbor)",
+        buyerPhone: "+91 98765 00000",
+        message: `I'm interested in ${deal.title}. Preferred pickup: ${formattedPickup}.`,
+        offeredPrice: offerPrice || deal.price,
+        preferredPickupTime: formattedPickup,
+      });
+
+      if (res?.success) {
+        setOfferSuccess({
+          deal,
+          inquiry: res.inquiry,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send offer:", err);
+
+      Alert.alert(
+        "Offer failed",
+        "Could not send your offer. Please try again.",
+      );
+    }
+  };
   const filteredDeals = dealsList.filter((deal) => {
+    const query = searchQuery.trim().toLowerCase();
+
     const matchesCat =
       activeCategory === "all" || deal.category === activeCategory;
+
     const matchesQuery =
-      !searchQuery.trim() ||
-      deal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      deal.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      deal.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      deal.description.toLowerCase().includes(searchQuery.toLowerCase());
+      !query ||
+      deal.title?.toLowerCase().includes(query) ||
+      deal.category?.toLowerCase().includes(query) ||
+      deal.location?.toLowerCase().includes(query) ||
+      deal.description?.toLowerCase().includes(query);
+
     return matchesCat && matchesQuery;
   });
 
@@ -1399,20 +1403,59 @@ export default function LocalDealsScreen() {
 
                       <TouchableOpacity
                         style={[styles.chatBtn, { borderColor: "#F59E0B" }]}
-                        onPress={() => router.push("/(tabs)/chats")}
+                        onPress={() => {
+                          console.log(
+                            "OPENING DEAL CHAT",
+                            JSON.stringify(deal, null, 2),
+                          );
+
+                          const dealId = deal?.id;
+                          const sellerId = deal?.sellerId || deal?.userId;
+
+                          if (!dealId || !sellerId) {
+                            console.log("Invalid deal for chat:", {
+                              dealId,
+                              sellerId,
+                              deal,
+                            });
+                            return;
+                          }
+
+                          router.push({
+                            pathname: "/(screens)/activity-chat",
+                            params: {
+                              entityId: String(dealId),
+                              entityType: "LOCAL_DEALS",
+
+                              participantId: String(sellerId),
+                              userId: String(sellerId),
+
+                              name: deal.sellerName || "Seller",
+                              user: deal.sellerName || "Seller",
+
+                              title: deal.title || "Local Deal",
+                              contextTitle: deal.title || "Local Deal",
+
+                              place: deal.location || "Nearby",
+
+                              activityEmoji: "🏷️",
+                              image: deal.image || "",
+                            },
+                          });
+                        }}
                       >
                         <Ionicons
                           name="chatbubble-ellipses"
                           size={13}
                           color="#D97706"
                         />
+
                         <Text
                           style={[styles.chatBtnText, { color: "#D97706" }]}
                         >
                           Chat
                         </Text>
                       </TouchableOpacity>
-
                       <TouchableOpacity
                         style={styles.offerBtn}
                         onPress={() => {
@@ -2412,31 +2455,80 @@ export default function LocalDealsScreen() {
 
       {/* Offer Sent Success Modal */}
       <Modal
-        visible={offerSuccessModal}
-        transparent={true}
+        visible={!!offerSuccess}
+        transparent
         animationType="fade"
-        onRequestClose={() => setOfferSuccessModal(false)}
+        onRequestClose={() => setOfferSuccess(null)}
       >
         <View style={styles.modalBackdrop}>
           <View
             style={[
               styles.successModalCard,
-              { backgroundColor: cardBg, borderColor: border },
+              {
+                backgroundColor: cardBg,
+                borderColor: border,
+              },
             ]}
           >
             <View style={styles.successIcon}>
               <Ionicons name="checkmark-done" size={32} color="#10B981" />
             </View>
+
             <Text style={[styles.successTitle, { color: textPrimary }]}>
               Offer Sent!
             </Text>
+
             <Text style={[styles.successDesc, { color: textMute }]}>
-              The seller was notified of your offer of {offerPrice}. Check your
-              chats for their response.
+              The seller was notified of your offer of {offerPrice}.
             </Text>
+
+            {/* Chat with seller */}
+            <TouchableOpacity
+              style={[styles.chatBtn, { borderColor: "#F59E0B" }]}
+              onPress={() => {
+                const deal = offerSuccess?.deal;
+
+                console.log("OPENING DEAL CHAT:", deal);
+
+                if (!deal?.id || !deal?.sellerId) {
+                  console.log("Invalid deal:", deal);
+                  return;
+                }
+
+                setOfferSuccess(null);
+
+                router.push({
+                  pathname: "/(screens)/activity-chat",
+                  params: {
+                    entityId: String(deal.id),
+                    entityType: "LOCAL_DEALS",
+                    participantId: String(deal.sellerId),
+
+                    name: deal.sellerName || "Seller",
+                    user: deal.sellerName || "Seller",
+                    userId: String(deal.sellerId),
+
+                    title: deal.title,
+                    contextTitle: deal.title,
+                    place: deal.location || "Nearby",
+
+                    activityEmoji: "🏷️",
+                    image: deal.image || "",
+                  },
+                });
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses" size={13} color="#D97706" />
+
+              <Text style={[styles.chatBtnText, { color: "#D97706" }]}>
+                Chat
+              </Text>
+            </TouchableOpacity>
+
+            {/* Just close */}
             <TouchableOpacity
               style={styles.successDoneBtn}
-              onPress={() => setOfferSuccessModal(false)}
+              onPress={() => setOfferSuccessData(null)}
             >
               <Text style={styles.successDoneText}>Got it</Text>
             </TouchableOpacity>
