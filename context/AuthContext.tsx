@@ -54,6 +54,7 @@ import {
   addNotificationToStore,
   fetchNotificationsFromApi,
 } from "@/hooks/useStore";
+import { signOutFromGoogle } from "@/services/googleAuth";
 
 export interface UserData {
   // accessToken: string | null;
@@ -66,6 +67,11 @@ export interface UserData {
   walletBalance: number;
   jwtToken: string;
   userHandle: string;
+  location?: string;
+  city?: string;
+  state?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 type AuthContextValue = {
@@ -135,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     setUser(null); //The UI updates immediately instead of waiting for storage.
     await removeJwtToken();
+    await signOutFromGoogle().catch(() => {});
   }, []);
 
   const fetchCurrentUser = useCallback(async (): Promise<UserData | null> => {

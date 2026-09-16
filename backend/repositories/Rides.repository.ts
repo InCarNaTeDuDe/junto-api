@@ -47,6 +47,8 @@ export interface RideRecord {
     passengerPhone?: string;
     status?: "pending" | "confirmed" | "declined";
     isTravelling?: boolean;
+    otp?: string;
+    otpVerified?: boolean;
     joinedAt: string;
   }>;
 
@@ -130,6 +132,20 @@ for (const r of initialSeedRides) {
   inMemoryRides.set(r.id, r);
 }
 
+export function generateOtpForPassenger(
+  rideId: string,
+  userId: string,
+): string {
+  let hash = 0;
+  const str = `${rideId}:${userId}:ride-otp`;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const code = (Math.abs(hash) % 9000) + 1000;
+  return String(code);
+}
+
 export class RideRepository extends BaseRepository<Ride> {
   constructor() {
     super(Ride);
@@ -182,6 +198,10 @@ export class RideRepository extends BaseRepository<Ride> {
         pickupPoint: passenger.pickupPoint,
         passengerPhone: passenger.passengerPhone,
         status: passenger.status || "pending",
+        isTravelling: passenger.isTravelling ?? false,
+        otp:
+          passenger.otp || generateOtpForPassenger(ride.id, passenger.userId),
+        otpVerified: passenger.otpVerified ?? false,
         joinedAt: passenger.joinedAt,
       })),
 
@@ -425,6 +445,8 @@ export class RideRepository extends BaseRepository<Ride> {
         pickupPoint: passenger.pickupPoint,
         passengerPhone: passenger.passengerPhone,
         status: "pending",
+        otp: generateOtpForPassenger(id, passenger.userId),
+        otpVerified: false,
         joinedAt: new Date().toISOString(),
       });
       ride.passengers = currentPassengers;
@@ -457,6 +479,8 @@ export class RideRepository extends BaseRepository<Ride> {
         pickupPoint: passenger.pickupPoint,
         passengerPhone: passenger.passengerPhone,
         status: "pending",
+        otp: generateOtpForPassenger(id, passenger.userId),
+        otpVerified: false,
         joinedAt: new Date().toISOString(),
       });
       ride.passengers = currentPassengers;
@@ -495,6 +519,9 @@ export class RideRepository extends BaseRepository<Ride> {
         ride.seatsLeft = Math.max(0, ride.seatsLeft - seatsToDeduct);
         target.status = "confirmed";
       }
+      if (!target.otp) {
+        target.otp = generateOtpForPassenger(rideId, target.userId);
+      }
       ride.passengers = currentPassengers;
       ride.updatedAt = new Date().toISOString();
       return ride;
@@ -514,6 +541,12 @@ export class RideRepository extends BaseRepository<Ride> {
         const seatsToDeduct = targetPassenger.seats || 1;
         ride.seatsLeft = Math.max(0, ride.seatsLeft - seatsToDeduct);
         targetPassenger.status = "confirmed";
+      }
+      if (!targetPassenger.otp) {
+        targetPassenger.otp = generateOtpForPassenger(
+          rideId,
+          targetPassenger.userId,
+        );
       }
       ride.passengers = currentPassengers;
       ride.updatedAt = new Date();

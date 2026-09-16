@@ -1,6 +1,6 @@
 import { User } from "../entities/User.entity";
 import { localServicesRepository } from "../repositories/LocalServices.repository";
-import { LocalService } from "../entities/LocalService.entity";
+import { LocalService } from "../entities/LocalServices.entity";
 import {
   CreateServiceProInput,
   UpdateServiceProInput,
@@ -28,6 +28,7 @@ export interface ServiceProRecord {
   phone: string;
   description?: string;
   availableToday: boolean;
+  availableDate?: string;
   image?: string;
   avatar?: string;
   createdAt: string;

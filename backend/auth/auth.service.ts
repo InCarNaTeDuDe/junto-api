@@ -84,6 +84,11 @@ export async function loginWithGoogle(
           identityVerified: true,
           rating: 5,
           walletBalance: 0,
+          location: "Bengaluru",
+          city: "Bengaluru",
+          state: "Karnataka",
+          latitude: 12.9716,
+          longitude: 77.5946,
           lastLogin: new Date(),
         });
 
@@ -97,6 +102,13 @@ export async function loginWithGoogle(
       } else {
         user.lastLogin = new Date();
         user.avatar = googleUser.picture;
+        if (!user.location) {
+          user.location = "Bengaluru";
+          user.city = "Bengaluru";
+          user.state = "Karnataka";
+          user.latitude = 12.9716;
+          user.longitude = 77.5946;
+        }
         await userRepo.save(user);
       }
 
@@ -258,7 +270,17 @@ export async function getUserProfile(currentUser: any) {
 
 export async function updateProfile(
   userId: string,
-  data: { name?: string; bio?: string; avatar?: string; userHandle?: string },
+  data: {
+    name?: string;
+    bio?: string;
+    avatar?: string;
+    userHandle?: string;
+    location?: string;
+    city?: string;
+    state?: string;
+    latitude?: number;
+    longitude?: number;
+  },
 ) {
   return userRepository.updateUser(userId, data);
 }

@@ -21,6 +21,7 @@ export const CreateServiceProSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   availableToday: z.boolean().optional().default(true),
+  availableDate: z.string().optional(),
 });
 
 export const UpdateServiceProSchema = CreateServiceProSchema.partial();

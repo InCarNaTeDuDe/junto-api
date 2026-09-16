@@ -34,8 +34,18 @@ export default function LocationSearch() {
     city.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  async function setLocationOnUserProfile() {
-    await ApiService.put("/api/auth/profile");
+  async function setLocationOnUserProfile(loc: {
+    location: string;
+    city?: string;
+    state?: string;
+    latitude?: number;
+    longitude?: number;
+  }) {
+    try {
+      await ApiService.put("/api/auth/profile", loc);
+    } catch (e) {
+      console.warn("Failed to update location on user profile:", e);
+    }
   }
 
   const useCurrentLocation = async () => {
@@ -54,7 +64,13 @@ export default function LocationSearch() {
       setSelectedLocation(obj);
       await saveSelectedLocation(obj);
 
-      await setLocationOnUserProfile();
+      await setLocationOnUserProfile({
+        location: obj.name,
+        city: obj.city,
+        state: obj.state,
+        latitude: obj.latitude,
+        longitude: obj.longitude,
+      });
 
       router.back();
 
@@ -218,7 +234,13 @@ export default function LocationSearch() {
                 longitude: item.longitude,
               });
 
-              await setLocationOnUserProfile();
+              await setLocationOnUserProfile({
+                location: item.name,
+                city: item.name,
+                state: item.state,
+                latitude: item.latitude,
+                longitude: item.longitude,
+              });
 
               router.back();
             }}

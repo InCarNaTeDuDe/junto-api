@@ -37,10 +37,10 @@ const STEPS: StepConfig[] = [
   },
   {
     key: "both_travelling",
-    title: "Both Travelling",
-    shortLabel: "3. Travelling",
-    subLabel: "On the way to pickup",
-    icon: "navigate-outline",
+    title: "Both Have Met",
+    shortLabel: "3. OTP Exchanged",
+    subLabel: "Both have met • OTP verified",
+    icon: "shield-checkmark-outline",
     color: "#8B5CF6",
   },
   {

@@ -200,6 +200,8 @@ export class Ride {
     passengerPhone?: string;
     status?: "pending" | "confirmed" | "declined";
     joinedAt: string;
+    otp?: string;
+    otpVerified?: boolean;
   }>;
 
   @Column({

@@ -4,15 +4,18 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Switch,
   Modal,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
   Image,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { CategorySelector } from "./CategorySelector";
 import {
   EnrollFormData,
@@ -20,6 +23,91 @@ import {
   MarketplaceCategory,
 } from "../types";
 import { pickAndUploadImage } from "@/services/cloudinaryService";
+
+/**
+ * Dynamic placeholder text for "Skills & Specialization" based on category
+ */
+export const getSkillsPlaceholderForCategory = (
+  categoryName: string,
+): string => {
+  const cat = (categoryName || "").toLowerCase().trim();
+
+  if (cat.includes("electric")) {
+    return "e.g. Domestic wiring, MCB switchboard repairs, inverter setup, fan & light installation, short-circuit diagnostics...";
+  }
+  if (cat.includes("plumb")) {
+    return "e.g. Pipe leakage fixes, bathroom fittings, tap & shower installation, water tank cleaning, motor pump repairs...";
+  }
+  if (cat.includes("carpenter")) {
+    return "e.g. Furniture making & repair, door lock fitting, modular kitchen cabinets, wooden polishing, hinge adjustments...";
+  }
+  if (
+    cat.includes("ac repair") ||
+    cat.includes("ac cleaning") ||
+    cat === "ac"
+  ) {
+    return "e.g. Split & window AC gas charging, cooling issue diagnostics, jet foam cleaning, compressor & PCB repair...";
+  }
+  if (cat.includes("washing machine")) {
+    return "e.g. Front & top load drum repairs, motor replacement, PCB board repair, water drainage and spin cycle fixes...";
+  }
+  if (cat.includes("refrigerator") || cat.includes("fridge")) {
+    return "e.g. Compressor replacement, thermostat fix, cooling coil repair, gas charging, single & double door servicing...";
+  }
+  if (cat.includes("tv") || cat.includes("electronic")) {
+    return "e.g. LED/OLED screen replacements, mother-board soldering, audio system repairs, wall-mount installations...";
+  }
+  if (cat.includes("motor")) {
+    return "e.g. Submersible pump rewinding, capacitor replacements, borewell motor servicing, industrial motor repairs...";
+  }
+  if (cat.includes("bike") || cat.includes("two wheeler")) {
+    return "e.g. Engine tune-ups, disc brake servicing, clutch plate replacements, carburetor tuning, oil change & chain lube...";
+  }
+  if (cat.includes("car repair") || cat.includes("four wheeler")) {
+    return "e.g. Engine diagnostics, brake pads overhaul, suspension repairs, clutch overhaul, battery jumpstart & OBD scans...";
+  }
+  if (cat.includes("puncture")) {
+    return "e.g. Quick tubeless & tube tyre puncture repair, mushroom patch, air pressure top-up, emergency doorstep puncture fix...";
+  }
+  if (cat.includes("battery")) {
+    return "e.g. Doorstep battery jumpstart, alternator check, terminal cleaning, emergency battery replacement & charging...";
+  }
+  if (cat.includes("car wash")) {
+    return "e.g. Pressure foam wash, interior dry vacuuming, dashboard polishing, windshield treatment, paint wax coating...";
+  }
+  if (cat.includes("roadside")) {
+    return "e.g. Emergency breakdown response, towing assistance, fuel delivery, flat tyre replacement, key lock-out assistance...";
+  }
+  if (cat.includes("deep clean") || cat.includes("cleaning")) {
+    return "e.g. Kitchen deep degreasing, bathroom sanitization, floor scrubbing, sofa shampooing, balcony & window mesh cleaning...";
+  }
+  if (cat.includes("cook")) {
+    return "e.g. North & South Indian home meals, dietary food, breakfast/lunch/dinner preparations, party catering assistance...";
+  }
+  if (cat.includes("maid") || cat.includes("housekeep")) {
+    return "e.g. Utensil cleaning, daily floor mopping, cloth washing, dusting, basic domestic household assistance...";
+  }
+  if (cat.includes("pack") || cat.includes("moving")) {
+    return "e.g. Bubble wrapping delicate glassware, furniture dismantling & reassembly, heavy carton loading & relocation...";
+  }
+  if (cat.includes("pest")) {
+    return "e.g. Odorless cockroach herbal gel treatment, termite drill-and-fill, bed bug spray eradication, mosquito & rodent control...";
+  }
+  if (
+    cat.includes("wax") ||
+    cat.includes("facial") ||
+    cat.includes("makeup") ||
+    cat.includes("mehendi") ||
+    cat.includes("nail") ||
+    cat.includes("glam") ||
+    cat.includes("beauty") ||
+    cat.includes("saree")
+  ) {
+    return "e.g. Bridal & party makeup, herbal facial, rica waxing, custom bridal mehendi, gel nail art, hair spa & styling...";
+  }
+
+  return `e.g. Specialized in ${categoryName || "service repairs"}, diagnostic tools, equipment, and certified doorstep experience...`;
+};
 
 export const EXPERIENCE_OPTIONS = [
   { value: "1 yr exp", label: "1 Year Experience", badge: "1" },
@@ -89,8 +177,8 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
   experienceLabel = "Years of Experience",
   experiencePlaceholder = "Select Years of Experience",
   distancePlaceholder = "e.g. Within 5 km of Banjara Hills",
-  descriptionLabel = "About Your Service",
-  descriptionPlaceholder = "Describe your expertise, tools, guarantee, and service turnaround...",
+  descriptionLabel = "Skills & Specialization",
+  descriptionPlaceholder,
   submitButtonText = "Submit Application",
   isDark = false,
 }) => {
@@ -111,11 +199,34 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
   const [description, setDescription] = useState(
     initialData?.description || "",
   );
-  const [availableToday, setAvailableToday] = useState(
-    initialData?.availableToday !== undefined
-      ? initialData.availableToday
-      : true,
-  );
+  const [availableDate, setAvailableDate] = useState<Date>(() => {
+    if (initialData?.availableDate) {
+      const parsed = new Date(initialData.availableDate);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  });
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  const isSameDayAsToday = (date: Date) => {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Dynamic placeholder for Skills & Specialization based on the selected category
+  const computedSkillsPlaceholder = getSkillsPlaceholderForCategory(category);
+  const activeDescriptionPlaceholder =
+    descriptionPlaceholder &&
+    descriptionPlaceholder !==
+      "Describe your expertise, tools, guarantee, and service turnaround..." &&
+    descriptionPlaceholder !==
+      "e.g. Specialized in domestic wiring, switchboard repairs, appliance troubleshooting..."
+      ? descriptionPlaceholder
+      : computedSkillsPlaceholder;
   const [avatar, setAvatar] = useState(initialData?.avatar || "");
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isExperienceModalOpen, setIsExperienceModalOpen] = useState(false);
@@ -202,7 +313,8 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
       experience: experience.trim() || "5 yrs exp",
       distance: distance.trim() || "Near you",
       description: description.trim(),
-      availableToday,
+      availableToday: isSameDayAsToday(availableDate),
+      availableDate: availableDate.toISOString().split("T")[0],
       avatar: avatar.trim(),
     };
 
@@ -427,11 +539,24 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
         />
       </View>
 
-      {/* 6. Description */}
+      {/* 6. Skills & Specialization Description */}
       <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: textPrimary }]}>
-          {descriptionLabel}
-        </Text>
+        <View style={styles.labelRow}>
+          <Text style={[styles.label, { color: textPrimary }]}>
+            {descriptionLabel}
+          </Text>
+          {category ? (
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                color: accentColor,
+              }}
+            >
+              Category: {category}
+            </Text>
+          ) : null}
+        </View>
         <TextInput
           style={[
             styles.textArea,
@@ -441,7 +566,7 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
               borderColor: border,
             },
           ]}
-          placeholder={descriptionPlaceholder}
+          placeholder={activeDescriptionPlaceholder}
           placeholderTextColor={textMute}
           value={description}
           onChangeText={setDescription}
@@ -450,22 +575,126 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
         />
       </View>
 
-      {/* 7. Available Today Toggle */}
-      <View style={[styles.switchRow, { borderTopColor: border }]}>
-        <View style={{ flex: 1, paddingRight: 10 }}>
-          <Text style={[styles.switchTitle, { color: textPrimary }]}>
-            Available Today for Service
-          </Text>
-          <Text style={[styles.switchSub, { color: textMute }]}>
-            Highlights your card with a live "Available Today" green badge
+      {/* 7. Service Availability Date (Replaces Available Today with Calendar, minDate as today) */}
+      <View style={styles.formGroup}>
+        <View style={styles.labelRow}>
+          <Text style={[styles.label, { color: textPrimary }]}>
+            Availability Date <Text style={styles.requiredStar}>*</Text>
           </Text>
         </View>
-        <Switch
-          value={availableToday}
-          onValueChange={setAvailableToday}
-          trackColor={{ false: "#64748B", true: accentColor }}
-          thumbColor="#FFFFFF"
-        />
+        <Text style={[styles.helperSubText, { color: textMute }]}>
+          Select date when you are available to accept service bookings (min
+          date is today)
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.calendarSelectorCard,
+            {
+              backgroundColor: inputBg,
+              borderColor: showCalendar ? accentColor : border,
+            },
+          ]}
+          onPress={() => setShowCalendar((prev) => !prev)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.calendarSelectorLeft}>
+            <View
+              style={[
+                styles.calendarIconCircle,
+                { backgroundColor: `${accentColor}18` },
+              ]}
+            >
+              <Ionicons name="calendar" size={18} color={accentColor} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.calendarSelectedDateText,
+                  { color: textPrimary },
+                ]}
+              >
+                {availableDate.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </Text>
+              <Text
+                style={[
+                  styles.calendarStatusHint,
+                  {
+                    color: isSameDayAsToday(availableDate)
+                      ? "#10B981"
+                      : accentColor,
+                  },
+                ]}
+              >
+                {isSameDayAsToday(availableDate)
+                  ? "✓ Available today for immediate bookings"
+                  : `📅 Available starting ${availableDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.calendarToggleActionBadge,
+              {
+                backgroundColor: showCalendar
+                  ? accentColor
+                  : isDark
+                    ? "#334155"
+                    : "#F1F5F9",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.calendarToggleActionText,
+                { color: showCalendar ? "#FFFFFF" : textPrimary },
+              ]}
+            >
+              {showCalendar ? "Done" : "Change Date"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {(showCalendar || Platform.OS === "web") && (
+          <View
+            style={[
+              styles.calendarPickerContainer,
+              {
+                backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+                borderColor: border,
+              },
+            ]}
+          >
+            <DateTimePicker
+              value={availableDate}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              onChange={(event: DateTimePickerEvent, date?: Date) => {
+                if (Platform.OS !== "web") {
+                  setShowCalendar(false);
+                }
+                if (date) {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const chosen = new Date(date);
+                  chosen.setHours(0, 0, 0, 0);
+                  if (chosen < today) {
+                    setAvailableDate(new Date());
+                  } else {
+                    setAvailableDate(date);
+                  }
+                }
+              }}
+              themeVariant={isDark ? "dark" : "light"}
+            />
+          </View>
+        )}
       </View>
 
       {/* 8. Provider / Technician Photo (Cloudinary services/ folder) */}
@@ -820,22 +1049,57 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  switchRow: {
+  helperSubText: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  calendarSelectorCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 14,
-    marginTop: 4,
-    marginBottom: 18,
-    borderTopWidth: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 10,
   },
-  switchTitle: {
+  calendarSelectorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  calendarIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarSelectedDateText: {
     fontSize: 14,
     fontWeight: "700",
   },
-  switchSub: {
-    fontSize: 12,
+  calendarStatusHint: {
+    fontSize: 11.5,
+    fontWeight: "600",
     marginTop: 2,
+  },
+  calendarToggleActionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  calendarToggleActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  calendarPickerContainer: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    marginBottom: 10,
   },
   submitBtn: {
     borderRadius: 12,

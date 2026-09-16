@@ -1480,7 +1480,7 @@ export default function LocalDealsScreen() {
                           setOfferPrice(deal.price);
                         }}
                       >
-                        <Text style={styles.offerBtnText}>⚡ Make Offer</Text>
+                        <Text style={styles.offerBtnText}>⚡ Make Deal</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2257,7 +2257,7 @@ export default function LocalDealsScreen() {
           >
             <View style={styles.offerModalTop}>
               <Text style={[styles.offerModalTitle, { color: textPrimary }]}>
-                Make an Offer
+                Make a Deal
               </Text>
               <TouchableOpacity onPress={() => setSelectedDealForAction(null)}>
                 <Ionicons name="close" size={20} color={textMute} />
@@ -2288,31 +2288,129 @@ export default function LocalDealsScreen() {
                 value={offerPrice.replace("₹", "")}
                 onChangeText={(val) => setOfferPrice(`₹${val}`)}
                 keyboardType="numeric"
-                placeholder="Enter counter offer..."
+                placeholder="Enter your deal amount..."
                 placeholderTextColor={textMute}
                 style={[styles.offerTextInput, { color: textPrimary }]}
               />
             </View>
 
-            <View style={styles.quickOfferPillRow}>
-              {["₹5,000", "₹5,500", "₹6,000", "₹6,200"].map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.quickOfferPill,
-                    {
-                      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-                      borderColor: border,
-                    },
-                  ]}
-                  onPress={() => setOfferPrice(p)}
-                >
-                  <Text style={[styles.quickOfferText, { color: textPrimary }]}>
-                    {p}
+            {/* Price Chips strictly less than the actual asking price */}
+            {(() => {
+              const askingRaw = selectedDealForAction?.price || "";
+              const askingNumeric =
+                parseFloat(String(askingRaw).replace(/[^0-9.]/g, "")) || 0;
+
+              const getSuggestedPrices = (num: number) => {
+                if (num <= 0) return [];
+
+                // 5%, 10%, 15%, 20% discounts strictly lower than asking price
+                const discounts = [0.05, 0.1, 0.15, 0.2];
+                const chips: { label: string; value: string; pct: number }[] =
+                  [];
+                const seen = new Set<number>();
+
+                for (const d of discounts) {
+                  let discounted = Math.round(num * (1 - d));
+                  if (num >= 5000) {
+                    discounted = Math.round(discounted / 100) * 100;
+                  } else if (num >= 500) {
+                    discounted = Math.round(discounted / 50) * 50;
+                  } else if (num >= 50) {
+                    discounted = Math.round(discounted / 10) * 10;
+                  }
+
+                  // Must be strictly less than asking price
+                  if (discounted >= num) {
+                    discounted = num - (num > 20 ? 10 : 1);
+                  }
+
+                  if (discounted > 0 && !seen.has(discounted)) {
+                    seen.add(discounted);
+                    chips.push({
+                      label: `₹${discounted.toLocaleString("en-IN")}`,
+                      value: `₹${discounted}`,
+                      pct: Math.round(d * 100),
+                    });
+                  }
+                }
+
+                // If asking price is very low or no chips generated yet
+                if (chips.length === 0 && num > 1) {
+                  const val = Math.max(1, Math.round(num * 0.9));
+                  chips.push({
+                    label: `₹${val.toLocaleString("en-IN")}`,
+                    value: `₹${val}`,
+                    pct: 10,
+                  });
+                }
+
+                return chips;
+              };
+
+              const suggestedChips = getSuggestedPrices(askingNumeric);
+
+              if (suggestedChips.length === 0) return null;
+
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: textMute,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Quick Deal Offers (less than asking price):
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  <View style={styles.quickOfferPillRow}>
+                    {suggestedChips.map((chip) => {
+                      const isSelected =
+                        offerPrice === chip.value || offerPrice === chip.label;
+                      return (
+                        <TouchableOpacity
+                          key={chip.label}
+                          style={[
+                            styles.quickOfferPill,
+                            {
+                              backgroundColor: isSelected
+                                ? "#10B98125"
+                                : isDark
+                                  ? "#1E293B"
+                                  : "#F1F5F9",
+                              borderColor: isSelected ? "#10B981" : border,
+                            },
+                          ]}
+                          onPress={() => setOfferPrice(chip.label)}
+                        >
+                          <Text
+                            style={[
+                              styles.quickOfferText,
+                              {
+                                color: isSelected ? "#10B981" : textPrimary,
+                                fontWeight: isSelected ? "700" : "600",
+                              },
+                            ]}
+                          >
+                            {chip.label}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              color: isSelected ? "#10B981" : "#059669",
+                              marginLeft: 4,
+                              fontWeight: "700",
+                            }}
+                          >
+                            -{chip.pct}%
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })()}
 
             {/* Preferred Inspection & Pickup Date & Time Picker */}
             <Text style={[styles.offerSectionLabel, { color: textPrimary }]}>
@@ -2464,7 +2562,9 @@ export default function LocalDealsScreen() {
               }}
             >
               <Ionicons name="paper-plane" size={16} color="#FFF" />
-              <Text style={styles.sendOfferConfirmText}>Send Direct Offer</Text>
+              <Text style={styles.sendOfferConfirmText}>
+                ⚡ Send Deal Offer
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -19,6 +19,7 @@ import {
   reportProblemHandler,
   verifyVehicleHandler,
   verifyDriverHandler,
+  verifyRideOtpHandler,
 } from "./rides.controller";
 import {
   CreateRideSchema,
@@ -69,6 +70,7 @@ router.patch(
 router.put("/:id", authenticate, validate(UpdateRideSchema), updateRideHandler);
 
 // Safety, Live GPS Tracking, Ratings & Reports endpoints
+router.post("/:id/verify-otp", authenticate, verifyRideOtpHandler);
 router.post("/:id/start-travelling", authenticate, startTravellingHandler);
 router.post("/:id/start", authenticate, startRideHandler);
 router.post("/:id/complete", authenticate, completeRideHandler);

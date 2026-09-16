@@ -12,6 +12,23 @@ GoogleSignin.configure({
   offlineAccess: true,
 });
 
+export async function signOutFromGoogle() {
+  try {
+    if (Platform.OS !== "web") {
+      await GoogleSignin.signOut().catch(() => {});
+    } else {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).google?.accounts?.id
+      ) {
+        (window as any).google.accounts.id.disableAutoSelect();
+      }
+    }
+  } catch (err) {
+    console.warn("Error signing out of Google:", err);
+  }
+}
+
 export async function signInWithGoogle() {
   console.log(
     "process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID:",
@@ -25,6 +42,10 @@ export async function signInWithGoogle() {
       await loadGoogleScript();
       const google = (window as any).google;
 
+      try {
+        google?.accounts?.id?.disableAutoSelect();
+      } catch {}
+
       return await new Promise((resolve, reject) => {
         google.accounts.id.initialize({
           client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
@@ -36,38 +57,11 @@ export async function signInWithGoogle() {
               resolve(null);
               return;
             }
-
-            // TODO:
-            // Send credentialResponse.credential (Google ID Token)
-            // to your backend.
-            //
-            // Example:
-            //
-            // const user = await axios.post("/auth/google", {
-            //   idToken: credentialResponse.credential,
-            // });
-            //
-            // resolve(user.data);
-
             resolve(credentialResponse);
           },
         });
 
         google.accounts.id.prompt();
-
-        // Render the standard Sign In button in the container
-        // const container = document.getElementById(
-        //   "google-one-tap-button-container",
-        // );
-        // if (container) {
-        //   google.accounts.id.renderButton(container, {
-        //     theme: "filled_black",
-        //     size: "large",
-        //     text: "continue_with",
-        //     shape: "pill",
-        //     width: 320,
-        //   });
-        // }
       });
     }
 
@@ -75,6 +69,15 @@ export async function signInWithGoogle() {
     // ANDROID / IOS LOGIN
     // ============================================================
     await GoogleSignin.hasPlayServices();
+
+    // Clear previous session so Android Google Play Services always prompts
+    // the account picker dialog, allowing users with multiple logged-in accounts to choose.
+    try {
+      await GoogleSignin.signOut();
+    } catch {
+      // ignore
+    }
+
     const response = await GoogleSignin.signIn();
 
     if (!isSuccessResponse(response)) {

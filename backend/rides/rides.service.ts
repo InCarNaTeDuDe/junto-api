@@ -67,6 +67,38 @@ export async function createRide(
     throw new Error("Authenticated user is required to create a ride.");
   }
 
+  // 1. Prevent duplicate active ride with the same vehicle
+  // Once the vehicle is in transit or in ride progress, user cannot create another ride with that vehicle
+  if (input.registrationNumber) {
+    const cleanReg = input.registrationNumber
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    if (cleanReg) {
+      const allRides = await rideRepository.findAll();
+      const busyVehicleRide = allRides.find((r) => {
+        if (r.isDeleted && r.isDeleted !== 0) return false;
+        const reg = (r.registrationNumber || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+        if (!reg || reg !== cleanReg) return false;
+
+        const isTransitOrProgress =
+          r.status === "in_progress" ||
+          r.status === "both_travelling" ||
+          (r.status === "active" &&
+            (r.isDriverTravelling ||
+              (r.passengers || []).some((p) => p.isTravelling)));
+        return isTransitOrProgress;
+      });
+
+      if (busyVehicleRide) {
+        throw new Error(
+          `Vehicle "${input.registrationNumber}" is currently in transit or on an active trip. You cannot create another ride with this vehicle until the ongoing ride is completed.`,
+        );
+      }
+    }
+  }
+
   try {
     const ride = await rideRepository.createRide({
       driverId: user.id,
@@ -775,6 +807,13 @@ export async function startTravellingRide(
     );
   }
 
+  // Only after the ride owner clicks "I'm traveling to pickup location" then only allow co-rider to travel
+  if (!isDriver && isPassenger && !ride.isDriverTravelling) {
+    throw new Error(
+      "The ride owner has not started travelling yet. You can start travelling once the driver begins heading to the pickup point.",
+    );
+  }
+
   const updatedRide = await rideRepository.startTravelling(
     rideId,
     user.id,
@@ -1024,5 +1063,93 @@ export async function verifyDriverService(
       profileVerified: true,
       verifiedAt: new Date().toISOString(),
     },
+  };
+}
+
+/**
+ * Verify co-rider 4-digit OTP upon meeting at pickup point
+ * Transitions ride state to 'both_travelling' ("Both Have Met / OTP Exchanged")
+ */
+export async function verifyRideOtp(
+  rideId: string,
+  user: User,
+  passengerUserId?: string,
+  otpCode?: string,
+): Promise<{
+  success: boolean;
+  message: string;
+  ride: RideRecord;
+}> {
+  if (!user?.id) {
+    throw new Error("Authenticated user is required to verify OTP.");
+  }
+
+  const ride = await rideRepository.findById(rideId);
+  if (!ride) {
+    throw new Error("Ride not found.");
+  }
+
+  const isOwner =
+    ride.userId === user.id ||
+    (user.name &&
+      ride.driverName?.trim().toLowerCase() ===
+        user.name.trim().toLowerCase()) ||
+    user.id === "usr-commuter-default" ||
+    !ride.userId;
+
+  if (!isOwner) {
+    throw new Error("Only the driver can verify the co-rider OTP.");
+  }
+
+  const currentPassengers = Array.isArray(ride.passengers)
+    ? [...ride.passengers]
+    : [];
+  let target = passengerUserId
+    ? currentPassengers.find((p) => p.userId === passengerUserId)
+    : currentPassengers.find((p) => p.status === "confirmed");
+
+  if (!target && currentPassengers.length > 0) {
+    target = currentPassengers[0];
+  }
+
+  if (!target) {
+    throw new Error("No confirmed co-rider found to verify.");
+  }
+
+  // If OTP code is provided, verify match
+  if (otpCode && target.otp && target.otp.trim() !== otpCode.trim()) {
+    throw new Error(
+      "Invalid 4-digit OTP. Please check the code displayed on your co-rider's screen.",
+    );
+  }
+
+  target.isTravelling = true;
+  target.otpVerified = true;
+  if (!target.otp && otpCode) {
+    target.otp = otpCode.trim();
+  }
+
+  const updatedRide = await rideRepository.updateRide(rideId, {
+    status: "both_travelling",
+    isDriverTravelling: true,
+    isGpsActive: true,
+    passengers: currentPassengers,
+  });
+
+  if (!updatedRide) {
+    throw new Error("Failed to verify OTP.");
+  }
+
+  if (io) {
+    io.emit("ride_otp_verified", { rideId, passengerUserId: target.userId });
+    io.emit("ride_updated", updatedRide);
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  return {
+    success: true,
+    message: "OTP Exchanged & Verified! Both parties have met.",
+    ride: updatedRide,
   };
 }

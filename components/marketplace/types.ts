@@ -17,6 +17,7 @@ export interface MarketplaceProvider {
   phone?: string;
   description?: string;
   availableToday?: boolean;
+  availableDate?: string;
   portfolioImages?: string[];
   badges?: string[];
 }
@@ -57,7 +58,8 @@ export interface EnrollFormData {
   rate: string;
   distance: string;
   description: string;
-  availableToday: boolean;
+  availableToday?: boolean;
+  availableDate?: string;
   avatar?: string;
   portfolioImages?: string[];
 }

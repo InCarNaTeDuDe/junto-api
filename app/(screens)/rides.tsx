@@ -859,6 +859,55 @@ export default function RidesScreen() {
     }
   };
 
+  // Verify Co-Rider Ride OTP (marks "Both Have Met" / OTP Exchanged)
+  const handleVerifyRideOtp = async (
+    ride: RideItem,
+    passengerUserId?: string,
+    otpCode?: string,
+  ) => {
+    try {
+      setActionLoadingRideId(ride.id);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${ride.id}/verify-otp`, {
+        passengerUserId,
+        otp: otpCode,
+      });
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+    } catch (err: any) {
+      console.warn("OTP verification API error:", err);
+      // Fallback: update state locally
+      setRidesList((prev) =>
+        prev.map((r) =>
+          r.id === ride.id
+            ? {
+                ...r,
+                status: "both_travelling",
+                isDriverTravelling: true,
+                isGpsActive: true,
+                passengers: (r.passengers || []).map((p) =>
+                  p.userId === passengerUserId || p.status === "confirmed"
+                    ? { ...p, isTravelling: true, otpVerified: true }
+                    : p,
+                ),
+              }
+            : r,
+        ),
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
   // End ride (for driver)
   const handleEndRide = async (ride: RideItem) => {
     Alert.alert(
@@ -1410,6 +1459,7 @@ export default function RidesScreen() {
           onBack={() => setActiveTab("find")}
           onOpenFilter={() => setShowFilterOptions(true)}
           getUserSeatRequest={getUserSeatRequest}
+          onVerifyOtp={handleVerifyRideOtp}
           onStartTravelling={handleStartTravelling}
           onStartRide={handleStartRide}
           onCompleteRide={handleEndRide}

@@ -18,6 +18,7 @@ import {
   startTravellingRide,
   verifyVehicleService,
   verifyDriverService,
+  verifyRideOtp,
 } from "./rides.service";
 import {
   CreateRideInput,
@@ -86,8 +87,39 @@ export async function createRideHandler(
       message: "Ride offer published successfully.",
       data: ride,
     });
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      message: err?.message || "Failed to create ride",
+    });
+  }
+}
+
+export async function verifyRideOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    const { passengerUserId, otpCode } = req.body || {};
+    const result = await verifyRideOtp(
+      req.params.id,
+      req.user!,
+      passengerUserId,
+      otpCode,
+    );
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      message: err?.message || "Failed to verify OTP",
+    });
   }
 }
 

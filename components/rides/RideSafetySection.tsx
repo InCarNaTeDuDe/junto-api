@@ -105,7 +105,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
           <Text style={styles.liveIndicatorText}>
             {isInProgress
               ? "LIVE TRIP IN PROGRESS • GPS ACTIVE"
-              : "BOTH TRAVELLING TO PICKUP • SAFETY ACTIVE"}
+              : "BOTH HAVE MET • OTP EXCHANGED • SAFETY ACTIVE"}
           </Text>
         </View>
         <View style={styles.batteryOptimizationBadge}>

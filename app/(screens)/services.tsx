@@ -77,6 +77,7 @@ export interface ServicePro {
   phone: string;
   description?: string;
   availableToday?: boolean;
+  availableDate?: string;
   avatar?: string;
   userId?: string;
 }
@@ -908,6 +909,8 @@ export default function ServicesScreen() {
         description: descriptionToSubmit,
         verified: true,
         availableToday: availableToSubmit,
+        availableDate:
+          formData?.availableDate || new Date().toISOString().split("T")[0],
         avatar: avatarToSubmit,
       };
 
@@ -945,6 +948,8 @@ export default function ServicesScreen() {
         phone: phoneToSubmit,
         description: descriptionToSubmit,
         availableToday: availableToSubmit,
+        availableDate:
+          formData?.availableDate || new Date().toISOString().split("T")[0],
       };
 
       setProsList((prev) => [localPro, ...prev]);
@@ -1624,8 +1629,7 @@ export default function ServicesScreen() {
             experienceLabel="Years of Experience"
             experiencePlaceholder="Select Years of Experience"
             distancePlaceholder={`e.g. Madhapur, Hitech City & ${cityName.split(",")[0]}`}
-            descriptionLabel="Skills & Specialties"
-            descriptionPlaceholder="e.g. Specialized in domestic wiring, switchboard repairs, appliance troubleshooting..."
+            descriptionLabel="Skills & Specialization"
             submitButtonText="Submit & Enroll as Technician"
             errorMessage={enrollFormError}
             isDark={isDark}

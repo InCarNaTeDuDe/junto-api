@@ -21,6 +21,8 @@ import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthContext } from "@/context/AuthContext";
+import { useLocation } from "@/context/LocationContext";
+import { saveSelectedLocation } from "@/utils/secureStorage";
 import { signInWithGoogle } from "@/services/googleAuth";
 import { router } from "expo-router";
 import { ApiService } from "@/services/api";
@@ -179,6 +181,7 @@ export default function Login() {
   const wide = width >= 720;
   const pad = Math.min(28, Math.max(18, width * 0.05));
   const { login } = useAuthContext();
+  const { setSelectedLocation } = useLocation();
 
   const [loading, setLoading] = useState(false);
 
@@ -220,9 +223,30 @@ export default function Login() {
         isVerified: true,
         rating: data?.user?.rating ?? 5,
         walletBalance: data?.user?.walletBalance ?? 0,
+        userHandle: data?.user?.userHandle || "",
+        location: data?.user?.location || "Bengaluru",
+        city: data?.user?.city || "Bengaluru",
+        state: data?.user?.state || "Karnataka",
+        latitude:
+          data?.user?.latitude != null ? Number(data?.user?.latitude) : 12.9716,
+        longitude:
+          data?.user?.longitude != null
+            ? Number(data?.user?.longitude)
+            : 77.5946,
       };
 
-      login(userObj, data?.accessToken);
+      await login(userObj, data?.accessToken);
+
+      // Save user location pulled from DB into context & expo storage
+      const userLocationObj = {
+        name: userObj.location || userObj.city || "Bengaluru",
+        city: userObj.city || userObj.location || "Bengaluru",
+        state: userObj.state || "Karnataka",
+        latitude: userObj.latitude,
+        longitude: userObj.longitude,
+      };
+      await saveSelectedLocation(userLocationObj);
+      setSelectedLocation(userLocationObj);
 
       router.replace("/(tabs)");
     } catch (e) {
