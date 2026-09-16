@@ -61,8 +61,18 @@ export interface RideRecord {
   // Live GPS Tracking
   currentLatitude?: number;
   currentLongitude?: number;
+  currentHeading?: number;
+  currentSpeedKmh?: number;
   lastGpsUpdatedAt?: string;
   isGpsActive?: boolean;
+  locationUpdateIntervalSeconds?: number;
+  locationHistory?: Array<{
+    latitude: number;
+    longitude: number;
+    heading?: number;
+    speedKmh?: number;
+    recordedAt: string;
+  }>;
 
   // Ratings & Reports
   ratings?: Array<{
@@ -216,8 +226,14 @@ export class RideRepository extends BaseRepository<Ride> {
 
       currentLatitude: ride.currentLatitude ?? ride.latitude,
       currentLongitude: ride.currentLongitude ?? ride.longitude,
+      currentHeading: ride.currentHeading,
+      currentSpeedKmh: ride.currentSpeedKmh,
       lastGpsUpdatedAt: ride.lastGpsUpdatedAt,
       isGpsActive: ride.isGpsActive ?? false,
+      locationUpdateIntervalSeconds: ride.locationUpdateIntervalSeconds || 60,
+      locationHistory: Array.isArray(ride.locationHistory)
+        ? ride.locationHistory
+        : [],
 
       ratings: Array.isArray(ride.ratings) ? ride.ratings : [],
       reports: Array.isArray(ride.reports) ? ride.reports : [],
@@ -769,7 +785,18 @@ export class RideRepository extends BaseRepository<Ride> {
     id: string,
     latitude: number,
     longitude: number,
+    heading?: number,
+    speedKmh?: number,
   ): Promise<RideRecord | null> {
+    const timestamp = new Date().toISOString();
+    const breadcrumb = {
+      latitude,
+      longitude,
+      heading,
+      speedKmh,
+      recordedAt: timestamp,
+    };
+
     let inMem = inMemoryRides.get(id);
     if (!inMem) {
       inMem = {
@@ -789,18 +816,31 @@ export class RideRepository extends BaseRepository<Ride> {
         passengers: [],
         currentLatitude: latitude,
         currentLongitude: longitude,
-        lastGpsUpdatedAt: new Date().toISOString(),
+        currentHeading: heading,
+        currentSpeedKmh: speedKmh,
+        locationUpdateIntervalSeconds: 60,
+        locationHistory: [breadcrumb],
+        lastGpsUpdatedAt: timestamp,
         isGpsActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
       };
       inMemoryRides.set(id, inMem);
     } else {
       inMem.currentLatitude = latitude;
       inMem.currentLongitude = longitude;
-      inMem.lastGpsUpdatedAt = new Date().toISOString();
+      if (heading !== undefined) inMem.currentHeading = heading;
+      if (speedKmh !== undefined) inMem.currentSpeedKmh = speedKmh;
+      inMem.lastGpsUpdatedAt = timestamp;
       inMem.isGpsActive = true;
-      inMem.updatedAt = new Date().toISOString();
+      inMem.updatedAt = timestamp;
+      if (!Array.isArray(inMem.locationHistory)) {
+        inMem.locationHistory = [];
+      }
+      inMem.locationHistory.push(breadcrumb);
+      if (inMem.locationHistory.length > 100) {
+        inMem.locationHistory = inMem.locationHistory.slice(-100);
+      }
     }
 
     if (!this.isConnected) {
@@ -812,9 +852,18 @@ export class RideRepository extends BaseRepository<Ride> {
       if (!ride) return inMem;
       ride.currentLatitude = latitude;
       ride.currentLongitude = longitude;
-      ride.lastGpsUpdatedAt = new Date().toISOString();
+      if (heading !== undefined) ride.currentHeading = heading;
+      if (speedKmh !== undefined) ride.currentSpeedKmh = speedKmh;
+      ride.lastGpsUpdatedAt = timestamp;
       ride.isGpsActive = true;
       ride.updatedAt = new Date();
+
+      const history = Array.isArray(ride.locationHistory)
+        ? [...ride.locationHistory]
+        : [];
+      history.push(breadcrumb);
+      ride.locationHistory = history.slice(-100);
+
       const saved = await this.repo.save(ride);
       const rec = this.toRideRecord(saved);
       inMemoryRides.set(rec.id, rec);

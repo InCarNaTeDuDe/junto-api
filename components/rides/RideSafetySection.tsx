@@ -104,14 +104,14 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
           <View style={styles.pulsingGreenBeacon} />
           <Text style={styles.liveIndicatorText}>
             {isInProgress
-              ? "LIVE TRIP IN PROGRESS • GPS ACTIVE"
-              : "BOTH HAVE MET • OTP EXCHANGED • SAFETY ACTIVE"}
+              ? "LIVE TRIP IN PROGRESS • SAFETY ACTIVE"
+              : "OTP EXCHANGED • SAFETY ACTIVE"}
           </Text>
         </View>
         <View style={styles.batteryOptimizationBadge}>
-          <Ionicons name="battery-charging-outline" size={12} color="#10B981" />
+          <Ionicons name="shield-checkmark" size={12} color="#10B981" />
           <Text style={styles.batteryOptimizationText}>
-            15-30s Battery Optimized
+            Safety Shield Active
           </Text>
         </View>
       </View>
@@ -365,8 +365,8 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
                 </Text>
                 <Text style={[styles.safetyCardText, { color: textMuted }]}>
                   Your commute is protected under Junto Community Guidelines.
-                  Driver's GPS location is transmitted every 15–30 seconds for
-                  verification.
+                  Active vehicle verification and emergency support are enabled
+                  for your ride.
                 </Text>
               </View>
 

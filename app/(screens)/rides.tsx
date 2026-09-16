@@ -79,6 +79,7 @@ export interface RideItem {
   currentLongitude?: number;
   lastGpsUpdatedAt?: string;
   isGpsActive?: boolean;
+  locationUpdateIntervalSeconds?: number;
   reviewsCount?: number;
   isPopular?: boolean;
   isEcoFriendly?: boolean;
@@ -387,6 +388,29 @@ export default function RidesScreen() {
       return;
     }
 
+    // Check if the vehicle is currently on an active trip in travelling state
+    const cleanVehicle = vehicleNum.replace(/[^A-Z0-9]/g, "");
+    const vehicleInTravel = ridesList.find((r) => {
+      const rReg = (r.registrationNumber || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+      if (!rReg || rReg !== cleanVehicle) return false;
+      return (
+        r.status === "in_progress" ||
+        r.status === "both_travelling" ||
+        !!r.isDriverTravelling ||
+        (r.passengers || []).some((p) => p.isTravelling)
+      );
+    });
+
+    if (vehicleInTravel) {
+      Alert.alert(
+        "Vehicle in Travelling State",
+        `Vehicle "${vehicleNum}" is currently on an active trip (${vehicleInTravel.from} ➔ ${vehicleInTravel.to}). Neither you nor another user can create or schedule a ride with this vehicle until the ongoing trip is finished.`,
+      );
+      return;
+    }
+
     const priceNum = parseFloat(offerPrice.replace(/[^0-9.]/g, "")) || 40;
     const departureStr = formatDeparture(departureDate, departureTime);
 
@@ -424,8 +448,18 @@ export default function RidesScreen() {
           ride?: RideItem;
         }>("/api/rides", payload);
         createdRide = res?.data || res?.ride || null;
-      } catch (e) {
+      } catch (e: any) {
         console.log("Post ride api error, creating locally:", e);
+        const errMsg = e?.message || e?.data?.message || "";
+        if (
+          errMsg.toLowerCase().includes("vehicle") ||
+          errMsg.toLowerCase().includes("transit") ||
+          errMsg.toLowerCase().includes("travelling")
+        ) {
+          Alert.alert("Cannot Offer Ride", errMsg);
+          setIsPublishing(false);
+          return;
+        }
       }
 
       if (!createdRide) {
@@ -859,7 +893,7 @@ export default function RidesScreen() {
     }
   };
 
-  // Verify Co-Rider Ride OTP (marks "Both Have Met" / OTP Exchanged)
+  // Verify Co-Rider Ride OTP (marks OTP Exchanged)
   const handleVerifyRideOtp = async (
     ride: RideItem,
     passengerUserId?: string,
@@ -1177,8 +1211,8 @@ export default function RidesScreen() {
     });
   }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
 
-  // Background GPS Tracking Interval (every 15–30 seconds, battery-optimized)
-  // Sends driver's GPS location to Junto while the ride is active; stops automatically when the ride ends
+  // Background GPS Tracking Interval (commented out per user request)
+  /*
   useEffect(() => {
     const driverActiveRide = ridesList.find((ride) => {
       const isActive =
@@ -1187,11 +1221,13 @@ export default function RidesScreen() {
     });
 
     if (!driverActiveRide) {
-      // Automatically stopped when ride completes or no active trip
       return;
     }
 
-    const intervalId = setInterval(async () => {
+    const intervalSeconds = driverActiveRide.locationUpdateIntervalSeconds || 60;
+    const intervalMs = Math.max(15, intervalSeconds) * 1000;
+
+    const sendLocationPing = async () => {
       try {
         const baseLat = driverActiveRide.currentLatitude || 17.4435;
         const baseLng = driverActiveRide.currentLongitude || 78.3772;
@@ -1209,12 +1245,16 @@ export default function RidesScreen() {
       } catch {
         // network resilience
       }
-    }, 20000); // 20s interval
+    };
+
+    sendLocationPing();
+    const intervalId = setInterval(sendLocationPing, intervalMs);
 
     return () => {
       clearInterval(intervalId);
     };
   }, [ridesList, checkIsRideOwner]);
+  */
 
   const bg = isDark ? "#0B111F" : "#F8FAFC";
   const cardBg = isDark ? "#0D1527" : "#FFFFFF";
@@ -1442,6 +1482,7 @@ export default function RidesScreen() {
           onBack={() => setActiveTab("find")}
           popularLocations={POPULAR_LOCATIONS}
           isDark={isDark}
+          existingRides={ridesList}
         />
       ) : activeTab === "my_rides" ? (
         <MyRidesTab
@@ -1978,27 +2019,18 @@ export default function RidesScreen() {
                     </View>
 
                     {/* Middle: Plate Badge & Verified Pill */}
-                    {/* <View style={styles.plateAndVerifiedCol}> */}
-                    {/* <View style={styles.plateBadgeNew}>
-                        <View style={styles.plateIndFlag}>
-                          <Text style={styles.plateIndText}>IND</Text>
+                    {ride.registrationNumber ? (
+                      <View style={styles.plateAndVerifiedCol}>
+                        <View style={styles.plateBadgeNew}>
+                          <View style={styles.plateIndFlag}>
+                            <Text style={styles.plateIndText}>IND</Text>
+                          </View>
+                          <Text style={styles.plateNumberString}>
+                            {ride.registrationNumber}
+                          </Text>
                         </View>
-                        <Text style={styles.plateNumberString}>
-                          {ride.registrationNumber || "TS-09-EA-4521"}
-                        </Text>
-                      </View> */}
-
-                    {/* <View style={styles.verifiedDriverChip}>
-                        <Ionicons
-                          name="shield-checkmark"
-                          size={10}
-                          color="#38BDF8"
-                        />
-                        <Text style={styles.verifiedDriverChipText}>
-                          Verified driver &gt;
-                        </Text>
-                      </View> */}
-                    {/* </View> */}
+                      </View>
+                    ) : null}
 
                     {/* Right: Action Button */}
                     <View style={styles.cardActionContainer}>

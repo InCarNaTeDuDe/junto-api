@@ -75,12 +75,14 @@ export const UpdateRideSchema = z.object({
   currentLongitude: z.number().optional(),
   lastGpsUpdatedAt: z.string().optional(),
   isGpsActive: z.boolean().optional(),
+  locationUpdateIntervalSeconds: z.number().int().min(15).max(600).optional(),
 });
 
 export const UpdateLocationSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   speed: z.number().optional(),
+  speedKmh: z.number().optional(),
   heading: z.number().optional(),
 });
 

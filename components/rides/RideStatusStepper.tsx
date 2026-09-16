@@ -37,10 +37,10 @@ const STEPS: StepConfig[] = [
   },
   {
     key: "both_travelling",
-    title: "Both Have Met",
-    shortLabel: "3. OTP Exchanged",
-    subLabel: "Both have met • OTP verified",
-    icon: "shield-checkmark-outline",
+    title: "OTP",
+    shortLabel: "3. OTP",
+    subLabel: "OTP exchanged & verified",
+    icon: "key-outline",
     color: "#8B5CF6",
   },
   {
@@ -68,6 +68,7 @@ interface RideStatusStepperProps {
   hasCoRider?: boolean;
   driverTravelling?: boolean;
   passengerTravelling?: boolean;
+  otpExchanged?: boolean;
 }
 
 export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
@@ -76,10 +77,17 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
   compact = false,
   driverTravelling = false,
   passengerTravelling = false,
+  otpExchanged = false,
 }) => {
   // Normalize status
   let activeIndex = 0;
   const normalized = (currentStatus || "active").toLowerCase();
+
+  const isOtpDone =
+    otpExchanged ||
+    normalized === "both_travelling" ||
+    normalized === "in_progress" ||
+    normalized === "completed";
 
   if (normalized === "completed") {
     activeIndex = 4;
@@ -96,11 +104,37 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
     activeIndex = 0;
   }
 
-  const currentStep = STEPS[activeIndex] || STEPS[0];
+  let currentStep = STEPS[activeIndex] || STEPS[0];
+  if (normalized === "both_travelling" || (isOtpDone && activeIndex === 2)) {
+    currentStep = {
+      key: "both_travelling",
+      title: "OTP Exchanged",
+      shortLabel: "3. OTP",
+      subLabel: "OTP exchanged & verified • Live trip controls active",
+      icon: "checkmark-circle-outline",
+      color: "#10B981",
+    };
+  }
+
   const bgCard = isDark ? "#0D1726" : "#F8FAFC";
   const borderColor = isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0";
   const textPrimary = isDark ? "#F8FAFC" : "#0F172A";
   const textMuted = isDark ? "#94A3B8" : "#64748B";
+
+  const getIsStepDone = (idx: number, stepKey: RideLifecycleState) => {
+    if (idx < activeIndex) return true;
+    if (stepKey === "both_travelling") {
+      return isOtpDone;
+    }
+    return false;
+  };
+
+  const getIsStepCurrent = (idx: number, stepKey: RideLifecycleState) => {
+    if (normalized === "both_travelling") {
+      return idx === 3;
+    }
+    return idx === activeIndex && !getIsStepDone(idx, stepKey);
+  };
 
   if (compact) {
     return (
@@ -129,15 +163,16 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
             </Text>
           </View>
           <Text style={[styles.compactStepCounter, { color: textMuted }]}>
-            Step {activeIndex + 1} of 5
+            Step {normalized === "both_travelling" ? 3 : activeIndex + 1} of 5
           </Text>
         </View>
 
         {/* Progress Bar */}
         <View style={styles.compactProgressBar}>
           {STEPS.map((step, idx) => {
-            const isFilled = idx <= activeIndex;
-            const isCurrent = idx === activeIndex;
+            const isDone = getIsStepDone(idx, step.key);
+            const isCurrent = getIsStepCurrent(idx, step.key);
+            const isFilled = isDone || isCurrent;
             return (
               <View
                 key={step.key}
@@ -145,7 +180,9 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
                   styles.compactProgressSegment,
                   {
                     backgroundColor: isFilled
-                      ? step.color
+                      ? isDone
+                        ? "#10B981"
+                        : step.color
                       : isDark
                         ? "rgba(255,255,255,0.1)"
                         : "#CBD5E1",
@@ -198,7 +235,9 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
               ]}
             >
               <Text style={[styles.stepPillText, { color: currentStep.color }]}>
-                State {activeIndex + 1} / 5
+                {normalized === "both_travelling"
+                  ? "OTP Verified"
+                  : `State ${activeIndex + 1} / 5`}
               </Text>
             </View>
           </View>
@@ -211,14 +250,13 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
       {/* 5-Step Horizontal Stepper */}
       <View style={styles.stepperTrack}>
         {STEPS.map((step, idx) => {
-          const isDone = idx < activeIndex;
-          const isCurrent = idx === activeIndex;
-          const isUpcoming = idx > activeIndex;
+          const isDone = getIsStepDone(idx, step.key);
+          const isCurrent = getIsStepCurrent(idx, step.key);
 
-          const dotColor = isCurrent
-            ? step.color
-            : isDone
-              ? "#10B981"
+          const dotColor = isDone
+            ? "#10B981"
+            : isCurrent
+              ? step.color
               : isDark
                 ? "rgba(255,255,255,0.2)"
                 : "#CBD5E1";
@@ -230,10 +268,10 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
                   style={[
                     styles.stepCircle,
                     {
-                      backgroundColor: isCurrent
-                        ? `${step.color}25`
-                        : isDone
-                          ? "#10B98125"
+                      backgroundColor: isDone
+                        ? "#10B98125"
+                        : isCurrent
+                          ? `${step.color}25`
                           : isDark
                             ? "rgba(255,255,255,0.06)"
                             : "#F1F5F9",
@@ -256,12 +294,12 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
                   style={[
                     styles.stepLabel,
                     {
-                      color: isCurrent
-                        ? step.color
-                        : isDone
-                          ? textPrimary
+                      color: isDone
+                        ? "#10B981"
+                        : isCurrent
+                          ? step.color
                           : textMuted,
-                      fontWeight: isCurrent ? "700" : "500",
+                      fontWeight: isCurrent || isDone ? "700" : "500",
                     },
                   ]}
                   numberOfLines={1}
@@ -277,7 +315,7 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
                     styles.connectorLine,
                     {
                       backgroundColor:
-                        idx < activeIndex
+                        isDone || idx < activeIndex
                           ? "#10B981"
                           : isDark
                             ? "rgba(255,255,255,0.12)"

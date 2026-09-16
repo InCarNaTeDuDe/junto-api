@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { ApiService } from "@/services/api";
 
 interface OfferRideTabProps {
   offerPickup: string;
@@ -38,6 +39,7 @@ interface OfferRideTabProps {
   onBack: () => void;
   popularLocations: string[];
   isDark?: boolean;
+  existingRides?: any[];
 }
 
 export const formatMockupDateTime = (date: Date, time: Date): string => {
@@ -123,10 +125,94 @@ export default function OfferRideTab({
   onBack,
   popularLocations,
   isDark = true,
+  existingRides,
 }: OfferRideTabProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
+
+  // Real-time vehicle number validation: prevents offering rides if vehicle is in travelling state
+  const [vehicleValidation, setVehicleValidation] = useState<{
+    checking: boolean;
+    isValid: boolean | null;
+    message?: string;
+    activeRide?: { from: string; to: string; status: string };
+  }>({ checking: false, isValid: null });
+
+  useEffect(() => {
+    const raw = (offerVehicleNumber || "").trim();
+    const cleanReg = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    if (!cleanReg || cleanReg.length < 4) {
+      setVehicleValidation({ checking: false, isValid: null });
+      return;
+    }
+
+    // 1. Immediate local check against active rides list if provided
+    if (existingRides && existingRides.length > 0) {
+      const busyRide = existingRides.find((r) => {
+        const rReg = (r.registrationNumber || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+        if (!rReg || rReg !== cleanReg) return false;
+        const isTravelling =
+          r.status === "in_progress" ||
+          r.status === "both_travelling" ||
+          !!r.isDriverTravelling ||
+          (r.passengers || []).some((p: any) => p.isTravelling);
+        return isTravelling;
+      });
+
+      if (busyRide) {
+        setVehicleValidation({
+          checking: false,
+          isValid: false,
+          message: `Vehicle "${raw.toUpperCase()}" is currently on an active trip (${busyRide.from} ➔ ${busyRide.to}). A new ride cannot be created with this vehicle until the ongoing trip is finished.`,
+          activeRide: {
+            from: busyRide.from,
+            to: busyRide.to,
+            status: busyRide.status || "in_progress",
+          },
+        });
+        return;
+      }
+    }
+
+    // 2. Debounced API check against backend database
+    setVehicleValidation((prev) => ({ ...prev, checking: true }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await ApiService.get<{
+          isAvailable: boolean;
+          message?: string;
+          activeRide?: any;
+        }>(
+          `/api/rides/check-vehicle?registrationNumber=${encodeURIComponent(cleanReg)}`,
+        );
+
+        if (res && res.isAvailable === false) {
+          setVehicleValidation({
+            checking: false,
+            isValid: false,
+            message:
+              res.message ||
+              "This vehicle is currently on an active trip in travelling state.",
+            activeRide: res.activeRide,
+          });
+        } else {
+          setVehicleValidation({
+            checking: false,
+            isValid: true,
+            message: "Vehicle available for new ride",
+          });
+        }
+      } catch {
+        setVehicleValidation({ checking: false, isValid: null });
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [offerVehicleNumber, existingRides]);
 
   const onDateChange = (_event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -480,7 +566,18 @@ export default function OfferRideTab({
               <Text style={{ color: "#EF4444" }}>*</Text>
             </Text>
           </View>
-          <View style={styles.plateInputContainer}>
+          <View
+            style={[
+              styles.plateInputContainer,
+              vehicleValidation.isValid === false && {
+                borderColor: "#EF4444",
+                backgroundColor: "rgba(239, 68, 68, 0.08)",
+              },
+              vehicleValidation.isValid === true && {
+                borderColor: "#10B981",
+              },
+            ]}
+          >
             <View style={styles.indPlateBadge}>
               <Text style={styles.indPlateBadgeText}>IND</Text>
             </View>
@@ -493,6 +590,36 @@ export default function OfferRideTab({
               style={styles.plateTextInput}
             />
           </View>
+
+          {/* Real-time Vehicle Availability Status */}
+          {vehicleValidation.checking ? (
+            <View style={styles.vehicleStatusRow}>
+              <ActivityIndicator size="small" color="#38BDF8" />
+              <Text style={styles.vehicleCheckingText}>
+                Checking vehicle availability...
+              </Text>
+            </View>
+          ) : vehicleValidation.isValid === false ? (
+            <View style={styles.vehicleErrorBox}>
+              <View style={styles.vehicleErrorHeader}>
+                <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                <Text style={styles.vehicleErrorTitle}>
+                  Vehicle Currently in Transit / Travelling State
+                </Text>
+              </View>
+              <Text style={styles.vehicleErrorMessage}>
+                {vehicleValidation.message ||
+                  "This vehicle is currently on an active trip. Neither you nor another user can create or schedule a ride with this vehicle until the ongoing trip is completed."}
+              </Text>
+            </View>
+          ) : vehicleValidation.isValid === true ? (
+            <View style={styles.vehicleSuccessRow}>
+              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              <Text style={styles.vehicleSuccessText}>
+                Vehicle available for booking
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* 7. Seats Available Card */}
@@ -608,13 +735,25 @@ export default function OfferRideTab({
 
         {/* 9. Post Ride Action Button */}
         <TouchableOpacity
-          style={[styles.postRideBtn, isPublishing && { opacity: 0.7 }]}
+          style={[
+            styles.postRideBtn,
+            (isPublishing || vehicleValidation.isValid === false) && {
+              opacity: 0.6,
+              backgroundColor:
+                vehicleValidation.isValid === false ? "#475569" : "#38BDF8",
+            },
+          ]}
           onPress={onPublish}
-          disabled={isPublishing}
+          disabled={isPublishing || vehicleValidation.isValid === false}
           activeOpacity={0.85}
         >
           {isPublishing ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : vehicleValidation.isValid === false ? (
+            <>
+              <Ionicons name="lock-closed" size={18} color="#CBD5E1" />
+              <Text style={styles.postRideBtnText}>Vehicle in Transit</Text>
+            </>
           ) : (
             <>
               <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
@@ -1082,5 +1221,50 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: 1,
+  },
+  vehicleStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  vehicleCheckingText: {
+    fontSize: 12,
+    color: "#38BDF8",
+  },
+  vehicleErrorBox: {
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.4)",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  vehicleErrorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  vehicleErrorTitle: {
+    color: "#EF4444",
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  vehicleErrorMessage: {
+    color: "#FCA5A5",
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  vehicleSuccessRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+  },
+  vehicleSuccessText: {
+    color: "#10B981",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

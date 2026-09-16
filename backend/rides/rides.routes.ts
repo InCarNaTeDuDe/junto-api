@@ -20,6 +20,7 @@ import {
   verifyVehicleHandler,
   verifyDriverHandler,
   verifyRideOtpHandler,
+  checkVehicleAvailabilityHandler,
 } from "./rides.controller";
 import {
   CreateRideSchema,
@@ -34,6 +35,7 @@ import { authenticate } from "../middleware/authenticate";
 const router = Router();
 
 // Authenticated ride endpoints
+router.get("/check-vehicle", authenticate, checkVehicleAvailabilityHandler);
 router.post("/verify-vehicle", authenticate, verifyVehicleHandler);
 router.post("/verify-driver", authenticate, verifyDriverHandler);
 router.get("/", authenticate, getRidesHandler);

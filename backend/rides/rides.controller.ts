@@ -19,6 +19,7 @@ import {
   verifyVehicleService,
   verifyDriverService,
   verifyRideOtp,
+  checkVehicleAvailability,
 } from "./rides.service";
 import {
   CreateRideInput,
@@ -350,6 +351,24 @@ export async function verifyDriverHandler(
   try {
     const { dlNumber, phone } = req.body;
     const result = await verifyDriverService(dlNumber, phone, req.user);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function checkVehicleAvailabilityHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const registrationNumber = (req.query.registrationNumber as string) || "";
+    const excludeRideId = (req.query.excludeRideId as string) || undefined;
+    const result = await checkVehicleAvailability(
+      registrationNumber,
+      excludeRideId,
+    );
     return res.status(200).json(result);
   } catch (err) {
     next(err);

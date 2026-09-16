@@ -57,6 +57,84 @@ export async function getRideById(id: string): Promise<RideRecord | null> {
 }
 
 /**
+ * Check if a vehicle registration number is currently in a travelling / in-progress trip state.
+ * Prevents the same or a different user from creating a ride with the same vehicle.
+ */
+export async function isVehicleInTravellingState(
+  registrationNumber: string,
+  excludeRideId?: string,
+): Promise<{ inTravelling: boolean; ride?: RideRecord }> {
+  if (!registrationNumber) return { inTravelling: false };
+  const cleanReg = registrationNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!cleanReg) return { inTravelling: false };
+
+  const allRides = await rideRepository.findAll();
+  const busyRide = allRides.find((r) => {
+    if (r.isDeleted && r.isDeleted !== 0) return false;
+    if (excludeRideId && r.id === excludeRideId) return false;
+    if (r.status === "completed" || r.status === "cancelled") return false;
+
+    const reg = (r.registrationNumber || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    if (!reg || reg !== cleanReg) return false;
+
+    const isTransitOrProgress =
+      r.status === "in_progress" ||
+      r.status === "both_travelling" ||
+      !!r.isDriverTravelling ||
+      (r.passengers || []).some((p) => p.isTravelling);
+
+    return isTransitOrProgress;
+  });
+
+  if (busyRide) {
+    return { inTravelling: true, ride: busyRide };
+  }
+  return { inTravelling: false };
+}
+
+/**
+ * Check vehicle availability for a new ride or update
+ */
+export async function checkVehicleAvailability(
+  registrationNumber: string,
+  excludeRideId?: string,
+): Promise<{
+  isAvailable: boolean;
+  message?: string;
+  activeRide?: {
+    id: string;
+    status: string;
+    from: string;
+    to: string;
+    driverName: string;
+    isDriverTravelling?: boolean;
+  };
+}> {
+  const check = await isVehicleInTravellingState(
+    registrationNumber,
+    excludeRideId,
+  );
+  if (check.inTravelling && check.ride) {
+    return {
+      isAvailable: false,
+      message: `Vehicle "${registrationNumber.toUpperCase()}" is currently on an active trip (${check.ride.from} ➔ ${check.ride.to}). A new ride cannot be created or scheduled with this vehicle until the ongoing trip is completed.`,
+      activeRide: {
+        id: check.ride.id,
+        status: check.ride.status,
+        from: check.ride.from,
+        to: check.ride.to,
+        driverName: check.ride.driverName,
+        isDriverTravelling: !!check.ride.isDriverTravelling,
+      },
+    };
+  }
+
+  return { isAvailable: true, message: "Vehicle is available." };
+}
+
+/**
  * Create a new ride
  */
 export async function createRide(
@@ -68,34 +146,13 @@ export async function createRide(
   }
 
   // 1. Prevent duplicate active ride with the same vehicle
-  // Once the vehicle is in transit or in ride progress, user cannot create another ride with that vehicle
+  // Once the vehicle is in travelling or active progress, neither the same user nor any different user can create a ride with that vehicle
   if (input.registrationNumber) {
-    const cleanReg = input.registrationNumber
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-    if (cleanReg) {
-      const allRides = await rideRepository.findAll();
-      const busyVehicleRide = allRides.find((r) => {
-        if (r.isDeleted && r.isDeleted !== 0) return false;
-        const reg = (r.registrationNumber || "")
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "");
-        if (!reg || reg !== cleanReg) return false;
-
-        const isTransitOrProgress =
-          r.status === "in_progress" ||
-          r.status === "both_travelling" ||
-          (r.status === "active" &&
-            (r.isDriverTravelling ||
-              (r.passengers || []).some((p) => p.isTravelling)));
-        return isTransitOrProgress;
-      });
-
-      if (busyVehicleRide) {
-        throw new Error(
-          `Vehicle "${input.registrationNumber}" is currently in transit or on an active trip. You cannot create another ride with this vehicle until the ongoing ride is completed.`,
-        );
-      }
+    const check = await isVehicleInTravellingState(input.registrationNumber);
+    if (check.inTravelling && check.ride) {
+      throw new Error(
+        `Vehicle "${input.registrationNumber}" is currently in travelling state on an active trip (${check.ride.from} ➔ ${check.ride.to}). Neither you nor another user can create a ride with this vehicle until the ongoing trip finishes.`,
+      );
     }
   }
 
@@ -390,6 +447,22 @@ export async function updateRide(
     throw new Error(
       "Vehicle registration number cannot be changed once the ride has started.",
     );
+  }
+
+  // Prevent changing to a vehicle that is currently in travelling state on another ride
+  if (
+    input.registrationNumber &&
+    input.registrationNumber !== ride.registrationNumber
+  ) {
+    const check = await isVehicleInTravellingState(
+      input.registrationNumber,
+      rideId,
+    );
+    if (check.inTravelling && check.ride) {
+      throw new Error(
+        `Vehicle "${input.registrationNumber}" is currently on an active trip (${check.ride.from} ➔ ${check.ride.to}). You cannot switch to this vehicle until its ride is completed.`,
+      );
+    }
   }
 
   const updatedRide = await rideRepository.updateRide(rideId, input);
@@ -707,6 +780,8 @@ export async function updateRideGpsLocation(
     rideId,
     input.latitude,
     input.longitude,
+    input.heading,
+    input.speed ?? (input as any).speedKmh,
   );
 
   if (!updatedRide) {

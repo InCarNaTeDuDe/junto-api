@@ -212,7 +212,7 @@ export default function MyRidesTab({
       setOtpModalRide(null);
       Alert.alert(
         "OTP Exchanged & Verified! 🤝",
-        "Both parties have met! Live trip controls and safety features are now active.",
+        "OTP has been verified! Live trip controls and safety features are now active.",
       );
     } catch (err: any) {
       setOtpError(err?.message || "Failed to verify OTP.");
@@ -431,7 +431,7 @@ export default function MyRidesTab({
                           {rideState === "completed"
                             ? "Completed"
                             : rideState === "both_travelling"
-                              ? "Both Travelling"
+                              ? "OTP Exchanged"
                               : rideState === "in_progress"
                                 ? "In Progress"
                                 : "Active"}
@@ -463,6 +463,9 @@ export default function MyRidesTab({
                     <Text style={styles.metaText}>
                       {toTitleCase(ride.vehicleType || "Car")} • {seatsCount}{" "}
                       seats • ₹{ride.price} per seat
+                      {ride.registrationNumber
+                        ? ` • ${ride.registrationNumber}`
+                        : ""}
                     </Text>
                   </View>
 
@@ -473,6 +476,14 @@ export default function MyRidesTab({
                     driverTravelling={driverIsTravelling}
                     passengerTravelling={
                       ride.passengers?.some((p) => p.isTravelling) || false
+                    }
+                    otpExchanged={
+                      rideState === "both_travelling" ||
+                      rideState === "in_progress" ||
+                      ride.status === "completed" ||
+                      (ride.passengers || []).some(
+                        (p) => p.status === "confirmed" && p.otpVerified,
+                      )
                     }
                   />
 
@@ -521,8 +532,7 @@ export default function MyRidesTab({
                       </View>
                       <Text style={styles.driverMeetingSub}>
                         When you meet your co-rider at the pickup spot, verify
-                        the 4-digit code shown on their screen to mark "Both
-                        Have Met".
+                        the 4-digit code shown on their screen to exchange OTP.
                       </Text>
                       <TouchableOpacity
                         style={styles.verifyOtpBtn}
@@ -535,13 +545,13 @@ export default function MyRidesTab({
                           color="#FFFFFF"
                         />
                         <Text style={styles.verifyOtpBtnText}>
-                          Verify Co-Rider OTP & Confirm Meeting
+                          Verify Co-Rider OTP
                         </Text>
                       </TouchableOpacity>
                     </View>
                   )}
 
-                  {/* Both Have Met Status Confirmation */}
+                  {/* OTP Exchanged Status Confirmation */}
                   {rideState === "both_travelling" && (
                     <View style={styles.metConfirmedBadge}>
                       <Ionicons
@@ -550,7 +560,7 @@ export default function MyRidesTab({
                         color="#10B981"
                       />
                       <Text style={styles.metConfirmedBadgeText}>
-                        Both Have Met • OTP Exchanged & Verified
+                        OTP Exchanged & Verified
                       </Text>
                     </View>
                   )}
@@ -754,6 +764,9 @@ export default function MyRidesTab({
                   <Text style={styles.metaText}>
                     Driver: {ride.driverName} •{" "}
                     {toTitleCase(ride.vehicleType || "Car")} • ₹{ride.price}
+                    {ride.registrationNumber
+                      ? ` • ${ride.registrationNumber}`
+                      : ""}
                   </Text>
                 </View>
 
@@ -763,6 +776,12 @@ export default function MyRidesTab({
                   isDark={isDark}
                   driverTravelling={!!ride.isDriverTravelling}
                   passengerTravelling={passengerIsTravelling}
+                  otpExchanged={
+                    rideState === "both_travelling" ||
+                    rideState === "in_progress" ||
+                    isCompleted ||
+                    !!userReq?.otpVerified
+                  }
                 />
 
                 {/* Co-Rider 4-Digit Unique Ride OTP */}
@@ -839,7 +858,7 @@ export default function MyRidesTab({
                         ]}
                       >
                         {isOtpExchanged
-                          ? "Both parties have met! OTP verified. Have a safe journey."
+                          ? "OTP verified & exchanged! Have a safe journey."
                           : "Share this unique 4-digit OTP with your driver when you meet at the pickup point."}
                       </Text>
 
@@ -892,7 +911,7 @@ export default function MyRidesTab({
                               { color: "#10B981" },
                             ]}
                           >
-                            Both have met • Live safety features active
+                            OTP exchanged • Live safety features active
                           </Text>
                         </View>
                       )}
@@ -1175,8 +1194,8 @@ export default function MyRidesTab({
                     color="#8FA0B8"
                   />
                   <Text style={styles.modalHintText}>
-                    Verifying transitions trip status to "Both Have Met (OTP
-                    Exchanged)" and activates live trip controls.
+                    Verifying transitions trip status to "OTP Exchanged" and
+                    activates live trip controls.
                   </Text>
                 </View>
 
@@ -1598,9 +1617,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14, 165, 233, 0.08)",
     borderWidth: 1,
     borderColor: "rgba(56, 189, 248, 0.3)",
-    borderRadius: 14,
-    padding: 14,
-    marginVertical: 10,
+    borderRadius: 12,
+    padding: 10,
+    marginVertical: 6,
   },
   otpCardContainerGrayed: {
     backgroundColor: "rgba(30, 41, 59, 0.5)",
@@ -1641,15 +1660,15 @@ const styles = StyleSheet.create({
   otpDigitsRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 12,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 8,
   },
   otpDigitBox: {
-    width: 52,
-    height: 56,
-    borderRadius: 12,
+    width: 36,
+    height: 40,
+    borderRadius: 8,
     backgroundColor: "#0D1B36",
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#38BDF8",
     alignItems: "center",
     justifyContent: "center",
@@ -1659,10 +1678,10 @@ const styles = StyleSheet.create({
     borderColor: "#475569",
   },
   otpDigitText: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "700",
     color: "#38BDF8",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   otpDigitTextGrayed: {
     color: "#94A3B8",
@@ -1689,34 +1708,34 @@ const styles = StyleSheet.create({
   },
   modalContentCard: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 360,
     backgroundColor: "#0D162A",
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
-    padding: 20,
+    padding: 16,
   },
   modalHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(56, 189, 248, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
   modalTitleText: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
   modalSubtitleText: {
-    fontSize: 11.5,
+    fontSize: 11,
     color: "#8FA0B8",
     marginTop: 1,
   },
@@ -1724,10 +1743,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalBody: {
-    marginTop: 4,
+    marginTop: 2,
   },
   modalInputLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: "#CBD5E1",
     marginBottom: 6,
@@ -1736,15 +1755,16 @@ const styles = StyleSheet.create({
   },
   modalOtpInput: {
     backgroundColor: "#131F35",
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: "#38BDF8",
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#FFFFFF",
     textAlign: "center",
-    letterSpacing: 8,
-    paddingVertical: 12,
+    letterSpacing: 6,
+    paddingVertical: 8,
+    height: 44,
     marginBottom: 8,
   },
   modalErrorText: {

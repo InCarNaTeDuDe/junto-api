@@ -245,6 +245,24 @@ export class Ride {
   currentLongitude?: number;
 
   @Column({
+    type: "int",
+    default: 60,
+  })
+  locationUpdateIntervalSeconds!: number;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  currentHeading?: number;
+
+  @Column({
+    type: "double precision",
+    nullable: true,
+  })
+  currentSpeedKmh?: number;
+
+  @Column({
     type: "varchar",
     length: 60,
     nullable: true,
@@ -256,6 +274,18 @@ export class Ride {
     default: false,
   })
   isGpsActive?: boolean;
+
+  @Column({
+    type: "jsonb",
+    default: () => "'[]'",
+  })
+  locationHistory!: Array<{
+    latitude: number;
+    longitude: number;
+    heading?: number;
+    speedKmh?: number;
+    recordedAt: string;
+  }>;
 
   @Column({
     type: "jsonb",
