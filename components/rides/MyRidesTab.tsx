@@ -20,22 +20,9 @@ import {
   ProblemReportData,
 } from "./RideCompletedRatingModal";
 import { RideChatModal } from "./RideChatModal";
+import { RideItem, RidePassenger } from "@/types/rides";
 
-export interface RidePassenger {
-  id?: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  seats: number;
-  pickupPoint?: string;
-  passengerPhone?: string;
-  phone?: string;
-  status?: "pending" | "confirmed" | "rejected" | "cancelled" | "declined";
-  joinedAt: string;
-  isTravelling?: boolean;
-  otp?: string;
-  otpVerified?: boolean;
-}
+export type { RideItem, RidePassenger };
 
 export function getCoRiderOtp(
   ride: RideItem,
@@ -57,47 +44,6 @@ export function getCoRiderOtp(
   }
   const code = (Math.abs(hash) % 9000) + 1000;
   return String(code);
-}
-
-export interface RideItem {
-  id: string;
-  userId?: string;
-  driverId?: string;
-  driverName: string;
-  driverPhone?: string;
-  driverAvatar?: string;
-  driverRating?: number;
-  from: string;
-  to: string;
-  time: string;
-  vehicleType: "car" | "bike" | "other";
-  seatsLeft: number;
-  totalSeats?: number;
-  price: number | string;
-  verified: boolean;
-  notes?: string;
-  date?: string;
-  passengers?: RidePassenger[];
-  vehicleModel?: string;
-  registrationNumber?: string;
-  pickupLocation?: string;
-  dropLocation?: string;
-  status?:
-    | "active"
-    | "both_travelling"
-    | "in_progress"
-    | "completed"
-    | "cancelled";
-  reviewsCount?: number;
-  isPopular?: boolean;
-  isEcoFriendly?: boolean;
-  departureTimeFormatted?: string;
-  arrivalTimeFormatted?: string;
-  currentLatitude?: number;
-  currentLongitude?: number;
-  lastGpsUpdatedAt?: string;
-  isGpsActive?: boolean;
-  isDriverTravelling?: boolean;
 }
 
 interface MyRidesTabProps {
@@ -1030,7 +976,7 @@ export default function MyRidesTab({
 
                 {/* Action Buttons: Note that Edit and Delete NEVER appear on joined rides */}
                 <View style={styles.actionsRow}>
-                  <TouchableOpacity
+                  {/* <TouchableOpacity
                     style={[styles.actionBtnSecondary, { flex: 1 }]}
                     onPress={() => setChatModalRide(ride)}
                     activeOpacity={0.8}
@@ -1043,7 +989,7 @@ export default function MyRidesTab({
                     <Text style={[styles.actionBtnText, { color: "#C084FC" }]}>
                       Chat
                     </Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
 
                   <TouchableOpacity
                     style={[styles.actionBtnSecondary, { flex: 1 }]}

@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { RideItem } from "@/app/(screens)/rides";
+import { RideItem } from "@/types/rides";
 
 interface ShareRideModalProps {
   visible: boolean;

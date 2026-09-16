@@ -39,59 +39,9 @@ import {
   requestCurrentLocation,
   UserLocation,
 } from "@/services/locationServices";
+import { RideItem, RidePassenger } from "@/types/rides";
 
-export interface RidePassenger {
-  id?: string;
-  userId: string;
-  userName: string;
-  seats: number;
-  pickupPoint?: string;
-  passengerPhone?: string;
-  status?: "pending" | "confirmed" | "declined" | "rejected" | "cancelled";
-  joinedAt: string;
-  isTravelling?: boolean;
-}
-
-export interface RideItem {
-  id: string;
-  userId?: string;
-  driverId?: string;
-  driverName: string;
-  driverRating: number;
-  driverAvatar: string;
-  from: string;
-  to: string;
-  time: string;
-  vehicleType: "car" | "bike" | "other";
-  seatsLeft: number;
-  totalSeats?: number;
-  price: number | string;
-  verified: boolean;
-  notes?: string;
-  date?: string;
-  passengers?: RidePassenger[];
-  vehicleModel?: string;
-  registrationNumber?: string;
-  pickupLocation?: string;
-  dropLocation?: string;
-  status?:
-    | "active"
-    | "both_travelling"
-    | "in_progress"
-    | "completed"
-    | "cancelled";
-  currentLatitude?: number;
-  currentLongitude?: number;
-  lastGpsUpdatedAt?: string;
-  isGpsActive?: boolean;
-  locationUpdateIntervalSeconds?: number;
-  reviewsCount?: number;
-  isPopular?: boolean;
-  isEcoFriendly?: boolean;
-  departureTimeFormatted?: string;
-  arrivalTimeFormatted?: string;
-  isDriverTravelling?: boolean;
-}
+export type { RideItem, RidePassenger };
 
 const POPULAR_LOCATIONS = [
   "Hitec City Cyber Towers",
@@ -475,7 +425,7 @@ export default function RidesScreen() {
           id: `ride-${Date.now()}`,
           userId: user?.id || "usr-current-user",
           driverName: user?.name || "Rahul S",
-          driverRating: 4.9,
+          driverRating: 0,
           driverAvatar:
             user?.avatar ||
             "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
@@ -504,9 +454,8 @@ export default function RidesScreen() {
           seatsLeft: offerSeats,
           totalSeats: offerSeats,
           verified: true,
-          // isPopular: false,
-          // isEcoFriendly: true,
-          reviewsCount: 12,
+          reviewsCount: 0,
+          ratings: [],
           status: "active",
           passengers: [],
         };
@@ -709,22 +658,10 @@ export default function RidesScreen() {
       return;
     }
     if (activeCoRiderRide && activeCoRiderRide.id !== ride.id) {
-      const vehicleEmojiMap: Record<string, string> = {
-        car: "🚗",
-        bike: "🏍️",
-        motorcycle: "🏍️",
-        auto: "🛺",
-        auto_rickshaw: "🛺",
-        bus: "🚌",
-        van: "🚐",
-      };
-
-      const vehicleEmoji =
-        vehicleEmojiMap[activeCoRiderRide.vehicleType?.toLowerCase()] ?? "🚗";
-
       Alert.alert(
-        `Already In A Ride ${vehicleEmoji}`,
-        `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}). You cannot request a seat for another ride while in an active ride.`,
+        "Already In A Ride 🚗",
+        `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}).
+          Please check the "My Rides" tab.`,
         [
           { text: "View My Ride", onPress: () => setActiveTab("my_rides") },
           { text: "OK" },
@@ -1989,12 +1926,50 @@ export default function RidesScreen() {
                         </View>
                       </View>
 
-                      {/* Dotted Vertical Connector */}
-                      <View style={styles.dottedConnectorCol}>
-                        <View style={styles.connectorDot} />
-                        <View style={styles.connectorDot} />
-                        <View style={styles.connectorDot} />
-                        <View style={styles.connectorDot} />
+                      {/* Dotted Vertical Connector & Registration Number Badge between location pills */}
+                      <View style={styles.routeMidConnectorRow}>
+                        <View style={styles.dottedConnectorCol}>
+                          <View style={styles.connectorDot} />
+                          <View style={styles.connectorDot} />
+                          <View style={styles.connectorDot} />
+                        </View>
+                        {ride.registrationNumber ? (
+                          <View style={styles.plateBadgeSmall}>
+                            <View style={styles.plateIndFlagSmall}>
+                              <Text style={styles.plateIndTextSmall}>IND</Text>
+                            </View>
+                            <Text style={styles.plateNumberSmallText}>
+                              {ride.registrationNumber}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {/* Review Star Aggregate: ONLY show if ratings array has items AND driverRating > 0 */}
+                        {Array.isArray(ride.ratings) &&
+                        ride.ratings.length > 0 &&
+                        ride.driverRating !== undefined &&
+                        ride.driverRating !== null &&
+                        Number(ride.driverRating) > 0 ? (
+                          <View style={styles.reviewAggregateBadge}>
+                            <Ionicons name="star" size={11} color="#F59E0B" />
+                            <Text
+                              style={[
+                                styles.reviewAggregateRatingText,
+                                { color: textPrimary },
+                              ]}
+                            >
+                              {Number(ride.driverRating).toFixed(1)}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.reviewAggregateCountText,
+                                { color: isDark ? "#94A3B8" : "#64748B" },
+                              ]}
+                            >
+                              ({ride.ratings.length})
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
 
                       {/* Drop */}
@@ -2167,7 +2142,7 @@ export default function RidesScreen() {
 
                   {/* Driver & Action Footer Row */}
                   <View style={styles.cardFooterMainRow}>
-                    {/* Left: Driver Avatar, Name & Rating */}
+                    {/* Left: Driver Avatar & Name */}
                     <View style={styles.driverProfileGroup}>
                       <Image
                         source={{
@@ -2189,38 +2164,8 @@ export default function RidesScreen() {
                             : ride.driverName}{" "}
                           {isOwner ? "(You)" : ""}
                         </Text>
-                        {/* <View style={styles.ratingAndReviewsRow}>
-                          <Ionicons name="star" size={13} color="#F59E0B" />
-                          <Text
-                            style={[
-                              styles.ratingScoreText,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {ride.driverRating
-                              ? Number(ride.driverRating).toFixed(1)
-                              : ""}
-                          </Text>
-                          <Text style={styles.reviewsCountText}>
-                            ({ride.reviewsCount || 0} rides)
-                          </Text>
-                        </View> */}
                       </View>
                     </View>
-
-                    {/* Middle: Plate Badge & Verified Pill */}
-                    {ride.registrationNumber ? (
-                      <View style={styles.plateAndVerifiedCol}>
-                        <View style={styles.plateBadgeNew}>
-                          <View style={styles.plateIndFlag}>
-                            <Text style={styles.plateIndText}>IND</Text>
-                          </View>
-                          <Text style={styles.plateNumberString}>
-                            {ride.registrationNumber}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : null}
 
                     {/* Right: Action Button */}
                     <View style={styles.cardActionContainer}>
@@ -2358,7 +2303,8 @@ export default function RidesScreen() {
                           onPress={() =>
                             Alert.alert(
                               "Already in a Ride 🚗",
-                              `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}). You cannot request seats for other rides while your current ride is active.`,
+                              `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}). You cannot request seats for other rides while your current ride is active.
+                                Please check the "My Rides" tab.`,
                               [
                                 {
                                   text: "View My Ride",
@@ -4905,15 +4851,22 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 1,
   },
+  routeMidConnectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 3,
+  },
   dottedConnectorCol: {
-    marginLeft: 4,
-    paddingVertical: 3,
-    gap: 3,
+    width: 10,
+    alignItems: "center",
+    paddingVertical: 1,
+    gap: 2.5,
   },
   connectorDot: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
     backgroundColor: "#64748B",
   },
   priceColumn: {
@@ -5037,6 +4990,66 @@ const styles = StyleSheet.create({
     color: "#38BDF8",
     fontSize: 10,
     fontWeight: "600",
+  },
+
+  /* Thin & Small Vehicle Number & Review Aggregate Row */
+  vehicleAndReviewThinRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 6,
+    paddingHorizontal: 1,
+  },
+  plateBadgeSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FDE047",
+    borderRadius: 3.5,
+    borderWidth: 1,
+    borderColor: "#CA8A04",
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    gap: 3.5,
+  },
+  plateIndFlagSmall: {
+    backgroundColor: "#1E3A8A",
+    borderRadius: 1.5,
+    paddingHorizontal: 2.5,
+    paddingVertical: 0.5,
+  },
+  plateIndTextSmall: {
+    color: "#FFF",
+    fontSize: 7.5,
+    fontWeight: "900",
+  },
+  plateNumberSmallText: {
+    color: "#0F172A",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  plateBadgeSmallPlaceholder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3.5,
+    backgroundColor: "rgba(148, 163, 184, 0.12)",
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3.5,
+  },
+  reviewAggregateBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2.5,
+  },
+  reviewAggregateRatingText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  reviewAggregateCountText: {
+    fontSize: 10,
+    fontWeight: "500",
   },
 
   /* Action Container */
