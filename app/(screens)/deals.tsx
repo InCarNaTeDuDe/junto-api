@@ -1286,48 +1286,70 @@ export default function LocalDealsScreen() {
                     </View>
                   </View>
 
-                  {/* Action Buttons: Delete and EDIT buttons vertically on card on right side, ICONS ONLY */}
-                  {isDealOwner && (
-                    <View style={styles.cardVerticalActions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.actionIconBtn,
-                          {
-                            borderColor: "#D97706",
-                            backgroundColor: isDark
-                              ? "rgba(217, 119, 6, 0.15)"
-                              : "#FEF3C7",
-                          },
-                        ]}
-                        onPress={() => handleOpenEditDeal(deal)}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Edit"
-                      >
-                        <Ionicons name="pencil" size={15} color="#D97706" />
-                      </TouchableOpacity>
+                  {/* Action Buttons: Next to item, Image on left side and <Make deal> then EDIT DELETE buttons */}
+                  <View style={styles.cardItemActions}>
+                    <TouchableOpacity
+                      style={styles.cardMakeDealBtn}
+                      onPress={() => {
+                        if (isDealOwner) {
+                          Alert.alert(
+                            "Your Listing",
+                            "You are the seller of this listing. Use the Edit button to update pricing or details.",
+                          );
+                          return;
+                        }
+                        setSelectedDealForAction(deal);
+                        setOfferPrice(deal.price);
+                      }}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Make Deal"
+                    >
+                      <Ionicons name="flash" size={12} color="#FFFFFF" />
+                      <Text style={styles.cardMakeDealBtnText}>Make Deal</Text>
+                    </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={[
-                          styles.actionIconBtn,
-                          {
-                            borderColor: "#EF4444",
-                            backgroundColor: isDark
-                              ? "rgba(239, 68, 68, 0.15)"
-                              : "#FEE2E2",
-                          },
-                        ]}
-                        onPress={() => handleDeleteDeal(deal)}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Delete"
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={15}
-                          color="#EF4444"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                    {isDealOwner && (
+                      <View style={styles.cardOwnerActionRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionIconBtn,
+                            {
+                              borderColor: "#D97706",
+                              backgroundColor: isDark
+                                ? "rgba(217, 119, 6, 0.15)"
+                                : "#FEF3C7",
+                            },
+                          ]}
+                          onPress={() => handleOpenEditDeal(deal)}
+                          activeOpacity={0.7}
+                          accessibilityLabel="Edit"
+                        >
+                          <Ionicons name="pencil" size={13} color="#D97706" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.actionIconBtn,
+                            {
+                              borderColor: "#EF4444",
+                              backgroundColor: isDark
+                                ? "rgba(239, 68, 68, 0.15)"
+                                : "#FEE2E2",
+                            },
+                          ]}
+                          onPress={() => handleDeleteDeal(deal)}
+                          activeOpacity={0.7}
+                          accessibilityLabel="Delete"
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={13}
+                            color="#EF4444"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 {/* Description */}
@@ -1472,15 +1494,6 @@ export default function LocalDealsScreen() {
                         >
                           Chat
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.offerBtn}
-                        onPress={() => {
-                          setSelectedDealForAction(deal);
-                          setOfferPrice(deal.price);
-                        }}
-                      >
-                        <Text style={styles.offerBtnText}>⚡ Make Deal</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -3429,7 +3442,7 @@ const styles = StyleSheet.create({
   dealTopSection: {
     flexDirection: "row",
     gap: 10,
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   dealImage: {
     width: 76,
@@ -3439,19 +3452,48 @@ const styles = StyleSheet.create({
   },
   dealInfoWrap: {
     flex: 1,
+    minWidth: 0,
     justifyContent: "space-between",
     minHeight: 76,
   },
-  cardVerticalActions: {
+  cardItemActions: {
     flexDirection: "column",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    alignItems: "center",
-    height: 76,
+    minHeight: 76,
     paddingLeft: 2,
   },
+  cardMakeDealBtn: {
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 8,
+    paddingVertical: 5.5,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        boxShadow: "0 2px 5px rgba(245, 158, 11, 0.28)",
+      },
+      default: { elevation: 2 },
+    }),
+  },
+  cardMakeDealBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  cardOwnerActionRow: {
+    flexDirection: "row",
+    gap: 5,
+    alignItems: "center",
+    marginTop: 6,
+  },
   actionIconBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",

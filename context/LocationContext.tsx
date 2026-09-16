@@ -51,18 +51,21 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
       // 2. If user is logged in with details in DB, pull and update context & expo storage
       if (user && (user.location || user.city)) {
-        const userLoc: SelectedLocation = {
-          name: user.location || user.city || "Bengaluru",
-          city: user.city || user.location || "Bengaluru",
-          state: user.state || "Karnataka",
-          latitude: user.latitude != null ? Number(user.latitude) : 12.9716,
-          longitude: user.longitude != null ? Number(user.longitude) : 77.5946,
-        };
+        const locName = user.location || user.city || "";
+        if (locName) {
+          const userLoc: SelectedLocation = {
+            name: locName,
+            city: user.city || user.location || "",
+            state: user.state || "",
+            latitude: user.latitude != null ? Number(user.latitude) : 0,
+            longitude: user.longitude != null ? Number(user.longitude) : 0,
+          };
 
-        if (isMounted) {
-          setSelectedLocation(userLoc);
+          if (isMounted) {
+            setSelectedLocation(userLoc);
+          }
+          await saveSelectedLocation(userLoc);
         }
-        await saveSelectedLocation(userLoc);
       }
     }
 

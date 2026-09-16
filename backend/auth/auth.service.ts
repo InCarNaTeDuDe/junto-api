@@ -84,11 +84,6 @@ export async function loginWithGoogle(
           identityVerified: true,
           rating: 5,
           walletBalance: 0,
-          location: "Bengaluru",
-          city: "Bengaluru",
-          state: "Karnataka",
-          latitude: 12.9716,
-          longitude: 77.5946,
           lastLogin: new Date(),
         });
 
@@ -102,13 +97,6 @@ export async function loginWithGoogle(
       } else {
         user.lastLogin = new Date();
         user.avatar = googleUser.picture;
-        if (!user.location) {
-          user.location = "Bengaluru";
-          user.city = "Bengaluru";
-          user.state = "Karnataka";
-          user.latitude = 12.9716;
-          user.longitude = 77.5946;
-        }
         await userRepo.save(user);
       }
 

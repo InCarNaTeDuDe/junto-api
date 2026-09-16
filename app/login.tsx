@@ -224,29 +224,33 @@ export default function Login() {
         rating: data?.user?.rating ?? 5,
         walletBalance: data?.user?.walletBalance ?? 0,
         userHandle: data?.user?.userHandle || "",
-        location: data?.user?.location || "Bengaluru",
-        city: data?.user?.city || "Bengaluru",
-        state: data?.user?.state || "Karnataka",
+        location: data?.user?.location || "",
+        city: data?.user?.city || "",
+        state: data?.user?.state || "",
         latitude:
-          data?.user?.latitude != null ? Number(data?.user?.latitude) : 12.9716,
+          data?.user?.latitude != null
+            ? Number(data?.user?.latitude)
+            : undefined,
         longitude:
           data?.user?.longitude != null
             ? Number(data?.user?.longitude)
-            : 77.5946,
+            : undefined,
       };
 
       await login(userObj, data?.accessToken);
 
-      // Save user location pulled from DB into context & expo storage
-      const userLocationObj = {
-        name: userObj.location || userObj.city || "Bengaluru",
-        city: userObj.city || userObj.location || "Bengaluru",
-        state: userObj.state || "Karnataka",
-        latitude: userObj.latitude,
-        longitude: userObj.longitude,
-      };
-      await saveSelectedLocation(userLocationObj);
-      setSelectedLocation(userLocationObj);
+      // Save user location pulled from DB into context & expo storage if present
+      if (userObj.location || userObj.city) {
+        const userLocationObj = {
+          name: userObj.location || userObj.city || "",
+          city: userObj.city || userObj.location || "",
+          state: userObj.state || "",
+          latitude: userObj.latitude ?? 0,
+          longitude: userObj.longitude ?? 0,
+        };
+        await saveSelectedLocation(userLocationObj);
+        setSelectedLocation(userLocationObj);
+      }
 
       router.replace("/(tabs)");
     } catch (e) {

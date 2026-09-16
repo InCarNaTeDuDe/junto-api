@@ -66,21 +66,18 @@ export class User {
   @Column({
     type: "varchar",
     nullable: true,
-    default: "Bengaluru",
   })
   location?: string;
 
   @Column({
     type: "varchar",
     nullable: true,
-    default: "Bengaluru",
   })
   city?: string;
 
   @Column({
     type: "varchar",
     nullable: true,
-    default: "Karnataka",
   })
   state?: string;
 
