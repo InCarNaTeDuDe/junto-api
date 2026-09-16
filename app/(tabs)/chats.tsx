@@ -31,7 +31,13 @@ interface Thread {
   partnerAvatar?: string | null;
   partnerUrl?: string | null;
   avatar?: string | null;
-  category: "DAY MATES" | "TICKET SWAP" | "LOST & FOUND" | "GROUP" | string;
+  category:
+    | "DAY MATES"
+    | "TICKET SWAP"
+    | "LOST & FOUND"
+    | "LOCAL DEALS"
+    | "GROUP"
+    | string;
   contextTitle: string;
   lastMessage: string;
   lastTime: string;
@@ -42,6 +48,7 @@ interface Thread {
   place?: string;
   participantId?: string | null;
   image?: string | null;
+  entityType?: "ACTIVITY" | "LOCAL_DEALS";
 }
 
 export default function ChatsScreen() {
@@ -97,12 +104,20 @@ export default function ChatsScreen() {
             partnerUrl: pAvatar,
             avatar:
               pAvatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=8B5CF6&color=fff`,
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                displayName,
+              )}&background=8B5CF6&color=fff`,
+
             category: (ch.category || ch.type || "DAY MATES").toUpperCase(),
+
+            entityType:
+              ch.entityType === "LOCAL_DEALS" ? "LOCAL_DEALS" : "ACTIVITY",
+
             contextTitle:
               pName && ch.name !== pName
                 ? ch.name
                 : ch.subtitle || ch.type || "Channel",
+
             lastMessage: ch.lastMessage || "Tap to open chat",
             lastTime: ch.lastTime || "Active",
             unreadCount:
@@ -139,26 +154,31 @@ export default function ChatsScreen() {
 
     const handleMessageReceived = (msg: any) => {
       if (!msg) return;
-      const targetId = msg.activityId || msg.chatId;
+      const targetId = msg.dealId || msg.activityId || msg.chatId;
+      const messageEntityType = msg.dealId ? "LOCAL_DEALS" : "ACTIVITY";
 
-      setThreads((prevThreads) => {
-        return prevThreads.map((t) => {
-          if (t.id === targetId) {
+      setThreads((prevThreads) =>
+        prevThreads.map((thread) => {
+          if (
+            thread.id === targetId &&
+            thread.entityType === messageEntityType
+          ) {
             return {
-              ...t,
-              lastMessage: msg.content || msg.text || t.lastMessage,
+              ...thread,
+              lastMessage: msg.content || msg.text || thread.lastMessage,
               lastTime: msg.timestamp
                 ? new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   })
                 : "Just now",
-              unreadCount: t.unreadCount + 1,
+              unreadCount: thread.unreadCount + 1,
             };
           }
-          return t;
-        });
-      });
+
+          return thread;
+        }),
+      );
     };
 
     socket.on("receive_message", handleMessageReceived);
@@ -186,9 +206,10 @@ export default function ChatsScreen() {
   /* ---------------- Filtering Logic ---------------- */
   const filterCategories = [
     "All",
-    `Unread`,
+    "Unread",
     "Day Mates",
     "Tickets",
+    "Deals",
     "Lost & Found",
     "Groups",
   ];
@@ -204,6 +225,9 @@ export default function ChatsScreen() {
     } else if (activeFilter === "Tickets") {
       matchesCategory =
         item.category.includes("TICKET") || item.category.includes("SWAP");
+    } else if (activeFilter === "Deals") {
+      matchesCategory =
+        item.entityType === "LOCAL_DEALS" || item.category.includes("DEAL");
     } else if (activeFilter === "Lost & Found") {
       matchesCategory =
         item.category.includes("LOST") || item.category.includes("FOUND");
@@ -224,34 +248,46 @@ export default function ChatsScreen() {
 
   /* ---------------- Open Direct Chat ---------------- */
   const openChat = (thread: Thread) => {
+    const isDeal = thread.entityType === "LOCAL_DEALS";
+
     // Clear unread count locally
     setThreads((prev) =>
       prev.map((t) => (t.id === thread.id ? { ...t, unreadCount: 0 } : t)),
     );
+
     setActiveChatId(thread.id);
+
+    // Mark the correct entity type as read
     ApiService.post("/api/messages/mark-read", {
-      activityId: thread.id,
+      ...(isDeal ? { dealId: thread.id } : { activityId: thread.id }),
       participantId: thread.participantId,
     }).catch(() => {});
 
     router.push({
       pathname: "/(screens)/activity-chat",
       params: {
-        id: thread.id,
-        activityId: thread.id,
+        entityId: thread.id,
+        entityType: isDeal ? "LOCAL_DEALS" : "ACTIVITY",
+
+        // Keep these for compatibility
+        ...(isDeal ? { dealId: thread.id } : { activityId: thread.id }),
+
         participantId: thread.participantId || "",
+
         name: thread.name,
         user: thread.partnerName || thread.name,
         partner: thread.partnerName || thread.name,
+
         title: thread.contextTitle,
         contextTitle: thread.contextTitle,
+
         type: thread.category,
         category: thread.category,
         place: thread.place || "Nearby",
         right: thread.lastTime,
         avatar:
           thread.partnerAvatar || thread.partnerUrl || thread.avatar || "",
-        activityEmoji: thread.activityEmoji || "💬",
+        activityEmoji: thread.activityEmoji || (isDeal ? "🏷️" : "💬"),
         image: thread.image || "",
       },
     });
@@ -282,6 +318,12 @@ export default function ChatsScreen() {
       return {
         bg: isDark ? "rgba(20, 184, 166, 0.18)" : "#CCFBF1",
         text: isDark ? "#2DD4BF" : "#0D9488",
+      };
+    }
+    if (catUpper.includes("DEAL")) {
+      return {
+        bg: isDark ? "rgba(34, 197, 94, 0.18)" : "#DCFCE7",
+        text: isDark ? "#4ADE80" : "#16A34A",
       };
     }
     return {

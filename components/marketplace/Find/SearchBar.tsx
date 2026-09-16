@@ -1,11 +1,10 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -35,6 +34,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const textPrimary = isDark ? "#F8FAFC" : "#0F172A";
   const textMute = isDark ? "#94A3B8" : "#64748B";
 
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!isListening) {
+      pulse.stopAnimation();
+      pulse.setValue(1);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1.18,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [isListening, pulse]);
+
   return (
     <View style={styles.container}>
       <View
@@ -42,7 +70,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           styles.inputContainer,
           {
             backgroundColor: bg,
-            borderColor: value ? accentColor : border,
+            borderColor: value || isListening ? accentColor : border,
           },
         ]}
       >
@@ -68,7 +96,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             style={styles.actionBtn}
             onPress={() => {
               onChangeText("");
-              if (onClear) onClear();
+              onClear?.();
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -78,21 +106,46 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
         {onVoicePress && (
           <TouchableOpacity
-            style={[
-              styles.micBtn,
-              isListening && { backgroundColor: `${accentColor}20` },
-            ]}
+            style={styles.micBtn}
             onPress={onVoicePress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {isListening ? (
-              <ActivityIndicator size="small" color={accentColor} />
+              <Animated.View
+                style={[
+                  styles.listeningCircle,
+                  {
+                    backgroundColor: `${accentColor}18`,
+                    transform: [{ scale: pulse }],
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.soundWave, { backgroundColor: accentColor }]}
+                />
+                <View
+                  style={[
+                    styles.soundWave,
+                    styles.waveTall,
+                    { backgroundColor: accentColor },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.soundWave,
+                    styles.waveSmall,
+                    { backgroundColor: accentColor },
+                  ]}
+                />
+                <Ionicons
+                  name="mic"
+                  size={15}
+                  color={accentColor}
+                  style={styles.micIcon}
+                />
+              </Animated.View>
             ) : (
-              <Ionicons
-                name="mic"
-                size={18}
-                color={isListening ? accentColor : textMute}
-              />
+              <Ionicons name="mic" size={18} color={textMute} />
             )}
           </TouchableOpacity>
         )}
@@ -103,37 +156,66 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    width: "100%",
   },
+
   inputContainer: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1.5,
     paddingHorizontal: 12,
-    height: 46,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
+
   searchIcon: {
     marginRight: 8,
   },
+
   input: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: "500",
-    paddingVertical: 0,
+    fontSize: 15,
+    paddingVertical: 10,
   },
+
   actionBtn: {
     padding: 4,
+    marginRight: 4,
   },
+
   micBtn: {
-    padding: 6,
-    borderRadius: 16,
-    marginLeft: 4,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  listeningCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 2,
+  },
+
+  soundWave: {
+    width: 2,
+    height: 7,
+    borderRadius: 2,
+    opacity: 0.7,
+  },
+
+  waveTall: {
+    height: 13,
+  },
+
+  waveSmall: {
+    height: 5,
+  },
+
+  micIcon: {
+    marginLeft: 1,
   },
 });

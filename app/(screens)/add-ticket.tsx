@@ -694,6 +694,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
               mode="date"
               display="default"
               onChange={onDateChange}
+              minimumDate={new Date()}
               themeVariant={isDark ? "dark" : "light"}
             />
           </View>
