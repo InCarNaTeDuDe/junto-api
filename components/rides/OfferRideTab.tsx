@@ -166,8 +166,16 @@ export default function OfferRideTab({
       .trim()
       .toUpperCase();
 
-    // FIRST: validate registration format
-    if (!VEHICLE_NUMBER_REGEX.test(raw)) {
+    // Format spaces automatically
+    const formatted = formatVehicleNumber(raw);
+
+    // Update UI to formatted value
+    if (formatted !== offerVehicleNumber) {
+      setOfferVehicleNumber(formatted);
+    }
+
+    // Validate formatted value
+    if (!VEHICLE_NUMBER_REGEX.test(formatted)) {
       setVehicleValidation({
         checking: false,
         isValid: false,
@@ -175,10 +183,11 @@ export default function OfferRideTab({
         message: "Please enter a valid vehicle number like TS 09 EA 1234.",
       });
 
-      return; // IMPORTANT: do not call API
+      return; // 🚫 NO API CALL
     }
 
-    const cleanReg = raw.replace(/[^A-Z0-9]/g, "");
+    // Remove spaces for API comparison
+    const cleanReg = formatted.replace(/[^A-Z0-9]/g, "");
 
     // Local active ride check
     if (existingRides && existingRides.length > 0) {
@@ -322,6 +331,28 @@ export default function OfferRideTab({
     } else if (offerSeats < 2) {
       setOfferSeats(3);
     }
+  };
+
+  const formatVehicleNumber = (value: string) => {
+    const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    // TS09EA1234 → TS 09 EA 1234
+    if (clean.length <= 2) {
+      return clean;
+    }
+
+    if (clean.length <= 4) {
+      return `${clean.slice(0, 2)} ${clean.slice(2)}`;
+    }
+
+    if (clean.length <= 6) {
+      return `${clean.slice(0, 2)} ${clean.slice(2, 4)} ${clean.slice(4)}`;
+    }
+
+    return `${clean.slice(0, 2)} ${clean.slice(2, 4)} ${clean.slice(
+      4,
+      -4,
+    )} ${clean.slice(-4)}`;
   };
 
   return (
