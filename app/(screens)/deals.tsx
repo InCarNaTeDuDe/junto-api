@@ -1288,25 +1288,29 @@ export default function LocalDealsScreen() {
 
                   {/* Action Buttons: Next to item, Image on left side and <Make deal> then EDIT DELETE buttons */}
                   <View style={styles.cardItemActions}>
-                    <TouchableOpacity
-                      style={styles.cardMakeDealBtn}
-                      onPress={() => {
-                        if (isDealOwner) {
-                          Alert.alert(
-                            "Your Listing",
-                            "You are the seller of this listing. Use the Edit button to update pricing or details.",
-                          );
-                          return;
-                        }
-                        setSelectedDealForAction(deal);
-                        setOfferPrice(deal.price);
-                      }}
-                      activeOpacity={0.8}
-                      accessibilityLabel="Make Deal"
-                    >
-                      <Ionicons name="flash" size={12} color="#FFFFFF" />
-                      <Text style={styles.cardMakeDealBtnText}>Make Deal</Text>
-                    </TouchableOpacity>
+                    {!isDealOwner && (
+                      <TouchableOpacity
+                        style={styles.cardMakeDealBtn}
+                        onPress={() => {
+                          if (isDealOwner) {
+                            Alert.alert(
+                              "Your Listing",
+                              "You are the seller of this listing. Use the Edit button to update pricing or details.",
+                            );
+                            return;
+                          }
+                          setSelectedDealForAction(deal);
+                          setOfferPrice(deal.price);
+                        }}
+                        activeOpacity={0.8}
+                        accessibilityLabel="Make Deal"
+                      >
+                        <Ionicons name="flash" size={12} color="#FFFFFF" />
+                        <Text style={styles.cardMakeDealBtnText}>
+                          Make Deal
+                        </Text>
+                      </TouchableOpacity>
+                    )}
 
                     {isDealOwner && (
                       <View style={styles.cardOwnerActionRow}>
