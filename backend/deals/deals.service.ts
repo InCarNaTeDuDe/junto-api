@@ -187,6 +187,8 @@ export async function createDeal(
     views: 1,
     status: "available",
     inquiries: [],
+    latitude: user.latitude,
+    longitude: user.longitude,
   });
 
   const newDeal = dealsRepository.toRecord(dealEntity);
