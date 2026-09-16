@@ -2528,7 +2528,7 @@ export default function LocalDealsScreen() {
             {/* Just close */}
             <TouchableOpacity
               style={styles.successDoneBtn}
-              onPress={() => setOfferSuccessData(null)}
+              onPress={() => setOfferSuccess(null)}
             >
               <Text style={styles.successDoneText}>Got it</Text>
             </TouchableOpacity>

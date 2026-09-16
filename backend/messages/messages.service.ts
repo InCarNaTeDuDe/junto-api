@@ -167,18 +167,29 @@ export async function fetchDealMessages(
 export async function createAndSaveMessage({
   entityId,
   entityType,
+  activityId,
+  dealId,
+  chatId,
   senderId,
   content,
   participantId,
   image,
 }: {
-  entityId: string;
-  entityType: "ACTIVITY" | "LOCAL_DEALS";
+  entityId?: string;
+  entityType?: "ACTIVITY" | "LOCAL_DEALS";
+  activityId?: string;
+  dealId?: string;
+  chatId?: string;
   senderId: string;
   content?: string;
   participantId?: string | null;
   image?: string | null;
 }) {
+  const resolvedEntityType: "ACTIVITY" | "LOCAL_DEALS" =
+    entityType || (dealId ? "LOCAL_DEALS" : "ACTIVITY");
+  const resolvedEntityId: string =
+    entityId || dealId || activityId || chatId || "";
+
   const senderUser = await userRepo.findById(senderId).catch(() => null);
 
   let computedParticipantId = participantId || null;
@@ -189,8 +200,8 @@ export async function createAndSaveMessage({
   // -----------------------------------------
   // ACTIVITY CHAT
   // -----------------------------------------
-  if (entityType === "ACTIVITY") {
-    activity = await activityRepo.findById(entityId).catch(() => null);
+  if (resolvedEntityType === "ACTIVITY") {
+    activity = await activityRepo.findById(resolvedEntityId).catch(() => null);
 
     if (activity) {
       if (senderId !== activity.organizerId) {
@@ -224,8 +235,8 @@ export async function createAndSaveMessage({
   // -----------------------------------------
   // LOCAL DEAL CHAT
   // -----------------------------------------
-  if (entityType === "LOCAL_DEALS") {
-    deal = await dealsRepository.findById(entityId).catch(() => null);
+  if (resolvedEntityType === "LOCAL_DEALS") {
+    deal = await dealsRepository.findById(resolvedEntityId).catch(() => null);
 
     if (deal && !computedParticipantId) {
       if (deal.userId !== senderId) {
@@ -238,9 +249,9 @@ export async function createAndSaveMessage({
   // SAVE MESSAGE
   // -----------------------------------------
   const savedMsg = await messageRepo.createMessage({
-    activityId: entityType === "ACTIVITY" ? entityId : null,
+    activityId: resolvedEntityType === "ACTIVITY" ? resolvedEntityId : null,
 
-    dealId: entityType === "LOCAL_DEALS" ? entityId : null,
+    dealId: resolvedEntityType === "LOCAL_DEALS" ? resolvedEntityId : null,
 
     senderId,
 
@@ -347,7 +358,9 @@ export async function fetchUserChannels(userId: string) {
 
       if (!entity) continue;
 
-      const ownerId = isDeal ? entity.userId : entity.organizerId;
+      const ownerId = isDeal
+        ? (entity as any).userId
+        : (entity as any).organizerId;
 
       const partnerId =
         message.senderId === userId
@@ -372,115 +385,173 @@ export async function fetchUserChannels(userId: string) {
       conversations.get(key)!.messages.push(message);
     }
 
-    return Array.from(conversations.values()).map(
-      ({ entity, entityType, partnerId, messages }) => {
-        // find newest message
-        const lastMessage = messages.reduce((latest, current) => {
-          if (!latest) return current;
+    const convList = Array.from(conversations.values());
 
-          return new Date(current.timestamp).getTime() >
-            new Date(latest.timestamp).getTime()
-            ? current
-            : latest;
-        }, messages[0]);
-
-        const partner =
-          lastMessage.senderId === userId
-            ? lastMessage.participant
-            : lastMessage.sender;
-
-        const partnerName = partner?.name || "Neighbor";
-
-        const partnerAvatar = partner?.avatar || null;
-
-        const avatar =
-          partnerAvatar ||
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            partnerName,
-          )}&background=8B5CF6&color=fff`;
-
-        const isDeal = entityType === "LOCAL_DEALS";
-
-        const unreadCount = messages.filter(
-          (message) => message.senderId !== userId,
-        ).length;
-
-        /**
-         * IMPORTANT:
-         * Local Deals must NEVER inherit entity.category.
-         *
-         * A deal may have category values such as DAY_MATES,
-         * but that does not mean the conversation is a Day Mate.
-         */
-        const channelType = isDeal
-          ? "Local Deals"
-          : formatCategoryLabel(entity.category || "Activity");
-
-        return {
-          id: entity.id,
-
-          channelId: `${entityType}_${entity.id}_${partnerId}`,
-
-          // Canonical universal-chat fields
-          entityId: entity.id,
-          entityType,
-
-          // Keep this only for old frontend code.
-          // Do NOT use a deal ID as activityId.
-          activityId: isDeal ? undefined : entity.id,
-
-          name: entity.title,
-
-          activityEmoji: isDeal
-            ? "🏷️"
-            : entity.activityEmoji ||
-              getDefaultEmoji(entity.category, entity.title),
-
-          avatar,
-
-          partnerName,
-          partnerAvatar: partnerAvatar || avatar,
-          partnerUrl: partnerAvatar || avatar,
-
-          participantId: partnerId,
-
-          // Correct category for the conversation
-          type: channelType,
-          category: channelType,
-
-          subtitle:
-            lastMessage?.content ||
-            (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
-
-          lastMessage:
-            lastMessage?.content ||
-            (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
-
-          lastTime: lastMessage
-            ? new Date(lastMessage.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "Active",
-
-          lastTimestamp: lastMessage
-            ? new Date(lastMessage.timestamp).getTime()
-            : 0,
-
-          organizerId: isDeal ? entity.userId : entity.organizerId,
-
-          participantIds: isDeal ? [] : entity.participantIds || [],
-
-          locationName: entity.locationName,
-
-          image: entity.image || null,
-
-          unreadCount,
-
-          isOnline: true,
-        };
-      },
+    // Fetch conversation partners directly from the database
+    const partnerIds = Array.from(
+      new Set(
+        convList
+          .map((c) => c.partnerId)
+          .filter((id): id is string => Boolean(id)),
+      ),
     );
+
+    const partnerUsers = await Promise.all(
+      partnerIds.map((id) => userRepo.findById(id).catch(() => null)),
+    );
+
+    const partnerMap = new Map<string, User>();
+    partnerUsers.forEach((u) => {
+      if (u) partnerMap.set(u.id, u);
+    });
+
+    return convList.map(({ entity, entityType, partnerId, messages }) => {
+      // find newest message
+      const lastMessage = messages.reduce((latest, current) => {
+        if (!latest) return current;
+
+        return new Date(current.timestamp).getTime() >
+          new Date(latest.timestamp).getTime()
+          ? current
+          : latest;
+      }, messages[0]);
+
+      const partnerDbUser = partnerMap.get(partnerId);
+
+      const partnerFromMsg =
+        lastMessage.senderId === partnerId
+          ? lastMessage.sender
+          : lastMessage.participant;
+
+      const isDeal = entityType === "LOCAL_DEALS";
+
+      const partnerName =
+        partnerDbUser?.name ||
+        partnerFromMsg?.name ||
+        (isDeal
+          ? (entity as any).sellerName ||
+            (entity as any).dealUser?.name ||
+            (entity as any).user?.name
+          : (entity as any).activityOrganizer?.name ||
+            (entity as any).organizer?.name) ||
+        "Neighbor";
+
+      // Extract partner avatar: prioritize database record, then message relations, then entity relation
+      const dbAvatar =
+        partnerDbUser?.avatar &&
+        typeof partnerDbUser.avatar === "string" &&
+        partnerDbUser.avatar.trim() !== ""
+          ? partnerDbUser.avatar.trim()
+          : null;
+
+      const msgAvatar =
+        partnerFromMsg?.avatar &&
+        typeof partnerFromMsg.avatar === "string" &&
+        partnerFromMsg.avatar.trim() !== ""
+          ? partnerFromMsg.avatar.trim()
+          : null;
+
+      const entityAvatar = isDeal
+        ? (entity as any).dealUser?.avatar || (entity as any).user?.avatar
+        : (entity as any).activityOrganizer?.avatar ||
+          (entity as any).organizer?.avatar;
+
+      const partnerAvatar =
+        dbAvatar ||
+        msgAvatar ||
+        (entityAvatar &&
+        typeof entityAvatar === "string" &&
+        entityAvatar.trim() !== ""
+          ? entityAvatar.trim()
+          : null) ||
+        null;
+
+      // Clean fallback avatar URL if not in database
+      const avatar =
+        partnerAvatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          partnerName,
+        )}&background=8B5CF6&color=fff&size=150`;
+
+      const unreadCount = messages.filter(
+        (message) => message.senderId !== userId,
+      ).length;
+
+      /**
+       * IMPORTANT:
+       * Local Deals must NEVER inherit entity.category.
+       *
+       * A deal may have category values such as DAY_MATES,
+       * but that does not mean the conversation is a Day Mate.
+       */
+      const channelType = isDeal
+        ? "Local Deals"
+        : formatCategoryLabel(entity.category || "Activity");
+
+      return {
+        id: entity.id,
+
+        channelId: `${entityType}_${entity.id}_${partnerId}`,
+
+        // Canonical universal-chat fields
+        entityId: entity.id,
+        entityType,
+
+        // Keep this only for old frontend code.
+        // Do NOT use a deal ID as activityId.
+        activityId: isDeal ? undefined : entity.id,
+
+        name: entity.title,
+
+        activityEmoji: isDeal
+          ? "🏷️"
+          : entity.activityEmoji ||
+            getDefaultEmoji(entity.category, entity.title),
+
+        avatar,
+
+        partnerName,
+        partnerAvatar: partnerAvatar || avatar,
+        partnerUrl: partnerAvatar || avatar,
+
+        participantId: partnerId,
+
+        // Correct category for the conversation
+        type: channelType,
+        category: channelType,
+
+        subtitle:
+          lastMessage?.content ||
+          (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
+
+        lastMessage:
+          lastMessage?.content ||
+          (lastMessage?.image ? "📷 Photo" : "Tap to open chat"),
+
+        lastTime: lastMessage
+          ? new Date(lastMessage.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Active",
+
+        lastTimestamp: lastMessage
+          ? new Date(lastMessage.timestamp).getTime()
+          : 0,
+
+        organizerId: isDeal ? entity.userId : entity.organizerId,
+
+        participantIds: isDeal ? [] : entity.participantIds || [],
+
+        locationName: entity.locationName,
+
+        image: entity.image || null,
+
+        unreadCount,
+
+        isOnline: true,
+      };
+    });
   } catch (err) {
     console.error("Error building user channels:", err);
 

@@ -4,6 +4,7 @@ import { Server as HttpServer } from "http";
 import { socketAuth } from "./socket.auth";
 import { registerSocketEvents } from "./socket.event";
 import { createAndSaveMessage } from "../messages/messages.service";
+import { userRepository } from "../repositories";
 
 export let io: Server;
 
@@ -59,19 +60,39 @@ export function initializeSocket(server: HttpServer) {
 
     socket.on(
       "typing",
-      (data: {
+      async (data: {
         chatId: string;
         userId: string;
         partnerId?: string;
         userName?: string;
+        avatar?: string;
+        userAvatar?: string;
       }) => {
+        let avatar = data.avatar || data.userAvatar;
+        let userName = data.userName;
+        if (!avatar && data.userId) {
+          try {
+            const u = await userRepository.findById(data.userId);
+            if (u?.avatar) avatar = u.avatar;
+            if (!userName && u?.name) userName = u.name;
+          } catch {
+            // Ignore DB lookup error
+          }
+        }
+
+        const payload = {
+          chatId: data.chatId,
+          userId: data.userId,
+          userName,
+          avatar,
+          userAvatar: avatar,
+          isTyping: true,
+        };
+
         if (data.partnerId) {
-          io.to(`user:${data.partnerId}`).emit("user_typing", {
-            chatId: data.chatId,
-            userId: data.userId,
-            userName: data.userName,
-            isTyping: true,
-          });
+          io.to(`user:${data.partnerId}`).emit("user_typing", payload);
+        } else if (data.chatId) {
+          socket.to(data.chatId).emit("user_typing", payload);
         }
       },
     );
@@ -79,12 +100,16 @@ export function initializeSocket(server: HttpServer) {
     socket.on(
       "stop_typing",
       (data: { chatId: string; userId: string; partnerId?: string }) => {
+        const payload = {
+          chatId: data.chatId,
+          userId: data.userId,
+          isTyping: false,
+        };
+
         if (data.partnerId) {
-          io.to(`user:${data.partnerId}`).emit("user_typing", {
-            chatId: data.chatId,
-            userId: data.userId,
-            isTyping: false,
-          });
+          io.to(`user:${data.partnerId}`).emit("user_typing", payload);
+        } else if (data.chatId) {
+          socket.to(data.chatId).emit("user_typing", payload);
         }
       },
     );

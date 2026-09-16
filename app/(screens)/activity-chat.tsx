@@ -147,14 +147,34 @@ export default function ActivityChatScreen() {
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
   const activityImage = params.image || activityDetail?.image || null;
 
+  const [partnerAvatarState, setPartnerAvatarState] = useState<string>(
+    params.avatar || activityDetail?.organizer?.avatar || "",
+  );
+  const [partnerNameState, setPartnerNameState] = useState<string>(partnerName);
+
   const [inputMessage, setInputMessage] = useState("");
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [typingUserName, setTypingUserName] = useState<string>("");
+  const [typingUserAvatar, setTypingUserAvatar] = useState<string>("");
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
+  const [topAvatarLoadError, setTopAvatarLoadError] = useState(false);
   const typingTimeoutRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [chatsLoading, setChatsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    if (params.avatar) {
+      setPartnerAvatarState(params.avatar);
+    }
+  }, [params.avatar]);
+
+  useEffect(() => {
+    if (partnerName) {
+      setPartnerNameState(partnerName);
+    }
+  }, [partnerName]);
 
   const loadMessages = async () => {
     try {
@@ -172,7 +192,26 @@ export default function ActivityChatScreen() {
         ? `/api/messages?${queryParam}&participantId=${targetPartnerId}`
         : `/api/messages?${queryParam}`;
       const res = await ApiService.get<any>(query);
-      const mapped = res.messages.map((m: any) => ({
+
+      // Dynamically extract partner info from API response
+      if (res?.partner) {
+        if (res.partner.avatar) {
+          setPartnerAvatarState(res.partner.avatar);
+        }
+        if (res.partner.name) {
+          setPartnerNameState(res.partner.name);
+        }
+      } else if (res?.messages && res.messages.length > 0) {
+        const otherMsg = res.messages.find((m: any) => m.senderId !== user?.id);
+        if (otherMsg?.sender?.avatar) {
+          setPartnerAvatarState(otherMsg.sender.avatar);
+        }
+        if (otherMsg?.sender?.name) {
+          setPartnerNameState(otherMsg.sender.name);
+        }
+      }
+
+      const mapped = (res?.messages || []).map((m: any) => ({
         id: m.id,
         sender: m.senderId === user?.id ? "me" : "them",
         text: m.content,
@@ -208,11 +247,24 @@ export default function ActivityChatScreen() {
 
     socket.on(
       "user_typing",
-      (data: { userId: string; userName?: string; isTyping: boolean }) => {
+      (data: {
+        userId: string;
+        userName?: string;
+        avatar?: string;
+        userAvatar?: string;
+        isTyping: boolean;
+      }) => {
         if (data.userId !== user?.id) {
           setIsPartnerTyping(data.isTyping);
-          if (data.isTyping && data.userName) {
-            setTypingUserName(data.userName);
+          if (data.isTyping) {
+            if (data.userName) {
+              setTypingUserName(data.userName);
+            }
+            const incomingAvatar = data.avatar || data.userAvatar;
+            if (incomingAvatar) {
+              setTypingUserAvatar(incomingAvatar);
+              setAvatarLoadError(false);
+            }
           }
         }
       },
@@ -278,8 +330,8 @@ export default function ActivityChatScreen() {
   const activeChat = {
     id: targetChatId,
     partner: {
-      name: partnerName,
-      avatar: partnerAvatar,
+      name: partnerNameState || partnerName,
+      avatar: partnerAvatarState || partnerAvatar,
       rating: 4.9,
       isOnline: true,
     },
@@ -287,6 +339,9 @@ export default function ActivityChatScreen() {
     contextTitle,
     unreadCount: 0,
   };
+
+  const activeTypingAvatar =
+    typingUserAvatar || partnerAvatarState || partnerAvatar;
 
   const displayedMessages = messages;
 
@@ -304,6 +359,8 @@ export default function ActivityChatScreen() {
         userId: user.id,
         partnerId: targetPartnerId,
         userName: user.name,
+        avatar: myAvatar,
+        userAvatar: myAvatar,
       });
 
       if (typingTimeoutRef.current) {
@@ -332,7 +389,14 @@ export default function ActivityChatScreen() {
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    socket.emit("stop_typing", { chatId, userId: user.id });
+    const targetPartnerId =
+      params.participantId ||
+      (organizerId && organizerId !== user.id ? organizerId : undefined);
+    socket.emit("stop_typing", {
+      chatId,
+      userId: user.id,
+      partnerId: targetPartnerId,
+    });
 
     const text = inputMessage.trim();
 
@@ -420,11 +484,11 @@ export default function ActivityChatScreen() {
 
           <View style={s.headerUser}>
             <View style={{ position: "relative" }}>
-              {activeChat.partner.avatar &&
-              !activeChat.partner.avatar.includes("unsplash.com") ? (
+              {activeChat.partner.avatar && !topAvatarLoadError ? (
                 <Image
                   source={{ uri: activeChat.partner.avatar }}
                   style={s.avatar}
+                  onError={() => setTopAvatarLoadError(true)}
                 />
               ) : (
                 <View style={s.headerEmojiBox}>
@@ -633,9 +697,18 @@ export default function ActivityChatScreen() {
           {isPartnerTyping && (
             <View style={[s.messageWrapper, { alignSelf: "flex-start" }]}>
               <View style={[s.bubble, s.bubbleThem, s.typingBubble]}>
-                <View style={s.typingEmojiBox}>
-                  <Text style={{ fontSize: 12 }}>{activityEmoji}</Text>
-                </View>
+                {activeTypingAvatar && !avatarLoadError ? (
+                  <Image
+                    source={{ uri: activeTypingAvatar }}
+                    style={s.typingAvatar}
+                    resizeMode="cover"
+                    onError={() => setAvatarLoadError(true)}
+                  />
+                ) : (
+                  <View style={s.typingEmojiBox}>
+                    <Text style={{ fontSize: 12 }}>{activityEmoji}</Text>
+                  </View>
+                )}
                 <Text style={[s.messageText, s.messageTextThem, s.typingText]}>
                   {(typingUserName || partnerName).split(" ")[0]} is typing...
                 </Text>
@@ -1005,6 +1078,7 @@ const createStyles = (t: any, isDark: boolean) => {
       width: 22,
       height: 22,
       borderRadius: 11,
+      backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#CBD5E1",
     },
     typingText: {
       fontSize: 12,

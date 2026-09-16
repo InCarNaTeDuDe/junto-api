@@ -101,7 +101,17 @@ export async function listDeals(
 
   let records = deals.map((d) => dealsRepository.toRecord(d));
 
-  records = records.filter((d) => d.status === "available");
+  if (query.userId) {
+    records = records.filter(
+      (d) => d.userId === query.userId || d.sellerId === query.userId,
+    );
+  }
+
+  if (query.status && query.status !== "all") {
+    records = records.filter((d) => d.status === query.status);
+  } else if (!query.userId && !query.status) {
+    records = records.filter((d) => d.status === "available");
+  }
 
   if (query.category && query.category !== "All") {
     const category = query.category.toLowerCase();
@@ -217,7 +227,7 @@ export async function contactSeller(
     buyerId: user.id,
     buyerName: input.buyerName,
     buyerPhone: input.buyerPhone,
-    buyerAvatar: user.avatar || user.profileImage || "",
+    buyerAvatar: user.avatar || (user as any).profileImage || "",
     message: input.message,
     offeredPrice: input.offeredPrice,
     createdAt: new Date().toISOString(),

@@ -40,6 +40,8 @@ export const QueryDealsSchema = z.object({
   search: z.string().optional(),
   condition: z.string().optional(),
   maxPrice: z.coerce.number().optional(),
+  userId: z.string().optional(),
+  status: z.string().optional(),
 });
 
 export const ContactSellerSchema = z.object({

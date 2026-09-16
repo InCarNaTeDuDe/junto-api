@@ -24,6 +24,8 @@ import type { Theme } from "@/theme";
 import { router } from "expo-router";
 import { ApiService } from "@/services/api";
 import CustomerCareChatModal from "@/components/CustomerCareChatModal";
+import ProfileDealsModal from "@/components/ProfileDealsModal";
+import ProfileRidesModal from "@/components/ProfileRidesModal";
 
 function hexA(hex: string, a: number) {
   if (!hex) return `rgba(168,85,247,${a})`;
@@ -55,6 +57,8 @@ export default function ProfileScreen() {
     | "edit"
     | "activities"
     | "tickets"
+    | "deals"
+    | "rides"
     | "saved"
     | "privacy"
     | "help"
@@ -64,6 +68,11 @@ export default function ProfileScreen() {
     | "customerCare"
     | null
   >(null);
+
+  const [dealsCount, setDealsCount] = useState<number | null>(null);
+  const [completedRidesCount, setCompletedRidesCount] = useState<number | null>(
+    null,
+  );
 
   // Realtime backend API user state fetched from /api/me
   const [apiUser, setApiUser] = useState<any>(null);
@@ -134,6 +143,12 @@ export default function ProfileScreen() {
         if (isMounted && res && res.user) {
           console.log("Fetched /api/me user data successfully:", res.user);
           setApiUser(res.user);
+          if (res.user.dealsCount !== undefined) {
+            setDealsCount(res.user.dealsCount);
+          }
+          if (res.user.completedRidesCount !== undefined) {
+            setCompletedRidesCount(res.user.completedRidesCount);
+          }
         }
       } catch (err) {
         console.log("Note: /api/me fetch skipped or offline:", err);
@@ -505,41 +520,58 @@ export default function ProfileScreen() {
         {/* 2. NUMERICAL STATS CARD */}
         <View style={s.statsCardWrapper}>
           <View style={s.statsCard}>
-            {/* Column 1: Connections */}
-            {/* <TouchableOpacity
-              style={s.statCol}
-              onPress={() => router.push("/(tabs)/chats")}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="people" size={scale(18)} color={t.primary} />
-              <Text style={s.statNumber}>{realConnectionsCount}</Text>
-              <Text style={s.statLabel}>Connections</Text>
-            </TouchableOpacity> */}
-
-            {/* <View style={s.statDivider} /> */}
-
-            {/* Column 2: Activities */}
+            {/* Column: Activities */}
             <TouchableOpacity
               style={s.statCol}
               onPress={() => setActiveModal("activities")}
               activeOpacity={0.75}
             >
-              <Ionicons name="calendar" size={scale(18)} color={t.error} />
+              <Ionicons name="calendar" size={scale(17)} color={t.error} />
               <Text style={s.statNumber}>
                 {apiUser?.createdActivitiesCount ?? userActivitiesList.length}
               </Text>
-              <Text style={s.statLabel}>All Activities</Text>
+              <Text style={s.statLabel}>Activities</Text>
             </TouchableOpacity>
 
             <View style={s.statDivider} />
 
-            {/* Column 3: Tickets */}
+            {/* Column: Deals */}
+            <TouchableOpacity
+              style={s.statCol}
+              onPress={() => setActiveModal("deals")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="pricetag" size={scale(17)} color={t.primary} />
+              <Text style={s.statNumber}>
+                {dealsCount ?? apiUser?.dealsCount ?? 0}
+              </Text>
+              <Text style={s.statLabel}>Deals</Text>
+            </TouchableOpacity>
+
+            <View style={s.statDivider} />
+
+            {/* Column: Rides (Completed) */}
+            <TouchableOpacity
+              style={s.statCol}
+              onPress={() => setActiveModal("rides")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="car-sport" size={scale(17)} color="#10B981" />
+              <Text style={s.statNumber}>
+                {completedRidesCount ?? apiUser?.completedRidesCount ?? 0}
+              </Text>
+              <Text style={s.statLabel}>Completed</Text>
+            </TouchableOpacity>
+
+            <View style={s.statDivider} />
+
+            {/* Column: Tickets */}
             <TouchableOpacity
               style={s.statCol}
               onPress={() => setActiveModal("tickets")}
               activeOpacity={0.75}
             >
-              <Ionicons name="ticket" size={scale(18)} color={t.info} />
+              <Ionicons name="ticket" size={scale(17)} color={t.info} />
               <Text style={s.statNumber}>
                 {apiUser?.ticketsCount ?? ticketPosts.length}
               </Text>
@@ -548,7 +580,7 @@ export default function ProfileScreen() {
 
             <View style={s.statDivider} />
 
-            {/* Column 4: Trusted */}
+            {/* Column: Trusted */}
             <TouchableOpacity
               style={s.statCol}
               onPress={() =>
@@ -565,7 +597,7 @@ export default function ProfileScreen() {
             >
               <Ionicons
                 name="shield-checkmark"
-                size={scale(18)}
+                size={scale(17)}
                 color={t.success}
               />
               <Text style={s.statNumber}>
@@ -640,6 +672,95 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* My Deals */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("deals")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: hexA(t.primary, 0.15) },
+                ]}
+              >
+                <Ionicons
+                  name="pricetag-outline"
+                  size={scale(16)}
+                  color={t.primary}
+                />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>My Deals</Text>
+                <Text style={s.menuItemSub}>
+                  Active, reserved and sold marketplace items
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: scale(6),
+                }}
+              >
+                {(dealsCount ?? apiUser?.dealsCount ?? 0) > 0 && (
+                  <View style={s.badgePill}>
+                    <Text style={s.badgePillText}>
+                      {dealsCount ?? apiUser?.dealsCount}
+                    </Text>
+                  </View>
+                )}
+                <Ionicons
+                  name="chevron-forward"
+                  size={scale(16)}
+                  color={t.sub}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* My Rides */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setActiveModal("rides")}
+              activeOpacity={0.7}
+            >
+              <View style={[s.menuIconBg, { backgroundColor: "#10B98120" }]}>
+                <Ionicons name="car-outline" size={scale(16)} color="#10B981" />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>My Rides</Text>
+                <Text style={s.menuItemSub}>
+                  {completedRidesCount ?? apiUser?.completedRidesCount ?? 0}{" "}
+                  completed • Active carpools & commutes
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: scale(6),
+                }}
+              >
+                {(completedRidesCount ?? apiUser?.completedRidesCount ?? 0) >
+                  0 && (
+                  <View style={[s.badgePill, { backgroundColor: "#10B981" }]}>
+                    <Text style={s.badgePillText}>
+                      {completedRidesCount ?? apiUser?.completedRidesCount} done
+                    </Text>
+                  </View>
+                )}
+                <Ionicons
+                  name="chevron-forward"
+                  size={scale(16)}
+                  color={t.sub}
+                />
+              </View>
             </TouchableOpacity>
 
             <View style={s.menuItemSeparator} />
@@ -1703,6 +1824,22 @@ export default function ProfileScreen() {
       >
         <CustomerCareChatModal onClose={() => setActiveModal(null)} />
       </Modal>
+
+      {/* 11. PROFILE DEALS MODAL */}
+      <ProfileDealsModal
+        visible={activeModal === "deals"}
+        onClose={() => setActiveModal(null)}
+        userId={apiUser?.id || user?.id}
+        onCountChange={(cnt) => setDealsCount(cnt)}
+      />
+
+      {/* 12. PROFILE RIDES MODAL */}
+      <ProfileRidesModal
+        visible={activeModal === "rides"}
+        onClose={() => setActiveModal(null)}
+        userId={apiUser?.id || user?.id}
+        onCompletedCountChange={(cnt) => setCompletedRidesCount(cnt)}
+      />
     </SafeAreaView>
   );
 }

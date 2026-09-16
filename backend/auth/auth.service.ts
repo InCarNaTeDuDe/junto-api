@@ -10,6 +10,8 @@ import { generateAccessToken } from "./jwt.service";
 import { userRepository } from "../repositories/User.repository";
 import { activityRepository } from "../repositories/Activity.repository";
 import { ticketRepository } from "../repositories/Ticket.repository";
+import { dealsRepository } from "../repositories/Deals.repository";
+import { rideRepository } from "../repositories/Rides.repository";
 import { Repository } from "typeorm";
 
 async function generateUniqueUserHandle(
@@ -179,10 +181,22 @@ export async function getUserProfile(currentUser: any) {
         ? currentUser
         : currentUser?.id || currentUser?.sub || "";
 
-    const [dbUser, directTicketsCount] = await Promise.all([
-      userRepository.findById(userId),
-      ticketRepository.countUserTickets(userId),
-    ]);
+    const [dbUser, directTicketsCount, allDeals, driverRides, passengerRides] =
+      await Promise.all([
+        userRepository.findById(userId),
+        ticketRepository.countUserTickets(userId),
+        dealsRepository.findAll().catch(() => []),
+        rideRepository.findByDriverId(userId).catch(() => []),
+        rideRepository.findByPassengerId(userId).catch(() => []),
+      ]);
+
+    const userDeals = allDeals.filter(
+      (d: any) => d.userId === userId || d.sellerId === userId,
+    );
+    const myRides = [...driverRides, ...passengerRides];
+    const completedRidesCount = myRides.filter(
+      (r: any) => r.status === "completed",
+    ).length;
 
     const user = {
       ...(typeof currentUser === "object" ? currentUser : {}),
@@ -222,6 +236,9 @@ export async function getUserProfile(currentUser: any) {
       userHandle: user.userHandle,
       createdActivitiesCount: userActivities.length,
       ticketsCount: activitiesGrouped.MOVIES.length + (directTicketsCount || 0),
+      dealsCount: userDeals.length,
+      completedRidesCount,
+      totalRidesCount: myRides.length,
       activities: activitiesGrouped,
     };
   } catch (error) {
@@ -231,6 +248,9 @@ export async function getUserProfile(currentUser: any) {
       userHandle: currentUser?.userHandle,
       createdActivitiesCount: 0,
       ticketsCount: 0,
+      dealsCount: 0,
+      completedRidesCount: 0,
+      totalRidesCount: 0,
       activities: { ASK_NEARBY: [], MOVIES: [], DAY_MATES: [] },
     };
   }

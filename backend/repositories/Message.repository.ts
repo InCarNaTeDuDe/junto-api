@@ -13,6 +13,7 @@ export class MessageRepository extends BaseRepository<Message> {
       },
       relations: {
         sender: true,
+        participant: true,
       },
       order: {
         timestamp: "ASC",
@@ -27,6 +28,7 @@ export class MessageRepository extends BaseRepository<Message> {
       },
       relations: {
         sender: true,
+        participant: true,
       },
       order: {
         timestamp: "ASC",
@@ -39,6 +41,7 @@ export class MessageRepository extends BaseRepository<Message> {
       where: [{ senderId: userId }, { participantId: userId }],
       relations: {
         sender: true,
+        participant: true,
       },
       order: {
         timestamp: "ASC",
@@ -68,8 +71,11 @@ export class MessageRepository extends BaseRepository<Message> {
     return this.repo
       .createQueryBuilder("message")
       .leftJoinAndSelect("message.sender", "sender")
+      .leftJoinAndSelect("message.participant", "participant")
       .leftJoinAndSelect("message.activity", "activity")
+      .leftJoinAndSelect("activity.organizer", "activityOrganizer")
       .leftJoinAndSelect("message.deal", "deal")
+      .leftJoinAndSelect("deal.user", "dealUser")
       .where(
         `
       message.senderId = :userId

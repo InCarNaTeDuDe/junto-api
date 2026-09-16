@@ -7,6 +7,9 @@ import {
   fetchUnreadCount,
   markChannelAsRead,
 } from "./messages.service";
+import { UserRepository } from "../repositories/User.repository";
+
+const userRepo = new UserRepository();
 
 export async function getChannels(req: Request, res: Response) {
   try {
@@ -37,22 +40,46 @@ export async function getMessages(req: Request, res: Response) {
       });
     }
 
-    if (dealId) {
-      const messages = await fetchDealMessages(dealId, userId, participantId);
+    let messages: any[] = [];
 
-      return res.json({
-        status: "success",
-        messages,
-      });
+    if (dealId) {
+      messages = await fetchDealMessages(dealId, userId, participantId);
+    } else {
+      markChannelAsRead(userId, activityId!, participantId);
+      messages = await fetchMessages(activityId!, userId, participantId);
     }
 
-    markChannelAsRead(userId, activityId!, participantId);
+    // Resolve partner details directly from database or message sender
+    let partnerInfo = null;
+    const targetPartnerId = participantId;
+    if (targetPartnerId) {
+      const partnerUser = await userRepo
+        .findById(targetPartnerId)
+        .catch(() => null);
+      if (partnerUser) {
+        partnerInfo = {
+          id: partnerUser.id,
+          name: partnerUser.name,
+          avatar: partnerUser.avatar || null,
+        };
+      }
+    }
 
-    const messages = await fetchMessages(activityId!, userId, participantId);
+    if (!partnerInfo && messages.length > 0) {
+      const otherMsg = messages.find((m: any) => m.senderId !== userId);
+      if (otherMsg?.sender) {
+        partnerInfo = {
+          id: otherMsg.sender.id,
+          name: otherMsg.sender.name,
+          avatar: otherMsg.sender.avatar || null,
+        };
+      }
+    }
 
     return res.json({
       status: "success",
       messages,
+      partner: partnerInfo,
     });
   } catch (err: any) {
     return res.status(500).json({

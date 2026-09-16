@@ -170,7 +170,7 @@ export class RideRepository extends BaseRepository<Ride> {
       latitude: ride.latitude,
       longitude: ride.longitude,
 
-      status: ride.status,
+      status: ride.status as any,
       isDriverTravelling: ride.isDriverTravelling ?? false,
       isDeleted: Number(ride.isDeleted || 0),
 
