@@ -139,6 +139,12 @@ export default function OfferRideTab({
     activeRide?: { from: string; to: string; status: string };
   }>({ checking: false, isValid: null });
 
+  const VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\s\d{2}\s[A-Z]{1,3}\s\d{4}$/;
+
+  const isValidVehicleNumber = (value: string) => {
+    return VEHICLE_NUMBER_REGEX.test(value.trim().toUpperCase());
+  };
+
   useEffect(() => {
     const raw = (offerVehicleNumber || "").trim();
     const cleanReg = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -583,10 +589,13 @@ export default function OfferRideTab({
             </View>
             <TextInput
               value={offerVehicleNumber}
-              onChangeText={(val) => setOfferVehicleNumber(val.toUpperCase())}
+              onChangeText={(val) => {
+                setOfferVehicleNumber(val.toUpperCase());
+              }}
               placeholder="e.g. TS 09 EA 1234"
               placeholderTextColor="#8FA0B8"
               autoCapitalize="characters"
+              maxLength={13}
               style={styles.plateTextInput}
             />
           </View>

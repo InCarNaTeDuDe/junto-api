@@ -325,6 +325,14 @@ export default function RidesScreen() {
     const drop = offerDrop.trim();
     const vehicleNum = offerVehicleNumber.trim().toUpperCase();
 
+    if (!/^[A-Z]{2}\s\d{2}\s[A-Z]{1,3}\s\d{4}$/.test(vehicleNum)) {
+      Alert.alert(
+        "Invalid Vehicle Number 🚗",
+        "Please enter a valid vehicle registration number like TS 09 EA 1234.",
+      );
+      return;
+    }
+
     if (!pickup) {
       Alert.alert(
         "Pickup Location Required",
