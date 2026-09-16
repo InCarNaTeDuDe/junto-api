@@ -429,6 +429,34 @@ export class RideRepository extends BaseRepository<Ride> {
   }
 
   /**
+   * Check if a co-rider is already in an active ride (confirmed/travelling)
+   */
+  async isUserInActiveRide(
+    userId: string,
+    excludeRideId?: string,
+  ): Promise<boolean> {
+    const activeStatuses = ["active", "both_travelling", "in_progress"];
+    const rides = this.isConnected
+      ? await this.repo.find({
+          where: activeStatuses.map((status) => ({
+            status,
+            isDeleted: 0,
+          })),
+        })
+      : Array.from(inMemoryRides.values()).filter(
+          (r) => !r.isDeleted && activeStatuses.includes(r.status),
+        );
+
+    return rides.some(
+      (r: any) =>
+        r.id !== excludeRideId &&
+        (r.passengers || []).some(
+          (p: any) => p.userId === userId && p.status === "confirmed",
+        ),
+    );
+  }
+
+  /**
    * Join ride / request seat
    */
   async joinRide(
@@ -445,6 +473,11 @@ export class RideRepository extends BaseRepository<Ride> {
       const ride = inMemoryRides.get(id);
       if (!ride) throw new Error("Ride not found");
       if (ride.status !== "active") throw new Error("Ride is no longer active");
+      if (await this.isUserInActiveRide(passenger.userId, id)) {
+        throw new Error(
+          "You are already a co-rider in an active ride. You cannot request a seat for another ride.",
+        );
+      }
       const currentPassengers = Array.isArray(ride.passengers)
         ? [...ride.passengers]
         : [];
@@ -474,6 +507,11 @@ export class RideRepository extends BaseRepository<Ride> {
       const ride = await this.repo.findOne({ where: { id } });
       if (!ride) throw new Error("Ride not found");
       if (ride.status !== "active") throw new Error("Ride is no longer active");
+      if (await this.isUserInActiveRide(passenger.userId, id)) {
+        throw new Error(
+          "You are already a co-rider in an active ride. You cannot request a seat for another ride.",
+        );
+      }
       const currentPassengers = Array.isArray(ride.passengers)
         ? [...ride.passengers]
         : [];

@@ -20,16 +20,19 @@ export let isConnectedToPostgres = false;
 
 export const AppDataSource = new DataSource({
   type: "postgres",
+
   host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
+  port: Number(process.env.DB_PORT) || 5432,
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
+
+  // ⚠️ Prefer false in production and migrations instead.
+  // synchronize: process.env.NODE_ENV !== "production",
   synchronize: true,
-  // synchronize: process.env.NODE_ENV !== "production", // Dev Only
-  // migrationsRun: process.env.NODE_ENV === "production",
+
   logging: false,
-  // dropSchema: true,
+
   entities: [
     User,
     DeviceSession,
@@ -44,7 +47,53 @@ export const AppDataSource = new DataSource({
     LocalService,
     SupportChat,
   ],
+
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+
+  // --------------------------------------------------
+  // CONNECTION TIMEOUT
+  // --------------------------------------------------
+  // Maximum time to establish a PostgreSQL connection.
+  // 5 seconds is reasonable for a cloud-hosted API.
+  connectTimeoutMS: 5000,
+
+  // --------------------------------------------------
+  // TYPEORM SLOW QUERY DETECTION
+  // --------------------------------------------------
+  // Logs queries taking > 2 seconds.
+  //
+  // IMPORTANT:
+  // This does NOT terminate the query.
+  maxQueryExecutionTime: 2000,
+
+  // --------------------------------------------------
+  // CONNECTION POOL
+  // --------------------------------------------------
+  poolSize: 10,
+
+  // --------------------------------------------------
+  // POSTGRES / pg OPTIONS
+  // --------------------------------------------------
+  extra: {
+    // How long pg waits to establish a connection.
+    connectionTimeoutMillis: 5000,
+
+    // Actually TERMINATE a PostgreSQL statement
+    // running longer than 30 seconds.
+    statement_timeout: 30000,
+
+    // Kill transactions that remain idle for 60 seconds.
+    idle_in_transaction_session_timeout: 60000,
+
+    // Keep TCP connections alive.
+    keepAlive: true,
+
+    // Start TCP keepalive after 10 seconds.
+    keepAliveInitialDelayMillis: 10000,
+
+    // Useful when diagnosing connections in PostgreSQL.
+    application_name: "junto-api",
+  },
 });
 
 export async function initializeDatabase() {

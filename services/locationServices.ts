@@ -13,17 +13,26 @@ export interface UserLocation {
 export async function requestCurrentLocation(): Promise<UserLocation> {
   console.log("📍 Requesting current location...");
 
-  // 1. Check whether GPS is enabled
-  const servicesEnabled = await Location.hasServicesEnabledAsync();
+  // 1. Check whether GPS is enabled (Native only - web does not support hasServicesEnabledAsync)
+  if (Platform.OS !== "web") {
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
 
-  if (!servicesEnabled) {
-    if (Platform.OS === "android") {
-      await IntentLauncher.startActivityAsync(
-        IntentLauncher.ActivityAction.LOCATION_SOURCE_SETTINGS,
-      );
+      if (!servicesEnabled) {
+        if (Platform.OS === "android") {
+          await IntentLauncher.startActivityAsync(
+            IntentLauncher.ActivityAction.LOCATION_SOURCE_SETTINGS,
+          );
+        }
+
+        throw new Error("LOCATION_DISABLED");
+      }
+    } catch (err: any) {
+      if (err?.message === "LOCATION_DISABLED") {
+        throw err;
+      }
+      console.warn("hasServicesEnabledAsync check skipped:", err);
     }
-
-    throw new Error("LOCATION_DISABLED");
   }
 
   // 2. Check existing permission
@@ -49,28 +58,40 @@ export async function requestCurrentLocation(): Promise<UserLocation> {
 
   console.log("Coordinates:", position.coords);
 
-  // 5. Reverse Geocode
-  const addresses = await Location.reverseGeocodeAsync({
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-  });
+  const latitude = position.coords.latitude;
+  const longitude = position.coords.longitude;
 
-  if (!addresses.length) {
-    throw new Error("LOCATION_NOT_FOUND");
+  // 5. Reverse Geocode safely without failing if empty
+  let locality = "Current Location";
+  let city = "";
+  let state = "";
+
+  try {
+    const addresses = await Location.reverseGeocodeAsync({
+      latitude,
+      longitude,
+    });
+
+    if (addresses && addresses.length > 0) {
+      const place = addresses[0];
+      console.log("Address:", place);
+      city = place.city || place.subregion || "";
+      state = place.region || "";
+      const streetPart = place.street || place.name || "";
+      locality =
+        [streetPart, city].filter(Boolean).join(", ") ||
+        city ||
+        "Current Location";
+    }
+  } catch (geoErr) {
+    console.warn("Reverse geocode failed, using coordinates:", geoErr);
   }
 
-  const place = addresses[0];
-
-  console.log("Address:", place);
-
   return {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-
-    locality: place.street + "," + place.city || "Unknown",
-
-    city: place.city || "",
-
-    state: place.region || "",
+    latitude,
+    longitude,
+    locality,
+    city,
+    state,
   };
 }

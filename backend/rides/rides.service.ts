@@ -253,6 +253,13 @@ export async function joinRide(
     throw new Error("You cannot join your own ride.");
   }
 
+  // Co-rider cannot join another ride if already in an active ride
+  if (await rideRepository.isUserInActiveRide(user.id, rideId)) {
+    throw new Error(
+      "You are already a co-rider in an active ride. You cannot request a seat for another ride.",
+    );
+  }
+
   // Validate requested seats
   if (input.seatsRequested < 1) {
     throw new Error("At least one seat must be requested.");

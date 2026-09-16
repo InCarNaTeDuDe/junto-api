@@ -34,6 +34,11 @@ import {
   ProblemReportData,
 } from "@/components/rides/RideCompletedRatingModal";
 import { RideChatModal } from "@/components/rides/RideChatModal";
+import { ShareRideModal } from "@/components/rides/ShareRideModal";
+import {
+  requestCurrentLocation,
+  UserLocation,
+} from "@/services/locationServices";
 
 export interface RidePassenger {
   id?: string;
@@ -202,6 +207,9 @@ export default function RidesScreen() {
     null,
   );
   const [isDeletingRide, setIsDeletingRide] = useState(false);
+
+  // Share Ride with Live Location Modal State (for co-riders)
+  const [shareModalRide, setShareModalRide] = useState<RideItem | null>(null);
 
   // Check if current user is owner of a ride
   const checkIsRideOwner = useCallback(
@@ -700,6 +708,30 @@ export default function RidesScreen() {
       Alert.alert("Your Ride", "You are the driver of this ride.");
       return;
     }
+    if (activeCoRiderRide && activeCoRiderRide.id !== ride.id) {
+      const vehicleEmojiMap: Record<string, string> = {
+        car: "🚗",
+        bike: "🏍️",
+        motorcycle: "🏍️",
+        auto: "🛺",
+        auto_rickshaw: "🛺",
+        bus: "🚌",
+        van: "🚐",
+      };
+
+      const vehicleEmoji =
+        vehicleEmojiMap[activeCoRiderRide.vehicleType?.toLowerCase()] ?? "🚗";
+
+      Alert.alert(
+        `Already In A Ride ${vehicleEmoji}`,
+        `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}). You cannot request a seat for another ride while in an active ride.`,
+        [
+          { text: "View My Ride", onPress: () => setActiveTab("my_rides") },
+          { text: "OK" },
+        ],
+      );
+      return;
+    }
     if (ride.status === "in_progress" || ride.status === "both_travelling") {
       Alert.alert(
         "Ride In Progress 🚗",
@@ -1036,13 +1068,66 @@ export default function RidesScreen() {
     );
   };
 
-  // Share Live Trip Details
-  const handleShareTrip = async (ride: RideItem) => {
+  // Execute actual share after user chooses whether to include live location
+  const handleExecuteShare = async (includeLocation: boolean) => {
+    if (!shareModalRide) return;
+    const ride = shareModalRide;
+    const isOwner = checkIsRideOwner(ride);
     const vehicleNum = ride.registrationNumber || "Not specified";
     const driver = ride.driverName || "Driver";
     const pickup = ride.pickupLocation || ride.from;
     const drop = ride.dropLocation || ride.to;
-    const text = `🛡️ JUNTO LIVE RIDE SAFETY STATUS\n\n🟢 Ride is IN PROGRESS\n👤 Driver: ${driver}\n🚗 Vehicle Plate: ${vehicleNum}\n📍 Route: ${pickup} ➔ ${drop}\n⏰ Departure: ${ride.time}\n\nShared safely via Junto App`;
+    const coRiderName = user?.name || "Co-Rider";
+
+    let liveLoc: UserLocation | null = null;
+    if (includeLocation) {
+      try {
+        liveLoc = await requestCurrentLocation();
+      } catch (err: any) {
+        console.warn("Could not retrieve GPS live location:", err);
+        if (selectedLocation?.latitude && selectedLocation?.longitude) {
+          liveLoc = {
+            latitude: selectedLocation.latitude,
+            longitude: selectedLocation.longitude,
+            locality: selectedLocation.name,
+            city: selectedLocation.city || "",
+            state: selectedLocation.state || "",
+          };
+        } else {
+          Alert.alert(
+            "Location Notice",
+            "Could not fetch current GPS location. Sharing trip details without GPS coordinates.",
+          );
+        }
+      }
+    }
+
+    const isTripActive =
+      ride.status === "in_progress" || ride.status === "both_travelling";
+    const statusLabel = isTripActive
+      ? "🟢 IN PROGRESS"
+      : "🟡 CONFIRMED / SCHEDULED";
+
+    let text =
+      `🛡️ JUNTO LIVE RIDE SAFETY STATUS\n\n` +
+      `Ride Status: ${statusLabel}\n` +
+      (!isOwner ? `👤 Co-Rider: ${coRiderName}\n` : "") +
+      `🚗 Driver: ${driver}\n` +
+      `🚙 Vehicle Plate: ${vehicleNum}\n` +
+      `📍 Route: ${pickup} ➔ ${drop}\n` +
+      `⏰ Departure: ${ride.time}\n`;
+
+    if (includeLocation && liveLoc) {
+      const mapsLink = `https://maps.google.com/?q=${liveLoc.latitude},${liveLoc.longitude}`;
+      text +=
+        `\n📍 Co-Rider Live Location: ${liveLoc.locality || "Current Location"}\n` +
+        `🗺️ GPS Coordinates: ${liveLoc.latitude.toFixed(5)}, ${liveLoc.longitude.toFixed(5)}\n` +
+        `🔗 Track Live on Google Maps: ${mapsLink}\n`;
+    }
+
+    text += `\nShared safely via Junto App`;
+
+    setShareModalRide(null);
 
     try {
       if (
@@ -1059,6 +1144,39 @@ export default function RidesScreen() {
       }
     } catch {
       Alert.alert("Trip Details", text);
+    }
+  };
+
+  // Share Live Trip Details
+  const handleShareTrip = async (ride: RideItem) => {
+    const isOwner = checkIsRideOwner(ride);
+    if (!isOwner) {
+      // Co-rider sharing: ask if they want to include live location (optional)
+      setShareModalRide(ride);
+    } else {
+      // Driver sharing
+      const vehicleNum = ride.registrationNumber || "Not specified";
+      const driver = ride.driverName || user?.name || "Driver";
+      const pickup = ride.pickupLocation || ride.from;
+      const drop = ride.dropLocation || ride.to;
+      const text = `🛡️ JUNTO LIVE RIDE SAFETY STATUS\n\n🟢 Ride is IN PROGRESS\n👤 Driver: ${driver}\n🚗 Vehicle Plate: ${vehicleNum}\n📍 Route: ${pickup} ➔ ${drop}\n⏰ Departure: ${ride.time}\n\nShared safely via Junto App`;
+
+      try {
+        if (
+          Platform.OS === "web" &&
+          typeof navigator !== "undefined" &&
+          navigator.share
+        ) {
+          await navigator.share({
+            title: "Junto Safe Ride Details",
+            text,
+          });
+        } else {
+          await Share.share({ message: text });
+        }
+      } catch {
+        Alert.alert("Trip Details", text);
+      }
     }
   };
 
@@ -1190,6 +1308,20 @@ export default function RidesScreen() {
   const joinedRides = useMemo(() => {
     return ridesList.filter((ride) => {
       if (checkIsRideOwner(ride)) return false;
+      const userReq = getUserSeatRequest(ride);
+      return userReq && userReq.status === "confirmed";
+    });
+  }, [ridesList, checkIsRideOwner, getUserSeatRequest]);
+
+  // Check if current user is already an active confirmed co-rider in any ride
+  const activeCoRiderRide = useMemo(() => {
+    return ridesList.find((ride) => {
+      if (checkIsRideOwner(ride)) return false;
+      const isOngoing =
+        ride.status === "active" ||
+        ride.status === "in_progress" ||
+        ride.status === "both_travelling";
+      if (!isOngoing) return false;
       const userReq = getUserSeatRequest(ride);
       return userReq && userReq.status === "confirmed";
     });
@@ -1643,6 +1775,64 @@ export default function RidesScreen() {
               );
             })}
           </View>
+
+          {/* Active Co-Rider Ride Notice Banner */}
+          {activeCoRiderRide && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: isDark
+                  ? "rgba(139, 92, 246, 0.12)"
+                  : "#F5F3FF",
+                borderWidth: 1,
+                borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : "#DDD6FE",
+                borderRadius: 14,
+                padding: 12,
+                marginBottom: 14,
+                gap: 10,
+              }}
+            >
+              <Ionicons name="information-circle" size={20} color="#8B5CF6" />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: isDark ? "#F1F5F9" : "#1E1B4B",
+                  }}
+                >
+                  You are in an active ride ({activeCoRiderRide.from} ➔{" "}
+                  {activeCoRiderRide.to})
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: isDark ? "#94A3B8" : "#6D28D9",
+                    marginTop: 1,
+                  }}
+                >
+                  You cannot request seats for other rides while your current
+                  ride is active.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setActiveTab("my_rides")}
+                style={{
+                  backgroundColor: "#8B5CF6",
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{ color: "#FFF", fontSize: 11, fontWeight: "600" }}
+                >
+                  View Ride
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Rides Feed */}
           {isLoading ? (
@@ -2150,6 +2340,53 @@ export default function RidesScreen() {
                           <Ionicons name="ban" size={13} color="#8FA0B8" />
                           <Text style={styles.rideFullBadgeText}>Full</Text>
                         </View>
+                      ) : activeCoRiderRide &&
+                        activeCoRiderRide.id !== ride.id ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.requestJoinPillBtn,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(255, 255, 255, 0.08)"
+                                : "#F1F5F9",
+                              borderWidth: 1,
+                              borderColor: isDark
+                                ? "rgba(255, 255, 255, 0.12)"
+                                : "#CBD5E1",
+                            },
+                          ]}
+                          onPress={() =>
+                            Alert.alert(
+                              "Already in a Ride 🚗",
+                              `You already have a confirmed seat in an active ride (${activeCoRiderRide.from} ➔ ${activeCoRiderRide.to}). You cannot request seats for other rides while your current ride is active.`,
+                              [
+                                {
+                                  text: "View My Ride",
+                                  onPress: () => setActiveTab("my_rides"),
+                                },
+                                { text: "OK" },
+                              ],
+                            )
+                          }
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="lock-closed"
+                            size={12}
+                            color={isDark ? "#94A3B8" : "#64748B"}
+                          />
+                          <Text
+                            style={[
+                              styles.requestJoinPillBtnText,
+                              {
+                                color: isDark ? "#94A3B8" : "#64748B",
+                                fontSize: 11,
+                              },
+                            ]}
+                          >
+                            In a Ride
+                          </Text>
+                        </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
                           style={styles.requestJoinPillBtn}
@@ -3188,6 +3425,19 @@ export default function RidesScreen() {
             </View>
           </View>
         </Modal>
+      )}
+
+      {/* Share Ride with Live Location Modal */}
+      {shareModalRide && (
+        <ShareRideModal
+          visible={!!shareModalRide}
+          ride={shareModalRide}
+          isDark={isDark}
+          coRiderName={user?.name || "Co-Rider"}
+          isCoRider={!checkIsRideOwner(shareModalRide)}
+          onClose={() => setShareModalRide(null)}
+          onShare={handleExecuteShare}
+        />
       )}
     </SafeAreaView>
   );

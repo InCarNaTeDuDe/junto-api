@@ -136,8 +136,11 @@ export async function joinRideHandler(
       req.user!,
     );
     return res.status(200).json(result);
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      message: err?.message || "Failed to request seat",
+    });
   }
 }
 
