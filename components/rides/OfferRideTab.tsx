@@ -131,13 +131,28 @@ export default function OfferRideTab({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
 
-  // Real-time vehicle number validation: prevents offering rides if vehicle is in travelling state
+  type VehicleValidationReason =
+    | "invalid_format"
+    | "active_trip"
+    | "available"
+    | null;
+
+  // Vehicle number validation state: prevents offering rides if vehicle is in travelling state
   const [vehicleValidation, setVehicleValidation] = useState<{
     checking: boolean;
     isValid: boolean | null;
+    reason: VehicleValidationReason;
     message?: string;
-    activeRide?: { from: string; to: string; status: string };
-  }>({ checking: false, isValid: null });
+    activeRide?: {
+      from: string;
+      to: string;
+      status: string;
+    };
+  }>({
+    checking: false,
+    isValid: null,
+    reason: null,
+  });
 
   const VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\s\d{2}\s[A-Z]{1,3}\s\d{4}$/;
 
@@ -145,27 +160,41 @@ export default function OfferRideTab({
     return VEHICLE_NUMBER_REGEX.test(value.trim().toUpperCase());
   };
 
-  useEffect(() => {
-    const raw = (offerVehicleNumber || "").trim();
-    const cleanReg = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // API call and validation triggered after user focuses out (onBlur) from the vehicle number input box
+  const checkVehicleAvailability = async (vehicleNumberToCheck?: string) => {
+    const raw = (vehicleNumberToCheck ?? offerVehicleNumber ?? "")
+      .trim()
+      .toUpperCase();
 
-    if (!cleanReg || cleanReg.length < 4) {
-      setVehicleValidation({ checking: false, isValid: null });
-      return;
+    // FIRST: validate registration format
+    if (!VEHICLE_NUMBER_REGEX.test(raw)) {
+      setVehicleValidation({
+        checking: false,
+        isValid: false,
+        reason: "invalid_format",
+        message: "Please enter a valid vehicle number like TS 09 EA 1234.",
+      });
+
+      return; // IMPORTANT: do not call API
     }
 
-    // 1. Immediate local check against active rides list if provided
+    const cleanReg = raw.replace(/[^A-Z0-9]/g, "");
+
+    // Local active ride check
     if (existingRides && existingRides.length > 0) {
       const busyRide = existingRides.find((r) => {
         const rReg = (r.registrationNumber || "")
           .toUpperCase()
           .replace(/[^A-Z0-9]/g, "");
+
         if (!rReg || rReg !== cleanReg) return false;
+
         const isTravelling =
           r.status === "in_progress" ||
           r.status === "both_travelling" ||
           !!r.isDriverTravelling ||
           (r.passengers || []).some((p: any) => p.isTravelling);
+
         return isTravelling;
       });
 
@@ -173,52 +202,63 @@ export default function OfferRideTab({
         setVehicleValidation({
           checking: false,
           isValid: false,
-          message: `Vehicle "${raw.toUpperCase()}" is currently on an active trip (${busyRide.from} ➔ ${busyRide.to}). A new ride cannot be created with this vehicle until the ongoing trip is finished.`,
+          reason: "active_trip",
+          message: `Vehicle "${raw}" is currently on an active trip (${busyRide.from} ➔ ${busyRide.to}).`,
           activeRide: {
             from: busyRide.from,
             to: busyRide.to,
             status: busyRide.status || "in_progress",
           },
         });
+
         return;
       }
     }
 
-    // 2. Debounced API check against backend database
-    setVehicleValidation((prev) => ({ ...prev, checking: true }));
-    const timer = setTimeout(async () => {
-      try {
-        const res = await ApiService.get<{
-          isAvailable: boolean;
-          message?: string;
-          activeRide?: any;
-        }>(
-          `/api/rides/check-vehicle?registrationNumber=${encodeURIComponent(cleanReg)}`,
-        );
+    // API check only after valid format
+    setVehicleValidation({
+      checking: true,
+      isValid: null,
+      reason: null,
+    });
 
-        if (res && res.isAvailable === false) {
-          setVehicleValidation({
-            checking: false,
-            isValid: false,
-            message:
-              res.message ||
-              "This vehicle is currently on an active trip in travelling state.",
-            activeRide: res.activeRide,
-          });
-        } else {
-          setVehicleValidation({
-            checking: false,
-            isValid: true,
-            message: "Vehicle available for new ride",
-          });
-        }
-      } catch {
-        setVehicleValidation({ checking: false, isValid: null });
+    try {
+      const res = await ApiService.get<{
+        isAvailable: boolean;
+        message?: string;
+        activeRide?: any;
+      }>(
+        `/api/rides/check-vehicle?registrationNumber=${encodeURIComponent(
+          cleanReg,
+        )}`,
+      );
+
+      if (res && res.isAvailable === false) {
+        setVehicleValidation({
+          checking: false,
+          isValid: false,
+          reason: "active_trip",
+          message:
+            res.message ||
+            "This vehicle is currently on an active trip in travelling state.",
+          activeRide: res.activeRide,
+        });
+      } else {
+        setVehicleValidation({
+          checking: false,
+          isValid: true,
+          reason: "available",
+          message: "Vehicle available for new ride",
+        });
       }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [offerVehicleNumber, existingRides]);
+    } catch {
+      setVehicleValidation({
+        checking: false,
+        isValid: null,
+        reason: null,
+      });
+    }
+  };
 
   const onDateChange = (_event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -590,7 +630,27 @@ export default function OfferRideTab({
             <TextInput
               value={offerVehicleNumber}
               onChangeText={(val) => {
-                setOfferVehicleNumber(val.toUpperCase());
+                const value = val.toUpperCase();
+
+                setOfferVehicleNumber(value);
+
+                // Reset previous validation whenever user edits the number
+                if (
+                  vehicleValidation.isValid !== null ||
+                  vehicleValidation.checking ||
+                  vehicleValidation.reason !== null
+                ) {
+                  setVehicleValidation({
+                    checking: false,
+                    isValid: null,
+                    reason: null,
+                    message: undefined,
+                    activeRide: undefined,
+                  });
+                }
+              }}
+              onBlur={() => {
+                checkVehicleAvailability();
               }}
               placeholder="e.g. TS 09 EA 1234"
               placeholderTextColor="#8FA0B8"
@@ -612,13 +672,16 @@ export default function OfferRideTab({
             <View style={styles.vehicleErrorBox}>
               <View style={styles.vehicleErrorHeader}>
                 <Ionicons name="alert-circle" size={16} color="#EF4444" />
+
                 <Text style={styles.vehicleErrorTitle}>
-                  Vehicle Currently in Transit / Travelling State
+                  {vehicleValidation.reason === "invalid_format"
+                    ? "Invalid Vehicle Registration Number"
+                    : "Vehicle Currently in Transit / Travelling State"}
                 </Text>
               </View>
+
               <Text style={styles.vehicleErrorMessage}>
-                {vehicleValidation.message ||
-                  "This vehicle is currently on an active trip. Neither you nor another user can create or schedule a ride with this vehicle until the ongoing trip is completed."}
+                {vehicleValidation.message}
               </Text>
             </View>
           ) : vehicleValidation.isValid === true ? (
@@ -746,14 +809,20 @@ export default function OfferRideTab({
         <TouchableOpacity
           style={[
             styles.postRideBtn,
-            (isPublishing || vehicleValidation.isValid === false) && {
+            (isPublishing ||
+              vehicleValidation.isValid === false ||
+              vehicleValidation.checking) && {
               opacity: 0.6,
               backgroundColor:
                 vehicleValidation.isValid === false ? "#475569" : "#38BDF8",
             },
           ]}
           onPress={onPublish}
-          disabled={isPublishing || vehicleValidation.isValid === false}
+          disabled={
+            isPublishing ||
+            vehicleValidation.isValid === false ||
+            vehicleValidation.checking
+          }
           activeOpacity={0.85}
         >
           {isPublishing ? (
