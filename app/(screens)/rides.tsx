@@ -37,6 +37,7 @@ import { RideChatModal } from "@/components/rides/RideChatModal";
 import { ShareRideModal } from "@/components/rides/ShareRideModal";
 import {
   requestCurrentLocation,
+  getCurrentFreshLocation,
   UserLocation,
 } from "@/services/locationServices";
 import { RideItem, RidePassenger } from "@/types/rides";
@@ -1006,7 +1007,10 @@ export default function RidesScreen() {
   };
 
   // Execute actual share after user chooses whether to include live location
-  const handleExecuteShare = async (includeLocation: boolean) => {
+  const handleExecuteShare = async (
+    includeLocation: boolean,
+    verifiedLocation?: UserLocation | null,
+  ) => {
     if (!shareModalRide) return;
     const ride = shareModalRide;
     const isOwner = checkIsRideOwner(ride);
@@ -1018,23 +1022,18 @@ export default function RidesScreen() {
 
     let liveLoc: UserLocation | null = null;
     if (includeLocation) {
-      try {
-        liveLoc = await requestCurrentLocation();
-      } catch (err: any) {
-        console.warn("Could not retrieve GPS live location:", err);
-        if (selectedLocation?.latitude && selectedLocation?.longitude) {
-          liveLoc = {
-            latitude: selectedLocation.latitude,
-            longitude: selectedLocation.longitude,
-            locality: selectedLocation.name,
-            city: selectedLocation.city || "",
-            state: selectedLocation.state || "",
-          };
-        } else {
-          Alert.alert(
-            "Location Notice",
-            "Could not fetch current GPS location. Sharing trip details without GPS coordinates.",
-          );
+      if (
+        verifiedLocation &&
+        verifiedLocation.latitude &&
+        verifiedLocation.longitude
+      ) {
+        liveLoc = verifiedLocation;
+      } else {
+        try {
+          liveLoc = await getCurrentFreshLocation();
+        } catch (err: any) {
+          console.warn("Could not retrieve GPS live location:", err);
+          liveLoc = null;
         }
       }
     }
@@ -1054,7 +1053,7 @@ export default function RidesScreen() {
       `📍 Route: ${pickup} ➔ ${drop}\n` +
       `⏰ Departure: ${ride.time}\n`;
 
-    if (includeLocation && liveLoc) {
+    if (includeLocation && liveLoc && liveLoc.latitude && liveLoc.longitude) {
       const mapsLink = `https://maps.google.com/?q=${liveLoc.latitude},${liveLoc.longitude}`;
       text +=
         `\n📍 Co-Rider Live Location: ${liveLoc.locality || "Current Location"}\n` +

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -7,15 +7,29 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
+  Alert,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RideItem } from "@/types/rides";
+import {
+  UserLocation,
+  isLocationServicesEnabled,
+  openLocationSettings,
+  checkLocationPermission,
+  requestLocationPermission,
+  getCurrentFreshLocation,
+} from "@/services/locationServices";
 
 interface ShareRideModalProps {
   visible: boolean;
   ride: RideItem | null;
   onClose: () => void;
-  onShare: (includeLocation: boolean) => Promise<void>;
+  onShare: (
+    includeLocation: boolean,
+    liveLocation?: UserLocation | null,
+  ) => Promise<void>;
   isDark?: boolean;
   coRiderName?: string;
   isCoRider?: boolean;
@@ -31,6 +45,172 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
   isCoRider = true,
 }) => {
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [waitingForSettings, setWaitingForSettings] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>("");
+
+  // Clean up state when modal closes or opens
+  useEffect(() => {
+    if (!visible) {
+      setIsFetchingLocation(false);
+      setWaitingForSettings(false);
+      setStatusMessage("");
+    }
+  }, [visible]);
+
+  // Safely acquire real GPS coordinates and proceed to native share
+  const performFetchAndShare = async () => {
+    try {
+      setIsFetchingLocation(true);
+      setStatusMessage("Acquiring live GPS coordinates...");
+      const loc = await getCurrentFreshLocation();
+      if (
+        !loc ||
+        typeof loc.latitude !== "number" ||
+        typeof loc.longitude !== "number"
+      ) {
+        throw new Error("Invalid coordinates received");
+      }
+      setWaitingForSettings(false);
+      setIsFetchingLocation(false);
+      setStatusMessage("");
+      // Real coordinates obtained! Now invoke onShare with the true coordinates
+      await onShare(true, loc);
+    } catch (err: any) {
+      console.warn("Could not retrieve GPS live location:", err);
+      setIsFetchingLocation(false);
+      setWaitingForSettings(false);
+      setStatusMessage("");
+      Alert.alert(
+        "Location Error",
+        "Could not retrieve your live GPS coordinates. Would you like to share trip details without GPS location?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Share Without GPS",
+            onPress: () => onShare(false),
+          },
+        ],
+      );
+    }
+  };
+
+  // Check permission & GPS services first, only open native share when user comes back
+  const handleShareWithLocation = async () => {
+    if (isFetchingLocation) return;
+
+    // Step 1: Check device Location Services (GPS hardware)
+    const servicesEnabled = await isLocationServicesEnabled();
+    if (!servicesEnabled) {
+      Alert.alert(
+        "Turn On Location 📍",
+        "Device location is turned off. Please turn ON location in Settings and return to Junto to share your live GPS location.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              setIsFetchingLocation(false);
+              setWaitingForSettings(false);
+              setStatusMessage("");
+            },
+          },
+          {
+            text: "Open Settings",
+            onPress: async () => {
+              setWaitingForSettings(true);
+              setIsFetchingLocation(true);
+              setStatusMessage(
+                "Waiting for GPS setting... Turn ON location and return to Junto.",
+              );
+              await openLocationSettings();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    // Step 2: Check foreground location permission
+    let perm = await checkLocationPermission();
+    if (perm !== "granted") {
+      perm = await requestLocationPermission();
+      if (perm !== "granted") {
+        setIsFetchingLocation(false);
+        setWaitingForSettings(false);
+        setStatusMessage("");
+        Alert.alert(
+          "Location Permission Required",
+          "Location permission is needed to attach your live Google Maps location to the share status.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: async () => {
+                setWaitingForSettings(true);
+                setIsFetchingLocation(true);
+                setStatusMessage(
+                  "Waiting for permission... Enable location in Settings and return.",
+                );
+                await openLocationSettings();
+              },
+            },
+          ],
+        );
+        return;
+      }
+    }
+
+    // Step 3: Both settings & permissions are verified! Acquire fresh GPS coords & share
+    await performFetchAndShare();
+  };
+
+  // AppState listener: When user returns from Settings to our screen, verify and trigger native share
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (nextAppState === "active" && waitingForSettings) {
+        console.log(
+          "App returned to active while waiting for location settings...",
+        );
+        setIsFetchingLocation(true);
+        setStatusMessage("Verifying location settings...");
+
+        const servicesEnabled = await isLocationServicesEnabled();
+        const perm = await checkLocationPermission();
+
+        if (servicesEnabled && perm === "granted") {
+          // Setting is turned ON and user is back on our screen!
+          // Now fetch GPS coords and show native share UI
+          await performFetchAndShare();
+        } else {
+          // User returned but setting is still disabled
+          setIsFetchingLocation(false);
+          setStatusMessage("");
+          Alert.alert(
+            "Location Not Enabled",
+            "Location is still turned off. To share your live GPS coordinates, please turn ON location in Settings.",
+            [
+              {
+                text: "OK",
+                onPress: () => setWaitingForSettings(false),
+              },
+              {
+                text: "Share Without Live Location",
+                onPress: () => {
+                  setWaitingForSettings(false);
+                  onShare(false);
+                },
+              },
+            ],
+          );
+        }
+      }
+    };
+
+    const sub = AppState.addEventListener("change", handleAppStateChange);
+    return () => {
+      sub.remove();
+    };
+  }, [waitingForSettings, onShare]);
 
   if (!visible || !ride) return null;
 
@@ -45,19 +225,18 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
   const driver = ride.driverName || "Driver";
   const vehiclePlate = ride.registrationNumber || "Not specified";
 
-  const handleShareWithLocation = async () => {
-    if (isFetchingLocation) return;
-    try {
-      setIsFetchingLocation(true);
-      await onShare(true);
-    } finally {
-      setIsFetchingLocation(false);
-    }
-  };
-
   const handleShareWithoutLocation = async () => {
     if (isFetchingLocation) return;
+    setWaitingForSettings(false);
+    setStatusMessage("");
     await onShare(false);
+  };
+
+  const handleCloseModal = () => {
+    setWaitingForSettings(false);
+    setIsFetchingLocation(false);
+    setStatusMessage("");
+    onClose();
   };
 
   return (
@@ -65,7 +244,7 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleCloseModal}
     >
       <View style={styles.backdrop}>
         <View
@@ -90,8 +269,8 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
             </View>
 
             <TouchableOpacity
-              onPress={onClose}
-              disabled={isFetchingLocation}
+              onPress={handleCloseModal}
+              disabled={isFetchingLocation && !waitingForSettings}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.closeBtn}
             >
@@ -152,48 +331,112 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
             )}
           </View>
 
-          {/* Prompt description */}
-          <View style={styles.promptBox}>
-            <Text style={[styles.promptTitle, { color: textPrimary }]}>
-              Include your live location? (Optional)
-            </Text>
-            <Text style={[styles.promptDesc, { color: textSecondary }]}>
-              Attaching your real-time GPS location creates a live Google Maps
-              link so friends & family can see your exact whereabouts.
-            </Text>
-          </View>
+          {/* Waiting for Settings Banner */}
+          {waitingForSettings ? (
+            <View
+              style={[
+                styles.waitingBanner,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(139, 92, 246, 0.15)"
+                    : "#F5F3FF",
+                  borderColor: "#8B5CF6",
+                },
+              ]}
+            >
+              <ActivityIndicator size="small" color="#8B5CF6" />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.waitingBannerTitle, { color: textPrimary }]}
+                >
+                  Turn ON Location in Settings
+                </Text>
+                <Text
+                  style={[styles.waitingBannerSub, { color: textSecondary }]}
+                >
+                  Once you enable location in settings and return to Junto, your
+                  live Google Maps link will generate automatically.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            /* Prompt description */
+            <View style={styles.promptBox}>
+              <Text style={[styles.promptTitle, { color: textPrimary }]}>
+                Include your live location? (Optional)
+              </Text>
+              <Text style={[styles.promptDesc, { color: textSecondary }]}>
+                Attaching your real-time GPS location creates a live Google Maps
+                link so friends & family can see your exact whereabouts.
+              </Text>
+            </View>
+          )}
 
           {/* Action 1: Include Live Location (Optional) */}
           <TouchableOpacity
             style={[
               styles.primaryShareBtn,
-              isFetchingLocation && { opacity: 0.8 },
+              isFetchingLocation && !waitingForSettings && { opacity: 0.8 },
             ]}
             onPress={handleShareWithLocation}
-            disabled={isFetchingLocation}
+            disabled={isFetchingLocation && !waitingForSettings}
             activeOpacity={0.8}
           >
-            {isFetchingLocation ? (
+            {isFetchingLocation && !waitingForSettings ? (
               <View style={styles.btnContentRow}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
                 <Text style={styles.primaryShareBtnText}>
-                  Fetching live GPS location...
+                  {statusMessage || "Fetching live GPS location..."}
                 </Text>
               </View>
             ) : (
               <View style={styles.btnContentRow}>
-                <Ionicons name="location" size={18} color="#FFFFFF" />
+                <Ionicons
+                  name={waitingForSettings ? "refresh" : "location"}
+                  size={18}
+                  color="#FFFFFF"
+                />
                 <View style={styles.btnTextColumn}>
                   <Text style={styles.primaryShareBtnText}>
-                    📍 Include Live Location & Share
+                    {waitingForSettings
+                      ? "I've Turned ON Location • Share Now"
+                      : "📍 Include Live Location & Share"}
                   </Text>
                   <Text style={styles.primaryShareBtnSub}>
-                    Takes your current GPS coordinates & map link
+                    {waitingForSettings
+                      ? "Check location status & show native share sheet"
+                      : "Verifies GPS & attaches live Google Maps link"}
                   </Text>
                 </View>
               </View>
             )}
           </TouchableOpacity>
+
+          {/* If waiting for settings, provide quick settings button */}
+          {waitingForSettings && (
+            <TouchableOpacity
+              style={[
+                styles.secondaryShareBtn,
+                { borderColor, backgroundColor: cardBg },
+              ]}
+              onPress={() => openLocationSettings()}
+              activeOpacity={0.8}
+            >
+              <View style={styles.btnContentRow}>
+                <Ionicons name="settings-outline" size={18} color="#8B5CF6" />
+                <View style={styles.btnTextColumn}>
+                  <Text
+                    style={[
+                      styles.secondaryShareBtnText,
+                      { color: textPrimary },
+                    ]}
+                  >
+                    Open Device Location Settings Again
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Action 2: Share without live location */}
           <TouchableOpacity
@@ -202,7 +445,7 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
               { borderColor, backgroundColor: cardBg },
             ]}
             onPress={handleShareWithoutLocation}
-            disabled={isFetchingLocation}
+            disabled={isFetchingLocation && !waitingForSettings}
             activeOpacity={0.8}
           >
             <View style={styles.btnContentRow}>
@@ -232,8 +475,8 @@ export const ShareRideModal: React.FC<ShareRideModalProps> = ({
           {/* Cancel */}
           <TouchableOpacity
             style={styles.cancelBtn}
-            onPress={onClose}
-            disabled={isFetchingLocation}
+            onPress={handleCloseModal}
+            disabled={isFetchingLocation && !waitingForSettings}
             activeOpacity={0.7}
           >
             <Text style={[styles.cancelBtnText, { color: textSecondary }]}>
@@ -252,14 +495,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.65)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 10,
   },
   modalContainer: {
     width: "100%",
     maxWidth: 440,
     borderRadius: 24,
     borderWidth: 1,
-    padding: 22,
+    padding: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -347,6 +590,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#8B5CF6",
     fontWeight: "600",
+  },
+  waitingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  waitingBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  waitingBannerSub: {
+    fontSize: 11.5,
+    lineHeight: 16,
   },
   promptBox: {
     marginBottom: 16,
