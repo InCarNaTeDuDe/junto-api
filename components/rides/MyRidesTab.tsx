@@ -999,7 +999,7 @@ export default function MyRidesTab({
                     <Ionicons
                       name="share-social-outline"
                       size={14}
-                      color="#F8FAFC"
+                      color="#10B981"
                     />
                     <Text style={styles.actionBtnText}>Share Trip</Text>
                   </TouchableOpacity>

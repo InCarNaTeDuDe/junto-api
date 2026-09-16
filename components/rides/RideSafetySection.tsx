@@ -250,7 +250,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
         </TouchableOpacity>
 
         {/* 3. Share Trip */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={[
             styles.secondaryControlBtn,
             { backgroundColor: bgInner, borderColor },
@@ -271,7 +271,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
               Send tracking to contacts
             </Text>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* 4. Junto Chat */}
         {/* <TouchableOpacity
