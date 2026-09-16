@@ -24,7 +24,11 @@ export const CreateRideSchema = z.object({
   verified: z.boolean().optional().default(true),
   // Safety & Vehicle details
   vehicleModel: z.string().trim().max(120).optional(),
-  registrationNumber: z.string().trim().max(50).optional(),
+  registrationNumber: z
+    .string()
+    .trim()
+    .min(2, "Vehicle registration number is required")
+    .max(50),
   pickupLocation: z.string().trim().max(200).optional(),
   dropLocation: z.string().trim().max(200).optional(),
 });

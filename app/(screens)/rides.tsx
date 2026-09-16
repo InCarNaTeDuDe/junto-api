@@ -361,10 +361,31 @@ export default function RidesScreen() {
 
   // Publish / Offer Ride
   const handlePublishRide = async () => {
-    const pickup = offerPickup.trim() || "Madhapur";
-    const drop = offerDrop.trim() || "Financial District";
-    const vehicleNum =
-      offerVehicleNumber.trim().toUpperCase() || "TS 09 EA 4521";
+    const pickup = offerPickup.trim();
+    const drop = offerDrop.trim();
+    const vehicleNum = offerVehicleNumber.trim().toUpperCase();
+
+    if (!pickup) {
+      Alert.alert(
+        "Pickup Location Required",
+        "Please enter your pickup location.",
+      );
+      return;
+    }
+    if (!drop) {
+      Alert.alert(
+        "Drop Location Required",
+        "Please enter your destination / drop location.",
+      );
+      return;
+    }
+    if (!vehicleNum) {
+      Alert.alert(
+        "Vehicle Number Required 🚗",
+        "Please enter your vehicle registration number (e.g. TS 09 EA 1234) before publishing your ride.",
+      );
+      return;
+    }
 
     const priceNum = parseFloat(offerPrice.replace(/[^0-9.]/g, "")) || 40;
     const departureStr = formatDeparture(departureDate, departureTime);
@@ -521,7 +542,12 @@ export default function RidesScreen() {
     if (!editModalRide) return;
     const pickup = editPickup.trim();
     const drop = editDrop.trim();
-    const vehicleNum = editVehicleNumber.trim().toUpperCase();
+    const isRideStarted =
+      editModalRide.status === "in_progress" ||
+      editModalRide.status === "both_travelling";
+    const vehicleNum = isRideStarted
+      ? (editModalRide.registrationNumber || "").trim().toUpperCase()
+      : editVehicleNumber.trim().toUpperCase();
 
     if (!pickup) {
       Alert.alert("Pickup Required", "Please enter your pickup location.");
@@ -536,6 +562,47 @@ export default function RidesScreen() {
         "Vehicle Number Required",
         "Please enter your vehicle registration number.",
       );
+      return;
+    }
+
+    // Check if any changes were made before making API call
+    const initialPickup = (
+      editModalRide.pickupLocation ||
+      editModalRide.from ||
+      ""
+    ).trim();
+    const initialDrop = (
+      editModalRide.dropLocation ||
+      editModalRide.to ||
+      ""
+    ).trim();
+    const initialVehicleType = editModalRide.vehicleType || "car";
+    const initialVehicleNum = (editModalRide.registrationNumber || "")
+      .trim()
+      .toUpperCase();
+    const initialVehicleModel = (editModalRide.vehicleModel || "").trim();
+    const initialSeats =
+      editModalRide.seatsLeft ?? (editModalRide.vehicleType === "bike" ? 1 : 3);
+    const initialPrice =
+      parseFloat(String(editModalRide.price ?? 0).replace(/[^0-9.]/g, "")) || 0;
+    const initialNotes = (editModalRide.notes || "").trim();
+
+    const currentPrice = parseFloat(editPrice.replace(/[^0-9.]/g, "")) || 0;
+    const currentNotes = editNotes.trim();
+    const currentVehicleModel = editVehicleModel.trim();
+
+    const hasChanges =
+      pickup !== initialPickup ||
+      drop !== initialDrop ||
+      editVehicleType !== initialVehicleType ||
+      (!isRideStarted && vehicleNum !== initialVehicleNum) ||
+      currentVehicleModel !== initialVehicleModel ||
+      editSeats !== initialSeats ||
+      currentPrice !== initialPrice ||
+      currentNotes !== initialNotes;
+
+    if (!hasChanges) {
+      setEditModalRide(null);
       return;
     }
 
@@ -597,6 +664,13 @@ export default function RidesScreen() {
   const handleRequestSeat = async (ride: RideItem) => {
     if (checkIsRideOwner(ride)) {
       Alert.alert("Your Ride", "You are the driver of this ride.");
+      return;
+    }
+    if (ride.status === "in_progress" || ride.status === "both_travelling") {
+      Alert.alert(
+        "Ride In Progress 🚗",
+        "This ride is already in progress with co-riders and cannot accept new seat requests.",
+      );
       return;
     }
     if (ride.seatsLeft <= 0) {
@@ -1304,6 +1378,10 @@ export default function RidesScreen() {
           setDepartureTime={setDepartureTime}
           offerVehicleType={offerVehicleType}
           setOfferVehicleType={setOfferVehicleType}
+          offerVehicleNumber={offerVehicleNumber}
+          setOfferVehicleNumber={setOfferVehicleNumber}
+          offerVehicleModel={offerVehicleModel}
+          setOfferVehicleModel={setOfferVehicleModel}
           offerSeats={offerSeats}
           setOfferSeats={setOfferSeats}
           offerPrice={offerPrice}
@@ -1523,7 +1601,9 @@ export default function RidesScreen() {
               const hasConfirmedCoRider = (ride.passengers || []).some(
                 (p) => p.status === "confirmed",
               );
-              const isStarted = ride.status === "in_progress";
+              const isStarted =
+                ride.status === "in_progress" ||
+                ride.status === "both_travelling";
               // EMERGENCY CONTROLS: Show only if ride is started with co-rider AND user is part of this ride
               const showEmergency =
                 isStarted &&
@@ -1545,9 +1625,16 @@ export default function RidesScreen() {
                 >
                   {/* Card Header Row: Popular tag on left, Edit & Delete on right */}
                   <View style={styles.cardHeaderTopRow}>
-                    {/* <View style={styles.popularBadge}>
-                      <Text style={styles.popularBadgeText}>🔥 Popular</Text>
-                    </View> */}
+                    {isStarted ? (
+                      <View style={styles.cardInProgressBadge}>
+                        <View style={styles.inProgressDot} />
+                        <Text style={styles.cardInProgressBadgeText}>
+                          Progress
+                        </Text>
+                      </View>
+                    ) : (
+                      <View />
+                    )}
 
                     {checkIsRideOwner(ride) && (
                       <View style={styles.cardHeaderActions}>
@@ -1884,49 +1971,89 @@ export default function RidesScreen() {
                             Manage
                           </Text>
                         </TouchableOpacity>
-                      ) : userReq ? (
+                      ) : userReq?.status === "confirmed" ? (
                         <View style={styles.passengerRequestedGroup}>
                           <View
                             style={[
                               styles.feedRequestedTag,
                               {
-                                backgroundColor:
-                                  userReq.status === "confirmed"
-                                    ? "#10B98120"
-                                    : "#F59E0B20",
+                                backgroundColor: "#10B98120",
                                 paddingVertical: 5,
                                 paddingHorizontal: 8,
                               },
                             ]}
                           >
                             <Ionicons
-                              name={
-                                userReq.status === "confirmed"
-                                  ? "checkmark-circle"
-                                  : "time-outline"
-                              }
+                              name="checkmark-circle"
                               size={13}
-                              color={
-                                userReq.status === "confirmed"
-                                  ? "#10B981"
-                                  : "#D97706"
-                              }
+                              color="#10B981"
                             />
                             <Text
                               style={[
                                 styles.feedRequestedTagText,
                                 {
                                   fontSize: 11,
-                                  color:
-                                    userReq.status === "confirmed"
-                                      ? "#10B981"
-                                      : "#D97706",
+                                  color: "#10B981",
                                 },
                               ]}
                             >
-                              {userReq.status === "confirmed"
-                                ? "Confirmed"
-                                : "Pending"}
+                              Confirmed
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={{ paddingHorizontal: 6, paddingVertical: 4 }}
+                            onPress={() => handleCancelSeat(ride)}
+                          >
+                            <Text style={styles.feedCancelBtnText}>Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : isStarted ? (
+                        <TouchableOpacity
+                          style={styles.rideProgressBadgeBtn}
+                          onPress={() =>
+                            Alert.alert(
+                              "Ride In Progress 🚗",
+                              "This ride is already in progress with co-riders and cannot accept new seat requests.",
+                            )
+                          }
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="speedometer"
+                            size={13}
+                            color="#F59E0B"
+                          />
+                          <Text style={styles.rideProgressBadgeBtnText}>
+                            Progress
+                          </Text>
+                        </TouchableOpacity>
+                      ) : userReq ? (
+                        <View style={styles.passengerRequestedGroup}>
+                          <View
+                            style={[
+                              styles.feedRequestedTag,
+                              {
+                                backgroundColor: "#F59E0B20",
+                                paddingVertical: 5,
+                                paddingHorizontal: 8,
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name="time-outline"
+                              size={13}
+                              color="#D97706"
+                            />
+                            <Text
+                              style={[
+                                styles.feedRequestedTagText,
+                                {
+                                  fontSize: 11,
+                                  color: "#D97706",
+                                },
+                              ]}
+                            >
+                              Pending
                             </Text>
                           </View>
                           <TouchableOpacity
@@ -2454,42 +2581,118 @@ export default function RidesScreen() {
                 </View>
 
                 {/* 4. Vehicle Registration Number */}
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                    Vehicle Registration Number{" "}
-                    <Text style={{ color: "#EF4444" }}>*</Text>
-                  </Text>
-                  <View
-                    style={[
-                      styles.inputBox,
-                      {
-                        backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                        borderColor: border,
-                      },
-                    ]}
-                  >
-                    <View style={styles.indPlateSmall}>
-                      <Text style={styles.indPlateSmallText}>IND</Text>
+                {(() => {
+                  const isEditRideStarted =
+                    editModalRide?.status === "in_progress" ||
+                    editModalRide?.status === "both_travelling";
+                  return (
+                    <View style={styles.inputGroup}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text
+                          style={[styles.fieldLabel, { color: textPrimary }]}
+                        >
+                          Vehicle Registration Number{" "}
+                          <Text style={{ color: "#EF4444" }}>*</Text>
+                        </Text>
+                        {isEditRideStarted && (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: isDark
+                                ? "rgba(245, 158, 11, 0.15)"
+                                : "#FEF3C7",
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                              gap: 4,
+                            }}
+                          >
+                            <Ionicons
+                              name="lock-closed"
+                              size={11}
+                              color="#D97706"
+                            />
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: "700",
+                                color: "#D97706",
+                              }}
+                            >
+                              Locked (Ride Started)
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.inputBox,
+                          {
+                            backgroundColor: isEditRideStarted
+                              ? isDark
+                                ? "#0B1120"
+                                : "#F1F5F9"
+                              : isDark
+                                ? "#1E293B"
+                                : "#F8FAFC",
+                            borderColor: border,
+                            opacity: isEditRideStarted ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <View style={styles.indPlateSmall}>
+                          <Text style={styles.indPlateSmallText}>IND</Text>
+                        </View>
+                        <TextInput
+                          value={editVehicleNumber}
+                          onChangeText={(val) =>
+                            setEditVehicleNumber(val.toUpperCase())
+                          }
+                          editable={!isEditRideStarted}
+                          autoCapitalize="characters"
+                          placeholder="e.g. TS 09 EA 1234"
+                          placeholderTextColor={textMute}
+                          style={[
+                            styles.textInputField,
+                            {
+                              color: isEditRideStarted ? textMute : textPrimary,
+                              fontWeight: "700",
+                              letterSpacing: 1,
+                            },
+                          ]}
+                        />
+                        {isEditRideStarted && (
+                          <Ionicons
+                            name="lock-closed-outline"
+                            size={16}
+                            color={textMute}
+                            style={{ marginRight: 6 }}
+                          />
+                        )}
+                      </View>
+                      {isEditRideStarted && (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#F59E0B",
+                            marginTop: 4,
+                            marginLeft: 2,
+                          }}
+                        >
+                          Vehicle number cannot be modified once the ride has
+                          started.
+                        </Text>
+                      )}
                     </View>
-                    <TextInput
-                      value={editVehicleNumber}
-                      onChangeText={(val) =>
-                        setEditVehicleNumber(val.toUpperCase())
-                      }
-                      autoCapitalize="characters"
-                      placeholder="e.g. TS 09 EA 1234"
-                      placeholderTextColor={textMute}
-                      style={[
-                        styles.textInputField,
-                        {
-                          color: textPrimary,
-                          fontWeight: "700",
-                          letterSpacing: 1,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
+                  );
+                })()}
 
                 {/* 5. Vehicle Model */}
                 <View style={styles.inputGroup}>
@@ -4545,6 +4748,45 @@ const styles = StyleSheet.create({
     color: "#8FA0B8",
     fontSize: 12,
     fontWeight: "600",
+  },
+  rideProgressBadgeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.35)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  rideProgressBadgeBtnText: {
+    color: "#F59E0B",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  cardInProgressBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.16)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.3)",
+  },
+  cardInProgressBadgeText: {
+    color: "#F59E0B",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  inProgressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F59E0B",
   },
 
   /* Sort Options Modal */

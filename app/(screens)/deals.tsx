@@ -167,6 +167,10 @@ export default function LocalDealsScreen() {
     inquiry?: any;
   } | null>(null);
 
+  // Big preview modal for listing image
+  const [selectedPreviewDeal, setSelectedPreviewDeal] =
+    useState<DealItem | null>(null);
+
   const checkIsDealOwner = useCallback(
     (deal: DealItem) => {
       if (!deal) return false;
@@ -377,7 +381,7 @@ export default function LocalDealsScreen() {
       (currentImage !== "" && currentImage !== initialImage);
 
     if (!hasChanges) {
-      Alert.alert("No Changes", "No changes were made to the listing.");
+      setEditingDeal(null);
       return;
     }
 
@@ -1191,11 +1195,24 @@ export default function LocalDealsScreen() {
               >
                 <View style={styles.dealTopSection}>
                   {/* Product Image */}
-                  <Image
-                    source={{ uri: deal.image }}
-                    style={styles.dealImage}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => setSelectedPreviewDeal(deal)}
+                    style={styles.dealImageTouchable}
+                  >
+                    <Image
+                      source={{ uri: deal.image }}
+                      style={styles.dealImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.imageZoomBadge}>
+                      <Ionicons
+                        name="expand-outline"
+                        size={11}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                  </TouchableOpacity>
 
                   {/* Info Right */}
                   <View style={styles.dealInfoWrap}>
@@ -3027,6 +3044,89 @@ export default function LocalDealsScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* ================= 🖼️ BIG IMAGE PREVIEW MODAL ================= */}
+      <Modal
+        visible={!!selectedPreviewDeal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPreviewDeal(null)}
+      >
+        <View style={styles.imageModalBackdrop}>
+          <TouchableOpacity
+            style={styles.imageModalDismissOverlay}
+            activeOpacity={1}
+            onPress={() => setSelectedPreviewDeal(null)}
+          />
+
+          <SafeAreaView
+            style={styles.imageModalContainer}
+            edges={["top", "bottom"]}
+          >
+            {/* Top Bar with Title & Close Button */}
+            <View style={styles.imageModalHeader}>
+              <View style={{ flex: 1, paddingRight: 14 }}>
+                <Text style={styles.imageModalTitle} numberOfLines={1}>
+                  {selectedPreviewDeal?.title || "Deal Item"}
+                </Text>
+                <Text style={styles.imageModalSubtitle} numberOfLines={1}>
+                  {selectedPreviewDeal?.category || "Listing"} •{" "}
+                  {selectedPreviewDeal?.condition || "Good"} •{" "}
+                  {selectedPreviewDeal?.price}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.imageModalCloseBtn}
+                onPress={() => setSelectedPreviewDeal(null)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Main Big Image View */}
+            <View style={styles.imageModalBody}>
+              {selectedPreviewDeal?.image ? (
+                <Image
+                  source={{ uri: selectedPreviewDeal.image }}
+                  style={styles.imageModalBigImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </View>
+
+            {/* Bottom Details Footer */}
+            <View style={styles.imageModalFooter}>
+              <View style={styles.imageModalFooterLeft}>
+                <Text style={styles.imageModalPrice}>
+                  {selectedPreviewDeal?.price}
+                </Text>
+                {selectedPreviewDeal?.originalPrice && (
+                  <Text style={styles.imageModalOriginalPrice}>
+                    {selectedPreviewDeal.originalPrice}
+                  </Text>
+                )}
+              </View>
+
+              {selectedPreviewDeal?.location ? (
+                <View style={styles.imageModalFooterRight}>
+                  <View style={styles.imageModalLocationRow}>
+                    <Ionicons name="location-sharp" size={13} color="#94A3B8" />
+                    <Text
+                      style={styles.imageModalLocationText}
+                      numberOfLines={1}
+                    >
+                      {selectedPreviewDeal.location}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -3856,5 +3956,110 @@ const styles = StyleSheet.create({
   pickerBoxTitle: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  dealImageTouchable: {
+    position: "relative",
+  },
+  imageZoomBadge: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.93)",
+    justifyContent: "center",
+  },
+  imageModalDismissOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  imageModalContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  imageModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  imageModalTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  imageModalSubtitle: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  imageModalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageModalBody: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  imageModalBigImage: {
+    width: "100%",
+    height: "100%",
+    maxHeight: 520,
+    borderRadius: 12,
+  },
+  imageModalFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.12)",
+  },
+  imageModalFooterLeft: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+  },
+  imageModalPrice: {
+    color: "#F8FAFC",
+    fontSize: 21,
+    fontWeight: "800",
+  },
+  imageModalOriginalPrice: {
+    color: "#94A3B8",
+    fontSize: 14,
+    textDecorationLine: "line-through",
+  },
+  imageModalFooterRight: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+  imageModalLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 180,
+  },
+  imageModalLocationText: {
+    color: "#CBD5E1",
+    fontSize: 12,
   },
 });

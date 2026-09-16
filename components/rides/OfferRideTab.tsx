@@ -19,6 +19,10 @@ interface OfferRideTabProps {
   setOfferDrop: (val: string) => void;
   offerVehicleType: "car" | "bike" | "other";
   setOfferVehicleType: (val: "car" | "bike" | "other") => void;
+  offerVehicleNumber: string;
+  setOfferVehicleNumber: (val: string) => void;
+  offerVehicleModel?: string;
+  setOfferVehicleModel?: (val: string) => void;
   offerSeats: number;
   setOfferSeats: (val: number | ((prev: number) => number)) => void;
   offerPrice: string;
@@ -100,6 +104,10 @@ export default function OfferRideTab({
   setOfferDrop,
   offerVehicleType,
   setOfferVehicleType,
+  offerVehicleNumber,
+  setOfferVehicleNumber,
+  offerVehicleModel,
+  setOfferVehicleModel,
   offerSeats,
   setOfferSeats,
   offerPrice,
@@ -463,7 +471,31 @@ export default function OfferRideTab({
           </View>
         </View>
 
-        {/* 6. Seats Available Card */}
+        {/* 6. Vehicle Registration Number (Mandatory) */}
+        <View style={styles.cardContainer}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="card-outline" size={18} color="#38BDF8" />
+            <Text style={styles.rowTitleText}>
+              Vehicle Registration Number{" "}
+              <Text style={{ color: "#EF4444" }}>*</Text>
+            </Text>
+          </View>
+          <View style={styles.plateInputContainer}>
+            <View style={styles.indPlateBadge}>
+              <Text style={styles.indPlateBadgeText}>IND</Text>
+            </View>
+            <TextInput
+              value={offerVehicleNumber}
+              onChangeText={(val) => setOfferVehicleNumber(val.toUpperCase())}
+              placeholder="e.g. TS 09 EA 1234"
+              placeholderTextColor="#8FA0B8"
+              autoCapitalize="characters"
+              style={styles.plateTextInput}
+            />
+          </View>
+        </View>
+
+        {/* 7. Seats Available Card */}
         <View style={styles.cardContainerRow}>
           <View style={styles.leftLabelWrap}>
             <Ionicons name="people-outline" size={19} color="#C084FC" />
@@ -1016,5 +1048,39 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginHorizontal: 24,
     lineHeight: 16,
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  plateInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#131F35",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  indPlateBadge: {
+    backgroundColor: "#1E3A8A",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  indPlateBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  plateTextInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
 });

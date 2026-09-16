@@ -152,6 +152,9 @@ export async function joinRide(
   }
 
   // Only active rides can be joined
+  if (ride.status === "in_progress" || ride.status === "both_travelling") {
+    throw new Error("This ride is already in progress with co-riders.");
+  }
   if (ride.status !== "active") {
     throw new Error("This ride is no longer available.");
   }
@@ -344,6 +347,17 @@ export async function updateRide(
   // Only the driver can update the ride
   if (ride.userId !== user.id) {
     throw new Error("Unauthorized to modify this ride");
+  }
+
+  // Number plate cannot be overridden once the ride has started
+  if (
+    (ride.status === "in_progress" || ride.status === "both_travelling") &&
+    input.registrationNumber &&
+    input.registrationNumber !== ride.registrationNumber
+  ) {
+    throw new Error(
+      "Vehicle registration number cannot be changed once the ride has started.",
+    );
   }
 
   const updatedRide = await rideRepository.updateRide(rideId, input);
