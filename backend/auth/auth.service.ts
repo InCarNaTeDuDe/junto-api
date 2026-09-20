@@ -231,10 +231,16 @@ export async function getUserProfile(currentUser: any) {
       (activitiesGrouped[key] ||= []).push(act);
     }
 
+    // Separate activities count from ticket count so tickets aren't counted inside activities
+    const nonTicketActivitiesCount = userActivities.filter((act) => {
+      const cat = String(act.category || "").toUpperCase();
+      return !(cat.includes("MOVIE") || cat.includes("TICKET"));
+    }).length;
+
     return {
       ...user,
       userHandle: user.userHandle,
-      createdActivitiesCount: userActivities.length,
+      createdActivitiesCount: nonTicketActivitiesCount,
       ticketsCount: activitiesGrouped.MOVIES.length + (directTicketsCount || 0),
       dealsCount: userDeals.length,
       completedRidesCount,
