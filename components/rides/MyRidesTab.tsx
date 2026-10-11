@@ -702,12 +702,36 @@ export default function MyRidesTab({
                   <Text style={styles.metaText}>
                     {ride.date || "Today"} • {ride.time}
                   </Text>
+
+                  {/* Animated Call Driver */}
+                  {true && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const phone = ride.driverPhone!.replace(/[^\d+]/g, "");
+
+                        Linking.openURL(`tel:${phone}`).catch(() => {
+                          Alert.alert(
+                            "Unable to call",
+                            "Please dial the driver's number manually.",
+                          );
+                        });
+                      }}
+                      style={styles.callDriverCompact}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="call" size={14} color="#059669" />
+                      <Text style={styles.callDriverCompactText}>
+                        Call Driver
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Driver & Price */}
+                {/* Driver & Price + Call Icon */}
                 <View style={styles.metaRow}>
                   <Ionicons name="person-outline" size={14} color="#8FA0B8" />
-                  <Text style={styles.metaText}>
+
+                  <Text style={[styles.metaText, { flex: 1 }]}>
                     Driver: {ride.driverName} •{" "}
                     {toTitleCase(ride.vehicleType || "Car")} • ₹{ride.price}
                     {ride.registrationNumber
@@ -1359,6 +1383,22 @@ const styles = StyleSheet.create({
   },
   completedActionsBox: {
     marginVertical: 10,
+  },
+  callDriverCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#D1FAE5",
+    marginLeft: 8,
+  },
+
+  callDriverCompactText: {
+    color: "#047857",
+    fontSize: 11,
+    fontWeight: "700",
   },
   rateRideBtn: {
     backgroundColor: "#059669",

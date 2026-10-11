@@ -100,6 +100,8 @@ export interface RideRecord {
 
   createdAt: string;
   updatedAt: string;
+
+  driverPhone?: string;
 }
 
 export interface CreateRideData {
@@ -176,6 +178,7 @@ export class RideRepository extends BaseRepository<Ride> {
       driverName: ride.driverName,
       driverRating: ride.driverRating,
       driverAvatar: ride.driverAvatar,
+      driverPhone: ride.driverPhone?.trim() as string | undefined,
 
       from: ride.from,
       to: ride.to,
