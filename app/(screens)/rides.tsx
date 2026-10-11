@@ -357,6 +357,14 @@ export default function RidesScreen() {
       return;
     }
 
+    if (!driverPhone || driverPhone.trim().length < 10) {
+      Alert.alert(
+        "Phone Number Required �",
+        "Please enter your phone number (10 digits) before publishing your ride.",
+      );
+      return;
+    }
+
     // Check if the vehicle is currently on an active trip in travelling state
     const cleanVehicle = vehicleNum.replace(/[^A-Z0-9]/g, "");
     const vehicleInTravel = ridesList.find((r) => {
@@ -406,6 +414,7 @@ export default function RidesScreen() {
         price: priceNum,
         notes: offerNotes.trim() || undefined,
         verified: true,
+        driverPhone: driverPhone.trim(),
       };
 
       let createdRide: RideItem | null = null;
