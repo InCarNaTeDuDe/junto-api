@@ -741,12 +741,12 @@ export default function OfferRideTab({
           <TextInput
             value={driverPhone}
             onChangeText={(value) =>
-              setDriverPhone(value.replace(/[^0-9+]/g, "").slice(0, 13))
+              setDriverPhone(value.replace(/[^0-9+]/g, "").slice(0, 10))
             }
             placeholder="Enter your phone number"
             placeholderTextColor="#8FA0B8"
             keyboardType="phone-pad"
-            maxLength={13}
+            maxLength={10}
             style={[
               styles.locationInput,
               {

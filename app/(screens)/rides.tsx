@@ -440,46 +440,46 @@ export default function RidesScreen() {
         }
       }
 
-      if (!createdRide) {
-        createdRide = {
-          id: `ride-${Date.now()}`,
-          userId: user?.id || "usr-current-user",
-          driverName: user?.name || "Rahul S",
-          driverRating: 0,
-          driverAvatar:
-            user?.avatar ||
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-          from: pickup,
-          to: drop,
-          pickupLocation: pickup,
-          dropLocation: drop,
-          time: departureTime.toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          date: departureDate.toLocaleDateString("en-IN", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }),
-          departureTimeFormatted: departureStr,
-          arrivalTimeFormatted: "Expected in 30 mins",
-          vehicleType: offerVehicleType,
-          vehicleModel:
-            offerVehicleModel.trim() ||
-            (offerVehicleType === "car" ? "Car" : "Bike"),
-          registrationNumber: vehicleNum,
-          price: priceNum,
-          seatsLeft: offerSeats,
-          totalSeats: offerSeats,
-          verified: true,
-          reviewsCount: 0,
-          ratings: [],
-          status: "active",
-          passengers: [],
-        };
-      }
+      // if (!createdRide) {
+      //   createdRide = {
+      //     id: `ride-${Date.now()}`,
+      //     userId: user?.id || "usr-current-user",
+      //     driverName: user?.name || "Rahul S",
+      //     driverRating: 0,
+      //     driverAvatar:
+      //       user?.avatar ||
+      //       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
+      //     from: pickup,
+      //     to: drop,
+      //     pickupLocation: pickup,
+      //     dropLocation: drop,
+      //     time: departureTime.toLocaleTimeString("en-IN", {
+      //       hour: "2-digit",
+      //       minute: "2-digit",
+      //       hour12: true,
+      //     }),
+      //     date: departureDate.toLocaleDateString("en-IN", {
+      //       month: "short",
+      //       day: "numeric",
+      //       year: "numeric",
+      //     }),
+      //     departureTimeFormatted: departureStr,
+      //     arrivalTimeFormatted: "Expected in 30 mins",
+      //     vehicleType: offerVehicleType,
+      //     vehicleModel:
+      //       offerVehicleModel.trim() ||
+      //       (offerVehicleType === "car" ? "Car" : "Bike"),
+      //     registrationNumber: vehicleNum,
+      //     price: priceNum,
+      //     seatsLeft: offerSeats,
+      //     totalSeats: offerSeats,
+      //     verified: true,
+      //     reviewsCount: 0,
+      //     ratings: [],
+      //     status: "active",
+      //     passengers: [],
+      //   };
+      // }
 
       setRidesList((prev) => [createdRide!, ...prev]);
 
