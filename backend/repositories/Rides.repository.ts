@@ -285,6 +285,7 @@ export class RideRepository extends BaseRepository<Ride> {
       ratings: [],
       reports: [],
       isDeleted: 0,
+      driverPhone: data.driverPhone?.trim() as string | undefined,
     } as any);
 
     return this.toRideRecord(newRide);
