@@ -824,7 +824,7 @@ export default function OfferRideTab({
             <TextInput
               value={offerPrice}
               onChangeText={setOfferPrice}
-              placeholder="40"
+              placeholder="0"
               placeholderTextColor="#8FA0B8"
               keyboardType="numeric"
               style={styles.priceTextInput}
