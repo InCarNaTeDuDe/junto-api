@@ -131,6 +131,8 @@ export interface CreateRideData {
 
   pickupLocation?: string;
   dropLocation?: string;
+
+  driverPhone?: string;
 }
 
 // In-memory fallback store when PostgreSQL is not configured or offline

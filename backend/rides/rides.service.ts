@@ -162,7 +162,7 @@ export async function createRide(
 
       driverName: user.name || "Neighbor Driver",
 
-      driverRating: 5.0,
+      driverRating: 0.0,
 
       driverAvatar:
         user.avatar ||
@@ -197,6 +197,7 @@ export async function createRide(
       registrationNumber: input.registrationNumber,
       pickupLocation: input.pickupLocation,
       dropLocation: input.dropLocation,
+      driverPhone: input.driverPhone?.trim() as string | undefined,
     });
 
     // Notify connected clients

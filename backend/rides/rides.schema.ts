@@ -31,6 +31,7 @@ export const CreateRideSchema = z.object({
     .max(50),
   pickupLocation: z.string().trim().max(200).optional(),
   dropLocation: z.string().trim().max(200).optional(),
+  driverPhone: z.string().trim().max(10).optional(),
 });
 
 export const QueryRideSchema = z.object({

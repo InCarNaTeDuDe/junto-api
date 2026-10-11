@@ -40,6 +40,8 @@ interface OfferRideTabProps {
   popularLocations: string[];
   isDark?: boolean;
   existingRides?: any[];
+  driverPhone: string;
+  setDriverPhone: (val: string) => void;
 }
 
 export const formatMockupDateTime = (date: Date, time: Date): string => {
@@ -126,6 +128,8 @@ export default function OfferRideTab({
   popularLocations,
   isDark = true,
   existingRides,
+  driverPhone,
+  setDriverPhone,
 }: OfferRideTabProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -723,6 +727,39 @@ export default function OfferRideTab({
               </Text>
             </View>
           ) : null}
+        </View>
+
+        {/* Driver Phone Number */}
+        <View style={styles.cardContainer}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="call-outline" size={18} color="#38BDF8" />
+            <Text style={styles.rowTitleText}>
+              Phone Number <Text style={{ color: "#EF4444" }}>*</Text>
+            </Text>
+          </View>
+
+          <TextInput
+            value={driverPhone}
+            onChangeText={(value) =>
+              setDriverPhone(value.replace(/[^0-9+]/g, "").slice(0, 13))
+            }
+            placeholder="Enter your phone number"
+            placeholderTextColor="#8FA0B8"
+            keyboardType="phone-pad"
+            maxLength={13}
+            style={[
+              styles.locationInput,
+              {
+                backgroundColor: "#131F35",
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.08)",
+                paddingHorizontal: 12,
+                paddingVertical: 12,
+                marginTop: 4,
+              },
+            ]}
+          />
         </View>
 
         {/* 7. Seats Available Card */}

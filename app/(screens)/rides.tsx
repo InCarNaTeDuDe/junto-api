@@ -139,6 +139,8 @@ export default function RidesScreen() {
     null,
   );
 
+  const [driverPhone, setDriverPhone] = useState("");
+
   // Rating Modal
   const [ratingModalRide, setRatingModalRide] = useState<RideItem | null>(null);
   const [ratingScore, setRatingScore] = useState(5);
@@ -378,7 +380,7 @@ export default function RidesScreen() {
       return;
     }
 
-    const priceNum = parseFloat(offerPrice.replace(/[^0-9.]/g, "")) || 40;
+    const priceNum = parseFloat(offerPrice.replace(/[^0-9.]/g, "")) || 0;
     const departureStr = formatDeparture(departureDate, departureTime);
 
     try {
@@ -1533,6 +1535,8 @@ export default function RidesScreen() {
       {/* Main Content Areas */}
       {activeTab === "offer" ? (
         <OfferRideTab
+          driverPhone={driverPhone}
+          setDriverPhone={setDriverPhone}
           offerPickup={offerPickup}
           setOfferPickup={setOfferPickup}
           offerDrop={offerDrop}

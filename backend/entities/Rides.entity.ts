@@ -331,4 +331,11 @@ export class Ride {
     type: "timestamp",
   })
   updatedAt!: Date;
+
+  @Column({
+    type: "varchar",
+    length: 20,
+    nullable: true,
+  })
+  driverPhone?: string;
 }
