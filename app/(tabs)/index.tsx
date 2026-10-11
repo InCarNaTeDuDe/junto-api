@@ -825,6 +825,25 @@ export default function Home() {
     selectedChip !== null,
   );
 
+  const currentVibeIcon = React.useMemo(() => {
+    if (selectedChip) {
+      const matched = ACTIVITIES.find(
+        (item) => item.label === selectedChip || item.key === selectedChip,
+      );
+      if (matched) {
+        return { icon: matched.icon, color: matched.color };
+      }
+    }
+    if (categoryFilter === "MOVIES") return { icon: "film", color: "#EC4899" };
+    if (categoryFilter === "DAY_MATES")
+      return { icon: "people", color: "#3B82F6" };
+    if (categoryFilter === "ASK_NEARBY")
+      return { icon: "chatbubbles", color: "#10B981" };
+    if (categoryFilter === "HOST_EVENT")
+      return { icon: "calendar", color: "#F59E0B" };
+    return { icon: "cafe", color: "#F59E0B" };
+  }, [selectedChip, categoryFilter]);
+
   const handleChipPress = (label: string) => {
     if (label === "More") {
       setShowFilterModal(true);
@@ -1084,6 +1103,7 @@ export default function Home() {
           contentContainerStyle={{
             paddingHorizontal: scale(20),
             gap: scale(10),
+            paddingVertical: scale(6),
           }}
         >
           {ACTIVITIES.map((item) => {
@@ -1106,9 +1126,13 @@ export default function Home() {
         <View style={s.sectionHead}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={s.sectionTitle}>Activities matching your vibe</Text>
-            <Text style={{ fontSize: moderateScale(16) }}>☕</Text>
+            <Ionicons
+              name={currentVibeIcon.icon as any}
+              size={moderateScale(18)}
+              color={currentVibeIcon.color}
+            />
           </View>
-          {(hasActiveFilters || q.trim().length > 0) && (
+          {/* {(hasActiveFilters || q.trim().length > 0) && (
             <Pressable
               style={s.viewAll}
               onPress={() => {
@@ -1125,7 +1149,7 @@ export default function Home() {
                 color={C.primary}
               />
             </Pressable>
-          )}
+          )} */}
         </View>
 
         {(hasActiveFilters || q.trim().length > 0) && (

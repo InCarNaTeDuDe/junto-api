@@ -1483,12 +1483,12 @@ export default function RidesScreen() {
             ]}
           />
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.tabSegmentBtn}
             onPress={() => setActiveTab("offer")}
           >
             <Ionicons name="add" size={16} color="#A855F7" />
-            <Text
+            <Text 
               style={[
                 styles.tabSegmentText,
                 {
@@ -1499,7 +1499,7 @@ export default function RidesScreen() {
             >
               + Offer Ride
             </Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <View
             style={[

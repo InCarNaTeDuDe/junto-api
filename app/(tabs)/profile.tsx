@@ -260,9 +260,19 @@ export default function ProfileScreen() {
     if (apiUser?.activities) {
       let rawList: any[] = [];
       if (Array.isArray(apiUser.activities)) {
-        rawList = apiUser.activities;
+        rawList = apiUser.activities.filter(
+          (act: any) =>
+            act.category !== "MOVIES" &&
+            act.category !== "Movie Tickets" &&
+            act.category !== "MOVIE TICKET" &&
+            act.category !== "TICKETS",
+        );
       } else if (typeof apiUser.activities === "object") {
-        rawList = Object.values(apiUser.activities).flat();
+        // Backend groups activities by category: { ASK_NEARBY: [...], MOVIES: [...], DAY_MATES: [...] }
+        // MOVIES are tickets, non-MOVIES are activities
+        rawList = Object.entries(apiUser.activities)
+          .filter(([key]) => key !== "MOVIES")
+          .flatMap(([_, list]) => (Array.isArray(list) ? list : []));
       }
 
       // Filter out soft-deleted items
@@ -271,26 +281,35 @@ export default function ProfileScreen() {
           !act.isDeleted || act.isDeleted === 0 || Number(act.isDeleted) === 0,
       );
 
-      if (rawList.length > 0) {
-        return rawList.map((act: any) => ({
-          id: act.id,
-          title: act.title,
-          category: act.category,
-          location: act.locationName || act.location || "Location",
-          image:
-            act.bannerImage ||
-            act.image ||
-            "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600",
-          status: act.remainingSeats === 0 ? "Resolved" : "Active",
-          host: {
-            name: act.organizer?.name || apiUser.name || "User",
-            avatar: act.organizer?.avatar || apiUser.avatar,
-          },
-          raw: act,
-        }));
-      }
+      return rawList.map((act: any) => ({
+        id: act.id,
+        title: act.title,
+        category:
+          act.category === "ASK_NEARBY"
+            ? "Ask Nearby"
+            : act.category === "DAY_MATES"
+              ? "DayMates"
+              : act.category,
+        location: act.locationName || act.location || "Location",
+        image:
+          act.bannerImage ||
+          act.image ||
+          "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600",
+        status: act.remainingSeats === 0 ? "Resolved" : "Active",
+        host: {
+          name: act.organizer?.name || apiUser.name || "User",
+          avatar: act.organizer?.avatar || apiUser.avatar,
+        },
+        raw: act,
+      }));
     }
-    return myPosts;
+    return myPosts.filter(
+      (p: any) =>
+        p.category !== "MOVIES" &&
+        p.category !== "Movie Tickets" &&
+        p.category !== "MOVIE TICKET" &&
+        p.category !== "TICKETS",
+    );
   }, [apiUser, myPosts]);
 
   // Filter user's ticket listings dynamically from API MOVIES activities and local posts

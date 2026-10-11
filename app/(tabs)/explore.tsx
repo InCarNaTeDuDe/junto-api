@@ -49,7 +49,9 @@ export type RadarCategoryId =
   | "cricket"
   | "walking"
   | "movies"
-  | "ask_nearby";
+  | "ask_nearby"
+  | "deals"
+  | "rides";
 
 export interface Activity {
   id: string;
@@ -90,6 +92,24 @@ const RADAR_CATEGORIES: RadarCategoryConfig[] = [
     iconColor: "#F43F5E",
     bgLight: "#FFE4E6",
     defaultEmoji: "🎬",
+  },
+  {
+    id: "deals",
+    label: "Deals",
+    iconType: "ionicons",
+    iconName: "pricetag",
+    iconColor: "#F59E0B",
+    bgLight: "#FEF3C7",
+    defaultEmoji: "🏷️",
+  },
+  {
+    id: "rides",
+    label: "Rides",
+    iconType: "ionicons",
+    iconName: "car",
+    iconColor: "#10B981",
+    bgLight: "#D1FAE5",
+    defaultEmoji: "🚗",
   },
   {
     id: "coffee",
@@ -145,6 +165,21 @@ function categorizeActivity(item: any): RadarCategoryId | "other" {
   const text =
     `${cat} ${item.title || ""} ${item.description || item.rightSub || ""}`.toLowerCase();
 
+  if (
+    cat.includes("DEAL") ||
+    text.includes("deal") ||
+    text.includes("discount") ||
+    text.includes("marketplace")
+  )
+    return "deals";
+  if (
+    cat.includes("RIDE") ||
+    cat.includes("CARPOOL") ||
+    text.includes("ride") ||
+    text.includes("carpool") ||
+    text.includes("lift")
+  )
+    return "rides";
   if (
     cat.includes("ASK") ||
     cat.includes("NEARBY") ||
@@ -212,6 +247,8 @@ export default function ExploreScreen() {
   const cityName = selectedLocation?.name?.split(",")[0]?.trim() || "Hyderabad";
 
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [dealsCount, setDealsCount] = useState<number>(0);
+  const [ridesCount, setRidesCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategoryModal, setActiveCategoryModal] =
@@ -371,18 +408,77 @@ export default function ExploreScreen() {
     [cityName, selectedLocation],
   );
 
+  // Fetch real-time deals and rides counts from backend
+  const fetchDealsAndRides = useCallback(async () => {
+    try {
+      const [dealsRes, ridesRes] = await Promise.allSettled([
+        ApiService.get<{
+          success?: boolean;
+          data?: any[];
+          deals?: any[];
+          total?: number;
+        }>("/api/deals"),
+        ApiService.get<{
+          success?: boolean;
+          data?: any[];
+          rides?: any[];
+          total?: number;
+        }>("/api/rides"),
+      ]);
+
+      if (dealsRes.status === "fulfilled" && dealsRes.value) {
+        const val = dealsRes.value;
+        const list = val.data || val.deals || [];
+        const count = typeof val.total === "number" ? val.total : list.length;
+        setDealsCount(count);
+      }
+
+      if (ridesRes.status === "fulfilled" && ridesRes.value) {
+        const val = ridesRes.value;
+        const list = val.data || val.rides || [];
+        const count = typeof val.total === "number" ? val.total : list.length;
+        setRidesCount(count);
+      }
+    } catch (err) {
+      console.warn("Error fetching deals/rides counts:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRealActivities();
-    const refresh = () => fetchRealActivities();
-    socket.on("new_activity", refresh);
-    socket.on("activity_created", refresh);
-    socket.on("activity_update", refresh);
+    fetchDealsAndRides();
+
+    const refreshActs = () => fetchRealActivities();
+    const refreshDealsRides = () => fetchDealsAndRides();
+
+    socket.on("new_activity", refreshActs);
+    socket.on("activity_created", refreshActs);
+    socket.on("activity_update", refreshActs);
+
+    socket.on("deals_updated", refreshDealsRides);
+    socket.on("new_deal", refreshDealsRides);
+    socket.on("deal_created", refreshDealsRides);
+
+    socket.on("rides_updated", refreshDealsRides);
+    socket.on("new_ride", refreshDealsRides);
+    socket.on("ride_created", refreshDealsRides);
+    socket.on("ride_update", refreshDealsRides);
+
     return () => {
-      socket.off("new_activity", refresh);
-      socket.off("activity_created", refresh);
-      socket.off("activity_update", refresh);
+      socket.off("new_activity", refreshActs);
+      socket.off("activity_created", refreshActs);
+      socket.off("activity_update", refreshActs);
+
+      socket.off("deals_updated", refreshDealsRides);
+      socket.off("new_deal", refreshDealsRides);
+      socket.off("deal_created", refreshDealsRides);
+
+      socket.off("rides_updated", refreshDealsRides);
+      socket.off("new_ride", refreshDealsRides);
+      socket.off("ride_created", refreshDealsRides);
+      socket.off("ride_update", refreshDealsRides);
     };
-  }, [fetchRealActivities]);
+  }, [fetchRealActivities, fetchDealsAndRides]);
 
   // Aggregate stats per category
   const categoryStats = useMemo(() => {
@@ -396,6 +492,8 @@ export default function ExploreScreen() {
       walking: { activitiesCount: 0, list: [] },
       movies: { activitiesCount: 0, list: [] },
       ask_nearby: { activitiesCount: 0, list: [] },
+      deals: { activitiesCount: dealsCount, list: [] },
+      rides: { activitiesCount: ridesCount, list: [] },
     };
 
     activities.forEach((act) => {
@@ -405,7 +503,7 @@ export default function ExploreScreen() {
       }
     });
     return stats;
-  }, [activities]);
+  }, [activities, dealsCount, ridesCount]);
 
   // Show ONLY matching activities that have > 0 count from the API response
   const activeRadarCategories = useMemo(() => {
@@ -537,7 +635,10 @@ export default function ExploreScreen() {
             s.refreshBtn,
             { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EDE9FE" },
           ]}
-          onPress={() => fetchRealActivities(true)}
+          onPress={() => {
+            fetchRealActivities(true);
+            fetchDealsAndRides();
+          }}
           activeOpacity={0.7}
         >
           {loading || refreshing ? (
@@ -545,6 +646,117 @@ export default function ExploreScreen() {
           ) : (
             <Ionicons name="sync" size={16} color="#7C3AED" />
           )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Discovery Quick Stats: Activities, Deals & Rides Counts */}
+      <View style={s.statsBar}>
+        <View
+          style={[
+            s.statChip,
+            {
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F8FAFC",
+              borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+            },
+          ]}
+        >
+          <View
+            style={[
+              s.statChipIcon,
+              {
+                backgroundColor: isDark ? "rgba(124, 58, 237, 0.2)" : "#EDE9FE",
+              },
+            ]}
+          >
+            <Ionicons name="sparkles" size={12} color="#7C3AED" />
+          </View>
+          <Text style={[s.statChipLabel, { color: textSub }]}>Activities</Text>
+          <View
+            style={[
+              s.statChipBadge,
+              { backgroundColor: isDark ? "#2E1A47" : "#F3E8FF" },
+            ]}
+          >
+            <Text style={[s.statChipBadgeText, { color: "#7C3AED" }]}>
+              {activities.length}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            s.statChip,
+            {
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F8FAFC",
+              borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+            },
+          ]}
+          activeOpacity={0.7}
+          onPress={() => router.push("/(screens)/deals")}
+        >
+          <View
+            style={[
+              s.statChipIcon,
+              {
+                backgroundColor: isDark ? "rgba(245, 158, 11, 0.2)" : "#FEF3C7",
+              },
+            ]}
+          >
+            <Ionicons name="pricetag" size={12} color="#F59E0B" />
+          </View>
+          <Text style={[s.statChipLabel, { color: textSub }]}>Deals</Text>
+          <View
+            style={[
+              s.statChipBadge,
+              {
+                backgroundColor: isDark
+                  ? "rgba(245, 158, 11, 0.25)"
+                  : "#FEF3C7",
+              },
+            ]}
+          >
+            <Text style={[s.statChipBadgeText, { color: "#D97706" }]}>
+              {dealsCount}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            s.statChip,
+            {
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F8FAFC",
+              borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+            },
+          ]}
+          activeOpacity={0.7}
+          onPress={() => router.push("/(screens)/rides")}
+        >
+          <View
+            style={[
+              s.statChipIcon,
+              {
+                backgroundColor: isDark ? "rgba(16, 185, 129, 0.2)" : "#D1FAE5",
+              },
+            ]}
+          >
+            <Ionicons name="car" size={12} color="#10B981" />
+          </View>
+          <Text style={[s.statChipLabel, { color: textSub }]}>Rides</Text>
+          <View
+            style={[
+              s.statChipBadge,
+              {
+                backgroundColor: isDark
+                  ? "rgba(16, 185, 129, 0.25)"
+                  : "#D1FAE5",
+              },
+            ]}
+          >
+            <Text style={[s.statChipBadgeText, { color: "#059669" }]}>
+              {ridesCount}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -861,6 +1073,14 @@ export default function ExploreScreen() {
                     style={s.nodeTouchArea}
                     activeOpacity={0.8}
                     onPress={() => {
+                      if (cat.id === "deals") {
+                        router.push("/(screens)/deals");
+                        return;
+                      }
+                      if (cat.id === "rides") {
+                        router.push("/(screens)/rides");
+                        return;
+                      }
                       setActiveTabFilter("all");
                       setActiveCategoryModal(cat.id);
                     }}
@@ -1364,7 +1584,48 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 6,
-    paddingBottom: 6,
+    paddingBottom: 4,
+  },
+  statsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  statChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  statChipIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4,
+  },
+  statChipLabel: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginRight: 4,
+  },
+  statChipBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+  },
+  statChipBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
   locationPill: {
     flexDirection: "row",

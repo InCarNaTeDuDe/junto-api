@@ -9,7 +9,7 @@ import { Platform } from "react-native";
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-  offlineAccess: true,
+  offlineAccess: false,
 });
 
 export async function signOutFromGoogle() {

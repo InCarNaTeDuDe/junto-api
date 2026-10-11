@@ -1,216 +1,182 @@
-// @ts-nocheck
-import React from "react";
-import { Tabs, usePathname } from "expo-router";
-import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { Suspense, useEffect, useState } from "react";
+import { Stack, Redirect, useSegments, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Text } from "react-native";
 
-import { useAuthContext } from "@/context/AuthContext";
-import { useStore } from "@/hooks/useStore";
-import { GlobalOverlays } from "@/components/GlobalOverlays";
-import { ApiService } from "@/services/api";
-import { TabRefreshProvider } from "@/context/TabRefreshContext";
+// import { patchFetch } from "../utils/apiHelper";
+import { AuthProvider, useAuthContext } from "@/context/AuthContext";
+import { LocationProvider } from "@/context/LocationContext";
+import { useTheme } from "@/hooks/useTheme";
+import SpinnerLoader from "@/components/SpinnerLoader";
+import { PushNotificationService } from "@/services/notifications";
+import { addNotificationToStore } from "@/hooks/useStore";
+// import { ScrollView } from "react-native/Libraries/Components/ScrollView/ScrollView";
 
-export default function TabsLayout() {
-  const { state } = useStore();
-  const pathname = usePathname();
-  const insets = useSafeAreaInsets();
+// patchFetch();
 
-  const { theme } = useAuthContext();
+function RootNavigator() {
+  const { loading, isLoggedIn } = useAuthContext();
+  const { isDark } = useTheme();
+  const segments = useSegments();
 
-  const isHideTabScreen =
-    pathname?.includes("create") ||
-    pathname?.includes("rides") ||
-    pathname?.includes("ask-nearby") ||
-    pathname?.includes("services") ||
-    pathname?.includes("deals") ||
-    pathname?.includes("add-daymate") ||
-    pathname?.includes("new-here") ||
-    pathname?.includes("add-ticket") ||
-    pathname?.includes("location-search") ||
-    pathname?.includes("activity-chat") ||
-    pathname?.includes("(screens)");
+  const [error, setError] = useState<string>("");
 
-  const [serverUnreadCount, setServerUnreadCount] = React.useState<number>(0);
-
-  const checkUnread = React.useCallback(async () => {
-    try {
-      const res = await ApiService.get<{
-        status?: string;
-        unreadCount?: number;
-      }>("/api/messages/unread-count");
-      if (res && typeof res.unreadCount === "number") {
-        setServerUnreadCount(res.unreadCount);
-      }
-    } catch (err) {
-      // Ignore errors gracefully
-    }
+  useEffect(() => {
+    const handler = (e: any) => {
+      setError(e.message + "\n" + e.stack);
+    };
+    // @ts-ignore
+    global.ErrorUtils.setGlobalHandler(handler);
   }, []);
 
-  const totalUnread = Math.max(
-    serverUnreadCount,
-    state.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0),
-  );
+  if (error) {
+    return (
+      <>
+        style={{
+          flex: 1,
+          backgroundColor: "white",
+          padding: 20,
+          paddingTop: 60,
+        }}
+      >
+        <Text style={{ color: "red", fontWeight: "bold" }}>JS CRASH:</Text>
+        <Text style={{ color: "black", marginTop: 10 }}>{error}</Text>
+      </>
+    );
+  }
+
+  // Initialize push notifications when user is logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      PushNotificationService.configureNotificationHandler();
+      PushNotificationService.registerForPushNotificationsAsync().catch(
+        (err) => {
+          console.warn("Auto-register push notification failed:", err);
+        },
+      );
+      const unsubscribeSocket =
+        PushNotificationService.initPushNotificationListener((notif: any) => {
+          console.log("🔔 In-App real-time push notification received:", notif);
+          const data = notif.data || {};
+          addNotificationToStore({
+            id: notif.id || `notif-${Date.now()}`,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type || "activity",
+            timestamp: notif.timestamp || new Date().toISOString(),
+            read: false,
+            activityId: notif.activityId || data.activityId,
+            user: notif.user || data.user || data.organizerName,
+            userId: notif.userId || data.userId || data.organizerId,
+            organizerId: notif.organizerId || data.organizerId || data.userId,
+            place: notif.place || data.place || data.locationName,
+            right: notif.right || data.right || data.urgency,
+            category: notif.category || data.category,
+            avatar: notif.avatar || data.avatar,
+            data: notif.data || { activityId: notif.activityId },
+          });
+        });
+      const unsubscribeExpo =
+        PushNotificationService.addExpoNotificationListeners(
+          (notification) => {
+            const data: any = notification.request.content.data;
+            if (data) {
+              addNotificationToStore({
+                id: notification.request.identifier,
+                title: notification.request.content.title || "Notification",
+                message: notification.request.content.body || "",
+                type: data.type || "activity",
+                timestamp: new Date().toISOString(),
+                read: false,
+                activityId: data.activityId || data.id,
+                user: data.user || data.organizerName,
+                userId: data.userId || data.organizerId,
+                organizerId: data.organizerId || data.userId,
+                place: data.place || data.locationName,
+                right: data.right || data.urgency,
+                category: data.category || data.type,
+                avatar: data.avatar,
+                data,
+              });
+            }
+          },
+          (response) => {
+            const data: any = response.notification.request.content.data;
+            const activityId = data?.activityId || data?.id;
+            if (activityId) {
+              router.push({
+                pathname: "/(screens)/activity-chat",
+                params: {
+                  activityId,
+                  title: data.title,
+                  user: data.user || data.organizerName,
+                  userId: data.userId || data.organizerId,
+                  organizerId: data.organizerId || data.userId,
+                  place: data.place || data.locationName,
+                  right:
+                    data.right ||
+                    data.urgency ||
+                    (data.cost ? `₹${data.cost}` : undefined) ||
+                    "Urgent",
+                  type: data.type || data.category || "ASK NEARBY",
+                  category: data.category || data.type || "ASK NEARBY",
+                  avatar: data.avatar,
+                },
+              });
+            }
+          },
+        );
+
+      return () => {
+        unsubscribeSocket?.();
+        unsubscribeExpo?.();
+      };
+    }
+  }, [isLoggedIn]);
+
+  if (loading) {
+    return <SpinnerLoader message="Junto never makes you alone" />;
+  }
+
+  const currentRoute = segments[0];
+
+  // Logged OUT -> allow only login
+  if (!isLoggedIn && currentRoute !== "login") {
+    return <Redirect href="/login" />;
+  }
+
+  // Logged IN -> never allow login screen
+  if (isLoggedIn && currentRoute === "login") {
+    return <Redirect href="/(tabs)" />;
+  }
 
   return (
-    <TabRefreshProvider onGlobalRefresh={checkUnread}>
-      <View style={[styles.rootContainer, { backgroundColor: theme.bg }]}>
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-              display: isHideTabScreen ? "none" : "flex",
-              height: 54 + Math.max(insets.bottom, 10),
-              backgroundColor: theme.bg2 || theme.bg || "#FFFFFF",
-              borderTopWidth: 1,
-              borderTopColor: theme.border || "#E2E8F0",
-              elevation: 8,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 4,
-              // paddingTop: 6,
-              paddingBottom: Math.max(insets.bottom, 8),
-            },
-            tabBarActiveTintColor: theme.primary || "#A855F7",
-            tabBarInactiveTintColor: theme.mute || "#8B94A7",
-            tabBarLabelStyle: {
-              fontSize: 11,
-              fontWeight: "600",            },
-          }}
-        >
-          {/* Home */}
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: "Home",
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "home" : "home-outline"}
-                  size={22}
-                  color={color}
-                />
-              ),
-            }}
-          />
+    <>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
-          {/* Explore */}
-          <Tabs.Screen
-            name="explore"
-            options={{
-              title: "Explore",
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "compass" : "compass-outline"}
-                  size={22}
-                  color={color}
-                />
-              ),
-            }}
-          />
-
-          {/* Create */}
-          <Tabs.Screen
-            name="create"
-            options={{
-              title: "",
-              tabBarLabel: () => null,
-              tabBarIcon: () => (
-                <View style={styles.createButtonCircle}>
-                  <Ionicons name="add" size={34} color="#FFFFFF" />
-                </View>
-              ),
-            }}
-          />
-
-          {/* Chats */}
-          <Tabs.Screen
-            name="chats"
-            options={{
-              title: "Chats",
-              tabBarIcon: ({ color, focused }) => (
-                <View style={{ position: "relative" }}>
-                  <Ionicons
-                    name={
-                      focused
-                        ? "chatbubble-ellipses"
-                        : "chatbubble-ellipses-outline"
-                    }
-                    size={22}
-                    color={color}
-                  />
-
-                  {totalUnread > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
-                    </View>
-                  )}
-                </View>
-              ),
-            }}
-          />
-
-          {/* Profile */}
-          <Tabs.Screen
-            name="profile"
-            options={{
-              title: "Profile",
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "person" : "person-outline"}
-                  size={22}
-                  color={color}
-                />
-              ),
-            }}
-          />
-        </Tabs>
-
-        {/* Slide-over overlays for details modals and notifications */}
-        <GlobalOverlays />
-      </View>
-    </TabRefreshProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(screens)" />
+      </Stack>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  rootContainer: {
-    flex: 1,
-  },
-  createButtonCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#8B5CF6",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -30,
-    shadowColor: "#8B5CF6",
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 10,
-  },
-  unreadBadge: {
-    position: "absolute",
-    top: -6,
-    right: -8,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#A855F7",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  unreadBadgeText: {
-    color: "#FFF",
-    fontSize: 10,
-    fontWeight: "700",
-  },
-});
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <Suspense
+        fallback={<SpinnerLoader message="Junto never makes you alone" />}
+      >
+        <AuthProvider>
+          <LocationProvider>
+            <RootNavigator />
+          </LocationProvider>
+        </AuthProvider>
+      </Suspense>
+    </SafeAreaProvider>
+  );
+}
