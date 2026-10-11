@@ -17,7 +17,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "prebuildAndroid": "APP_VARIANT=prod npx expo prebuild --platform android --clean",
+    "prebuildAndroid": "APP_VARIANT=prod npx expo prebuild --platform android #--clean",
     "prebuildIos": "APP_VARIANT=prod npx expo prebuild --platform ios",
     "android": "npm run prebuildAndroid && npx expo run:android",
     "ios": "npm run prebuildIos && npx expo run:ios"

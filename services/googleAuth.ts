@@ -8,7 +8,7 @@ import {
 import { Platform } from "react-native";
 
 GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+  webClientId: Env.GOOGLE_CLIENT_ID,
   offlineAccess: false,
 });
 
