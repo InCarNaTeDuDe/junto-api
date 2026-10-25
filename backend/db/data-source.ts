@@ -13,6 +13,7 @@ import { Ride } from "../entities/Rides.entity";
 import { LocalDeal } from "../entities/LocalDeals.entity";
 import { LocalService } from "../entities/LocalServices.entity";
 import { SupportChat } from "../entities/SupportChat.entity";
+import { AppConfig } from "../entities/AppConfig.entity";
 
 // import { inMemoryStore } from "../db"; // <-- adjust path if needed
 
@@ -31,8 +32,8 @@ export const AppDataSource = new DataSource({
   // synchronize: process.env.NODE_ENV !== "production",
   synchronize: true,
 
-  logging: false,
-
+  // logging: false,
+  logging: ["query", "error"],
   entities: [
     User,
     DeviceSession,
@@ -46,6 +47,7 @@ export const AppDataSource = new DataSource({
     LocalDeal,
     LocalService,
     SupportChat,
+    AppConfig,
   ],
 
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,

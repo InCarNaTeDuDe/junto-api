@@ -26,6 +26,7 @@ import { ApiService } from "@/services/api";
 import CustomerCareChatModal from "@/components/CustomerCareChatModal";
 import ProfileDealsModal from "@/components/ProfileDealsModal";
 import ProfileRidesModal from "@/components/ProfileRidesModal";
+import { AppConfigManagerModal } from "@/components/AppConfigManagerModal";
 
 function hexA(hex: string, a: number) {
   if (!hex) return `rgba(168,85,247,${a})`;
@@ -73,6 +74,7 @@ export default function ProfileScreen() {
   const [completedRidesCount, setCompletedRidesCount] = useState<number | null>(
     null,
   );
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // Realtime backend API user state fetched from /api/me
   const [apiUser, setApiUser] = useState<any>(null);
@@ -858,6 +860,37 @@ export default function ProfileScreen() {
                 <Text style={s.menuItemTitle}>Settings</Text>
                 <Text style={s.menuItemSub}>
                   Preferences, theme and account settings
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
+            </TouchableOpacity>
+
+            <View style={s.menuItemSeparator} />
+
+            {/* Dynamic App Config & Feature Flags (DB Driven) */}
+            <TouchableOpacity
+              style={s.menuItemRow}
+              onPress={() => setShowConfigModal(true)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  s.menuIconBg,
+                  { backgroundColor: "rgba(168, 85, 247, 0.18)" },
+                ]}
+              >
+                <Ionicons
+                  name="server-outline"
+                  size={scale(17)}
+                  color="#A855F7"
+                />
+              </View>
+              <View style={s.menuTextCol}>
+                <Text style={s.menuItemTitle}>
+                  DB Feature Flags & Maintenance
+                </Text>
+                <Text style={s.menuItemSub}>
+                  Live app-config, rides, tickets & maintenance
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
@@ -1858,6 +1891,12 @@ export default function ProfileScreen() {
         onClose={() => setActiveModal(null)}
         userId={apiUser?.id || user?.id}
         onCompletedCountChange={(cnt) => setCompletedRidesCount(cnt)}
+      />
+
+      {/* 13. APP CONFIG & FEATURE TOGGLES MODAL (DB Driven) */}
+      <AppConfigManagerModal
+        visible={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
       />
     </SafeAreaView>
   );

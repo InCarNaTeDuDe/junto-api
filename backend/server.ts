@@ -20,6 +20,7 @@ import glamupRoutes from "./glamup/glamup.routes";
 import dealsRoutes from "./deals/deals.routes";
 import universalNeedRoutes from "./universalneed/universalneed.routes";
 import cloudinaryRoutes from "./cloudinary/cloudinary.routes";
+import appconfigRoutes from "./appconfig/appconfig.routes";
 
 import { initializeDatabase } from "./db/data-source";
 import { initializeSocket } from "./socket/socket";
@@ -177,6 +178,7 @@ async function startServer() {
   app.use("/api/universal-need", universalNeedRoutes);
   app.use("/api/upload", cloudinaryRoutes);
   app.use("/api/cloudinary", cloudinaryRoutes);
+  app.use("/api/app-config", appconfigRoutes);
 
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);

@@ -7,67 +7,122 @@ import {
   Easing,
   StyleSheet,
   useWindowDimensions,
+  SafeAreaView,
 } from "react-native";
 import Svg, { Path, Defs, LinearGradient, Stop, G } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { useStyles } from "@/hooks/useStyles";
 
-/** Icons placed evenly around the orbit with dedicated theme colors for visible borders & attractive accents */
-const ORBIT_ICON_DETAILS = [
+export interface AppFeatureShowcase {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  category: string;
+  headline: string;
+  description: string;
+  color: string;
+  lightBg: string;
+  darkBg: string;
+  tags: string[];
+}
+
+/** 7 Core Pillars that authentically represent everything the application provides */
+export const APP_FEATURES: AppFeatureShowcase[] = [
   {
-    icon: "👥",
-    color: "#3B82F6",
-    lightBg: "#EFF6FF",
-    darkBg: "#0F172A",
-    label: "DayMates",
-  },
-  {
-    icon: "🎒",
-    color: "#F59E0B",
-    lightBg: "#FFFBEB",
-    darkBg: "#1F1600",
-    label: "Hangouts",
-  },
-  {
-    icon: "💬",
-    color: "#10B981",
+    id: "ridemate",
+    icon: "car-sport",
+    title: "RideMate",
+    category: "Carpool & Bike Pool",
+    headline: "Share Daily Rides & Split Petrol",
+    description:
+      "Commute with verified coworkers & neighbors with 0% platform commission and live GPS tracking.",
+    color: "#10B981", // Emerald
     lightBg: "#ECFDF5",
     darkBg: "#061A14",
-    label: "Chats",
+    tags: ["0% Commission", "OTP Verified", "Live GPS"],
   },
   {
-    icon: "☕",
-    color: "#EC4899",
-    lightBg: "#FDF2F8",
-    darkBg: "#200818",
-    label: "Coffee",
-  },
-  {
-    icon: "📍",
-    color: "#8B5CF6",
+    id: "daymates",
+    icon: "people",
+    title: "DayMates",
+    category: "Companions & Hangouts",
+    headline: "Find Buddies for Any Activity",
+    description:
+      "Never do things alone—find genuine buddies for gym, coffee, badminton, dining, walks & movies.",
+    color: "#8B5CF6", // Royal Purple
     lightBg: "#F5F3FF",
     darkBg: "#160B2C",
-    label: "Nearby",
+    tags: ["Activity Partners", "Mutual Vibes", "Free Meetups"],
   },
   {
-    icon: "🎟️",
-    color: "#FF5722",
+    id: "ticketswap",
+    icon: "ticket",
+    title: "Ticket Swap",
+    category: "Movie & Event Tickets",
+    headline: "Swap or Sell Extra Tickets",
+    description:
+      "Sell or swap spare cinema, concert, and match tickets directly peer-to-peer at fair face value.",
+    color: "#F97316", // Coral Orange
     lightBg: "#FFF7ED",
     darkBg: "#240E05",
-    label: "Tickets",
+    tags: ["Face Value", "Zero Scalping", "Instant Chat"],
+  },
+  {
+    id: "services",
+    icon: "construct",
+    title: "Fix Services",
+    category: "Home & Tech Repairs",
+    headline: "Book Trusted Local Technicians",
+    description:
+      "Connect directly with neighborhood electricians, plumbers, appliance mechanics & home cleaners.",
+    color: "#3B82F6", // Cobalt Blue
+    lightBg: "#EFF6FF",
+    darkBg: "#0F172A",
+    tags: ["Certified Pros", "Direct Contact", "No Markup"],
+  },
+  {
+    id: "glamup",
+    icon: "sparkles",
+    title: "GlamUp",
+    category: "Doorstep Salon & Beauty",
+    headline: "Salon & Styling at Your Doorstep",
+    description:
+      "Book professional haircuts, makeup artists & grooming stylists directly to your home.",
+    color: "#EC4899", // Rose Pink
+    lightBg: "#FDF2F8",
+    darkBg: "#200818",
+    tags: ["Doorstep Visit", "Fair Rates", "Top Stylists"],
+  },
+  {
+    id: "deals",
+    icon: "pricetag",
+    title: "Local Deals",
+    category: "Hyperlocal Marketplace",
+    headline: "Pre-Owned Neighborhood Deals",
+    description:
+      "Buy and sell pre-loved gadgets, furniture, cycles & home goods safely with nearby neighbors.",
+    color: "#F59E0B", // Amber Gold
+    lightBg: "#FFFBEB",
+    darkBg: "#1F1600",
+    tags: ["Direct Pickup", "Zero Middlemen", "Instant UPI"],
+  },
+  {
+    id: "asknearby",
+    icon: "megaphone",
+    title: "Ask Nearby",
+    category: "Community & Emergency",
+    headline: "Instant Local Help & SOS Alerts",
+    description:
+      "Ask neighborhood questions, report lost & found, or broadcast urgent blood donor emergency alerts.",
+    color: "#06B6D4", // Cyan
+    lightBg: "#ECFEFF",
+    darkBg: "#081E24",
+    tags: ["Hyperlocal Radar", "Emergency SOS", "Community Q&A"],
   },
 ];
 
-const ORBIT_ICONS = ORBIT_ICON_DETAILS.map((d) => d.icon);
-
-const ROTATING_MESSAGES = [
-  "Finding Day Mates...",
-  "Looking for Ticket Deals...",
-  "Checking Lost & Found...",
-  "Discovering Nearby...",
-];
-
-/** 12 ultra-vibrant continuous rainbow colors spanning the entire spectrum */
+/** 12 ultra-vibrant continuous rainbow colors spanning the spectrum */
 const SPECTRUM_COLORS = [
   "#00F2FE", // Electric Cyan
   "#0EA5E9", // Vivid Sky Blue
@@ -78,59 +133,37 @@ const SPECTRUM_COLORS = [
   "#D946EF", // Fuchsia / Magenta
   "#EC4899", // Hot Pink
   "#F43F5E", // Rose Red
-  "#FF5722", // Vibrant Coral / Flame
+  "#FF5722", // Vibrant Coral
   "#F59E0B", // Golden Amber
   "#10B981", // Emerald Mint Green
 ];
 
 export interface JuntoOrbitProps {
-  /** Diameter of the whole orbit widget. Defaults to a responsive size. */
   size?: number;
-  /** Seconds for one full revolution. */
   duration?: number;
-  /** Rotate clockwise (default) or counter-clockwise. */
   reverse?: boolean;
-  label?: string;
-  labels?: string[];
+  activeFeatureIndex?: number;
 }
 
 export function JuntoOrbit({
   size,
-  duration = 18,
+  duration = 20,
   reverse = false,
-  label = "DAYMATES",
-  labels,
+  activeFeatureIndex = 0,
 }: JuntoOrbitProps) {
   const { width } = useWindowDimensions();
-  const dimension = size ?? Math.min(width - 48, 250);
+  const dimension = size ?? Math.min(width - 48, 220);
   const s = useStyles(createStyles);
   const { theme: t, isDark } = useTheme();
 
-  // Generate a unique instance ID for SVG gradient defs to avoid Web DOM ID collisions
   const autoId = useId();
   const instanceId = useMemo(
     () => autoId.replace(/[^a-zA-Z0-9]/g, "") || "orbit_ring",
     [autoId],
   );
 
-  // Bubble orbit animation
   const spin = useRef(new Animated.Value(0)).current;
-
-  // Dedicated infinite rotating line animation
   const lineSpin = useRef(new Animated.Value(0)).current;
-
-  // Center label rotation state & animation
-  const labelList = useMemo(() => {
-    if (labels && labels.length > 0) return labels;
-    if (label)
-      return [label, "JUNTO", "SWAP TICKETS", "DAY MATES", "ASK NEARBY"].filter(
-        Boolean,
-      );
-    return ["DAYMATES", "JUNTO", "SWAP TICKETS", "ASK NEARBY"];
-  }, [label, labels]);
-
-  const [labelIndex, setLabelIndex] = useState(0);
-  const labelFade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -145,12 +178,11 @@ export function JuntoOrbit({
     return () => loop.stop();
   }, [spin, duration]);
 
-  // Infinite smooth rotation for the colorful line
   useEffect(() => {
     const lineLoop = Animated.loop(
       Animated.timing(lineSpin, {
         toValue: 1,
-        duration: 9000, // 9s continuous infinite rotation of the colorful spectrum
+        duration: 9000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -158,26 +190,6 @@ export function JuntoOrbit({
     lineLoop.start();
     return () => lineLoop.stop();
   }, [lineSpin]);
-
-  useEffect(() => {
-    if (labelList.length <= 1) return;
-    const interval = setInterval(() => {
-      Animated.timing(labelFade, {
-        toValue: 0,
-        duration: 350,
-        useNativeDriver: true,
-      }).start(() => {
-        setLabelIndex((prev) => (prev + 1) % labelList.length);
-        Animated.timing(labelFade, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }).start();
-      });
-    }, 2200);
-
-    return () => clearInterval(interval);
-  }, [labelList, labelFade]);
 
   const rotate = spin.interpolate({
     inputRange: [0, 1],
@@ -195,18 +207,16 @@ export function JuntoOrbit({
   });
 
   const logoSize = dimension * 0.28;
-  const bubbleSize = dimension * 0.16;
+  const bubbleSize = dimension * 0.165;
   const radius = dimension / 2 - bubbleSize / 2 - 2;
   const centerCoord = dimension / 2;
 
-  // Build 12 seamless circular arc segments with gradient coordinates
   const segments = useMemo(() => {
     const numSegs = SPECTRUM_COLORS.length;
     const segAngle = (Math.PI * 2) / numSegs;
 
     return SPECTRUM_COLORS.map((color, i) => {
       const nextColor = SPECTRUM_COLORS[(i + 1) % numSegs];
-      // Slight overlap (0.015 rad ~ 0.85 deg) to eliminate sub-pixel gaps between arcs
       const startA = i * segAngle - 0.015;
       const endA = (i + 1) * segAngle + 0.015;
 
@@ -232,16 +242,19 @@ export function JuntoOrbit({
 
   const positions = useMemo(
     () =>
-      ORBIT_ICONS.map((icon, i) => {
-        const angle = (i / ORBIT_ICONS.length) * Math.PI * 2 - Math.PI / 2;
+      APP_FEATURES.map((item, i) => {
+        const angle = (i / APP_FEATURES.length) * Math.PI * 2 - Math.PI / 2;
         return {
-          icon,
+          item,
+          index: i,
           left: dimension / 2 + radius * Math.cos(angle) - bubbleSize / 2,
           top: dimension / 2 + radius * Math.sin(angle) - bubbleSize / 2,
         };
       }),
     [dimension, radius, bubbleSize],
   );
+
+  const activeFeature = APP_FEATURES[activeFeatureIndex] || APP_FEATURES[0];
 
   return (
     <View style={[s.wrapper, { width: dimension, height: dimension }]}>
@@ -301,7 +314,6 @@ export function JuntoOrbit({
             ))}
           </Defs>
 
-          {/* Luminous Neon Glow Halo under the line */}
           <G opacity={0.5}>
             {segments.map((seg) => (
               <Path
@@ -315,7 +327,6 @@ export function JuntoOrbit({
             ))}
           </G>
 
-          {/* Crisp, ultra-vibrant colorful rotating line */}
           <G>
             {segments.map((seg) => (
               <Path
@@ -331,7 +342,7 @@ export function JuntoOrbit({
         </Svg>
       </Animated.View>
 
-      {/* Inner guide ring with subtle accent */}
+      {/* Inner guide ring */}
       <View
         style={[
           s.innerRing,
@@ -343,23 +354,21 @@ export function JuntoOrbit({
         ]}
       />
 
-      {/* Rotating orbit ring with floating bubbles */}
+      {/* Rotating orbit ring with floating feature nodes */}
       <Animated.View
         style={[
           s.orbit,
           { width: dimension, height: dimension, transform: [{ rotate }] },
         ]}
       >
-        {positions.map(({ icon, left, top }, i) => {
-          const detail = ORBIT_ICON_DETAILS[i % ORBIT_ICON_DETAILS.length];
-          const itemColor = detail?.color || "#A855F7";
-          const itemBg = isDark
-            ? detail?.darkBg || "#17122C"
-            : detail?.lightBg || "#FFFFFF";
+        {positions.map(({ item, index, left, top }) => {
+          const isActive = index === activeFeatureIndex;
+          const itemColor = item.color;
+          const itemBg = isDark ? item.darkBg : item.lightBg;
 
           return (
             <Animated.View
-              key={`${icon}-${i}`}
+              key={item.id}
               style={[
                 s.bubble,
                 {
@@ -368,41 +377,44 @@ export function JuntoOrbit({
                   width: bubbleSize,
                   height: bubbleSize,
                   borderRadius: bubbleSize / 2,
-                  borderWidth: 2.8,
+                  borderWidth: isActive ? 3 : 2.2,
                   borderColor: itemColor,
                   backgroundColor: itemBg,
                   shadowColor: itemColor,
-                  shadowOpacity: isDark ? 0.75 : 0.45,
-                  shadowRadius: 9,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 8,
+                  shadowOpacity: isActive ? 0.9 : isDark ? 0.6 : 0.35,
+                  shadowRadius: isActive ? 12 : 7,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: isActive ? 10 : 5,
                   transform: [{ rotate: counterRotate }],
                 },
               ]}
             >
-              {/* Inner concentric circular frame for striking depth and high-end finish */}
               <View
                 style={{
-                  width: bubbleSize - 7,
-                  height: bubbleSize - 7,
-                  borderRadius: (bubbleSize - 7) / 2,
+                  width: bubbleSize - 6,
+                  height: bubbleSize - 6,
+                  borderRadius: (bubbleSize - 6) / 2,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderWidth: 1.2,
+                  borderWidth: 1,
                   borderColor: isDark ? `${itemColor}60` : `${itemColor}40`,
                   backgroundColor: isDark
-                    ? "rgba(0,0,0,0.3)"
-                    : "rgba(255,255,255,0.75)",
+                    ? "rgba(0,0,0,0.35)"
+                    : "rgba(255,255,255,0.85)",
                 }}
               >
-                <Text style={{ fontSize: bubbleSize * 0.46 }}>{icon}</Text>
+                <Ionicons
+                  name={item.icon}
+                  size={bubbleSize * 0.44}
+                  color={itemColor}
+                />
               </View>
             </Animated.View>
           );
         })}
       </Animated.View>
 
-      {/* Static center logo with rotating label and visible glowing border */}
+      {/* Static center logo with highlighted feature pill */}
       <View style={s.center} pointerEvents="none">
         <View
           style={[
@@ -411,9 +423,8 @@ export function JuntoOrbit({
               width: logoSize + 8,
               height: logoSize + 8,
               borderRadius: (logoSize + 8) / 2,
-              borderColor: isDark
-                ? "rgba(168, 85, 247, 0.45)"
-                : "rgba(124, 58, 237, 0.35)",
+              borderColor: activeFeature.color,
+              shadowColor: activeFeature.color,
             },
           ]}
         >
@@ -427,9 +438,22 @@ export function JuntoOrbit({
             resizeMode="contain"
           />
         </View>
-        <Animated.View style={[s.labelPill, { opacity: labelFade }]}>
-          <Text style={s.label}>{labelList[labelIndex]}</Text>
-        </Animated.View>
+
+        <View
+          style={[
+            s.labelPill,
+            {
+              backgroundColor: isDark
+                ? `${activeFeature.color}25`
+                : `${activeFeature.color}15`,
+              borderColor: `${activeFeature.color}50`,
+            },
+          ]}
+        >
+          <Text style={[s.label, { color: activeFeature.color }]}>
+            {activeFeature.title.toUpperCase()}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -437,65 +461,157 @@ export function JuntoOrbit({
 
 export interface SpinnerLoaderProps {
   message?: string;
-  messages?: string[];
   size?: number;
   fullScreen?: boolean;
 }
 
 export function SpinnerLoader({
   message,
-  // messages,
-  size = 240,
+  size = 220,
   fullScreen = true,
 }: SpinnerLoaderProps) {
   const s = useStyles(createStyles);
-  const [msgIndex, setMsgIndex] = useState(0);
-  const textFade = useRef(new Animated.Value(1)).current;
+  const { theme: t, isDark } = useTheme();
 
-  const messages = ROTATING_MESSAGES;
+  const [featureIndex, setFeatureIndex] = useState(0);
+  const cardFade = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
-  const activeMessages = useMemo(() => {
-    if (messages && messages.length > 0) return messages;
-    if (message) {
-      return [message, ...ROTATING_MESSAGES.filter((m) => m !== message)];
-    }
-    return ROTATING_MESSAGES;
-  }, [message, messages]);
-
+  // Cycle through all what the app provides every 2.4 seconds
   useEffect(() => {
-    if (activeMessages.length <= 1) return;
     const interval = setInterval(() => {
-      Animated.timing(textFade, {
+      Animated.timing(cardFade, {
         toValue: 0,
-        duration: 300,
+        duration: 250,
         useNativeDriver: true,
       }).start(() => {
-        setMsgIndex((prev) => (prev + 1) % activeMessages.length);
-        Animated.timing(textFade, {
+        setFeatureIndex((prev) => (prev + 1) % APP_FEATURES.length);
+        Animated.timing(cardFade, {
           toValue: 1,
-          duration: 300,
+          duration: 250,
           useNativeDriver: true,
         }).start();
       });
-    }, 2500);
+    }, 2400);
 
     return () => clearInterval(interval);
-  }, [activeMessages, textFade]);
+  }, [cardFade]);
 
-  const currentMessage =
-    activeMessages[msgIndex] || message || ROTATING_MESSAGES[0];
+  // Gentle breathing glow on loading indicator
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [pulseAnim]);
+
+  const active = APP_FEATURES[featureIndex] || APP_FEATURES[0];
 
   const content = (
-    <View style={s.centerBox}>
-      <JuntoOrbit size={size} label="JUNTO" />
-      <Animated.Text style={[s.loadingText, { opacity: textFade }]}>
-        {currentMessage}
-      </Animated.Text>
+    <View style={s.mainContainer}>
+      {/* 1. App Identity & Mission Header */}
+      <View style={s.topHeader}>
+        <View style={s.brandRow}>
+          <Text style={s.brandName}>JUNTO</Text>
+          <View style={s.brandDot} />
+          <Text style={s.brandTag}>DAYMATES</Text>
+        </View>
+        <Text style={s.brandMotto}>Your Hyperlocal Peer Community</Text>
+      </View>
+
+      {/* 2. Interactive Feature Orbit Showcase */}
+      <View style={s.orbitWrapper}>
+        <JuntoOrbit size={size} activeFeatureIndex={featureIndex} />
+      </View>
+
+      {/* 3. Meaningful Feature Explanation Card */}
+      <Animated.View style={[s.featureCard, { opacity: cardFade }]}>
+        <View
+          style={[
+            s.featureBadge,
+            {
+              backgroundColor: isDark ? active.darkBg : active.lightBg,
+              borderColor: active.color,
+            },
+          ]}
+        >
+          <Ionicons
+            name={active.icon}
+            size={14}
+            color={active.color}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[s.featureBadgeText, { color: active.color }]}>
+            {active.category.toUpperCase()}
+          </Text>
+        </View>
+
+        <Text style={s.featureHeadline}>{active.headline}</Text>
+        <Text style={s.featureDescription}>{active.description}</Text>
+
+        {/* Feature Highlights Pills */}
+        <View style={s.tagsRow}>
+          {active.tags.map((tag, i) => (
+            <View
+              key={i}
+              style={[
+                s.tagPill,
+                {
+                  borderColor: isDark
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(0, 0, 0, 0.08)",
+                },
+              ]}
+            >
+              <Text style={s.tagText}>{tag}</Text>
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* 4. Active Feature Pagination Indicator */}
+      <View style={s.paginationRow}>
+        {APP_FEATURES.map((feat, idx) => (
+          <View
+            key={feat.id}
+            style={[
+              s.pageDot,
+              idx === featureIndex
+                ? [s.pageDotActive, { backgroundColor: active.color }]
+                : s.pageDotInactive,
+            ]}
+          />
+        ))}
+      </View>
+
+      {/* 5. Bottom Connection Status & Trust Bar */}
+      <View style={s.bottomStatusBox}>
+        <Animated.View style={[s.pulseDot, { opacity: pulseAnim }]} />
+        <Text style={s.statusText}>
+          {message || "Connecting to your neighborhood network..."}
+        </Text>
+      </View>
+
+      <Text style={s.trustNotice}>
+        ⚡ 100% Free Peer Community • 0% Platform Commission
+      </Text>
     </View>
   );
 
   if (fullScreen) {
-    return <View style={s.fullScreenContainer}>{content}</View>;
+    return <SafeAreaView style={s.fullScreenContainer}>{content}</SafeAreaView>;
   }
 
   return content;
@@ -506,6 +622,60 @@ const createStyles = (t: any) => {
     t?.mode === "dark" || t?.bg === "#0B0714" || t?.text === "#FFFFFF";
 
   return StyleSheet.create({
+    fullScreenContainer: {
+      flex: 1,
+      backgroundColor: t?.bg || (isDark ? "#090212" : "#F8FAFC"),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    mainContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 32,
+      paddingHorizontal: 24,
+      width: "100%",
+      maxWidth: 440,
+    },
+    topHeader: {
+      alignItems: "center",
+      marginTop: 8,
+    },
+    brandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    brandName: {
+      fontSize: 19,
+      fontWeight: "900",
+      letterSpacing: 2.5,
+      color: "#FFFFFF",
+    },
+    brandDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "#A855F7",
+    },
+    brandTag: {
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 1.5,
+      color: "#A855F7",
+    },
+    brandMotto: {
+      fontSize: 12,
+      fontWeight: "600",
+      letterSpacing: 0.5,
+      color: "#94A3B8",
+      marginTop: 4,
+    },
+    orbitWrapper: {
+      alignItems: "center",
+      justifyContent: "center",
+      marginVertical: 14,
+    },
     wrapper: {
       alignItems: "center",
       justifyContent: "center",
@@ -515,16 +685,13 @@ const createStyles = (t: any) => {
     orbit: {
       position: "absolute",
     },
-    ring: {
-      position: "absolute",
-      borderWidth: 1,
-      borderColor: t?.primary ? `${t.primary}33` : "rgba(168, 85, 247, 0.2)",
-    },
     innerRing: {
       position: "absolute",
       borderWidth: 1,
       borderStyle: "dashed",
-      borderColor: t?.primary ? `${t.primary}22` : "rgba(168, 85, 247, 0.15)",
+      borderColor: isDark
+        ? "rgba(168, 85, 247, 0.2)"
+        : "rgba(124, 58, 237, 0.15)",
     },
     bubble: {
       position: "absolute",
@@ -543,8 +710,7 @@ const createStyles = (t: any) => {
       justifyContent: "center",
       borderWidth: 2,
       backgroundColor: isDark ? "#120B24" : "#FFFFFF",
-      shadowColor: "#A855F7",
-      shadowOpacity: isDark ? 0.5 : 0.25,
+      shadowOpacity: 0.6,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 3 },
       elevation: 6,
@@ -552,41 +718,121 @@ const createStyles = (t: any) => {
     labelPill: {
       marginTop: 6,
       paddingHorizontal: 10,
+      paddingVertical: 2.5,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    label: {
+      fontSize: 9.5,
+      fontWeight: "800",
+      letterSpacing: 1.2,
+      textAlign: "center",
+    },
+    featureCard: {
+      width: "100%",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 20,
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.03)"
+        : "rgba(0, 0, 0, 0.02)",
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)",
+      marginBottom: 8,
+    },
+    featureBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 20,
+      borderWidth: 1,
+      marginBottom: 8,
+    },
+    featureBadgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: 0.8,
+    },
+    featureHeadline: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: "#FFFFFF",
+      textAlign: "center",
+      marginBottom: 6,
+    },
+    featureDescription: {
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: "#94A3B8",
+      textAlign: "center",
+      maxWidth: 320,
+      marginBottom: 10,
+    },
+    tagsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      gap: 6,
+    },
+    tagPill: {
+      paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 12,
       backgroundColor: isDark
-        ? "rgba(168, 85, 247, 0.16)"
-        : "rgba(124, 58, 237, 0.08)",
+        ? "rgba(255, 255, 255, 0.05)"
+        : "rgba(0, 0, 0, 0.04)",
       borderWidth: 1,
-      borderColor: isDark
-        ? "rgba(168, 85, 247, 0.35)"
-        : "rgba(124, 58, 237, 0.2)",
     },
-    label: {
+    tagText: {
       fontSize: 10,
-      fontWeight: "800",
-      letterSpacing: 1.5,
-      textAlign: "center",
-      color: t?.primary || "#A855F7",
+      fontWeight: "600",
+      color: "#CBD5E1",
     },
-    fullScreenContainer: {
-      flex: 1,
-      backgroundColor: t?.bg || (isDark ? "#070514" : "#F8FAFC"),
+    paginationRow: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
+      gap: 6,
+      marginVertical: 6,
     },
-    centerBox: {
+    pageDot: {
+      height: 4,
+      borderRadius: 2,
+    },
+    pageDotActive: {
+      width: 18,
+    },
+    pageDotInactive: {
+      width: 5,
+      backgroundColor: isDark
+        ? "rgba(255, 255, 255, 0.15)"
+        : "rgba(0, 0, 0, 0.15)",
+    },
+    bottomStatusBox: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 20,
+      gap: 8,
+      marginTop: 4,
     },
-    loadingText: {
-      color: t?.primary || "#A855F7",
-      fontSize: 13,
-      fontWeight: "800",
-      letterSpacing: 0.5,
+    pulseDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor: "#10B981",
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#A855F7",
+      letterSpacing: 0.3,
+    },
+    trustNotice: {
+      fontSize: 10.5,
+      fontWeight: "600",
+      color: "#64748B",
       textAlign: "center",
-      marginTop: 12,
+      marginTop: 4,
     },
   });
 };

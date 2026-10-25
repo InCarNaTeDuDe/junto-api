@@ -39,6 +39,16 @@ const config: ExpoConfig = {
     bundler: "metro",
   },
 
+  updates: {
+    url: "https://u.expo.dev/abd87e6e-ee7a-4967-a6b0-9866b21eebd6",
+    checkAutomatically: "ON_LOAD",
+    fallbackToCacheTimeout: 0,
+  },
+
+  runtimeVersion: {
+    policy: "appVersion",
+  },
+
   plugins: [
     "expo-router",
     "expo-web-browser",
@@ -46,6 +56,7 @@ const config: ExpoConfig = {
     "@react-native-google-signin/google-signin",
     "expo-notifications",
     "expo-speech-recognition",
+    "expo-updates",
     [
       "expo-location",
       {

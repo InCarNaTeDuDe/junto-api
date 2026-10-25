@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { patchFetch } from "../utils/apiHelper";
+import { AppConfigProvider } from "@/context/AppConfigContext";
 import { AuthProvider, useAuthContext } from "@/context/AuthContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -143,11 +144,13 @@ export default function RootLayout() {
       <Suspense
         fallback={<SpinnerLoader message="Junto never makes you alone" />}
       >
-        <AuthProvider>
-          <LocationProvider>
-            <RootNavigator />
-          </LocationProvider>
-        </AuthProvider>
+        <AppConfigProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <RootNavigator />
+            </LocationProvider>
+          </AuthProvider>
+        </AppConfigProvider>
       </Suspense>
     </SafeAreaProvider>
   );

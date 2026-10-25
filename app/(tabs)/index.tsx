@@ -841,7 +841,7 @@ export default function Home() {
       return { icon: "chatbubbles", color: "#10B981" };
     if (categoryFilter === "HOST_EVENT")
       return { icon: "calendar", color: "#F59E0B" };
-    return { icon: "cafe", color: "#F59E0B" };
+    return null;
   }, [selectedChip, categoryFilter]);
 
   const handleChipPress = (label: string) => {
@@ -1126,11 +1126,13 @@ export default function Home() {
         <View style={s.sectionHead}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={s.sectionTitle}>Activities matching your vibe</Text>
-            <Ionicons
-              name={currentVibeIcon.icon as any}
-              size={moderateScale(18)}
-              color={currentVibeIcon.color}
-            />
+            {currentVibeIcon ? (
+              <Ionicons
+                name={currentVibeIcon.icon as any}
+                size={moderateScale(18)}
+                color={currentVibeIcon.color}
+              />
+            ) : null}
           </View>
           {/* {(hasActiveFilters || q.trim().length > 0) && (
             <Pressable
