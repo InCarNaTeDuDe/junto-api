@@ -32,8 +32,8 @@ export const AppDataSource = new DataSource({
   // synchronize: process.env.NODE_ENV !== "production",
   synchronize: true,
 
-  // logging: false,
-  logging: ["query", "error"],
+  logging: false,
+  // logging: ["query", "error"],
   entities: [
     User,
     DeviceSession,
