@@ -45,16 +45,41 @@ Junto is a direct community connection platform for finding activity companions 
 - **How do I change my location?**: Tap on your location badge at the top of Home/Explore/Profile screens or go to Profile -> Location -> Change.
 - **How can I contact human customer care?**: If the AI assistant cannot resolve your issue, you can request an escalation or email support@junto.app.
 
-4. ASSISTANT PERSONA:
-You are "DayMates Support AI" (Customer Care Assistant).
-- Personality: Warm, polite, concise, super helpful, and empathetic.
+4. IN-APP DEEP LINKS FOR USER NAVIGATION:
+Whenever a user asks where to go or how to post/create/find something, ALWAYS provide actionable markdown links using the app:// protocol:
+- Post / Offer a Ride: [🚗 Tap here to Post / Offer a Ride](app://rides?tab=offer)
+- Find / Search a Ride: [🔍 Tap here to Find a Ride](app://rides?tab=find)
+- Sell / Swap Ticket: [🎟️ Tap here to Sell / Swap Ticket](app://add-ticket)
+- Create Social Activity / Hangout: [👥 Tap here to Post DayMate Activity](app://add-daymate)
+- Ask Nearby Neighbors / Emergency: [📢 Tap here to Ask Nearby](app://asknearby)
+- Local Deals Marketplace: [🏷️ Tap here for Local Deals](app://deals)
+- Local Services & Technicians: [🔧 Tap here for Local Services](app://services)
+The app will render these as instant clickable navigation cards taking the user straight to that screen.
+
+5. ASSISTANT PERSONA:
+You are "Junto Copilot" (DayMates AI Customer Care Assistant).
+- Personality: Warm, polite, concise, super helpful, and proactive with in-app navigation.
 - Answer questions accurately using this knowledge base.
-- If users ask about application issues, explain how DayMates works and offer actionable guidance.
-- Always remain friendly and professional. Keep replies well-formatted with bullet points when helpful.
+- When users ask how to post a ride or do something, give clear numbered steps AND the direct link!
 `;
 
 function generateFallbackSupportAnswer(userMessage: string): string {
   const query = userMessage.toLowerCase();
+
+  if (
+    query.includes("post a ride") ||
+    query.includes("offer a ride") ||
+    query.includes("create ride") ||
+    query.includes("publish ride") ||
+    query.includes("give ride") ||
+    query.includes("post ride") ||
+    query.includes("carpool") ||
+    query.includes("cab") ||
+    query.includes("drive") ||
+    query.includes("ride")
+  ) {
+    return "🚗 **RideMate (Carpool & Bike Pool)**:\n\nTo post or offer a ride to coworkers and neighbors heading your way:\n\n1. Tap the direct button below to open the ride creation screen:\n👉 **[🚗 Tap here to Post / Offer a Ride](app://rides?tab=offer)**\n\n2. Enter your **Pickup & Drop** locations.\n3. Choose your **Date & Time**, available seats, and vehicle type (Car or Bike).\n4. Set your price per seat (0% platform fee) and tap Publish!\n\nLooking to find a ride instead? Tap **[🔍 Find a Ride](app://rides?tab=find)**.";
+  }
 
   if (
     query.includes("ticket") ||
@@ -62,7 +87,28 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     query.includes("buy") ||
     query.includes("sell")
   ) {
-    return "🎟️ **Junto Ticket Swap & Marketplace**:\n\n- **Direct Peer Deals**: If your plans change, avoid complete loss by offering your ticket to another user.\n- **0% Platform Fee**: Junto does not take a cut or charge escrow fees; buyers get great ticket offers, and sellers recover their money.\n- **How to post**: Tap the '+' button in the bottom navigation bar and choose **'Sell / Swap Ticket'**.\n\nLet me know if you need help with a specific ticket listing!";
+    return "🎟️ **Junto Ticket Swap & Marketplace**:\n\n- **Direct Peer Deals**: If your plans change, avoid complete loss by offering your ticket to another user at 0% platform fee.\n\n👉 **[🎟️ Tap here to Sell / Swap a Ticket](app://add-ticket)**\n\nFill in the movie/event details, original & selling price, venue, and post!";
+  }
+
+  if (
+    query.includes("daymate") ||
+    query.includes("activity") ||
+    query.includes("buddy") ||
+    query.includes("hangout") ||
+    query.includes("coffee") ||
+    query.includes("gym")
+  ) {
+    return "👥 **DayMates Activities & Hangouts**:\n\nFind companions for coffee, gym workouts, sports, dining, or movies so you never have to go alone!\n\n👉 **[👥 Tap here to Create a DayMate Activity](app://add-daymate)**\n\nPick your category, location, and date/time to find peers with matching vibes!";
+  }
+
+  if (
+    query.includes("service") ||
+    query.includes("technician") ||
+    query.includes("plumber") ||
+    query.includes("electrician") ||
+    query.includes("repair")
+  ) {
+    return "🔧 **Local Fix & Home Services**:\n\nBook certified local electricians, plumbers, appliance mechanics & home cleaners!\n\n👉 **[🔧 Tap here to Browse Local Services](app://services)**";
   }
 
   if (
@@ -80,7 +126,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     query.includes("change location") ||
     query.includes("area")
   ) {
-    return "📍 **Changing Your Active Location**:\n\n1. Tap the location chip at the top of your **Home** or **Profile** screen.\n2. Pick from popular hubs (Indiranagar, Koramangala, HSR Layout, MG Road) or search for your neighborhood.\n3. Your feed and companions will automatically refresh for your selected zone!";
+    return "📍 **Changing Your Active Location**:\n\n1. Tap the location chip at the top of your **Home** or **Profile** screen.\n2. Pick from popular hubs or search for your neighborhood.\n3. Your feed and companions will automatically refresh for your selected zone!";
   }
 
   if (
@@ -93,16 +139,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     return "📞 **Contacting Human Customer Care**:\n\nOur specialized human support team is standing by to help you!\n- **Official Support Email**: [support@junto.app](mailto:support@junto.app)\n- **Response Time**: Typically under 2 hours during active business hours.\n- **In-App**: You can also report issues directly from any activity or ticket details screen.";
   }
 
-  if (
-    query.includes("ride") ||
-    query.includes("carpool") ||
-    query.includes("cab") ||
-    query.includes("drive")
-  ) {
-    return "🚗 **Junto Community Rides & Carpooling**:\n\n- Find and share verified rides with friendly locals heading your way.\n- Filter by morning/evening routes, smoke-free preferences, and women-only carpools.\n- Split fuel costs seamlessly through the app!";
-  }
-
-  return "👋 I'm here to help you get the most out of **Junto**!\n\n- **DayMates Activities**: Join companions for walking, coffee, gym, sports, or events.\n- **Ticket Swaps**: Buy, sell, or swap event tickets directly with 0% platform fee.\n- **Local Deals & Rides**: Discover pre-owned items and community carpools.\n\nFeel free to ask any question, or reach out to **support@junto.app** anytime!";
+  return "👋 I'm here to help you get the most out of **Junto**!\n\n- **RideMate**: [🚗 Post / Offer a Ride](app://rides?tab=offer)\n- **DayMates Activities**: [👥 Post an Activity](app://add-daymate)\n- **Ticket Swaps**: [🎟️ Sell / Swap Ticket](app://add-ticket)\n- **Local Services**: [🔧 Find Technicians](app://services)\n\nAsk me anything or tap any link above to jump right in!";
 }
 
 async function callOpenRouter(

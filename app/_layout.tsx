@@ -12,7 +12,7 @@ import SpinnerLoader from "@/components/SpinnerLoader";
 import { PushNotificationService } from "@/services/notifications";
 import { addNotificationToStore } from "@/hooks/useStore";
 
-patchFetch();
+// patchFetch();
 
 function RootNavigator() {
   const { loading, isLoggedIn } = useAuthContext();

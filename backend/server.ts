@@ -183,57 +183,20 @@ async function startServer() {
   // app.use("/api/users", userRoutes);
   // app.use("/api/tickets", ticketRoutes);
   // app.use("/api/events", eventRoutes);
+  // Serve static files from compiled dist/ directory (Expo web export)
+  const distPath = path.resolve(__dirname, "../dist");
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.use((req, res, next) => {
+      if (req.method === "GET" && !req.path.startsWith("/api/")) {
+        const indexPath = path.join(distPath, "index.html");
+        return res.sendFile(indexPath);
+      }
+      next();
+    });
+  }
+
   app.use(errorHandler);
-
-  // Serve static files from dist or auto-export if missing
-  // const distPath = path.join(process.cwd(), "dist");
-  // let hasDist = fs.existsSync(path.join(distPath, "index.html"));
-
-  // if (!hasDist) {
-  //   console.log(
-  //     "No compiled static files found in dist/. Exporting web bundle...",
-  //   );
-  //   try {
-  //     const { execSync } = await import("child_process");
-  //     execSync(
-  //       "npx tsx generate_assets.js && npx expo export -p web --output-dir dist",
-  //       {
-  //         stdio: "inherit",
-  //       },
-  //     );
-  //     hasDist = fs.existsSync(path.join(distPath, "index.html"));
-  //   } catch (e: any) {
-  //     console.warn("Auto-exporting web bundle failed:", e?.message || e);
-  //   }
-  // }
-
-  // console.log(
-  //   `Serving static files from compiled dist/ directory: ${distPath}`,
-  // );
-  // app.use(express.static(distPath));
-  // app.get("*", (req, res) => {
-  //   const indexPath = path.join(distPath, "index.html");
-  //   if (fs.existsSync(indexPath)) {
-  //     res.sendFile(indexPath, (err) => {
-  //       if (err) {
-  //         console.error("Error serving index.html:", err);
-  //         if (!res.headersSent) {
-  //           res.status(500).send("Internal Server Error loading index.html");
-  //         }
-  //       }
-  //     });
-  //   } else {
-  //     res
-  //       .status(404)
-  //       .send(
-  //         "Application dist/index.html is missing. Run npm run build first.",
-  //       );
-  //   }
-  // });
-
-  // app.listen(PORT, "0.0.0.0", () => {
-  //   console.log(`Server running on http://localhost:${PORT}`);
-  // });
   const server = http.createServer(app);
 
   const io = initializeSocket(server);

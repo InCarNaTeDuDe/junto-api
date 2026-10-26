@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { INeedThisModal } from "./NeedThisModal";
+import { useAppConfig, type AppConfig } from "@/context/AppConfigContext";
 
 interface QuickFeaturesProps {
   isDark?: boolean;
@@ -695,13 +696,56 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
   isDark,
   onSelectFeature,
 }) => {
+  const { checkFeatureOrAlert } = useAppConfig();
   const [showAllModal, setShowAllModal] = useState(false);
   const [showNeedModal, setShowNeedModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
 
+  const getFeatureConfigMapping = (
+    item: FeatureItem,
+  ): { key: keyof AppConfig; name: string } | null => {
+    if (item.id === "ridemate" || item.route?.includes("/rides")) {
+      return { key: "enableRides", name: "RideMate (Carpool)" };
+    }
+    if (item.id === "glamup" || item.route?.includes("/glamup")) {
+      return { key: "enableGlamup", name: "GlamUp Salon" };
+    }
+    if (
+      item.id === "services" ||
+      item.id === "homehelp" ||
+      item.route?.includes("services")
+    ) {
+      return { key: "enableServices", name: "Local Services & Repairs" };
+    }
+    if (item.id === "ticketswap" || item.route?.includes("ticket")) {
+      return { key: "enableTicketSelling", name: "Ticket Swap" };
+    }
+    if (item.id === "daymate" || item.route?.includes("daymate")) {
+      return { key: "enableDaymates", name: "DayMates Activities" };
+    }
+    if (item.id === "deals" || item.route?.includes("deals")) {
+      return { key: "enableDeals", name: "Local Deals" };
+    }
+    if (item.id === "asknearby" || item.route?.includes("ask-nearby")) {
+      return { key: "enableAskNearby", name: "Ask Nearby" };
+    }
+    if (item.id === "activitychats" || item.route?.includes("chats")) {
+      return { key: "enableChats", name: "Activity Chats" };
+    }
+    if (item.id === "ineedthis") {
+      return { key: "enableUniversalNeed", name: "Universal Need Search" };
+    }
+    return null;
+  };
+
   const handlePressRowItem = (item: FeatureItem) => {
+    const mapping = getFeatureConfigMapping(item);
+    if (mapping && !checkFeatureOrAlert(mapping.key, mapping.name)) {
+      return;
+    }
+
     if (item.id === "ineedthis") {
       setShowNeedModal(true);
       return;
@@ -719,6 +763,11 @@ export const QuickFeatures: React.FC<QuickFeaturesProps> = ({
   };
 
   const handleLaunchFeature = (item: FeatureItem) => {
+    const mapping = getFeatureConfigMapping(item);
+    if (mapping && !checkFeatureOrAlert(mapping.key, mapping.name)) {
+      return;
+    }
+
     setShowAllModal(false);
     if (item.id === "ineedthis") {
       setShowNeedModal(true);

@@ -11,10 +11,12 @@ import {
   StyleSheet,
   Alert,
   Modal,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { scale } from "react-native-size-matters";
+import { router } from "expo-router";
 import { ApiService } from "@/services/api";
 import FormattedMarkdownText from "@/components/FormattedMarkdownText";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -33,10 +35,118 @@ export interface SupportChatMessage {
   timestamp: string;
 }
 
+interface InAppActionCard {
+  label: string;
+  sub: string;
+  url: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}
+
+function detectActionCards(text: string): InAppActionCard[] {
+  const cards: InAppActionCard[] = [];
+  const lower = text.toLowerCase();
+
+  // 1. Explicit markdown link detection [label](app://...)
+  const linkMatches = [...text.matchAll(/\[(.*?)\]\((app:\/\/[^\s)]+)\)/g)];
+  if (linkMatches.length > 0) {
+    for (const match of linkMatches) {
+      const rawLabel = match[1].replace(/^[^\w\s]+/, "").trim();
+      const url = match[2];
+      let icon: keyof typeof Ionicons.glyphMap = "navigate-circle-outline";
+      let color = "#A855F7";
+      let sub = "Tap to open inside app";
+
+      if (url.includes("rides")) {
+        icon = "car-sport";
+        color = "#10B981";
+        sub = url.includes("offer")
+          ? "Open ride creation screen"
+          : "Search available carpools";
+      } else if (url.includes("ticket")) {
+        icon = "ticket";
+        color = "#F97316";
+        sub = "Open ticket listing & swap";
+      } else if (url.includes("daymate")) {
+        icon = "people";
+        color = "#8B5CF6";
+        sub = "Create hangout or activity";
+      } else if (url.includes("service")) {
+        icon = "construct";
+        color = "#3B82F6";
+        sub = "Browse verified neighborhood pros";
+      } else if (url.includes("deal")) {
+        icon = "pricetag";
+        color = "#F59E0B";
+        sub = "Open pre-owned marketplace";
+      }
+
+      cards.push({ label: rawLabel || "Open Screen", sub, url, icon, color });
+    }
+    return cards;
+  }
+
+  // 2. Intelligent fallback intent detection
+  if (
+    (lower.includes("post") ||
+      lower.includes("offer") ||
+      lower.includes("create") ||
+      lower.includes("publish")) &&
+    (lower.includes("ride") || lower.includes("carpool"))
+  ) {
+    cards.push({
+      label: "Post / Offer a Ride",
+      sub: "Open RideMate carpool creation screen",
+      url: "app://rides?tab=offer",
+      icon: "car-sport",
+      color: "#10B981",
+    });
+  } else if (
+    lower.includes("find") &&
+    (lower.includes("ride") || lower.includes("carpool"))
+  ) {
+    cards.push({
+      label: "Find Available Rides",
+      sub: "Search daily carpools on your route",
+      url: "app://rides?tab=find",
+      icon: "car-outline",
+      color: "#10B981",
+    });
+  } else if (
+    (lower.includes("sell") ||
+      lower.includes("swap") ||
+      lower.includes("list")) &&
+    lower.includes("ticket")
+  ) {
+    cards.push({
+      label: "Sell / Swap Ticket",
+      sub: "Post spare movie or event ticket",
+      url: "app://add-ticket",
+      icon: "ticket",
+      color: "#F97316",
+    });
+  } else if (
+    lower.includes("post activity") ||
+    lower.includes("create daymate") ||
+    lower.includes("find buddy") ||
+    lower.includes("hangout")
+  ) {
+    cards.push({
+      label: "Create DayMate Activity",
+      sub: "Find companion for gym, coffee or sports",
+      url: "app://add-daymate",
+      icon: "people",
+      color: "#8B5CF6",
+    });
+  }
+
+  return cards;
+}
+
 const DEFAULT_WELCOME_MESSAGE: SupportChatMessage = {
   id: "welcome-bot-msg",
   sender: "bot",
-  text: "👋 **Hello! I'm Junto Copilot**.\n\nYour 24/7 AI Assistant for **Junto**. How can I help you with activity companions, ticket swaps, or local queries today?",
+  text: "👋 **Hello! I'm Junto Copilot**.\n\nYour 24/7 AI Assistant for **Junto**. Need to post a ride, sell a ticket, find activity buddies, or explore services? Ask me anything and I'll provide direct links to the right screen!",
   timestamp: new Date().toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -112,11 +222,50 @@ export default function CustomerCareChatModal({
   }, [user?.id, isLoggedIn]);
 
   const quickPrompts = [
-    "How does Junto Ticket Escrow work?",
-    "Safety guidelines for meeting DayMates",
-    "How do I change my location?",
-    "How to post a ticket for swap on Junto?",
+    "🚗 How do I post a ride on RideMate?",
+    "🎟️ How to post a ticket for swap?",
+    "👥 How do I find a DayMate companion?",
+    "🛡️ Safety guidelines for meeting people",
+    "📍 How do I change my location?",
   ];
+
+  const handleActionNavigation = (rawUrl: string) => {
+    let target = rawUrl;
+    if (rawUrl.startsWith("app://")) {
+      const path = rawUrl.replace("app://", "");
+      if (path.startsWith("rides")) {
+        target = `/(screens)/${path}`;
+      } else if (path === "add-ticket") {
+        target = "/(screens)/add-ticket";
+      } else if (path === "add-daymate") {
+        target = "/(screens)/add-daymate";
+      } else if (path === "deals") {
+        target = "/(screens)/deals";
+      } else if (path === "services") {
+        target = "/(screens)/localservices";
+      } else if (path === "glamup") {
+        target = "/(screens)/glamup";
+      } else if (path === "profile") {
+        target = "/(tabs)/profile";
+      } else if (path === "asknearby") {
+        target = "/(screens)/add-daymate?category=ASK_NEARBY";
+      } else {
+        target = `/(screens)/${path}`;
+      }
+    } else if (
+      rawUrl.startsWith("http://") ||
+      rawUrl.startsWith("https://") ||
+      rawUrl.startsWith("mailto:")
+    ) {
+      Linking.openURL(rawUrl).catch(() => {});
+      return;
+    }
+
+    onClose();
+    setTimeout(() => {
+      router.push(target as any);
+    }, 120);
+  };
 
   // Helper to persist messages locally
   const persistMessages = async (newMessages: SupportChatMessage[]) => {
@@ -422,11 +571,79 @@ export default function CustomerCareChatModal({
                   <FormattedMarkdownText
                     text={m.text}
                     isUser={isUser}
+                    onLinkPress={handleActionNavigation}
                     style={{
                       color: isUser ? "#FFFFFF" : t.text,
                       fontSize: 14,
                     }}
                   />
+
+                  {!isUser && (
+                    <View style={{ marginTop: 8, gap: 6 }}>
+                      {detectActionCards(m.text).map((action, actionIdx) => (
+                        <TouchableOpacity
+                          key={actionIdx}
+                          onPress={() => handleActionNavigation(action.url)}
+                          activeOpacity={0.8}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: isDark
+                              ? "rgba(168, 85, 247, 0.16)"
+                              : "rgba(168, 85, 247, 0.09)",
+                            borderWidth: 1.5,
+                            borderColor: action.color,
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 9,
+                            gap: 10,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 16,
+                              backgroundColor: `${action.color}25`,
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Ionicons
+                              name={action.icon}
+                              size={18}
+                              color={action.color}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: "800",
+                                color: t.text,
+                              }}
+                            >
+                              {action.label}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: t.sub,
+                                marginTop: 1,
+                              }}
+                            >
+                              {action.sub}
+                            </Text>
+                          </View>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color={action.color}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
                 <Text
                   style={{

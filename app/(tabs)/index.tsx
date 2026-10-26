@@ -40,6 +40,7 @@ import { JuntoNow } from "@/components/JuntoNow";
 import { QuickFeatures } from "@/components/QuickFeatures";
 import { UniversalNeedBar } from "@/components/UniversalNeedBar";
 import { useVoiceSpeech } from "@/hooks/useVoiceSpeech";
+import { useAppConfig } from "@/context/AppConfigContext";
 
 // useHeroCardSize.js
 const SIDE_PADDING = 8;
@@ -247,44 +248,55 @@ const Chip = ({ icon, label, color, s, isSelected, onPress }: any) => (
   </Pressable>
 );
 
-const HeroCard = ({ item, s, width, artHeight }) => (
-  <Pressable
-    style={[
-      s.hero,
-      { width, backgroundColor: item.tintMid },
-      Platform.OS === "web" && {
-        backgroundImage: `linear-gradient(180deg, ${item.tintTop} 0%, ${item.tintMid} 55%, ${item.tint2} 100%)`,
-      },
-      shadow(10),
-    ]}
-    onPress={() => {
-      switch (item.key) {
-        case "swap":
-          router.push("/(screens)/add-ticket");
-          break;
-        case "daymates":
-          router.push("/(screens)/add-daymate");
-          break;
-        case "help":
-          router.push("/(screens)/ask-nearby");
-          break;
-        default:
-          break;
-      }
-    }}
-  >
-    <View
-      style={[s.heroArt, { height: artHeight, backgroundColor: item.tintTop }]}
+const HeroCard = ({ item, s, width, artHeight }) => {
+  const { checkFeatureOrAlert } = useAppConfig();
+
+  return (
+    <Pressable
+      style={[
+        s.hero,
+        { width, backgroundColor: item.tintMid },
+        Platform.OS === "web" && {
+          backgroundImage: `linear-gradient(180deg, ${item.tintTop} 0%, ${item.tintMid} 55%, ${item.tint2} 100%)`,
+        },
+        shadow(10),
+      ]}
+      onPress={() => {
+        switch (item.key) {
+          case "swap":
+            if (!checkFeatureOrAlert("enableTicketSelling", "Ticket Swap"))
+              return;
+            router.push("/(screens)/add-ticket");
+            break;
+          case "daymates":
+            if (!checkFeatureOrAlert("enableDaymates", "DayMates")) return;
+            router.push("/(screens)/add-daymate");
+            break;
+          case "help":
+            if (!checkFeatureOrAlert("enableAskNearby", "Ask Nearby")) return;
+            router.push("/(screens)/ask-nearby");
+            break;
+          default:
+            break;
+        }
+      }}
     >
-      <Image source={item.image} style={s.heroImg} resizeMode="cover" />
-    </View>
-    <Text style={s.heroTitle}>{item.title}</Text>
-    <Text style={s.heroSub}>{item.sub}</Text>
-    <View style={[s.heroArrow, { backgroundColor: item.tint }]}>
-      <Ionicons name="arrow-forward" size={moderateScale(16)} color="#fff" />
-    </View>
-  </Pressable>
-);
+      <View
+        style={[
+          s.heroArt,
+          { height: artHeight, backgroundColor: item.tintTop },
+        ]}
+      >
+        <Image source={item.image} style={s.heroImg} resizeMode="cover" />
+      </View>
+      <Text style={s.heroTitle}>{item.title}</Text>
+      <Text style={s.heroSub}>{item.sub}</Text>
+      <View style={[s.heroArrow, { backgroundColor: item.tint }]}>
+        <Ionicons name="arrow-forward" size={moderateScale(16)} color="#fff" />
+      </View>
+    </Pressable>
+  );
+};
 
 const FeedRow = ({ item, s, C }) => {
   const { user } = useAuthContext();

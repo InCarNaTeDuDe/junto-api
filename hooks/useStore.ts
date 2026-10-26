@@ -95,252 +95,252 @@ export interface AppState {
 
 // Initial Mock Data from Wireframes
 const initialPosts: Post[] = [
-  {
-    id: "p-1",
-    title: "Avengers: Endgame",
-    category: "Movie Tickets",
-    image: "https://images.unsplash.com/photo-1478720143022-9099477e637a?w=800",
-    date: "Today, 18 May • 7:30 PM",
-    location: "PVR Phoenix Marketcity, Mumbai",
-    price: "₹500 each",
-    spotsDetail: "2 Tickets",
-    tag: "Sci-Fi",
-    host: {
-      name: "Rohan S.",
-      avatar:
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-      rating: 4.8,
-      reviews: 23,
-    },
-    aboutTickets: [
-      "2 Tickets (Together)",
-      "Seats: G10, G11",
-      "Original price: ₹600 each",
-      "Selling price: ₹500 each (Discounted)",
-      "Tickets will be transferred via Paytm",
-    ],
-    description:
-      "Selling spare tickets for tonight since my friends backed out. Great seats near center screen!",
-    status: "Active",
-    attendees: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-    ],
-  },
-  {
-    id: "p-2",
-    title: "Spider-Man: No Way Home",
-    category: "Movie Tickets",
-    image: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=800",
-    date: "Tomorrow, 19 May • 6:45 PM",
-    location: "PVR Icon, Andheri",
-    price: "₹400 each",
-    spotsDetail: "2 Tickets",
-    tag: "Action",
-    host: {
-      name: "Ananya R.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-      rating: 4.9,
-      reviews: 15,
-    },
-    aboutTickets: [
-      "2 Tickets (Side-by-side)",
-      "Seats: K14, K15",
-      "Original price: ₹550 each",
-      "Selling price: ₹400 each",
-    ],
-    description:
-      "Unused tickets for the Spider-man sequel. Digital tickets, instantly shareable.",
-    status: "Active",
-  },
-  {
-    id: "p-3",
-    title: "Black Wallet",
-    category: "Lost & Found",
-    image: "https://images.unsplash.com/photo-1627124118303-19d5f0ce0e85?w=800",
-    date: "18 May • 10:45 AM",
-    location: "Found near Dadar Station",
-    spotsDetail: "Found item",
-    tag: "Wallet",
-    host: {
-      name: "Neha P.",
-      avatar:
-        "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
-      rating: 4.7,
-      reviews: 8,
-    },
-    description:
-      "Found a black leather wallet on platform 3. Contains some cards. Message with identification details to claim.",
-    status: "Active",
-  },
-  {
-    id: "p-4",
-    title: "Morning Walk Buddy",
-    category: "Day Mates",
-    image: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800",
-    date: "Tomorrow • 6:00 AM",
-    location: "Bandra Reclamation",
-    spotsDetail: "1.1 km away",
-    tag: "Fitness",
-    host: {
-      name: "Ananya R.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-      rating: 4.9,
-    },
-    description:
-      "Looking for a companion for jogging and morning power walk at Bandra Reclamation. Usually do 5k.",
-    status: "Active",
-    attendees: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-    ],
-  },
-  {
-    id: "p-5",
-    title: "Midnight Cycling Tour",
-    category: "Day Mates",
-    image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800",
-    date: "Tonight, 10:00 PM",
-    location: "Colaba Causeway to Bandra",
-    spotsDetail: "3 spots left",
-    tag: "Adventure",
-    host: {
-      name: "Aarav Mehta",
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-      rating: 4.6,
-    },
-    description:
-      "Cycling around clean Mumbai coastal streets at midnight. Rent a cycle at Colaba if you do not have one!",
-    status: "Active",
-  },
-  {
-    id: "p-6",
-    title: "Stand-up Comedy Showcase",
-    category: "Movie Tickets", // Using as general event tickets
-    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800",
-    date: "Tomorrow, 8:30 PM",
-    location: "The Habitat, Khar",
-    price: "₹450 each",
-    spotsDetail: "Selling fast",
-    tag: "Comedy",
-    host: {
-      name: "Rohan S.",
-      avatar:
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-      rating: 4.8,
-    },
-    status: "Active",
-  },
+  // {
+  //   id: "p-1",
+  //   title: "Avengers: Endgame",
+  //   category: "Movie Tickets",
+  //   image: "https://images.unsplash.com/photo-1478720143022-9099477e637a?w=800",
+  //   date: "Today, 18 May • 7:30 PM",
+  //   location: "PVR Phoenix Marketcity, Mumbai",
+  //   price: "₹500 each",
+  //   spotsDetail: "2 Tickets",
+  //   tag: "Sci-Fi",
+  //   host: {
+  //     name: "Rohan S.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+  //     rating: 4.8,
+  //     reviews: 23,
+  //   },
+  //   aboutTickets: [
+  //     "2 Tickets (Together)",
+  //     "Seats: G10, G11",
+  //     "Original price: ₹600 each",
+  //     "Selling price: ₹500 each (Discounted)",
+  //     "Tickets will be transferred via Paytm",
+  //   ],
+  //   description:
+  //     "Selling spare tickets for tonight since my friends backed out. Great seats near center screen!",
+  //   status: "Active",
+  //   attendees: [
+  //     "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+  //     "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
+  //   ],
+  // },
+  // {
+  //   id: "p-2",
+  //   title: "Spider-Man: No Way Home",
+  //   category: "Movie Tickets",
+  //   image: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=800",
+  //   date: "Tomorrow, 19 May • 6:45 PM",
+  //   location: "PVR Icon, Andheri",
+  //   price: "₹400 each",
+  //   spotsDetail: "2 Tickets",
+  //   tag: "Action",
+  //   host: {
+  //     name: "Ananya R.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+  //     rating: 4.9,
+  //     reviews: 15,
+  //   },
+  //   aboutTickets: [
+  //     "2 Tickets (Side-by-side)",
+  //     "Seats: K14, K15",
+  //     "Original price: ₹550 each",
+  //     "Selling price: ₹400 each",
+  //   ],
+  //   description:
+  //     "Unused tickets for the Spider-man sequel. Digital tickets, instantly shareable.",
+  //   status: "Active",
+  // },
+  // {
+  //   id: "p-3",
+  //   title: "Black Wallet",
+  //   category: "Lost & Found",
+  //   image: "https://images.unsplash.com/photo-1627124118303-19d5f0ce0e85?w=800",
+  //   date: "18 May • 10:45 AM",
+  //   location: "Found near Dadar Station",
+  //   spotsDetail: "Found item",
+  //   tag: "Wallet",
+  //   host: {
+  //     name: "Neha P.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
+  //     rating: 4.7,
+  //     reviews: 8,
+  //   },
+  //   description:
+  //     "Found a black leather wallet on platform 3. Contains some cards. Message with identification details to claim.",
+  //   status: "Active",
+  // },
+  // {
+  //   id: "p-4",
+  //   title: "Morning Walk Buddy",
+  //   category: "Day Mates",
+  //   image: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800",
+  //   date: "Tomorrow • 6:00 AM",
+  //   location: "Bandra Reclamation",
+  //   spotsDetail: "1.1 km away",
+  //   tag: "Fitness",
+  //   host: {
+  //     name: "Ananya R.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+  //     rating: 4.9,
+  //   },
+  //   description:
+  //     "Looking for a companion for jogging and morning power walk at Bandra Reclamation. Usually do 5k.",
+  //   status: "Active",
+  //   attendees: [
+  //     "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+  //   ],
+  // },
+  // {
+  //   id: "p-5",
+  //   title: "Midnight Cycling Tour",
+  //   category: "Day Mates",
+  //   image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800",
+  //   date: "Tonight, 10:00 PM",
+  //   location: "Colaba Causeway to Bandra",
+  //   spotsDetail: "3 spots left",
+  //   tag: "Adventure",
+  //   host: {
+  //     name: "Aarav Mehta",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+  //     rating: 4.6,
+  //   },
+  //   description:
+  //     "Cycling around clean Mumbai coastal streets at midnight. Rent a cycle at Colaba if you do not have one!",
+  //   status: "Active",
+  // },
+  // {
+  //   id: "p-6",
+  //   title: "Stand-up Comedy Showcase",
+  //   category: "Movie Tickets", // Using as general event tickets
+  //   image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800",
+  //   date: "Tomorrow, 8:30 PM",
+  //   location: "The Habitat, Khar",
+  //   price: "₹450 each",
+  //   spotsDetail: "Selling fast",
+  //   tag: "Comedy",
+  //   host: {
+  //     name: "Rohan S.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+  //     rating: 4.8,
+  //   },
+  //   status: "Active",
+  // },
 ];
 
 const initialChats: Chat[] = [];
 
 const initialNotifications: AppNotification[] = [
-  {
-    id: "n-1",
-    actor: {
-      name: "Rohan S.",
-      avatar:
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-    },
-    type: "message",
-    content: "New message about Avengers: Endgame – 2 Tickets",
-    timestamp: "1m ago",
-    read: false,
-    activityId: "post-1",
-    data: {
-      activityId: "post-1",
-      postId: "post-1",
-      title: "Avengers: Endgame – 2 Tickets",
-      category: "MOVIE TICKETS",
-      user: "Rohan S.",
-      place: "PVR Cinemas, Mumbai",
-    },
-  },
-  {
-    id: "n-2",
-    actor: {
-      name: "Ananya R.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-    },
-    type: "join_request",
-    content: 'Accepted your request to join "Morning Walk Buddy"',
-    timestamp: "5m ago",
-    read: false,
-    activityId: "act-morning-walk",
-    data: {
-      activityId: "act-morning-walk",
-      title: "Morning Walk Buddy",
-      category: "DAY MATES",
-      user: "Ananya R.",
-      place: "Bandra Reclamation, Mumbai",
-    },
-  },
-  {
-    id: "n-3",
-    actor: {
-      name: "Neha P.",
-      avatar:
-        "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
-    },
-    type: "like",
-    content: 'Liked your post "Black Wallet Found near Dadar Station".',
-    timestamp: "15m ago",
-    read: true,
-    activityId: "post-3",
-    data: {
-      activityId: "post-3",
-      postId: "post-3",
-      title: "Black Wallet Found near Dadar Station",
-      category: "Lost & Found",
-      user: "Neha P.",
-      place: "Dadar Station, Mumbai",
-    },
-  },
-  {
-    id: "n-4",
-    actor: {
-      name: "Karan M.",
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-    },
-    type: "message",
-    content: "Sent you a message.",
-    timestamp: "1h ago",
-    read: true,
-    activityId: "act-weekend-coffee",
-    data: {
-      activityId: "act-weekend-coffee",
-      title: "Coffee & Tech Discussions",
-      category: "DAY MATES",
-      user: "Karan M.",
-      place: "Starbucks, Bandra",
-    },
-  },
-  {
-    id: "n-5",
-    actor: {
-      name: "Amit P.",
-      avatar:
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
-    },
-    type: "like",
-    content: 'Liked your post "iPhone 13 - Blue Lost near Juhu Beach".',
-    timestamp: "2h ago",
-    read: true,
-    activityId: "post-4",
-    data: {
-      activityId: "post-4",
-      postId: "post-4",
-      title: "iPhone 13 - Blue Lost near Juhu Beach",
-      category: "Lost & Found",
-      user: "Amit P.",
-      place: "Juhu Beach, Mumbai",
-    },
-  },
+  // {
+  //   id: "n-1",
+  //   actor: {
+  //     name: "Rohan S.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+  //   },
+  //   type: "message",
+  //   content: "New message about Avengers: Endgame – 2 Tickets",
+  //   timestamp: "1m ago",
+  //   read: false,
+  //   activityId: "post-1",
+  //   data: {
+  //     activityId: "post-1",
+  //     postId: "post-1",
+  //     title: "Avengers: Endgame – 2 Tickets",
+  //     category: "MOVIE TICKETS",
+  //     user: "Rohan S.",
+  //     place: "PVR Cinemas, Mumbai",
+  //   },
+  // },
+  // {
+  //   id: "n-2",
+  //   actor: {
+  //     name: "Ananya R.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+  //   },
+  //   type: "join_request",
+  //   content: 'Accepted your request to join "Morning Walk Buddy"',
+  //   timestamp: "5m ago",
+  //   read: false,
+  //   activityId: "act-morning-walk",
+  //   data: {
+  //     activityId: "act-morning-walk",
+  //     title: "Morning Walk Buddy",
+  //     category: "DAY MATES",
+  //     user: "Ananya R.",
+  //     place: "Bandra Reclamation, Mumbai",
+  //   },
+  // },
+  // {
+  //   id: "n-3",
+  //   actor: {
+  //     name: "Neha P.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
+  //   },
+  //   type: "like",
+  //   content: 'Liked your post "Black Wallet Found near Dadar Station".',
+  //   timestamp: "15m ago",
+  //   read: true,
+  //   activityId: "post-3",
+  //   data: {
+  //     activityId: "post-3",
+  //     postId: "post-3",
+  //     title: "Black Wallet Found near Dadar Station",
+  //     category: "Lost & Found",
+  //     user: "Neha P.",
+  //     place: "Dadar Station, Mumbai",
+  //   },
+  // },
+  // {
+  //   id: "n-4",
+  //   actor: {
+  //     name: "Karan M.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+  //   },
+  //   type: "message",
+  //   content: "Sent you a message.",
+  //   timestamp: "1h ago",
+  //   read: true,
+  //   activityId: "act-weekend-coffee",
+  //   data: {
+  //     activityId: "act-weekend-coffee",
+  //     title: "Coffee & Tech Discussions",
+  //     category: "DAY MATES",
+  //     user: "Karan M.",
+  //     place: "Starbucks, Bandra",
+  //   },
+  // },
+  // {
+  //   id: "n-5",
+  //   actor: {
+  //     name: "Amit P.",
+  //     avatar:
+  //       "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+  //   },
+  //   type: "like",
+  //   content: 'Liked your post "iPhone 13 - Blue Lost near Juhu Beach".',
+  //   timestamp: "2h ago",
+  //   read: true,
+  //   activityId: "post-4",
+  //   data: {
+  //     activityId: "post-4",
+  //     postId: "post-4",
+  //     title: "iPhone 13 - Blue Lost near Juhu Beach",
+  //     category: "Lost & Found",
+  //     user: "Amit P.",
+  //     place: "Juhu Beach, Mumbai",
+  //   },
+  // },
 ];
 
 // In-Memory Global State Singletone

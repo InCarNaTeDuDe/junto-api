@@ -1,34 +1,65 @@
 import React from "react";
-import { Text, TextStyle, View } from "react-native";
+import { Text, TextStyle, View, Linking } from "react-native";
 
 interface FormattedMarkdownTextProps {
   text: string;
   style?: TextStyle;
   isUser?: boolean;
+  onLinkPress?: (url: string) => void;
 }
 
 /**
  * Robust markdown markup renderer for React Native chat messages.
- * Formats **bold**, *italic*, headers (#, ##, ###), lists (- or 1.), and inline code.
+ * Formats **bold**, *italic*, headers (#, ##, ###), lists (- or 1.), inline code, and clickable [links](url).
  */
 export const FormattedMarkdownText: React.FC<FormattedMarkdownTextProps> = ({
   text,
   style,
   isUser,
+  onLinkPress,
 }) => {
   if (!text) return null;
 
-  // Inline formatter for bold, italic, code, and bold+italic
+  // Inline formatter for bold, italic, code, links, and bold+italic
   const renderInlineFormattedText = (lineText: string, keyPrefix: string) => {
-    // Regex matches **bold**, __bold__, *italic*, _italic_, `code`
+    // Regex matches [link](url), **bold**, __bold__, *italic*, _italic_, `code`
     const tokenRegex =
-      /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_|`.*?`)/g;
+      /(\[.*?\]\(.*?\)|\*\*\*.*?\*\*\*|\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_|`.*?`)/g;
     const parts = lineText.split(tokenRegex);
 
     return parts.map((part, index) => {
       const key = `${keyPrefix}-inline-${index}`;
 
       if (!part) return null;
+
+      // Markdown link [text](url)
+      if (part.startsWith("[") && part.includes("](") && part.endsWith(")")) {
+        const splitIdx = part.indexOf("](");
+        const linkLabel = part.slice(1, splitIdx);
+        const linkUrl = part.slice(splitIdx + 2, -1);
+        return (
+          <Text
+            key={key}
+            onPress={() => {
+              if (onLinkPress) {
+                onLinkPress(linkUrl);
+              } else if (
+                linkUrl.startsWith("http") ||
+                linkUrl.startsWith("mailto:")
+              ) {
+                Linking.openURL(linkUrl).catch(() => {});
+              }
+            }}
+            style={{
+              color: isUser ? "#FFFFFF" : "#A855F7",
+              fontWeight: "800",
+              textDecorationLine: "underline",
+            }}
+          >
+            {linkLabel}
+          </Text>
+        );
+      }
 
       // Bold + Italic ***text***
       if (part.startsWith("***") && part.endsWith("***") && part.length >= 6) {

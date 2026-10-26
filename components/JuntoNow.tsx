@@ -17,6 +17,7 @@ import {
 } from "@/theme";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
+import { useAppConfig, type AppConfig } from "@/context/AppConfigContext";
 
 export { JuntoNowColors, DefaultJuntoNowFeatures, type JuntoNowItemConfig };
 
@@ -110,7 +111,33 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
     };
   }, [fetchStats]);
 
+  const { checkFeatureOrAlert } = useAppConfig();
+
+  const getJuntoNowMapping = (
+    item: JuntoNowItemConfig,
+  ): { key: keyof AppConfig; name: string } | null => {
+    switch (item.id) {
+      case "ride":
+        return { key: "enableRides", name: "RideMate (Carpool)" };
+      case "help":
+        return { key: "enableAskNearby", name: "Ask Nearby" };
+      case "service":
+        return { key: "enableServices", name: "Local Services" };
+      case "something":
+        return { key: "enableDeals", name: "Local Deals" };
+      case "company":
+        return { key: "enableDaymates", name: "DayMates Activities" };
+      default:
+        return null;
+    }
+  };
+
   const handlePress = (item: JuntoNowItemConfig) => {
+    const mapping = getJuntoNowMapping(item);
+    if (mapping && !checkFeatureOrAlert(mapping.key, mapping.name)) {
+      return;
+    }
+
     if (onItemPress) {
       onItemPress(item);
       return;

@@ -18,6 +18,13 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["codebase", "node_modules", "dist"],
+  "exclude": [
+    "codebase",
+    "node_modules",
+    "dist",
+    "backend",
+    "server.ts",
+    "vite.config.ts"
+  ],
   "extends": "expo/tsconfig.base"
 }

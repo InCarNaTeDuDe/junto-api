@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -26,6 +26,8 @@ import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
 import { socket } from "@/services/socket";
 import { useAuthContext } from "@/context/AuthContext";
+import { useAppConfig } from "@/context/AppConfigContext";
+import { FeatureDisabledView } from "@/components/FeatureDisabledBanner";
 import OfferRideTab from "@/components/rides/OfferRideTab";
 import MyRidesTab from "@/components/rides/MyRidesTab";
 import {
@@ -73,12 +75,42 @@ export default function RidesScreen() {
   const { theme: t, isDark } = useTheme();
   const { selectedLocation } = useLocation();
   const { user } = useAuthContext();
+  const { isFeatureEnabled, refreshConfig } = useAppConfig();
   const cityName = selectedLocation?.name || "Hyderabad";
+
+  if (!isFeatureEnabled("enableRides")) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <FeatureDisabledView
+          featureName="RideMate"
+          message="RideMate carpooling and ridesharing is currently paused for scheduled maintenance. You can check back shortly!"
+          icon="car-outline"
+          onRefresh={refreshConfig}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const params = useLocalSearchParams<{ tab?: string }>();
 
   // Tab State: 'find' | 'offer' | 'my_rides'
   const [activeTab, setActiveTab] = useState<"find" | "offer" | "my_rides">(
-    "find",
+    params.tab === "offer"
+      ? "offer"
+      : params.tab === "my_rides"
+        ? "my_rides"
+        : "find",
   );
+
+  useEffect(() => {
+    if (
+      params.tab === "offer" ||
+      params.tab === "find" ||
+      params.tab === "my_rides"
+    ) {
+      setActiveTab(params.tab);
+    }
+  }, [params.tab]);
   const [myRidesSubTab, setMyRidesSubTab] = useState<"posted" | "joined">(
     "posted",
   );

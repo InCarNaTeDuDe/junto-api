@@ -1,31 +1,43 @@
 /**
- * DayMates API Service
+ * Junto API Service
  *
+ * - Resolves API URLs from the endpoint
  * - Automatically attaches JWT
+ * - Attaches device info to Google login
+ * - Adds location to eligible POST/PUT/PATCH requests
  * - Handles 401 globally
- * - Strongly typed
+ * - Handles network errors and timeouts
  * - Supports GET, POST, PATCH, PUT, DELETE
  */
 
-import { Env } from "@/config/env";
+import { Platform } from "react-native";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Application from "expo-application";
+
 import {
   getJwtToken,
   getSelectedLocation,
   removeJwtToken,
 } from "@/utils/secureStorage";
-import { Alert } from "react-native";
 
-const BASE_URL = /*"http://192.168.29.37:3000";*/ Env.API_BASE_URL!;
-const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const DEFAULT_TIMEOUT_MS = 30_000;
 
-const buildUrl = (endpoint: string) => `${BASE_URL}${endpoint}`;
+// Set API_URL in your environment/configuration when needed.
+// Examples:
+// EXPO_PUBLIC_API_URL=http://192.168.1.10:3000
+// EXPO_PUBLIC_API_URL=https://your-backend.example.com
+const CONFIGURED_API_URL = //"http://192.168.29.7:3000"
+  process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || "";
+
+const DEFAULT_WEB_BACKEND = "http://localhost:3000";
 
 export class ApiError extends Error {
   status: number;
 
   constructor(status: number, message: string) {
     super(message);
-
+    this.name = "ApiError";
     this.status = status;
   }
 }
@@ -33,7 +45,121 @@ export class ApiError extends Error {
 export class UnauthorizedError extends ApiError {
   constructor(message = "Unauthorized") {
     super(401, message);
+    this.name = "UnauthorizedError";
   }
+}
+
+/* ---------------- Device information ---------------- */
+
+let cachedDeviceInfo: Record<string, unknown> | null = null;
+
+async function getDeviceInfo() {
+  if (cachedDeviceInfo) return cachedDeviceInfo;
+
+  let deviceId: string | undefined;
+
+  try {
+    if (Platform.OS === "android") {
+      deviceId = Application.getAndroidId() ?? undefined;
+    } else if (Platform.OS === "ios") {
+      deviceId = (await Application.getIosIdForVendorAsync()) ?? undefined;
+    }
+  } catch (error) {
+    console.warn("[API] Could not retrieve device ID:", error);
+  }
+
+  cachedDeviceInfo = {
+    deviceId,
+    platform:
+      Platform.OS === "android"
+        ? "ANDROID"
+        : Platform.OS === "ios"
+          ? "IOS"
+          : "WEB",
+    deviceName: Device.deviceName ?? undefined,
+    model: Device.modelName ?? undefined,
+    operatingSystem: Device.osName ?? undefined,
+    operatingSystemVersion: Device.osVersion ?? undefined,
+    appVersion: Application.nativeApplicationVersion ?? undefined,
+  };
+
+  return cachedDeviceInfo;
+}
+
+/* ---------------- Base URL resolution ---------------- */
+
+function getBaseUrl(): string {
+  // Explicit configuration takes precedence on every platform.
+  if (CONFIGURED_API_URL.trim()) {
+    return CONFIGURED_API_URL.trim().replace(/\/+$/, "");
+  }
+
+  // Browser development: use the local backend.
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined") {
+      const { hostname, origin } = window.location;
+
+      if (hostname === "localhost" || hostname === "127.0.0.1") {
+        // If the frontend is running on port 3000, avoid duplicating it.
+        if (window.location.port === "3000") return origin;
+        return DEFAULT_WEB_BACKEND;
+      }
+
+      // Production web: same-origin API.
+      return origin;
+    }
+
+    return DEFAULT_WEB_BACKEND;
+  }
+
+  // Native app: use Expo's development host IP when available.
+  const hostUri =
+    Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
+
+  if (__DEV__ && hostUri) {
+    const host = hostUri.split(":")[0];
+
+    if (host) {
+      return `http://${host}:3000`;
+    }
+  }
+
+  // Android emulator's special address for the host machine.
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:3000";
+  }
+
+  // iOS simulator fallback. Physical iPhones need a reachable LAN IP
+  // or a configured public HTTPS backend.
+  return "http://localhost:3000";
+}
+
+function buildUrl(endpoint: string): string {
+  // Allow absolute URLs for exceptional external requests.
+  if (/^https?:\/\//i.test(endpoint)) {
+    return endpoint;
+  }
+
+  const baseUrl = getBaseUrl();
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  return `${baseUrl}${path}`;
+}
+
+/* ---------------- Request helpers ---------------- */
+
+function isGoogleLogin(endpoint: string): boolean {
+  return /\/api\/auth\/google(?:\/|$|\?)/.test(endpoint);
+}
+
+function shouldSkipLocation(endpoint: string): boolean {
+  return (
+    endpoint.startsWith("/api/auth/google") ||
+    endpoint.startsWith("/api/auth/profile") ||
+    endpoint.startsWith("/api/notifications/register-token") ||
+    endpoint.startsWith("/api/upload") ||
+    endpoint.startsWith("/api/cloudinary")
+  );
 }
 
 async function request<T>(
@@ -42,8 +168,6 @@ async function request<T>(
 ): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase();
   const hasBody = ["POST", "PUT", "PATCH"].includes(method);
-
-  /* ---------------- Authentication ---------------- */
 
   const token = await getJwtToken();
 
@@ -56,32 +180,37 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  /* ---------------- Request Body ---------------- */
+  let requestBody: any;
 
-  let requestBody =
-    hasBody && options.body ? JSON.parse(options.body as string) : undefined;
+  if (hasBody && options.body != null) {
+    try {
+      requestBody =
+        typeof options.body === "string"
+          ? JSON.parse(options.body)
+          : options.body;
+    } catch {
+      throw new ApiError(400, "Invalid request body. Expected valid JSON.");
+    }
+  }
 
-  // Global preprocessing for requests with a body
-  if (
-    hasBody &&
-    !endpoint.startsWith("/api/auth/google") &&
-    !endpoint.startsWith("/api/notifications/register-token") &&
-    !endpoint.startsWith("/api/upload") &&
-    !endpoint.startsWith("/api/cloudinary")
-  ) {
-    console.log(`Passing Location to this endpoint -> ${endpoint}`);
+  /* Google login: attach device info based on the route. */
+  if (hasBody && isGoogleLogin(endpoint)) {
+    requestBody = {
+      ...(requestBody ?? {}),
+      device: await getDeviceInfo(),
+    };
+  }
 
+  /* Location enrichment for eligible write requests. */
+  if (hasBody && !shouldSkipLocation(endpoint)) {
     const location = await getSelectedLocation();
-    // this is the 1st route hits immediately after logging in, so all POST requests expect location.
-    if (endpoint === "/api/activity/activities-around" && !location) {
-      console.log(
-        `Skipping ${endpoint} request because location is not available yet.`,
-      );
+
+    if (endpoint.startsWith("/api/activity/activities-around") && !location) {
+      console.log(`[API] Skipping ${endpoint}: location is not available yet.`);
       return undefined as T;
     }
 
-    // Use selected location or sensible default if not yet chosen in web preview
-    const effectiveLocation = location || {
+    const effectiveLocation = location ?? {
       name: "Hyderabad",
       state: "Telangana",
       latitude: 17.385,
@@ -90,8 +219,8 @@ async function request<T>(
     };
 
     requestBody = {
-      ...requestBody,
-      ...(endpoint !== "/api/auth/profile" && !requestBody?.locationName
+      ...(requestBody ?? {}),
+      ...(!requestBody?.locationName && endpoint !== "/api/auth/profile"
         ? {
             locationName: effectiveLocation.name,
             locationState: effectiveLocation.state,
@@ -104,66 +233,75 @@ async function request<T>(
     };
   }
 
-  /* ---------------- Fetch ---------------- */
-
-  const fetchOptions: RequestInit = {
-    ...options,
-    method,
-    headers,
-  };
-
-  if (hasBody) {
-    fetchOptions.body = JSON.stringify(requestBody);
-  }
-
+  const url = buildUrl(endpoint);
   const controller = new AbortController();
 
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, DEFAULT_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
   try {
-    const response = await fetch(buildUrl(endpoint), {
-      ...fetchOptions,
+    console.log(`[API] ${method} ${url}`);
+
+    const response = await fetch(url, {
+      ...options,
+      method,
+      headers,
+      ...(hasBody ? { body: JSON.stringify(requestBody) } : {}),
       signal: controller.signal,
     });
-
-    /* ---------------- Parse Response ---------------- */
 
     let body: any = null;
 
     try {
       body = await response.json();
     } catch {
-      // Ignore non-JSON responses
+      // Some endpoints may return an empty or non-JSON response.
     }
-
-    /* ---------------- Error Handling ---------------- */
 
     if (response.status === 401) {
       await removeJwtToken();
-      throw new UnauthorizedError(body?.error ?? "Unauthorized");
+      throw new UnauthorizedError(
+        body?.error ?? body?.message ?? "Unauthorized",
+      );
     }
 
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        body?.error ?? body?.message ?? "Something went wrong.",
+        body?.error ?? body?.message ?? `Request failed (${response.status}).`,
       );
     }
 
     return body as T;
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
     if (error?.name === "AbortError") {
-      throw new ApiError(408, "Request timed out. Please try again.");
+      throw new ApiError(
+        408,
+        "The server took too long to respond. Please try again.",
+      );
+    }
+
+    if (
+      error instanceof TypeError ||
+      error?.message === "Network request failed" ||
+      error?.message === "Failed to fetch"
+    ) {
+      throw new ApiError(
+        0,
+        `Cannot connect to the backend (${url}). Check the server, network, and API URL configuration.`,
+      );
     }
 
     throw error;
   } finally {
     clearTimeout(timeoutId);
   }
-  /* ---------------- Parse Response ---------------- */
 }
+
+/* ---------------- Public API ---------------- */
 
 export const ApiService = {
   get<T>(endpoint: string): Promise<T> {
