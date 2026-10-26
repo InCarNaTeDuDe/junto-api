@@ -1,7 +1,7 @@
 /**
  * Junto API Service
  *
- * - Resolves API URLs from the endpoint
+ * - Uses global API URL configuration on web, Android and iOS
  * - Automatically attaches JWT
  * - Attaches device info to Google login
  * - Adds location to eligible POST/PUT/PATCH requests
@@ -11,10 +11,9 @@
  */
 
 import { Platform } from "react-native";
-import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Application from "expo-application";
-
+import { Env } from "@/config/env";
 import {
   getJwtToken,
   getSelectedLocation,
@@ -23,14 +22,35 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-// Set API_URL in your environment/configuration when needed.
-// Examples:
-// EXPO_PUBLIC_API_URL=http://192.168.1.10:3000
-// EXPO_PUBLIC_API_URL=https://your-backend.example.com
-const CONFIGURED_API_URL = //"http://192.168.29.7:3000"
-  process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || "";
+/**
+ * Resolve the API URL from the existing shared environment configuration.
+ * Uses the fallback defined in @/config/env when the environment variable
+ * is unavailable.
+ */
+function getBaseUrl(): string {
+  const url = Env.API_BASE_URL?.trim();
 
-const DEFAULT_WEB_BACKEND = "http://localhost:3000";
+  if (!url) {
+    throw new Error("[API] Env.API_BASE_URL is not configured.");
+  }
+
+  return url.replace(/\/+$/, "");
+}
+
+/**
+ * Accept relative API routes or absolute URLs.
+ */
+function buildUrl(endpoint: string): string {
+  if (/^https?:\/\//i.test(endpoint)) {
+    return endpoint;
+  }
+
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  return `${getBaseUrl()}${path}`;
+}
+
+/* ---------------- Errors ---------------- */
 
 export class ApiError extends Error {
   status: number;
@@ -51,10 +71,22 @@ export class UnauthorizedError extends ApiError {
 
 /* ---------------- Device information ---------------- */
 
-let cachedDeviceInfo: Record<string, unknown> | null = null;
+type DeviceInfo = {
+  deviceId?: string;
+  platform: string;
+  deviceName?: string;
+  model?: string;
+  operatingSystem?: string;
+  operatingSystemVersion?: string;
+  appVersion?: string;
+};
 
-async function getDeviceInfo() {
-  if (cachedDeviceInfo) return cachedDeviceInfo;
+let cachedDeviceInfo: DeviceInfo | null = null;
+
+async function getDeviceInfo(): Promise<DeviceInfo> {
+  if (cachedDeviceInfo) {
+    return cachedDeviceInfo;
+  }
 
   let deviceId: string | undefined;
 
@@ -86,81 +118,30 @@ async function getDeviceInfo() {
   return cachedDeviceInfo;
 }
 
-/* ---------------- Base URL resolution ---------------- */
+/* ---------------- Route helpers ---------------- */
 
-function getBaseUrl(): string {
-  // Explicit configuration takes precedence on every platform.
-  if (CONFIGURED_API_URL.trim()) {
-    return CONFIGURED_API_URL.trim().replace(/\/+$/, "");
-  }
-
-  // Browser development: use the local backend.
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined") {
-      const { hostname, origin } = window.location;
-
-      if (hostname === "localhost" || hostname === "127.0.0.1") {
-        // If the frontend is running on port 3000, avoid duplicating it.
-        if (window.location.port === "3000") return origin;
-        return DEFAULT_WEB_BACKEND;
-      }
-
-      // Production web: same-origin API.
-      return origin;
-    }
-
-    return DEFAULT_WEB_BACKEND;
-  }
-
-  // Native app: use Expo's development host IP when available.
-  const hostUri =
-    Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
-
-  if (__DEV__ && hostUri) {
-    const host = hostUri.split(":")[0];
-
-    if (host) {
-      return `http://${host}:3000`;
-    }
-  }
-
-  // Android emulator's special address for the host machine.
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3000";
-  }
-
-  // iOS simulator fallback. Physical iPhones need a reachable LAN IP
-  // or a configured public HTTPS backend.
-  return "http://localhost:3000";
+function getRoute(endpoint: string): string {
+  // Remove query string and hash for route comparisons.
+  return endpoint.split("?")[0].split("#")[0];
 }
-
-function buildUrl(endpoint: string): string {
-  // Allow absolute URLs for exceptional external requests.
-  if (/^https?:\/\//i.test(endpoint)) {
-    return endpoint;
-  }
-
-  const baseUrl = getBaseUrl();
-  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-
-  return `${baseUrl}${path}`;
-}
-
-/* ---------------- Request helpers ---------------- */
 
 function isGoogleLogin(endpoint: string): boolean {
-  return /\/api\/auth\/google(?:\/|$|\?)/.test(endpoint);
+  return /^\/api\/auth\/google(?:\/|$)/.test(getRoute(endpoint));
 }
 
 function shouldSkipLocation(endpoint: string): boolean {
+  const route = getRoute(endpoint);
+
   return (
-    endpoint.startsWith("/api/auth/google") ||
-    endpoint.startsWith("/api/auth/profile") ||
-    endpoint.startsWith("/api/notifications/register-token") ||
-    endpoint.startsWith("/api/upload") ||
-    endpoint.startsWith("/api/cloudinary")
+    route.startsWith("/api/auth/google") ||
+    route.startsWith("/api/auth/profile") ||
+    route.startsWith("/api/notifications/register-token") ||
+    route.startsWith("/api/upload") ||
+    route.startsWith("/api/cloudinary")
   );
 }
+
+/* ---------------- Core request ---------------- */
 
 async function request<T>(
   endpoint: string,
@@ -168,6 +149,7 @@ async function request<T>(
 ): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase();
   const hasBody = ["POST", "PUT", "PATCH"].includes(method);
+  const route = getRoute(endpoint);
 
   const token = await getJwtToken();
 
@@ -179,6 +161,8 @@ async function request<T>(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+
+  /* ---------------- Parse request body ---------------- */
 
   let requestBody: any;
 
@@ -193,20 +177,23 @@ async function request<T>(
     }
   }
 
-  /* Google login: attach device info based on the route. */
-  if (hasBody && isGoogleLogin(endpoint)) {
+  /* ---------------- Google login device information ---------------- */
+
+  if (hasBody && isGoogleLogin(route)) {
     requestBody = {
       ...(requestBody ?? {}),
       device: await getDeviceInfo(),
     };
   }
 
-  /* Location enrichment for eligible write requests. */
-  if (hasBody && !shouldSkipLocation(endpoint)) {
+  /* ---------------- Location enrichment ---------------- */
+
+  if (hasBody && !shouldSkipLocation(route)) {
     const location = await getSelectedLocation();
 
-    if (endpoint.startsWith("/api/activity/activities-around") && !location) {
-      console.log(`[API] Skipping ${endpoint}: location is not available yet.`);
+    if (route === "/api/activity/activities-around" && !location) {
+      console.log(`[API] Skipping ${route}: location is not available yet.`);
+
       return undefined as T;
     }
 
@@ -220,18 +207,24 @@ async function request<T>(
 
     requestBody = {
       ...(requestBody ?? {}),
-      ...(!requestBody?.locationName && endpoint !== "/api/auth/profile"
+
+      ...(!requestBody?.locationName && route !== "/api/auth/profile"
         ? {
             locationName: effectiveLocation.name,
             locationState: effectiveLocation.state,
           }
         : {}),
+
       latitude: requestBody?.latitude ?? effectiveLocation.latitude,
+
       longitude: requestBody?.longitude ?? effectiveLocation.longitude,
+
       isAutoDetected:
         requestBody?.isAutoDetected ?? effectiveLocation.isAutoDetected,
     };
   }
+
+  /* ---------------- Resolve URL ---------------- */
 
   const url = buildUrl(endpoint);
   const controller = new AbortController();
@@ -249,20 +242,27 @@ async function request<T>(
       signal: controller.signal,
     });
 
+    /* ---------------- Parse response ---------------- */
+
     let body: any = null;
 
     try {
       body = await response.json();
     } catch {
-      // Some endpoints may return an empty or non-JSON response.
+      // Support endpoints returning empty or non-JSON responses.
     }
+
+    /* ---------------- Handle unauthorized ---------------- */
 
     if (response.status === 401) {
       await removeJwtToken();
+
       throw new UnauthorizedError(
         body?.error ?? body?.message ?? "Unauthorized",
       );
     }
+
+    /* ---------------- Handle HTTP errors ---------------- */
 
     if (!response.ok) {
       throw new ApiError(
@@ -291,7 +291,7 @@ async function request<T>(
     ) {
       throw new ApiError(
         0,
-        `Cannot connect to the backend (${url}). Check the server, network, and API URL configuration.`,
+        `Cannot connect to the backend at ${url}. Check the API URL, server status, and network connection.`,
       );
     }
 

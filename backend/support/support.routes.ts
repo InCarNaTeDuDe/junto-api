@@ -112,6 +112,24 @@ function generateFallbackSupportAnswer(userMessage: string): string {
   }
 
   if (
+    query.includes("deal") ||
+    query.includes("marketplace") ||
+    query.includes("discount")
+  ) {
+    return "🏷️ **Local Deals Marketplace**:\n\nDiscover and offer deals for pre-owned electronics, furniture, books, and sports gear near you!\n\n👉 **[🏷️ Tap here for Local Deals](app://deals)**";
+  }
+
+  if (
+    query.includes("ask") ||
+    query.includes("nearby") ||
+    query.includes("emergency") ||
+    query.includes("blood") ||
+    query.includes("lost")
+  ) {
+    return "📢 **Ask Nearby Broadcast**:\n\nBroadcast urgent queries, lost items, blood donation requests, or neighborhood questions to people in your area!\n\n👉 **[📢 Tap here to Ask Nearby](app://ask-nearby)**";
+  }
+
+  if (
     query.includes("safety") ||
     query.includes("safe") ||
     query.includes("meet") ||
@@ -126,7 +144,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     query.includes("change location") ||
     query.includes("area")
   ) {
-    return "📍 **Changing Your Active Location**:\n\n1. Tap the location chip at the top of your **Home** or **Profile** screen.\n2. Pick from popular hubs or search for your neighborhood.\n3. Your feed and companions will automatically refresh for your selected zone!";
+    return "📍 **Changing Your Active Location**:\n\n1. Tap the direct button below to change your active city or locality:\n👉 **[📍 Tap here to Change Location](app://location-search)**\n\n2. Pick from popular hubs or search for your neighborhood.\n3. Your feed and companions will automatically refresh for your selected zone!";
   }
 
   if (

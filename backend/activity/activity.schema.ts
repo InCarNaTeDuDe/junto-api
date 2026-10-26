@@ -32,9 +32,9 @@ export const CreateActivitySchema = z.object({
 export const CreateTicketForSaleSchema = z.object({
   movieName: z.string().trim().min(2).max(150),
 
-  showDate: z.string().datetime(),
+  showDate: z.union([z.string(), z.date()]),
 
-  showTime: z.string().datetime(),
+  showTime: z.union([z.string(), z.date()]),
 
   originalPrice: z
     .number({
@@ -61,11 +61,11 @@ export const CreateTicketForSaleSchema = z.object({
   // Location
   locationName: z.string().trim().min(2).max(100),
 
-  locationState: z.string().trim().min(2).max(100),
+  locationState: z.string().trim().min(1).max(100).optional(),
 
-  latitude: z.number(),
+  latitude: z.number().optional(),
 
-  longitude: z.number(),
+  longitude: z.number().optional(),
 
   isAutoDetected: z.boolean().optional(),
 });

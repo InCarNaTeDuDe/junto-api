@@ -354,7 +354,26 @@ export async function addTicketForSale(
 
       category: ActivityCategory.MOVIES,
 
-      datetime: new Date(`${body.showDate}T${body.showTime}`),
+      datetime: (() => {
+        try {
+          const dStr =
+            typeof body.showDate === "string"
+              ? body.showDate
+              : new Date(body.showDate).toISOString();
+          const tStr =
+            typeof body.showTime === "string"
+              ? body.showTime
+              : new Date(body.showTime).toTimeString();
+          const dateOnly = dStr.includes("T") ? dStr.split("T")[0] : dStr;
+          const timeOnly = tStr.includes("T")
+            ? tStr.split("T")[1].replace("Z", "")
+            : tStr.split(" ")[0];
+          const combined = new Date(`${dateOnly}T${timeOnly.slice(0, 8)}`);
+          return isNaN(combined.getTime()) ? new Date(body.showDate) : combined;
+        } catch {
+          return new Date();
+        }
+      })(),
       cost: body.sellingPrice,
 
       maxParticipants: body.quantity,
@@ -364,9 +383,9 @@ export async function addTicketForSale(
       tags: ["MOVIES", body.movieName, "TICKET_SALE"],
 
       locationName: body.locationName,
-      locationState: body.locationState,
-      latitude: body.latitude,
-      longitude: body.longitude,
+      locationState: body.locationState || "Telangana",
+      latitude: body.latitude || 17.4375,
+      longitude: body.longitude || 78.3853,
       isAutoDetected: body.isAutoDetected ?? false,
     });
 

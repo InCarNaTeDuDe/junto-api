@@ -69,6 +69,7 @@ interface AppConfigContextType {
     featureKey: keyof AppConfig,
     featureName?: string,
   ) => boolean;
+  clearFeatureAlert: () => void;
   otaStatus: { isChecking: boolean; isAvailable: boolean };
   checkOtaUpdates: () => Promise<void>;
 }
@@ -215,6 +216,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
         updateConfig,
         isFeatureEnabled,
         checkFeatureOrAlert,
+        clearFeatureAlert: () => setDisabledModalInfo(null),
         otaStatus,
         checkOtaUpdates,
       }}

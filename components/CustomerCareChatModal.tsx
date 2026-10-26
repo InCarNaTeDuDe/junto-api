@@ -22,6 +22,7 @@ import FormattedMarkdownText from "@/components/FormattedMarkdownText";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/context/AuthContext";
+import { useAppConfig } from "@/context/AppConfigContext";
 import {
   saveSupportChatMessages,
   getSupportChatMessages,
@@ -79,6 +80,14 @@ function detectActionCards(text: string): InAppActionCard[] {
         icon = "pricetag";
         color = "#F59E0B";
         sub = "Open pre-owned marketplace";
+      } else if (url.includes("asknearby") || url.includes("ask-nearby")) {
+        icon = "megaphone";
+        color = "#EC4899";
+        sub = "Broadcast urgent requests to neighbors";
+      } else if (url.includes("location")) {
+        icon = "location";
+        color = "#06B6D4";
+        sub = "Change active neighborhood or city";
       }
 
       cards.push({ label: rawLabel || "Open Screen", sub, url, icon, color });
@@ -115,8 +124,11 @@ function detectActionCards(text: string): InAppActionCard[] {
   } else if (
     (lower.includes("sell") ||
       lower.includes("swap") ||
-      lower.includes("list")) &&
-    lower.includes("ticket")
+      lower.includes("list") ||
+      lower.includes("post")) &&
+    (lower.includes("ticket") ||
+      lower.includes("movie") ||
+      lower.includes("event"))
   ) {
     cards.push({
       label: "Sell / Swap Ticket",
@@ -129,7 +141,8 @@ function detectActionCards(text: string): InAppActionCard[] {
     lower.includes("post activity") ||
     lower.includes("create daymate") ||
     lower.includes("find buddy") ||
-    lower.includes("hangout")
+    lower.includes("hangout") ||
+    lower.includes("daymate")
   ) {
     cards.push({
       label: "Create DayMate Activity",
@@ -137,6 +150,42 @@ function detectActionCards(text: string): InAppActionCard[] {
       url: "app://add-daymate",
       icon: "people",
       color: "#8B5CF6",
+    });
+  } else if (lower.includes("service") || lower.includes("technician")) {
+    cards.push({
+      label: "Browse Local Services",
+      sub: "Find verified local technicians & pros",
+      url: "app://services",
+      icon: "construct",
+      color: "#3B82F6",
+    });
+  } else if (lower.includes("deal") || lower.includes("marketplace")) {
+    cards.push({
+      label: "Local Deals Marketplace",
+      sub: "Discover and offer deals for pre-owned items",
+      url: "app://deals",
+      icon: "pricetag",
+      color: "#F59E0B",
+    });
+  } else if (
+    lower.includes("ask nearby") ||
+    lower.includes("emergency") ||
+    lower.includes("lost")
+  ) {
+    cards.push({
+      label: "Ask Nearby",
+      sub: "Broadcast urgent queries to neighbors",
+      url: "app://ask-nearby",
+      icon: "megaphone",
+      color: "#EC4899",
+    });
+  } else if (lower.includes("location") || lower.includes("change city")) {
+    cards.push({
+      label: "Change Location",
+      sub: "Select active hub or city",
+      url: "app://location-search",
+      icon: "location",
+      color: "#06B6D4",
     });
   }
 
@@ -160,6 +209,7 @@ export default function CustomerCareChatModal({
 }) {
   const { theme: t, isDark } = useTheme();
   const { user, isLoggedIn } = useAuthContext();
+  const { clearFeatureAlert } = useAppConfig();
 
   const [messages, setMessages] = useState<SupportChatMessage[]>([
     DEFAULT_WELCOME_MESSAGE,
@@ -222,14 +272,21 @@ export default function CustomerCareChatModal({
   }, [user?.id, isLoggedIn]);
 
   const quickPrompts = [
-    "🚗 How do I post a ride on RideMate?",
-    "🎟️ How to post a ticket for swap?",
-    "👥 How do I find a DayMate companion?",
-    "🛡️ Safety guidelines for meeting people",
-    "📍 How do I change my location?",
+    "🚗 Help me post a ride",
+    "🎟️ Help posting a movie ticket",
+    "🔍 Find available rides",
+    "👥 Find a DayMate companion",
+    "🔧 Browse local services",
+    "🏷️ Search deals & marketplace",
+    "📢 Ask nearby neighbors",
+    "📍 Change my location",
+    "🛡️ Safety guidelines",
   ];
 
   const handleActionNavigation = (rawUrl: string) => {
+    // Clear any previous maintenance/feature popup from app config so it never bleeds into new screens
+    clearFeatureAlert?.();
+
     let target = rawUrl;
     if (rawUrl.startsWith("app://")) {
       const path = rawUrl.replace("app://", "");
@@ -241,14 +298,16 @@ export default function CustomerCareChatModal({
         target = "/(screens)/add-daymate";
       } else if (path === "deals") {
         target = "/(screens)/deals";
-      } else if (path === "services") {
-        target = "/(screens)/localservices";
+      } else if (path === "services" || path === "localservices") {
+        target = "/(screens)/services";
       } else if (path === "glamup") {
         target = "/(screens)/glamup";
       } else if (path === "profile") {
         target = "/(tabs)/profile";
-      } else if (path === "asknearby") {
-        target = "/(screens)/add-daymate?category=ASK_NEARBY";
+      } else if (path === "asknearby" || path === "ask-nearby") {
+        target = "/(screens)/ask-nearby";
+      } else if (path === "location-search" || path === "location") {
+        target = "/(screens)/location-search";
       } else {
         target = `/(screens)/${path}`;
       }

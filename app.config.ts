@@ -72,6 +72,7 @@ const config: ExpoConfig = {
     eas: {
       projectId: "abd87e6e-ee7a-4967-a6b0-9866b21eebd6",
     },
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
     router: {
       origin:
         "https://ais-dev-do6tm66cxhkyor7idpd6ap-692488307747.asia-east1.run.app",
