@@ -11,7 +11,7 @@ import {
   Modal,
   Image,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimeRow } from "@/components/AppDatePicker";
 import { useStyles } from "@/hooks/useStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { ApiService } from "@/services/api";
@@ -787,103 +787,34 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
         </View>
 
         {/* 2. When are you free? */}
-        <View>
-          <View style={styles.dateControlRow}>
-            {/* Date Control */}
-            <TouchableOpacity
-              style={[
-                styles.dateTimeHalfCard,
-                showDatePicker && styles.dateTimeHalfCardActive,
-              ]}
-              onPress={() => {
-                setSelectedTimeId("pick_date");
-                setShowDatePicker((prev) => !prev);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.dateTimeIconCircle}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={primary || "#8B5CF6"}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dateTimeLabel}>Pick Date</Text>
-                <Text style={styles.dateTimeValue}>
-                  {formatDate(meetingDate)}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-down"
-                size={14}
-                color={sub || "#94A3B8"}
-              />
-            </TouchableOpacity>
-
-            {/* Time Control */}
-            <TouchableOpacity
-              style={[
-                styles.dateTimeHalfCard,
-                showTimePicker && styles.dateTimeHalfCardActive,
-              ]}
-              onPress={() => {
-                setSelectedTimeId("pick_date");
-                setShowTimePicker((prev) => !prev);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.dateTimeIconCircle}>
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color={primary || "#8B5CF6"}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dateTimeLabel}>Pick Time</Text>
-                <Text style={styles.dateTimeValue}>
-                  {formatTime(meetingDate)}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-down"
-                size={14}
-                color={sub || "#94A3B8"}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* DateTimePickers side-by-side */}
-          {(showDatePicker || showTimePicker || Platform.OS === "web") && (
-            <View style={styles.pickersRow}>
-              {(showDatePicker || Platform.OS === "web") && (
-                <View style={styles.pickerHalf}>
-                  <Text style={styles.pickerLabel}>Date</Text>
-                  <DateTimePicker
-                    value={meetingDate}
-                    mode="date"
-                    display="default"
-                    onChange={onDateChange}
-                    themeVariant={isDark ? "dark" : "light"}
-                  />
-                </View>
-              )}
-
-              {(showTimePicker || Platform.OS === "web") && (
-                <View style={styles.pickerHalf}>
-                  <Text style={styles.pickerLabel}>Time</Text>
-                  <DateTimePicker
-                    value={meetingDate}
-                    mode="time"
-                    display="default"
-                    onChange={onTimeChange}
-                    themeVariant={isDark ? "dark" : "light"}
-                  />
-                </View>
-              )}
-            </View>
-          )}
+        <View style={{ marginBottom: 16 }}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "800",
+              color: text || "#0F172A",
+              marginBottom: 8,
+              letterSpacing: 0.2,
+            }}
+          >
+            When are you free?
+          </Text>
+          <AppDateTimeRow
+            dateValue={meetingDate}
+            timeValue={meetingDate}
+            onDateChange={(d) => {
+              const next = new Date(meetingDate);
+              next.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              setMeetingDate(next);
+            }}
+            onTimeChange={(t) => {
+              const next = new Date(meetingDate);
+              next.setHours(t.getHours(), t.getMinutes(), 0, 0);
+              setMeetingDate(next);
+            }}
+            minimumDate={new Date()}
+            accentColor={primary || "#8B5CF6"}
+          />
         </View>
 
         {/* 3. How Many Mates Needed? */}

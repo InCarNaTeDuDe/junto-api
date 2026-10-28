@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimeRow } from "@/components/AppDatePicker";
 import { useRouter } from "expo-router";
 import {
   SafeAreaView,
@@ -82,8 +82,6 @@ export default function SellTicketScreen({
     d.setHours(19, 0, 0, 0);
     return d;
   });
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const origPriceNum = parseFloat(originalPrice.replace(/[^0-9.]/g, "")) || 0;
@@ -100,16 +98,6 @@ export default function SellTicketScreen({
     else if (onClose) onClose();
     else if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
-  };
-
-  const onDateChange = (_: any, selected?: Date) => {
-    if (Platform.OS !== "web") setIsDatePickerOpen(false);
-    if (selected) setShowDate(selected);
-  };
-
-  const onTimeChange = (_: any, selected?: Date) => {
-    if (Platform.OS !== "web") setIsTimePickerOpen(false);
-    if (selected) setShowTime(selected);
   };
 
   const handleSubmit = async () => {
@@ -381,140 +369,14 @@ export default function SellTicketScreen({
             <Text style={[styles.sectionHeading, { color: t.text }]}>
               Date & Time
             </Text>
-            <View style={styles.dateTimeRow}>
-              {/* Pick Date */}
-              <TouchableOpacity
-                onPress={() => setIsDatePickerOpen((prev) => !prev)}
-                style={[
-                  styles.dateTimeCard,
-                  {
-                    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: isDatePickerOpen ? "#E11D48" : t.border,
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.dateTimeIconBox,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(225, 29, 72, 0.2)"
-                        : "#FFE4E6",
-                    },
-                  ]}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#E11D48" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.dateTimeLabel, { color: t.sub }]}>
-                    Date
-                  </Text>
-                  <Text style={[styles.dateTimeValue, { color: t.text }]}>
-                    {showDate.toLocaleDateString("en-IN", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={14} color={t.sub} />
-              </TouchableOpacity>
-
-              {/* Pick Time */}
-              <TouchableOpacity
-                onPress={() => setIsTimePickerOpen((prev) => !prev)}
-                style={[
-                  styles.dateTimeCard,
-                  {
-                    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: isTimePickerOpen ? "#E11D48" : t.border,
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.dateTimeIconBox,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(225, 29, 72, 0.2)"
-                        : "#FFE4E6",
-                    },
-                  ]}
-                >
-                  <Ionicons name="time-outline" size={18} color="#E11D48" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.dateTimeLabel, { color: t.sub }]}>
-                    Time
-                  </Text>
-                  <Text style={[styles.dateTimeValue, { color: t.text }]}>
-                    {showTime.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={14} color={t.sub} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Inline Pickers for Web / Expanded */}
-            {(isDatePickerOpen ||
-              isTimePickerOpen ||
-              Platform.OS === "web") && (
-              <View style={styles.pickersContainer}>
-                {(isDatePickerOpen || Platform.OS === "web") && (
-                  <View
-                    style={[
-                      styles.pickerBox,
-                      {
-                        backgroundColor: isDark
-                          ? "rgba(255,255,255,0.04)"
-                          : t.card,
-                        borderColor: t.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.pickerBoxLabel, { color: t.sub }]}>
-                      Select Date
-                    </Text>
-                    <DateTimePicker
-                      value={showDate}
-                      mode="date"
-                      display="default"
-                      onChange={onDateChange}
-                      themeVariant={isDark ? "dark" : "light"}
-                    />
-                  </View>
-                )}
-                {(isTimePickerOpen || Platform.OS === "web") && (
-                  <View
-                    style={[
-                      styles.pickerBox,
-                      {
-                        backgroundColor: isDark
-                          ? "rgba(255,255,255,0.04)"
-                          : t.card,
-                        borderColor: t.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.pickerBoxLabel, { color: t.sub }]}>
-                      Select Time
-                    </Text>
-                    <DateTimePicker
-                      value={showTime}
-                      mode="time"
-                      display="default"
-                      onChange={onTimeChange}
-                      themeVariant={isDark ? "dark" : "light"}
-                    />
-                  </View>
-                )}
-              </View>
-            )}
+            <AppDateTimeRow
+              dateValue={showDate}
+              timeValue={showTime}
+              onDateChange={setShowDate}
+              onTimeChange={setShowTime}
+              minimumDate={new Date()}
+              accentColor="#E11D48"
+            />
           </View>
 
           {/* 3. Original Price & Selling Price */}

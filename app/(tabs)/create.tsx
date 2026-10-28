@@ -85,8 +85,9 @@ const OPTIONS: OptionDef[] = [
   // },
   {
     id: "ask_nearby",
-    title: "Ask Something Nearby",
-    description: "Ask about crowds, entry fees, or bar recommendations.",
+    title: "Ask Nearby Help",
+    description:
+      "Ask about crowds, entry fees, emergency requests, or recommendations.",
     icon: "megaphone",
     key: "question",
   },

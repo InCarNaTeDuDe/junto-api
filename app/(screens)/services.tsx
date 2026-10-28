@@ -14,7 +14,7 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimeRow } from "@/components/AppDatePicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   SafeAreaView,
@@ -1898,81 +1898,17 @@ export default function ServicesScreen() {
 
                 {/* Custom Date & Time Controls */}
                 {bookingSlotPreset === "custom" && (
-                  <View style={styles.customDateRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.customDateTimeBtn,
-                        { borderColor: border },
-                      ]}
-                      onPress={() => setShowDatePicker(!showDatePicker)}
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={15}
-                        color="#9333EA"
-                      />
-                      <Text
-                        style={[
-                          styles.customDateTimeText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {formatDate(serviceDate)}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.customDateTimeBtn,
-                        { borderColor: border },
-                      ]}
-                      onPress={() => setShowTimePicker(!showTimePicker)}
-                    >
-                      <Ionicons name="time-outline" size={15} color="#0284C7" />
-                      <Text
-                        style={[
-                          styles.customDateTimeText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {formatTime(serviceTime)}
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={{ marginVertical: 8 }}>
+                    <AppDateTimeRow
+                      dateValue={serviceDate}
+                      timeValue={serviceTime}
+                      onDateChange={setServiceDate}
+                      onTimeChange={setServiceTime}
+                      minimumDate={new Date()}
+                      accentColor="#9333EA"
+                    />
                   </View>
                 )}
-
-                {/* Date / Time Pickers */}
-                {bookingSlotPreset === "custom" &&
-                  (showDatePicker || Platform.OS === "web") && (
-                    <View style={[styles.pickerBox, { borderColor: border }]}>
-                      <DateTimePicker
-                        value={serviceDate}
-                        mode="date"
-                        display="default"
-                        onChange={(_, d) => {
-                          if (Platform.OS !== "web") setShowDatePicker(false);
-                          if (d) setServiceDate(d);
-                        }}
-                        themeVariant={isDark ? "dark" : "light"}
-                      />
-                    </View>
-                  )}
-
-                {bookingSlotPreset === "custom" &&
-                  (showTimePicker || Platform.OS === "web") && (
-                    <View style={[styles.pickerBox, { borderColor: border }]}>
-                      <DateTimePicker
-                        value={serviceTime}
-                        mode="time"
-                        display="default"
-                        onChange={(_, t) => {
-                          if (Platform.OS !== "web") setShowTimePicker(false);
-                          if (t) setServiceTime(t);
-                        }}
-                        themeVariant={isDark ? "dark" : "light"}
-                      />
-                    </View>
-                  )}
 
                 {/* Client Contact Info */}
                 <Text

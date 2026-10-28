@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDateTimeRow } from "@/components/AppDatePicker";
 import { useRouter } from "expo-router";
 import {
   SafeAreaView,
@@ -2433,143 +2433,18 @@ export default function LocalDealsScreen() {
             <Text style={[styles.offerSectionLabel, { color: textPrimary }]}>
               Preferred Inspection &amp; Pickup Time:
             </Text>
-            <View style={styles.dateTimeRow}>
-              {/* Pickup Date Selector */}
-              <TouchableOpacity
-                style={[
-                  styles.dateTimeCard,
-                  {
-                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                    borderColor: border,
-                  },
-                ]}
-                onPress={() => setShowDatePicker(!showDatePicker)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.dateTimeContent}>
-                  <View
-                    style={[
-                      styles.dateTimeIconCircle,
-                      { backgroundColor: isDark ? "#10B98125" : "#ECFDF5" },
-                    ]}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={16}
-                      color="#10B981"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
-                      Pickup Date
-                    </Text>
-                    <Text
-                      style={[styles.dateTimeValue, { color: textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {formatDate(pickupDate)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-down" size={14} color={textMute} />
-              </TouchableOpacity>
-
-              {/* Pickup Time Selector */}
-              <TouchableOpacity
-                style={[
-                  styles.dateTimeCard,
-                  {
-                    backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-                    borderColor: border,
-                  },
-                ]}
-                onPress={() => setShowTimePicker(!showTimePicker)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.dateTimeContent}>
-                  <View
-                    style={[
-                      styles.dateTimeIconCircle,
-                      { backgroundColor: isDark ? "#F59E0B25" : "#FEF3C7" },
-                    ]}
-                  >
-                    <Ionicons name="time-outline" size={16} color="#F59E0B" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dateTimeLabel, { color: textMute }]}>
-                      Slot
-                    </Text>
-                    <Text
-                      style={[styles.dateTimeValue, { color: textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {formatTime(pickupTime)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-down" size={14} color={textMute} />
-              </TouchableOpacity>
+            <View style={{ marginVertical: 8 }}>
+              <AppDateTimeRow
+                dateValue={pickupDate}
+                timeValue={pickupTime}
+                onDateChange={setPickupDate}
+                onTimeChange={setPickupTime}
+                minimumDate={new Date()}
+                accentColor="#10B981"
+                dateLabel="Pickup Date"
+                timeLabel="Time Slot"
+              />
             </View>
-
-            {/* Date Picker Modal / Inline Controls */}
-            {(showDatePicker || Platform.OS === "web") && (
-              <View
-                style={[
-                  styles.pickerBox,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <View style={styles.pickerBoxHeader}>
-                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
-                    📅 Select Preferred Pickup Date
-                  </Text>
-                  {Platform.OS !== "web" && (
-                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                      <Text style={{ color: "#10B981", fontWeight: "700" }}>
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <DateTimePicker
-                  value={pickupDate}
-                  mode="date"
-                  display="default"
-                  onChange={onDateChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-            )}
-
-            {/* Time Picker Modal / Inline Controls */}
-            {(showTimePicker || Platform.OS === "web") && (
-              <View
-                style={[
-                  styles.pickerBox,
-                  { backgroundColor: cardBg, borderColor: border },
-                ]}
-              >
-                <View style={styles.pickerBoxHeader}>
-                  <Text style={[styles.pickerBoxTitle, { color: textPrimary }]}>
-                    ⏰ Select Preferred Time Slot
-                  </Text>
-                  {Platform.OS !== "web" && (
-                    <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                      <Text style={{ color: "#10B981", fontWeight: "700" }}>
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <DateTimePicker
-                  value={pickupTime}
-                  mode="time"
-                  display="default"
-                  onChange={onTimeChange}
-                  themeVariant={isDark ? "dark" : "light"}
-                />
-              </View>
-            )}
 
             <TouchableOpacity
               style={styles.sendOfferConfirmBtn}

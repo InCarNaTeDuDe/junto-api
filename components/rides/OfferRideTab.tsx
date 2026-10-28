@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { AppDatePicker } from "@/components/AppDatePicker";
 import { ApiService } from "@/services/api";
 
 interface OfferRideTabProps {
@@ -485,74 +485,25 @@ export default function OfferRideTab({
           </View>
         </View>
 
-        {/* Date */}
-        <TouchableOpacity
-          style={styles.cardContainerRow}
-          onPress={openDatePicker}
-          activeOpacity={0.8}
-        >
-          <View style={styles.purpleIconSquare}>
-            <Ionicons name="calendar" size={18} color="#C084FC" />
-          </View>
-
-          <View style={styles.middleTextWrap}>
-            <Text style={styles.cardLabel}>Date</Text>
-            <Text style={styles.cardValueText}>
-              {formatDateOnly(departureDate)}
-            </Text>
-          </View>
-
-          <Ionicons
-            name={showDatePicker ? "chevron-up" : "chevron-forward"}
-            size={18}
-            color="#64748B"
-          />
-        </TouchableOpacity>
-
-        {showDatePicker && Platform.OS !== "web" && (
-          <DateTimePicker
-            value={departureDate}
+        {/* Date & Time */}
+        <View style={{ gap: 12 }}>
+          <AppDatePicker
             mode="date"
-            display="default"
+            value={departureDate}
+            onChange={setDepartureDate}
             minimumDate={new Date()}
-            onChange={onDateChange}
-            themeVariant={isDark ? "dark" : "light"}
+            accentColor="#C084FC"
+            label="Departure Date"
           />
-        )}
 
-        {/* Time */}
-        <TouchableOpacity
-          style={styles.cardContainerRow}
-          onPress={openTimePicker}
-          activeOpacity={0.8}
-        >
-          <View style={styles.purpleIconSquare}>
-            <Ionicons name="time-outline" size={18} color="#C084FC" />
-          </View>
-
-          <View style={styles.middleTextWrap}>
-            <Text style={styles.cardLabel}>Departure Time</Text>
-            <Text style={styles.cardValueText}>
-              {formatTimeOnly(departureTime)}
-            </Text>
-          </View>
-
-          <Ionicons
-            name={showTimePicker ? "chevron-up" : "chevron-forward"}
-            size={18}
-            color="#64748B"
-          />
-        </TouchableOpacity>
-
-        {showTimePicker && Platform.OS !== "web" && (
-          <DateTimePicker
-            value={departureTime}
+          <AppDatePicker
             mode="time"
-            display="default"
-            onChange={onTimeChange}
-            themeVariant={isDark ? "dark" : "light"}
+            value={departureTime}
+            onChange={setDepartureTime}
+            accentColor="#C084FC"
+            label="Departure Time"
           />
-        )}
+        </View>
 
         {/* 5. Vehicle Type Card */}
         <View style={styles.cardContainer}>
