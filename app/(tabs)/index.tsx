@@ -27,7 +27,8 @@ import heroSwap from "@/assets/hero-swap.png";
 import heroMates from "@/assets/hero-mates.png";
 import heroHelp from "@/assets/hero-help.png";
 import { requestCurrentLocation } from "@/services/locationServices";
-import { router } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { socket } from "@/services/socket";
 import { useLocation } from "@/context/LocationContext";
 import { ApiService } from "@/services/api";
 import { useTabRefresh } from "@/context/TabRefreshContext";
@@ -721,8 +722,36 @@ export default function Home() {
     }
   }, []);
 
+  const searchParams = useLocalSearchParams<{ refresh?: string }>();
+
   useEffect(() => {
     loadActivities();
+  }, [loadActivities]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadActivities();
+    }, [loadActivities]),
+  );
+
+  useEffect(() => {
+    if (searchParams.refresh) {
+      loadActivities();
+    }
+  }, [searchParams.refresh, loadActivities]);
+
+  useEffect(() => {
+    const handleSocketUpdate = () => {
+      loadActivities();
+    };
+    socket.on("activity_created", handleSocketUpdate);
+    socket.on("activities_updated", handleSocketUpdate);
+    socket.on("ticket_created", handleSocketUpdate);
+    return () => {
+      socket.off("activity_created", handleSocketUpdate);
+      socket.off("activities_updated", handleSocketUpdate);
+      socket.off("ticket_created", handleSocketUpdate);
+    };
   }, [loadActivities]);
 
   useEffect(() => {

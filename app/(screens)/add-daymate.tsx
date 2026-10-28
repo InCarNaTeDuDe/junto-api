@@ -678,10 +678,14 @@ const DayMatesForm: React.FC<DayMatesFormProps> = ({
       if (typeof window !== "undefined" && window.alert) {
         window.alert(msg);
       } else {
-        Alert.alert("Success", msg);
+        Alert.alert("Activity Posted! 🚀", msg);
       }
 
       onSubmitSuccess?.(payload);
+      router.replace({
+        pathname: "/(tabs)",
+        params: { refresh: Date.now().toString() },
+      });
     } catch {
       Alert.alert("Error", "Failed to submit request. Please try again.");
     } finally {

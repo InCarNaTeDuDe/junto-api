@@ -125,6 +125,11 @@ export async function createActivity(
   //   organizer.id,
   // );
 
+  if (io) {
+    io.emit("activity_created", activity);
+    io.emit("activities_updated");
+  }
+
   return activity;
 }
 
@@ -235,7 +240,7 @@ export async function popularActivitiesAround(locationFilter?: {
       organizerId: a.organizerId,
       activityEmoji: a.activityEmoji,
       image: a.image,
-      createdAt: a.createdAt || a.datetime,
+      createdAt: a.datetime || a.createdAt,
       latitude: a.latitude,
       longitude: a.longitude,
     };
@@ -456,6 +461,12 @@ export async function addTicketForSale(
       },
       organizer.id,
     ).catch((e) => console.error("Error broadcasting ticket push:", e));
+
+    if (io) {
+      io.emit("activity_created", activity);
+      io.emit("activities_updated");
+      io.emit("ticket_created", activity);
+    }
 
     return activity;
   } catch (error) {

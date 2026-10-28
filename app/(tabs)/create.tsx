@@ -292,13 +292,46 @@ export default function CreateScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           {selected === "day_mates" && (
-            <DayMatesForm from="create" onBack={back} onClose={close} />
+            <DayMatesForm
+              from="create"
+              onBack={back}
+              onClose={close}
+              onSubmitSuccess={() => {
+                setSelected(null);
+                router.replace({
+                  pathname: "/(tabs)",
+                  params: { refresh: Date.now().toString() },
+                });
+              }}
+            />
           )}
           {selected === "sell_ticket" && (
-            <SellTicketForm from="create" onBack={back} onClose={close} />
+            <SellTicketForm
+              from="create"
+              onBack={back}
+              onClose={close}
+              onSubmitSuccess={() => {
+                setSelected(null);
+                router.replace({
+                  pathname: "/(tabs)",
+                  params: { refresh: Date.now().toString() },
+                });
+              }}
+            />
           )}
           {selected === "ask_nearby" && (
-            <AskNearbyScreen from="create" onBack={back} onClose={close} />
+            <AskNearbyScreen
+              from="create"
+              onBack={back}
+              onClose={close}
+              onSubmitSuccess={() => {
+                setSelected(null);
+                router.replace({
+                  pathname: "/(tabs)",
+                  params: { refresh: Date.now().toString() },
+                });
+              }}
+            />
           )}
         </ScrollView>
       )}

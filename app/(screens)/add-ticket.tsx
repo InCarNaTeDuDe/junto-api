@@ -114,12 +114,39 @@ export default function SellTicketScreen({
 
   const handleSubmit = async () => {
     const trimmedTitle = movieName.trim();
+    const missing: string[] = [];
+
     if (!trimmedTitle) {
-      Alert.alert("Movie Name Required", "Please enter the movie name.");
-      return;
+      missing.push("movie name");
     }
-    if (sellPriceNum <= 0) {
-      Alert.alert("Selling Price Required", "Please enter your selling price.");
+    if (!showDate) {
+      missing.push("date");
+    }
+    if (!showTime) {
+      missing.push("time");
+    }
+    if (!originalPrice.trim() || origPriceNum <= 0) {
+      missing.push("original amount");
+    }
+    if (!sellingPrice.trim() || sellPriceNum <= 0) {
+      missing.push("selling amount");
+    }
+
+    if (missing.length > 0) {
+      let missingText = "";
+      if (missing.length === 1) {
+        missingText = missing[0];
+      } else if (missing.length === 2) {
+        missingText = `${missing[0]} & ${missing[1]}`;
+      } else {
+        missingText = `${missing.slice(0, -1).join(", ")} & ${missing[missing.length - 1]}`;
+      }
+
+      const alertMsg = `Please add "${missingText}"`;
+      if (typeof window !== "undefined" && window.alert) {
+        window.alert(alertMsg);
+      }
+      Alert.alert("Missing Details", alertMsg);
       return;
     }
 
@@ -183,19 +210,32 @@ export default function SellTicketScreen({
         { type: "ticket" },
       );
 
-      Alert.alert(
-        "Ticket Listed! 🎟️",
-        `Your movie ticket for "${trimmedTitle}" is listed at ₹${sellPriceNum}. People nearby can see it!`,
-        [
-          {
-            text: "Done",
-            onPress: () => {
-              if (onSubmitSuccess) onSubmitSuccess(payload);
-              handleClose();
-            },
+      const successMsg = `🎉 Your movie ticket for "${trimmedTitle}" has been listed successfully!`;
+      if (typeof window !== "undefined" && window.alert) {
+        window.alert(successMsg);
+      }
+
+      Alert.alert("Ticket Listed Successfully! 🎟️", successMsg, [
+        {
+          text: "OK",
+          onPress: () => {
+            if (onSubmitSuccess) onSubmitSuccess(payload);
+            router.replace({
+              pathname: "/(tabs)",
+              params: { refresh: Date.now().toString() },
+            });
           },
-        ],
-      );
+        },
+      ]);
+
+      // Auto-navigate to homescreen with refresh parameter
+      if (onSubmitSuccess) {
+        onSubmitSuccess(payload);
+      }
+      router.replace({
+        pathname: "/(tabs)",
+        params: { refresh: Date.now().toString() },
+      });
     } catch (err: any) {
       Alert.alert(
         "Listing Failed",
