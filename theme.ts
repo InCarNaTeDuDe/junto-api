@@ -48,23 +48,23 @@ export const JuntoNowColors = {
   },
 
   service: {
-    tint: "#9333EA",
-    tintDark: "#C084FC",
+    tint: "#6366F1",
+    tintDark: "#818CF8",
     light: {
-      bg: "#FAF5FF",
-      border: "#F3E8FF",
-      iconBg: "#F3E8FF",
-      btnBg: "#F3E8FF",
-      btnText: "#9333EA",
+      bg: "#EEF2FF",
+      border: "#E0E7FF",
+      iconBg: "#E0E7FF",
+      btnBg: "#E0E7FF",
+      btnText: "#6366F1",
       title: "#0F172A",
       sub: "#64748B",
     },
     dark: {
-      bg: "rgba(168, 85, 247, 0.12)",
-      border: "rgba(168, 85, 247, 0.28)",
-      iconBg: "rgba(168, 85, 247, 0.22)",
-      btnBg: "rgba(168, 85, 247, 0.22)",
-      btnText: "#C084FC",
+      bg: "rgba(99, 102, 241, 0.12)",
+      border: "rgba(99, 102, 241, 0.28)",
+      iconBg: "rgba(99, 102, 241, 0.22)",
+      btnBg: "rgba(99, 102, 241, 0.22)",
+      btnText: "#818CF8",
       title: "#F8FAFC",
       sub: "rgba(255, 255, 255, 0.7)",
     },
@@ -94,23 +94,23 @@ export const JuntoNowColors = {
   },
 
   company: {
-    tint: "#2563EB",
-    tintDark: "#60A5FA",
+    tint: "#A855F7",
+    tintDark: "#C084FC",
     light: {
-      bg: "#EFF6FF",
-      border: "#DBEAFE",
-      iconBg: "#DBEAFE",
-      btnBg: "#DBEAFE",
-      btnText: "#2563EB",
+      bg: "#FAF5FF",
+      border: "#F3E8FF",
+      iconBg: "#F3E8FF",
+      btnBg: "#F3E8FF",
+      btnText: "#A855F7",
       title: "#0F172A",
       sub: "#64748B",
     },
     dark: {
-      bg: "rgba(37, 99, 235, 0.12)",
-      border: "rgba(37, 99, 235, 0.28)",
-      iconBg: "rgba(37, 99, 235, 0.22)",
-      btnBg: "rgba(37, 99, 235, 0.22)",
-      btnText: "#60A5FA",
+      bg: "rgba(168, 85, 247, 0.12)",
+      border: "rgba(168, 85, 247, 0.28)",
+      iconBg: "rgba(168, 85, 247, 0.22)",
+      btnBg: "rgba(168, 85, 247, 0.22)",
+      btnText: "#C084FC",
       title: "#F8FAFC",
       sub: "rgba(255, 255, 255, 0.7)",
     },
@@ -245,9 +245,9 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
   {
     id: "company",
     icon: "people",
-    title: "Need Company",
-    subtitle: "6 people looking for something fun",
-    btn: "Find People",
+    title: "Find Mate",
+    subtitle: "Connect with people nearby",
+    btn: "Find Mates",
     colorKey: "company",
     route: "/(screens)/add-daymate",
   },
@@ -277,6 +277,13 @@ export function getJuntoNowFeatureColors(
     colorKey === "sell_tickets"
   ) {
     colorKey = "ticket";
+  }
+  if (
+    colorKey === "find_mate" ||
+    colorKey === "day_mates" ||
+    colorKey === "dayMate"
+  ) {
+    colorKey = "company";
   }
 
   const config =

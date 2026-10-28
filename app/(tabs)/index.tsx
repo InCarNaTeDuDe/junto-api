@@ -854,8 +854,8 @@ export default function Home() {
         if (sortBy === "title") {
           return (a.title || "").localeCompare(b.title || "");
         }
-        const timeA = new Date(a.datetime || a.createdAt || 0).getTime();
-        const timeB = new Date(b.datetime || b.createdAt || 0).getTime();
+        const timeA = new Date(a.createdAt || a.datetime || 0).getTime();
+        const timeB = new Date(b.createdAt || b.datetime || 0).getTime();
         return timeB - timeA;
       });
   }, [userActs, q, selectedChip, categoryFilter, sortBy]);

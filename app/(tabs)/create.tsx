@@ -29,7 +29,7 @@ import { router } from "expo-router";
 
 import { useTheme } from "@/hooks/useTheme";
 import { ActivityHeader } from "@/components/ActivityHeader";
-import type { Theme } from "@/theme";
+import { JuntoNowColors, type Theme } from "@/theme";
 import { ApiService } from "@/services/api";
 import { useLocation } from "@/context/LocationContext";
 import DayMatesForm from "../(screens)/add-daymate";
@@ -111,18 +111,28 @@ const URGENCY_LEVELS = ["Normal Info", "Urgent Broadcast"];
  */
 function getPalettes(t: Theme, isDark: boolean) {
   const soft = (hex: string, a = isDark ? 0.18 : 0.12) => hexA(hex, a);
+  const companyTint = isDark
+    ? JuntoNowColors.company.tintDark
+    : JuntoNowColors.company.tint;
+  const ticketTint = isDark
+    ? JuntoNowColors.ticket.tintDark
+    : JuntoNowColors.ticket.tint;
+  const helpTint = isDark
+    ? JuntoNowColors.help.tintDark
+    : JuntoNowColors.help.tint;
+
   return {
     dayMate: {
-      bg: soft(t.primary),
-      circle: soft(t.primary, 0.25),
-      icon: t.primary,
-      arrow: t.primary,
+      bg: soft(companyTint),
+      circle: soft(companyTint, 0.25),
+      icon: companyTint,
+      arrow: companyTint,
     },
     ticket: {
-      bg: soft(t.warning),
-      circle: soft(t.warning, 0.25),
-      icon: t.warning,
-      arrow: t.warning,
+      bg: soft(ticketTint),
+      circle: soft(ticketTint, 0.25),
+      icon: ticketTint,
+      arrow: ticketTint,
     },
     event: {
       bg: soft(t.error, 0.14),
@@ -130,17 +140,11 @@ function getPalettes(t: Theme, isDark: boolean) {
       icon: t.error,
       arrow: t.error,
     },
-    // rideMate: {
-    //   bg: soft(t.error, 0.14),
-    //   circle: soft(t.error, 0.28),
-    //   icon: t.error,
-    //   arrow: t.error,
-    // },
     question: {
-      bg: soft(t.info),
-      circle: soft(t.info, 0.25),
-      icon: t.info,
-      arrow: t.info,
+      bg: soft(helpTint),
+      circle: soft(helpTint, 0.25),
+      icon: helpTint,
+      arrow: helpTint,
     },
   } as const;
 }
