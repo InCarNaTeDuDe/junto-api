@@ -343,7 +343,7 @@ export default function NewHereScreen() {
                     style={styles.findBuddyBtn}
                     onPress={() => router.push("/(screens)/add-daymate")}
                   >
-                    <Ionicons name="people" size={13} color="#2563EB" />
+                    <Ionicons name="people" size={13} color="#8B5CF6" />
                     <Text style={styles.findBuddyText}>Find Mate to Visit</Text>
                   </TouchableOpacity>
                 </View>
@@ -605,7 +605,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#FAF5FF",
+    borderWidth: 1,
+    borderColor: "#F3E8FF",
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 8,
@@ -613,7 +615,7 @@ const styles = StyleSheet.create({
   findBuddyText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#7C3AED",
   },
   foodCard: {
     flexDirection: "row",
