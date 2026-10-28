@@ -32,66 +32,23 @@ export async function fetchMessages(
   userId?: string,
   targetParticipantId?: string | null,
 ) {
-  const [activity, msgs] = await Promise.all([
-    activityRepo.findById(activityId).catch(() => null),
-    messageRepo.findByActivityId(activityId),
-  ]);
+  const activity = await activityRepo.findById(activityId).catch(() => null);
 
-  if (!userId || userId === "guest-user") {
-    // If no authenticated user, only return messages where participantId is not restricted
-    return msgs.map((msg) => ({
-      id: msg.id,
-      activityId: msg.activityId,
-      senderId: msg.senderId,
-      participantId: msg.participantId || null,
-      sender: {
-        id: msg.sender?.id || msg.senderId || "unknown",
-        name: msg.sender?.name || "Junto User",
-        avatar: msg.sender?.avatar || DEFAULT_AVATAR,
-      },
-      content: msg.content,
-      timestamp: msg.timestamp,
-    }));
-  }
-
-  // Determine the partner ID for the two-party conversation
   let partnerId = targetParticipantId;
-  if (!partnerId && activity) {
+  if (!partnerId && activity && userId && userId !== "guest-user") {
     if (activity.organizerId !== userId) {
       partnerId = activity.organizerId;
-    } else {
-      // Find the other party from messages
-      const otherMsg = [...msgs]
-        .reverse()
-        .find(
-          (m) =>
-            m.senderId !== userId ||
-            (m.participantId && m.participantId !== userId),
-        );
-      if (otherMsg) {
-        partnerId =
-          otherMsg.senderId !== userId
-            ? otherMsg.senderId
-            : otherMsg.participantId;
-      }
     }
   }
 
-  // Filter messages: ONLY return messages strictly exchanged between userId and partnerId
-  const filtered = msgs.filter((msg) => {
-    if (!partnerId) {
-      return msg.senderId === userId || msg.participantId === userId;
-    }
-    const isFromUserToPartner =
-      msg.senderId === userId &&
-      (!msg.participantId || msg.participantId === partnerId);
-    const isFromPartnerToUser =
-      msg.senderId === partnerId &&
-      (!msg.participantId || msg.participantId === userId);
-    return isFromUserToPartner || isFromPartnerToUser;
-  });
+  // Database ORM query handles filtering and timestamp ordering
+  const msgs = await messageRepo.findConversationMessages(
+    activityId,
+    userId,
+    partnerId,
+  );
 
-  return filtered.map((msg) => ({
+  return msgs.map((msg) => ({
     id: msg.id,
     activityId: msg.activityId,
     senderId: msg.senderId,

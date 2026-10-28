@@ -19,34 +19,8 @@ import { rideRepository, RideRecord } from "../repositories/Rides.repository";
  * List rides
  */
 export async function listRides(query: QueryRideInput): Promise<RideRecord[]> {
-  const rides = await rideRepository.findAll();
-  const search = query.search?.toLowerCase();
-  const from = query.from?.toLowerCase();
-  const to = query.to?.toLowerCase();
-  const vehicleType =
-    query.vehicleType && query.vehicleType !== "all" ? query.vehicleType : null;
-  const availableOnly = query.availableOnly === "true";
-
-  if (!search && !from && !to && !vehicleType && !availableOnly) {
-    return rides;
-  }
-
-  return rides.filter((ride) => {
-    if (vehicleType && ride.vehicleType !== vehicleType) return false;
-    if (availableOnly && ride.seatsLeft <= 0) return false;
-    if (from && !ride.from.toLowerCase().includes(from)) return false;
-    if (to && !ride.to.toLowerCase().includes(to)) return false;
-    if (
-      search &&
-      !ride.from.toLowerCase().includes(search) &&
-      !ride.to.toLowerCase().includes(search) &&
-      !ride.driverName.toLowerCase().includes(search) &&
-      !ride.notes?.toLowerCase().includes(search)
-    ) {
-      return false;
-    }
-    return true;
-  });
+  // Delegate all filtering, search and ordering to database ORM in repository
+  return rideRepository.findRides(query);
 }
 
 /**
@@ -68,25 +42,11 @@ export async function isVehicleInTravellingState(
   const cleanReg = registrationNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!cleanReg) return { inTravelling: false };
 
-  const allRides = await rideRepository.findAll();
-  const busyRide = allRides.find((r) => {
-    if (r.isDeleted && r.isDeleted !== 0) return false;
-    if (excludeRideId && r.id === excludeRideId) return false;
-    if (r.status === "completed" || r.status === "cancelled") return false;
-
-    const reg = (r.registrationNumber || "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-    if (!reg || reg !== cleanReg) return false;
-
-    const isTransitOrProgress =
-      r.status === "in_progress" ||
-      r.status === "both_travelling" ||
-      !!r.isDriverTravelling ||
-      (r.passengers || []).some((p) => p.isTravelling);
-
-    return isTransitOrProgress;
-  });
+  // Query database ORM directly
+  const busyRide = await rideRepository.findTravellingRideByVehicle(
+    cleanReg,
+    excludeRideId,
+  );
 
   if (busyRide) {
     return { inTravelling: true, ride: busyRide };

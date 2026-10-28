@@ -334,6 +334,128 @@ export class RideRepository extends BaseRepository<Ride> {
   }
 
   /**
+   * Database ORM query for listing and filtering rides with criteria and ordering by createdAt DESC.
+   */
+  async findRides(query: any): Promise<RideRecord[]> {
+    if (!this.isConnected) {
+      const all = Array.from(inMemoryRides.values()).filter(
+        (r) => !r.isDeleted || r.isDeleted === 0,
+      );
+      const search = query.search?.toLowerCase();
+      const from = query.from?.toLowerCase();
+      const to = query.to?.toLowerCase();
+      const vehicleType =
+        query.vehicleType && query.vehicleType !== "all"
+          ? query.vehicleType
+          : null;
+      const availableOnly = query.availableOnly === "true";
+
+      return all.filter((ride) => {
+        if (vehicleType && ride.vehicleType !== vehicleType) return false;
+        if (availableOnly && ride.seatsLeft <= 0) return false;
+        if (from && !ride.from.toLowerCase().includes(from)) return false;
+        if (to && !ride.to.toLowerCase().includes(to)) return false;
+        if (
+          search &&
+          !ride.from.toLowerCase().includes(search) &&
+          !ride.to.toLowerCase().includes(search) &&
+          !ride.driverName.toLowerCase().includes(search) &&
+          !ride.notes?.toLowerCase().includes(search)
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    try {
+      const qb = this.repo
+        .createQueryBuilder("ride")
+        .where("ride.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (query.vehicleType && query.vehicleType !== "all") {
+        qb.andWhere("ride.vehicleType = :vehicleType", {
+          vehicleType: query.vehicleType,
+        });
+      }
+      if (query.availableOnly === "true") {
+        qb.andWhere("ride.seatsLeft > 0");
+      }
+      if (query.from) {
+        qb.andWhere("LOWER(ride.from) LIKE LOWER(:from)", {
+          from: `%${query.from}%`,
+        });
+      }
+      if (query.to) {
+        qb.andWhere("LOWER(ride.to) LIKE LOWER(:to)", {
+          to: `%${query.to}%`,
+        });
+      }
+      if (query.search) {
+        qb.andWhere(
+          "(LOWER(ride.from) LIKE LOWER(:search) OR LOWER(ride.to) LIKE LOWER(:search) OR LOWER(ride.driverName) LIKE LOWER(:search) OR LOWER(ride.notes) LIKE LOWER(:search))",
+          { search: `%${query.search}%` },
+        );
+      }
+      qb.orderBy("ride.createdAt", "DESC");
+      const rides = await qb.getMany();
+      return rides.map((ride) => this.toRideRecord(ride));
+    } catch {
+      return this.findAll();
+    }
+  }
+
+  /**
+   * Database ORM query checking if a vehicle is currently travelling or in-progress.
+   */
+  async findTravellingRideByVehicle(
+    cleanReg: string,
+    excludeRideId?: string,
+  ): Promise<RideRecord | null> {
+    if (!this.isConnected) {
+      const allRides = Array.from(inMemoryRides.values());
+      const busy = allRides.find((r) => {
+        if (r.isDeleted && r.isDeleted !== 0) return false;
+        if (excludeRideId && r.id === excludeRideId) return false;
+        if (r.status === "completed" || r.status === "cancelled") return false;
+        const reg = (r.registrationNumber || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+        if (!reg || reg !== cleanReg) return false;
+        return (
+          r.status === "in_progress" ||
+          r.status === "both_travelling" ||
+          !!r.isDriverTravelling ||
+          (r.passengers || []).some((p) => p.isTravelling)
+        );
+      });
+      return busy || null;
+    }
+
+    try {
+      const qb = this.repo
+        .createQueryBuilder("ride")
+        .where("ride.isDeleted = :isDeleted", { isDeleted: 0 })
+        .andWhere("ride.status NOT IN (:...doneStatuses)", {
+          doneStatuses: ["completed", "cancelled"],
+        })
+        .andWhere(
+          "REPLACE(UPPER(ride.registrationNumber), ' ', '') = :cleanReg",
+          { cleanReg },
+        );
+
+      if (excludeRideId) {
+        qb.andWhere("ride.id != :excludeRideId", { excludeRideId });
+      }
+
+      const busyRide = await qb.getOne();
+      return busyRide ? this.toRideRecord(busyRide) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Find ride by ID
    */
   override async findById<R = RideRecord>(

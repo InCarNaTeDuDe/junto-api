@@ -40,30 +40,104 @@ export class ActivityRepository extends BaseRepository<Activity> {
     });
   }
 
-  async findByLocation(latitude: number, longitude: number) {
+  /**
+   * Fetches popular activities around a given location, using database ORM haversine distance
+   * calculation and sorting directly in PostgreSQL instead of manual JS filtering in server code.
+   */
+  async findPopularAround(locationFilter?: {
+    latitude?: number | string;
+    longitude?: number | string;
+    locationName?: string;
+    locationState?: string;
+    radiusKm?: number | string;
+  }): Promise<Activity[]> {
     if (!this.isConnected) return [];
+
+    const rawLat = locationFilter?.latitude;
+    const rawLng = locationFilter?.longitude;
+    const lat =
+      rawLat !== undefined && rawLat !== null && rawLat !== ""
+        ? Number(rawLat)
+        : null;
+    const lng =
+      rawLng !== undefined && rawLng !== null && rawLng !== ""
+        ? Number(rawLng)
+        : null;
+    const radius = Number(locationFilter?.radiusKm) || 50;
+    const name = locationFilter?.locationName?.trim();
+    const state = locationFilter?.locationState?.trim();
+    const hasGeo =
+      lat !== null &&
+      lng !== null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng);
+
+    const qb = this.repo
+      .createQueryBuilder("activity")
+      .leftJoinAndSelect("activity.organizer", "organizer")
+      .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+
+    if (hasGeo) {
+      // Direct SQL Haversine formula inside PostgreSQL with clamped cosine to prevent NaN
+      const haversineSql = `(6371 * acos(least(1.0, greatest(-1.0, cos(radians(:lat)) * cos(radians(activity.latitude)) * cos(radians(activity.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(activity.latitude))))))`;
+
+      qb.andWhere(`${haversineSql} <= :radius`, { lat, lng, radius })
+        .addSelect(haversineSql, "distance_km")
+        .orderBy("distance_km", "ASC")
+        .addOrderBy("activity.createdAt", "DESC");
+    } else if (name || state) {
+      if (name && state) {
+        qb.andWhere(
+          "(LOWER(activity.locationName) LIKE LOWER(:name) OR LOWER(activity.locationState) LIKE LOWER(:state))",
+          { name: `%${name}%`, state: `%${state}%` },
+        );
+      } else if (name) {
+        qb.andWhere("LOWER(activity.locationName) LIKE LOWER(:name)", {
+          name: `%${name}%`,
+        });
+      } else {
+        qb.andWhere("LOWER(activity.locationState) LIKE LOWER(:state)", {
+          state: `%${state}%`,
+        });
+      }
+      qb.orderBy("activity.createdAt", "DESC");
+    } else {
+      qb.orderBy("activity.createdAt", "DESC");
+    }
+
+    return qb.getMany();
+  }
+
+  async findByLocation(
+    latitude: number,
+    longitude: number,
+    radiusKm: number = 50,
+  ) {
+    if (!this.isConnected) return [];
+
+    if (
+      Number.isFinite(Number(latitude)) &&
+      Number.isFinite(Number(longitude))
+    ) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      const haversineSql = `(6371 * acos(least(1.0, greatest(-1.0, cos(radians(:lat)) * cos(radians(activity.latitude)) * cos(radians(activity.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(activity.latitude))))))`;
+
+      return this.repo
+        .createQueryBuilder("activity")
+        .leftJoinAndSelect("activity.organizer", "organizer")
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 })
+        .andWhere(`${haversineSql} <= :radiusKm`, { lat, lng, radiusKm })
+        .addSelect(haversineSql, "distance_km")
+        .orderBy("distance_km", "ASC")
+        .addOrderBy("activity.createdAt", "DESC")
+        .getMany();
+    }
+
     return this.repo.find({
-      where: {
-        latitude,
-        longitude,
-        isDeleted: 0,
-      },
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        cost: true,
-        latitude: true,
-        longitude: true,
-        locationName: true,
-        organizer: {
-          name: true,
-          avatar: true,
-        },
-      },
-      relations: {
-        organizer: true,
-      },
+      where: { isDeleted: 0 },
+      relations: { organizer: true },
+      order: { createdAt: "DESC" },
     });
   }
 
@@ -82,74 +156,51 @@ export class ActivityRepository extends BaseRepository<Activity> {
         : userId?.id || userId?.userId || userId?.sub || userId?._id || "";
 
     if (!targetUserId && !userEmail && !userName) return [];
+    if (!this.isConnected) return [];
 
-    if (this.isConnected) {
-      try {
-        const activities = await this.repo.find({
-          where: [
-            {
-              organizer: {
-                id: userId,
-              },
-              isDeleted: 0,
-            },
-            {
-              organizerId: userId,
-              isDeleted: 0,
-            },
-          ],
-          relations: {
-            organizer: true,
-          },
-          order: {
-            createdAt: "DESC",
-          },
-        });
+    try {
+      const qb = this.repo
+        .createQueryBuilder("activity")
+        .leftJoinAndSelect("activity.organizer", "organizer")
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
 
-        return activities.filter((activity) => {
-          if (activity.isDeleted && Number(activity.isDeleted) === 1) {
-            return false;
-          }
-          const orgId = activity.organizerId || activity.organizer?.id;
-          const orgEmail = activity.organizer?.email;
-          const orgName = activity.organizer?.name;
+      const orConditions: string[] = [];
+      const parameters: Record<string, any> = { isDeleted: 0 };
 
-          const isOrganizer = Boolean(
-            (targetUserId && orgId && String(orgId) === String(targetUserId)) ||
-            (userEmail &&
-              orgEmail &&
-              orgEmail.toLowerCase() === userEmail.toLowerCase()) ||
-            (userName &&
-              orgName &&
-              orgName.toLowerCase() === userName.toLowerCase()),
-          );
-
-          let isParticipant = false;
-          if (activity.participantIds) {
-            if (Array.isArray(activity.participantIds)) {
-              isParticipant = activity.participantIds.some(
-                (p) =>
-                  (targetUserId && String(p) === String(targetUserId)) ||
-                  (userEmail && String(p) === userEmail),
-              );
-            } else if (typeof activity.participantIds === "string") {
-              const pList = (activity.participantIds as string).split(",");
-              isParticipant = pList.some(
-                (p) =>
-                  (targetUserId && p.trim() === String(targetUserId)) ||
-                  (userEmail && p.trim() === userEmail),
-              );
-            }
-          }
-
-          return isOrganizer || isParticipant;
-        });
-      } catch (err) {
-        console.error("Error finding user activities:", err);
+      if (targetUserId) {
+        orConditions.push("activity.organizerId = :targetUserId");
+        orConditions.push("organizer.id = :targetUserId");
+        orConditions.push(
+          "activity.participantIds LIKE :participantUserIdPattern",
+        );
+        parameters.targetUserId = targetUserId;
+        parameters.participantUserIdPattern = `%${targetUserId}%`;
       }
-    }
 
-    return [];
+      if (userEmail) {
+        orConditions.push("LOWER(organizer.email) = LOWER(:userEmail)");
+        orConditions.push(
+          "activity.participantIds LIKE :participantEmailPattern",
+        );
+        parameters.userEmail = userEmail;
+        parameters.participantEmailPattern = `%${userEmail}%`;
+      }
+
+      if (userName) {
+        orConditions.push("LOWER(organizer.name) = LOWER(:userName)");
+        parameters.userName = userName;
+      }
+
+      if (orConditions.length > 0) {
+        qb.andWhere(`(${orConditions.join(" OR ")})`, parameters);
+      }
+
+      qb.orderBy("activity.createdAt", "DESC");
+      return await qb.getMany();
+    } catch (err) {
+      console.error("Error finding user activities via ORM:", err);
+      return [];
+    }
   }
 }
 

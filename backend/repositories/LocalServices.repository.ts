@@ -112,6 +112,135 @@ export class LocalServicesRepository extends BaseRepository<ServiceProvider> {
     });
   }
 
+  /**
+   * Database ORM query for filtering services by cluster, category, and search query, ordered by createdAt DESC.
+   */
+  async queryServices(query: any): Promise<ServiceProvider[]> {
+    if (!this.isConnected) {
+      let result = this.fallbackStore.map((item) => ({
+        ...item,
+        name: item.name || item.title || "Service Pro",
+        title: item.title || item.name || "Service Pro",
+        cluster: resolveServiceCluster(
+          item.category,
+          item.description,
+          item.cluster,
+        ),
+      }));
+
+      const clusterParam = (query.cluster || "").toLowerCase().trim();
+      if (clusterParam && clusterParam !== "all") {
+        result = result.filter(
+          (p) =>
+            p.cluster?.toLowerCase() === clusterParam ||
+            p.category?.toLowerCase().includes(clusterParam),
+        );
+      }
+      if (query.category && query.category !== "all") {
+        const cat = query.category.toLowerCase().trim();
+        result = result.filter((p) => p.category?.toLowerCase().includes(cat));
+      }
+      if (query.search) {
+        const term = query.search.toLowerCase().trim();
+        result = result.filter(
+          (p) =>
+            p.name?.toLowerCase().includes(term) ||
+            p.category?.toLowerCase().includes(term) ||
+            (p.description && p.description.toLowerCase().includes(term)),
+        );
+      }
+      return result.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
+      ) as unknown as ServiceProvider[];
+    }
+
+    try {
+      const qb = this.repo.createQueryBuilder("service");
+
+      const clusterParam = (query.cluster || "").toLowerCase().trim();
+      if (clusterParam && clusterParam !== "all") {
+        if (clusterParam === "fix" || clusterParam === "fix & repair") {
+          qb.andWhere(
+            "(LOWER(service.cluster) = 'fix' OR LOWER(service.category) ~ 'electrician|plumber|carpenter|ac|washing|refrigerator|tv|motor|bike|car')",
+          );
+        } else if (
+          clusterParam === "glam" ||
+          clusterParam === "glamup" ||
+          clusterParam === "beauty"
+        ) {
+          qb.andWhere(
+            "(LOWER(service.cluster) = 'glam' OR LOWER(service.category) ~ 'makeup|bridal|party|eyebrow|threading|hair|facial|waxing|mehendi|saree|nail|beauty' OR LOWER(service.description) LIKE '%glamup%')",
+          );
+        } else if (clusterParam === "home" || clusterParam === "home help") {
+          qb.andWhere(
+            "(LOWER(service.cluster) = 'home' OR LOWER(service.category) ~ 'clean|cook|maid|moving|packing|pest|tiffin')",
+          );
+        } else if (clusterParam === "auto" || clusterParam === "auto help") {
+          qb.andWhere(
+            "(LOWER(service.cluster) = 'auto' OR LOWER(service.category) ~ 'bike|car|puncture|battery|wash|roadside|mechanic')",
+          );
+        } else {
+          qb.andWhere("LOWER(service.cluster) = :clusterParam", {
+            clusterParam,
+          });
+        }
+      }
+
+      if (query.category && query.category !== "all") {
+        const catLower = query.category.toLowerCase().trim();
+        if (catLower === "fix" || catLower === "fix & repair") {
+          qb.andWhere(
+            "LOWER(service.category) ~ 'electrician|plumber|carpenter|ac|washing|refrigerator|tv|motor|bike|car'",
+          );
+        } else if (
+          catLower === "glam" ||
+          catLower === "glamup" ||
+          catLower === "beauty"
+        ) {
+          qb.andWhere(
+            "(LOWER(service.category) ~ 'makeup|bridal|party|eyebrow|threading|hair|facial|waxing|mehendi|saree|nail|beauty' OR LOWER(service.description) LIKE '%glamup%')",
+          );
+        } else if (catLower === "home" || catLower === "home help") {
+          qb.andWhere(
+            "LOWER(service.category) ~ 'clean|cook|maid|moving|packing|pest|tiffin'",
+          );
+        } else if (catLower === "auto" || catLower === "auto help") {
+          qb.andWhere(
+            "LOWER(service.category) ~ 'bike|car|puncture|battery|wash|roadside|mechanic'",
+          );
+        } else {
+          qb.andWhere("LOWER(service.category) LIKE :catPattern", {
+            catPattern: `%${catLower}%`,
+          });
+        }
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          "(LOWER(service.name) LIKE LOWER(:search) OR LOWER(service.category) LIKE LOWER(:search) OR LOWER(service.description) LIKE LOWER(:search))",
+          { search: `%${query.search}%` },
+        );
+      }
+
+      qb.orderBy("service.createdAt", "DESC");
+      const records = await qb.getMany();
+      return records.map((item) => ({
+        ...item,
+        name: item.name || item.title || "Service Pro",
+        title: item.title || item.name || "Service Pro",
+        cluster: resolveServiceCluster(
+          item.category,
+          item.description,
+          item.cluster,
+        ),
+      })) as unknown as ServiceProvider[];
+    } catch {
+      return this.findAllServices();
+    }
+  }
+
   async findAllServices(
     options?: FindManyOptions<ServiceProvider>,
   ): Promise<ServiceProvider[]> {

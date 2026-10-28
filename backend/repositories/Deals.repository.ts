@@ -80,6 +80,85 @@ export class DealsRepository extends BaseRepository<LocalDeal> {
     });
   }
 
+  /**
+   * Database ORM query for deals with user relation, filtering by category, search, userId, status, condition, and sorting by createdAt DESC.
+   */
+  async queryDeals(query: any = {}): Promise<LocalDeal[]> {
+    if (!this.isConnected) {
+      let records = [...this.fallbackStore];
+      if (query.userId) {
+        records = records.filter((d) => d.userId === query.userId);
+      }
+      if (query.status && query.status !== "all") {
+        records = records.filter((d) => d.status === query.status);
+      } else if (!query.userId && !query.status) {
+        records = records.filter((d) => d.status === "available");
+      }
+      if (query.category && query.category !== "All") {
+        const cat = query.category.toLowerCase();
+        records = records.filter((d) => d.category?.toLowerCase() === cat);
+      }
+      if (query.search) {
+        const term = query.search.toLowerCase();
+        records = records.filter(
+          (d) =>
+            d.title?.toLowerCase().includes(term) ||
+            d.description?.toLowerCase().includes(term) ||
+            d.locationName?.toLowerCase().includes(term) ||
+            d.sellerName?.toLowerCase().includes(term),
+        );
+      }
+      if (query.condition) {
+        records = records.filter((d) => d.condition === query.condition);
+      }
+      return records.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
+      );
+    }
+
+    try {
+      const qb = this.repo
+        .createQueryBuilder("deal")
+        .leftJoinAndSelect("deal.user", "user");
+
+      if (query.userId) {
+        qb.andWhere("(deal.userId = :userId)", { userId: query.userId });
+      }
+
+      if (query.status && query.status !== "all") {
+        qb.andWhere("deal.status = :status", { status: query.status });
+      } else if (!query.userId && !query.status) {
+        qb.andWhere("deal.status = :status", { status: "available" });
+      }
+
+      if (query.category && query.category !== "All") {
+        qb.andWhere("LOWER(deal.category) = LOWER(:category)", {
+          category: query.category,
+        });
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          "(LOWER(deal.title) LIKE LOWER(:search) OR LOWER(deal.description) LIKE LOWER(:search) OR LOWER(deal.locationName) LIKE LOWER(:search) OR LOWER(deal.sellerName) LIKE LOWER(:search))",
+          { search: `%${query.search}%` },
+        );
+      }
+
+      if (query.condition) {
+        qb.andWhere("deal.condition = :condition", {
+          condition: query.condition,
+        });
+      }
+
+      qb.orderBy("deal.createdAt", "DESC");
+      return await qb.getMany();
+    } catch {
+      return this.findAll();
+    }
+  }
+
   override async findById(id: string | number): Promise<LocalDeal | null> {
     if (!this.isConnected) {
       return this.fallbackStore.find((d) => d.id === String(id)) || null;

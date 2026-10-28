@@ -61,83 +61,9 @@ function isValidUuid(val?: string): boolean {
 export async function listDeals(
   query: Partial<QueryDealsInput> = {},
 ): Promise<DealRecord[]> {
-  const deals = await dealsRepository.findAll({
-    relations: {
-      user: true,
-    },
-    select: {
-      // LocalDeal fields...
-      id: true,
-      userId: true,
-      title: true,
-      description: true,
-      businessName: true,
-      sellerName: true,
-      sellerPhone: true,
-      sellerAvatarBg: true,
-      sellerRating: true,
-      category: true,
-      price: true,
-      originalPrice: true,
-      dealPrice: true,
-      condition: true,
-      locationName: true,
-      distance: true,
-      latitude: true,
-      longitude: true,
-      image: true,
-      verified: true,
-      views: true,
-      status: true,
-      inquiries: true,
-      createdAt: true,
-      updatedAt: true,
-
-      user: {
-        userHandle: true,
-      },
-    },
-  });
-
-  let records = deals.map((d) => dealsRepository.toRecord(d));
-
-  if (query.userId) {
-    records = records.filter(
-      (d) => d.userId === query.userId || d.sellerId === query.userId,
-    );
-  }
-
-  if (query.status && query.status !== "all") {
-    records = records.filter((d) => d.status === query.status);
-  } else if (!query.userId && !query.status) {
-    records = records.filter((d) => d.status === "available");
-  }
-
-  if (query.category && query.category !== "All") {
-    const category = query.category.toLowerCase();
-
-    records = records.filter((d) => d.category.toLowerCase() === category);
-  }
-
-  if (query.search) {
-    const term = query.search.toLowerCase();
-
-    records = records.filter(
-      (d) =>
-        d.title.toLowerCase().includes(term) ||
-        d.description.toLowerCase().includes(term) ||
-        d.location.toLowerCase().includes(term) ||
-        d.sellerName.toLowerCase().includes(term),
-    );
-  }
-
-  if (query.condition) {
-    records = records.filter((d) => d.condition === query.condition);
-  }
-
-  // No sort here.
-  // dealsRepository.findAll() already returns createdAt DESC.
-  return records;
+  // Delegate filtering, search, relations, and sorting directly to database ORM in repository
+  const deals = await dealsRepository.queryDeals(query);
+  return deals.map((d) => dealsRepository.toRecord(d));
 }
 
 export async function getDealById(id: string): Promise<DealRecord | null> {

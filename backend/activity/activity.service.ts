@@ -193,34 +193,8 @@ export async function popularActivitiesAround(locationFilter?: {
   locationState?: string;
   radiusKm?: number | string;
 }) {
-  const all = await activityRepository.findAll();
-
-  const lat = Number(locationFilter?.latitude);
-  const lng = Number(locationFilter?.longitude);
-  const radius = Number(locationFilter?.radiusKm) || 50;
-  const name = locationFilter?.locationName?.trim().toLowerCase();
-  const state = locationFilter?.locationState?.trim().toLowerCase();
-  const hasGeo = Number.isFinite(lat) && Number.isFinite(lng);
-
-  const activities = hasGeo
-    ? all.filter((a) => {
-        const aLat = Number(a.latitude);
-        const aLng = Number(a.longitude);
-        return (
-          Number.isFinite(aLat) &&
-          Number.isFinite(aLng) &&
-          calculateDistanceInKm(lat, lng, aLat, aLng) <= radius
-        );
-      })
-    : name || state
-      ? all.filter((a) => {
-          const aName = a.locationName?.trim().toLowerCase() || "";
-          const aState = a.locationState?.trim().toLowerCase() || "";
-          return (
-            (name && aName.includes(name)) || (state && aState.includes(state))
-          );
-        })
-      : all;
+  // Query, calculate distances and sort directly in database ORM instead of manual server code filtration
+  const activities = await activityRepository.findPopularAround(locationFilter);
 
   return activities.map((a) => {
     const base = {
