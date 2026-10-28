@@ -19,6 +19,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
+import { JuntoNowColors } from "@/theme";
 import { useLocation } from "@/context/LocationContext";
 import { useAppConfig } from "@/context/AppConfigContext";
 import { FeatureDisabledView } from "@/components/FeatureDisabledBanner";
@@ -52,6 +53,9 @@ export default function SellTicketScreen({
   const { theme: t, isDark } = useTheme();
   const { selectedLocation } = useLocation();
   const { isFeatureEnabled, refreshConfig } = useAppConfig();
+  const ticketColor = JuntoNowColors.ticket.tint;
+  const ticketSoftBg = isDark ? "rgba(249, 115, 22, 0.18)" : "#FFF7ED";
+  const ticketBorder = isDark ? "rgba(249, 115, 22, 0.3)" : "#FFEDD5";
 
   if (!isFeatureEnabled("enableTicketSelling")) {
     return (
@@ -280,13 +284,11 @@ export default function SellTicketScreen({
               style={[
                 styles.heroIconBox,
                 {
-                  backgroundColor: isDark
-                    ? "rgba(225, 29, 72, 0.22)"
-                    : "#FFE4E6",
+                  backgroundColor: ticketSoftBg,
                 },
               ]}
             >
-              <Ionicons name="ticket" size={24} color="#E11D48" />
+              <Ionicons name="ticket" size={24} color={ticketColor} />
             </View>
             <View style={{ flex: 1 }}>
               <View
@@ -341,20 +343,18 @@ export default function SellTicketScreen({
                     {
                       backgroundColor:
                         movieName === item
-                          ? isDark
-                            ? "rgba(225, 29, 72, 0.22)"
-                            : "#FFE4E6"
+                          ? ticketSoftBg
                           : isDark
                             ? "rgba(255, 255, 255, 0.04)"
                             : t.card,
-                      borderColor: movieName === item ? "#E11D48" : t.border,
+                      borderColor: movieName === item ? ticketColor : t.border,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      { color: movieName === item ? "#E11D48" : t.sub },
+                      { color: movieName === item ? ticketColor : t.sub },
                     ]}
                   >
                     {item}
@@ -375,7 +375,7 @@ export default function SellTicketScreen({
               onDateChange={setShowDate}
               onTimeChange={setShowTime}
               minimumDate={new Date()}
-              accentColor="#E11D48"
+              accentColor={ticketColor}
             />
           </View>
 
@@ -425,13 +425,13 @@ export default function SellTicketScreen({
                     styles.priceInputWrapper,
                     {
                       backgroundColor: isDark
-                        ? "rgba(225, 29, 72, 0.1)"
-                        : "#FFF1F2",
-                      borderColor: "#E11D48",
+                        ? "rgba(249, 115, 22, 0.1)"
+                        : "#FFF7ED",
+                      borderColor: ticketColor,
                     },
                   ]}
                 >
-                  <Text style={[styles.currencyPrefix, { color: "#E11D48" }]}>
+                  <Text style={[styles.currencyPrefix, { color: ticketColor }]}>
                     ₹
                   </Text>
                   <TextInput

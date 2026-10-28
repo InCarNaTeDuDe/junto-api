@@ -655,12 +655,17 @@ export default function ServicesScreen() {
   const {
     isListening: isSearchListening,
     startListening: startSearchListening,
+    stopListening: stopSearchListening,
   } = useVoiceSpeech("services-search");
-  const { isListening: isIssueListening, startListening: startIssueListening } =
-    useVoiceSpeech("services-issue");
+  const {
+    isListening: isIssueListening,
+    startListening: startIssueListening,
+    stopListening: stopIssueListening,
+  } = useVoiceSpeech("services-issue");
   const {
     isListening: isSkillsListening,
     startListening: startSkillsListening,
+    stopListening: stopSkillsListening,
   } = useVoiceSpeech("services-skills");
 
   const formatDate = (d: Date) =>
@@ -673,11 +678,6 @@ export default function ServicesScreen() {
     t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   const getEffectiveAppointmentTime = () => {
-    if (bookingSlotPreset === "asap") return "Today ASAP (within 2 hours)";
-    if (bookingSlotPreset === "evening")
-      return "Today Evening (5:00 PM - 8:00 PM)";
-    if (bookingSlotPreset === "tomorrow")
-      return "Tomorrow Morning (9:00 AM - 12:00 PM)";
     return `${formatDate(serviceDate)} at ${formatTime(serviceTime)}`;
   };
 
@@ -738,6 +738,10 @@ export default function ServicesScreen() {
 
   // Voice Search Handler
   const handleVoiceSearch = () => {
+    if (isSearchListening) {
+      stopSearchListening();
+      return;
+    }
     startSearchListening((text) => {
       setSearchQuery(text.replace(/i need|need|find|search for/gi, "").trim());
     });
@@ -745,6 +749,10 @@ export default function ServicesScreen() {
 
   // Voice Speak for Booking Issue
   const handleVoiceBookingIssue = () => {
+    if (isIssueListening) {
+      stopIssueListening();
+      return;
+    }
     startIssueListening((text) => {
       setBookingIssue(text);
     });
@@ -752,6 +760,10 @@ export default function ServicesScreen() {
 
   // Voice Speak for Technician Skills Enrollment
   const handleVoiceEnrollSkills = () => {
+    if (isSkillsListening) {
+      stopSkillsListening();
+      return;
+    }
     startSkillsListening((text) => {
       setEnrollDescription(text);
     });
@@ -1723,192 +1735,28 @@ export default function ServicesScreen() {
                   </View>
                 </View>
 
-                {/* Appointment Timing Options */}
+                {/* Appointment Date & Time */}
                 <Text
-                  style={[styles.bookingSectionLabel, { color: textPrimary }]}
+                  style={[
+                    styles.bookingSectionLabel,
+                    { color: textPrimary, marginBottom: 8 },
+                  ]}
                 >
-                  When do you need the service?
+                  When do you need the service? (Select Date & Time)
                 </Text>
 
-                <View style={styles.slotPillsWrap}>
-                  <TouchableOpacity
-                    style={[
-                      styles.slotPill,
-                      bookingSlotPreset === "asap" && styles.slotPillActive,
-                      {
-                        borderColor:
-                          bookingSlotPreset === "asap" ? "#9333EA" : border,
-                        backgroundColor:
-                          bookingSlotPreset === "asap"
-                            ? isDark
-                              ? "#9333EA30"
-                              : "#F3E8FF"
-                            : cardBg,
-                      },
-                    ]}
-                    onPress={() => setBookingSlotPreset("asap")}
-                  >
-                    <Ionicons
-                      name="flash"
-                      size={13}
-                      color={
-                        bookingSlotPreset === "asap" ? "#9333EA" : textMute
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        {
-                          color:
-                            bookingSlotPreset === "asap"
-                              ? "#9333EA"
-                              : textPrimary,
-                          fontWeight:
-                            bookingSlotPreset === "asap" ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      Today ASAP (within 2h)
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.slotPill,
-                      bookingSlotPreset === "evening" && styles.slotPillActive,
-                      {
-                        borderColor:
-                          bookingSlotPreset === "evening" ? "#9333EA" : border,
-                        backgroundColor:
-                          bookingSlotPreset === "evening"
-                            ? isDark
-                              ? "#9333EA30"
-                              : "#F3E8FF"
-                            : cardBg,
-                      },
-                    ]}
-                    onPress={() => setBookingSlotPreset("evening")}
-                  >
-                    <Ionicons
-                      name="time"
-                      size={13}
-                      color={
-                        bookingSlotPreset === "evening" ? "#9333EA" : textMute
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        {
-                          color:
-                            bookingSlotPreset === "evening"
-                              ? "#9333EA"
-                              : textPrimary,
-                          fontWeight:
-                            bookingSlotPreset === "evening" ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      Today Evening (5-8 PM)
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.slotPill,
-                      bookingSlotPreset === "tomorrow" && styles.slotPillActive,
-                      {
-                        borderColor:
-                          bookingSlotPreset === "tomorrow" ? "#9333EA" : border,
-                        backgroundColor:
-                          bookingSlotPreset === "tomorrow"
-                            ? isDark
-                              ? "#9333EA30"
-                              : "#F3E8FF"
-                            : cardBg,
-                      },
-                    ]}
-                    onPress={() => setBookingSlotPreset("tomorrow")}
-                  >
-                    <Ionicons
-                      name="calendar"
-                      size={13}
-                      color={
-                        bookingSlotPreset === "tomorrow" ? "#9333EA" : textMute
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        {
-                          color:
-                            bookingSlotPreset === "tomorrow"
-                              ? "#9333EA"
-                              : textPrimary,
-                          fontWeight:
-                            bookingSlotPreset === "tomorrow" ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      Tomorrow Morning
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.slotPill,
-                      bookingSlotPreset === "custom" && styles.slotPillActive,
-                      {
-                        borderColor:
-                          bookingSlotPreset === "custom" ? "#9333EA" : border,
-                        backgroundColor:
-                          bookingSlotPreset === "custom"
-                            ? isDark
-                              ? "#9333EA30"
-                              : "#F3E8FF"
-                            : cardBg,
-                      },
-                    ]}
-                    onPress={() => setBookingSlotPreset("custom")}
-                  >
-                    <Ionicons
-                      name="options"
-                      size={13}
-                      color={
-                        bookingSlotPreset === "custom" ? "#9333EA" : textMute
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        {
-                          color:
-                            bookingSlotPreset === "custom"
-                              ? "#9333EA"
-                              : textPrimary,
-                          fontWeight:
-                            bookingSlotPreset === "custom" ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      Custom Date & Time
-                    </Text>
-                  </TouchableOpacity>
+                <View style={{ marginBottom: 14 }}>
+                  <AppDateTimeRow
+                    dateValue={serviceDate}
+                    timeValue={serviceTime}
+                    onDateChange={setServiceDate}
+                    onTimeChange={setServiceTime}
+                    minimumDate={new Date()}
+                    accentColor="#6366F1"
+                    dateLabel="Appointment Date"
+                    timeLabel="Preferred Time"
+                  />
                 </View>
-
-                {/* Custom Date & Time Controls */}
-                {bookingSlotPreset === "custom" && (
-                  <View style={{ marginVertical: 8 }}>
-                    <AppDateTimeRow
-                      dateValue={serviceDate}
-                      timeValue={serviceTime}
-                      onDateChange={setServiceDate}
-                      onTimeChange={setServiceTime}
-                      minimumDate={new Date()}
-                      accentColor="#9333EA"
-                    />
-                  </View>
-                )}
 
                 {/* Client Contact Info */}
                 <Text

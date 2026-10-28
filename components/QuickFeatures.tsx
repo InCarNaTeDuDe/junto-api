@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { INeedThisModal } from "./NeedThisModal";
 import { useAppConfig, type AppConfig } from "@/context/AppConfigContext";
+import { JuntoNowColors } from "@/theme";
 
 interface QuickFeaturesProps {
   isDark?: boolean;
@@ -538,8 +539,8 @@ const ALL_FEATURES: FeatureItem[] = [
     badge: "Hot",
     category: "market",
     icon: "ticket",
-    color: "#F97316",
-    bg: "#FFF7ED",
+    color: JuntoNowColors.ticket.tint,
+    bg: JuntoNowColors.ticket.light.bg,
     route: "/(screens)/add-ticket",
     query: "ticket",
   },
@@ -657,8 +658,8 @@ const ROW_FEATURES: FeatureItem[] = [
     name: "Ticket Swap",
     subtitle: "Buy / Sell",
     icon: "ticket",
-    color: "#F97316",
-    bg: "#FFF7ED",
+    color: JuntoNowColors.ticket.tint,
+    bg: JuntoNowColors.ticket.light.bg,
     route: "/(screens)/add-ticket",
     query: "ticket",
   },
