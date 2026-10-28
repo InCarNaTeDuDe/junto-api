@@ -5,6 +5,8 @@
  * - Automatically attaches JWT
  * - Attaches device info to Google login
  * - Adds location to eligible POST/PUT/PATCH requests
+ * - Skips activities-around when location is unavailable
+ * - Does not inject a hardcoded fallback location
  * - Handles 401 globally
  * - Handles network errors and timeouts
  * - Supports GET, POST, PATCH, PUT, DELETE
@@ -13,20 +15,19 @@
 import { Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Application from "expo-application";
+
 import { Env } from "@/config/env";
+
 import {
   getJwtToken,
   getSelectedLocation,
   removeJwtToken,
 } from "@/utils/secureStorage";
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000;
 
-/**
- * Resolve the API URL from the existing shared environment configuration.
- * Uses the fallback defined in @/config/env when the environment variable
- * is unavailable.
- */
+/* ---------------- Base URL ---------------- */
+
 function getBaseUrl(): string {
   const url = Env.API_BASE_URL?.trim();
 
@@ -37,9 +38,8 @@ function getBaseUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
-/**
- * Accept relative API routes or absolute URLs.
- */
+/* ---------------- URL helpers ---------------- */
+
 function buildUrl(endpoint: string): string {
   if (/^https?:\/\//i.test(endpoint)) {
     return endpoint;
@@ -48,6 +48,29 @@ function buildUrl(endpoint: string): string {
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
   return `${getBaseUrl()}${path}`;
+}
+
+function getRoute(endpoint: string): string {
+  // Remove an absolute URL's origin, if supplied.
+  const path = endpoint.replace(/^https?:\/\/[^/]+/i, "");
+
+  // Remove query strings and hashes for route comparisons.
+  return path.split("?")[0].split("#")[0] || "/";
+}
+
+function isGoogleLogin(endpoint: string): boolean {
+  return /^\/api\/auth\/google(?:\/|$)/.test(getRoute(endpoint));
+}
+
+function shouldSkipLocation(endpoint: string): boolean {
+  const route = getRoute(endpoint);
+
+  return (
+    route.startsWith("/api/auth/google") ||
+    route.startsWith("/api/notifications/register-token") ||
+    route.startsWith("/api/upload") ||
+    route.startsWith("/api/cloudinary")
+  );
 }
 
 /* ---------------- Errors ---------------- */
@@ -118,29 +141,6 @@ async function getDeviceInfo(): Promise<DeviceInfo> {
   return cachedDeviceInfo;
 }
 
-/* ---------------- Route helpers ---------------- */
-
-function getRoute(endpoint: string): string {
-  // Remove query string and hash for route comparisons.
-  return endpoint.split("?")[0].split("#")[0];
-}
-
-function isGoogleLogin(endpoint: string): boolean {
-  return /^\/api\/auth\/google(?:\/|$)/.test(getRoute(endpoint));
-}
-
-function shouldSkipLocation(endpoint: string): boolean {
-  const route = getRoute(endpoint);
-
-  return (
-    route.startsWith("/api/auth/google") ||
-    route.startsWith("/api/auth/profile") ||
-    route.startsWith("/api/notifications/register-token") ||
-    route.startsWith("/api/upload") ||
-    route.startsWith("/api/cloudinary")
-  );
-}
-
 /* ---------------- Core request ---------------- */
 
 async function request<T>(
@@ -162,9 +162,9 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  /* ---------------- Parse request body ---------------- */
+  /* ---------------- Request Body ---------------- */
 
-  let requestBody: any;
+  let requestBody: any = hasBody ? {} : undefined;
 
   if (hasBody && options.body != null) {
     try {
@@ -189,39 +189,54 @@ async function request<T>(
   /* ---------------- Location enrichment ---------------- */
 
   if (hasBody && !shouldSkipLocation(route)) {
+    console.log(`[API] Passing location to endpoint: ${route}`);
+
     const location = await getSelectedLocation();
 
+    // This route runs immediately after login.
+    // Do not call it until a location is available.
     if (route === "/api/activity/activities-around" && !location) {
       console.log(`[API] Skipping ${route}: location is not available yet.`);
 
       return undefined as T;
     }
 
-    const effectiveLocation = location ?? {
-      name: "Hyderabad",
-      state: "Telangana",
-      latitude: 17.385,
-      longitude: 78.4866,
-      isAutoDetected: false,
-    };
+    // Never invent a location or use a hardcoded fallback.
+    if (location) {
+      const body =
+        requestBody && typeof requestBody === "object" ? requestBody : {};
 
-    requestBody = {
-      ...(requestBody ?? {}),
+      requestBody = {
+        ...body,
 
-      ...(!requestBody?.locationName && route !== "/api/auth/profile"
-        ? {
-            locationName: effectiveLocation.name,
-            locationState: effectiveLocation.state,
-          }
-        : {}),
+        // Fill these independently so one existing field
+        // does not prevent the other from being populated.
+        ...(route !== "/api/auth/profile" && !body.locationName
+          ? { locationName: location.name }
+          : {}),
 
-      latitude: requestBody?.latitude ?? effectiveLocation.latitude,
+        ...(route !== "/api/auth/profile" && !body.locationState
+          ? { locationState: location.state }
+          : {}),
 
-      longitude: requestBody?.longitude ?? effectiveLocation.longitude,
+        latitude: body.latitude ?? location.latitude,
+        longitude: body.longitude ?? location.longitude,
+        isAutoDetected: body.isAutoDetected ?? location.isAutoDetected,
+      };
 
-      isAutoDetected:
-        requestBody?.isAutoDetected ?? effectiveLocation.isAutoDetected,
-    };
+      console.log("[API] Location enrichment:", {
+        endpoint: route,
+        locationName: requestBody.locationName,
+        locationState: requestBody.locationState,
+        latitude: requestBody.latitude,
+        longitude: requestBody.longitude,
+        isAutoDetected: requestBody.isAutoDetected,
+      });
+    } else {
+      console.log(
+        `[API] No selected location for ${route}; sending request without location enrichment.`,
+      );
+    }
   }
 
   /* ---------------- Resolve URL ---------------- */
@@ -244,12 +259,12 @@ async function request<T>(
 
     /* ---------------- Parse response ---------------- */
 
-    let body: any = null;
+    let responseBody: any = null;
 
     try {
-      body = await response.json();
+      responseBody = await response.json();
     } catch {
-      // Support endpoints returning empty or non-JSON responses.
+      // Supports empty and non-JSON responses.
     }
 
     /* ---------------- Handle unauthorized ---------------- */
@@ -258,7 +273,7 @@ async function request<T>(
       await removeJwtToken();
 
       throw new UnauthorizedError(
-        body?.error ?? body?.message ?? "Unauthorized",
+        responseBody?.error ?? responseBody?.message ?? "Unauthorized",
       );
     }
 
@@ -267,11 +282,13 @@ async function request<T>(
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        body?.error ?? body?.message ?? `Request failed (${response.status}).`,
+        responseBody?.error ??
+          responseBody?.message ??
+          `Request failed (${response.status}).`,
       );
     }
 
-    return body as T;
+    return responseBody as T;
   } catch (error: any) {
     if (error instanceof ApiError) {
       throw error;

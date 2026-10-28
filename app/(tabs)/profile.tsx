@@ -912,7 +912,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Privacy & Safety */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={s.menuItemRow}
               onPress={() => setActiveModal("privacy")}
               activeOpacity={0.7}
@@ -938,7 +938,7 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={scale(16)} color={t.sub} />
             </TouchableOpacity>
 
-            <View style={s.menuItemSeparator} />
+            <View style={s.menuItemSeparator} /> */}
 
             {/* Help & Support */}
             <TouchableOpacity
@@ -1457,7 +1457,7 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <View style={s.switchCard}>
+            {/* <View style={s.switchCard}>
               <View style={{ flex: 1 }}>
                 <Text style={s.switchTitle}>Private Profile</Text>
                 <Text style={s.switchSub}>
@@ -1485,7 +1485,7 @@ export default function ProfileScreen() {
                 trackColor={{ false: t.border, true: t.primary }}
                 thumbColor={t.white}
               />
-            </View>
+            </View> */}
           </ScrollView>
         </SafeAreaView>
       </Modal>
