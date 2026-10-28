@@ -20,17 +20,17 @@ export async function createActivity(
   body: CreateActivityRequest,
   organizer: User,
 ) {
-  const date = new Date(body.date);
-  const time = new Date(body.time);
+  const timeStr = String(body.time);
+  const [hours, minutes] = timeStr.split(/[: ]/);
+  const period = timeStr.slice(-2).toUpperCase();
 
-  if (!isNaN(date.getTime()) && !isNaN(time.getTime())) {
-    date.setHours(
-      time.getHours(),
-      time.getMinutes(),
-      time.getSeconds(),
-      time.getMilliseconds(),
-    );
-  }
+  const date = new Date(`${body.date}T00:00:00`);
+  let h = Number(hours);
+
+  if (period === "PM" && h !== 12) h += 12;
+  if (period === "AM" && h === 12) h = 0;
+
+  date.setHours(h, Number(minutes), 0, 0);
 
   const activity = await activityRepository.create({
     organizerId: organizer.id,
@@ -46,9 +46,7 @@ export async function createActivity(
     latitude: body.latitude,
     longitude: body.longitude,
     isAutoDetected: body.isAutoDetected ?? false,
-
     datetime: date,
-
     cost: 0,
     maxParticipants: body.matesNeeded,
     remainingSeats: body.matesNeeded,
