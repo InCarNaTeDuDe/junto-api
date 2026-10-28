@@ -36,25 +36,11 @@ export const CreateTicketForSaleSchema = z.object({
 
   showTime: z.union([z.string(), z.date()]),
 
-  originalPrice: z
-    .number({
-      error: "originalPrice is required.",
-    })
-    .nonnegative(),
+  originalPrice: z.number().nonnegative().optional().default(0),
 
-  sellingPrice: z
-    .number({
-      error: "sellingPrice is required.",
-    })
-    .nonnegative(),
+  sellingPrice: z.number().nonnegative().optional().default(0),
 
-  quantity: z
-    .number({
-      error: "quantity is required.",
-    })
-    .int()
-    .min(1)
-    .max(20),
+  quantity: z.number().int().min(1).max(20).optional().default(1),
 
   note: z.string().trim().max(500).optional(),
 

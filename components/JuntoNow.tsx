@@ -127,6 +127,9 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
         return { key: "enableDeals", name: "Local Deals" };
       case "company":
         return { key: "enableDaymates", name: "DayMates Activities" };
+      case "ticket_swap":
+      case "sell_ticket":
+        return { key: "enableTicketSelling", name: "Ticket Swap & Resale" };
       default:
         return null;
     }
@@ -161,6 +164,9 @@ export const JuntoNow: React.FC<JuntoNowProps> = ({
         return `${stats.dealsCount} deals posted`;
       case "company":
         return `${stats.companyCount} looking for mates`;
+      case "ticket_swap":
+      case "sell_ticket":
+        return "Find / Sell movie tickets";
       case "new_here":
         return `Explore ${rawCity}`;
       default:

@@ -63,6 +63,24 @@ export class Activity {
   })
   cost!: number;
 
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  originalPrice?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  sellingPrice?: number;
+
   @Column({ type: "int" })
   maxParticipants!: number;
 

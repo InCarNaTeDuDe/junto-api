@@ -40,8 +40,27 @@ export class Ticket {
     type: "decimal",
     precision: 10,
     scale: 2,
+    default: 0,
   })
   price!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  originalPrice?: number;
+
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  sellingPrice?: number;
 
   @Column({ type: "varchar" })
   section!: string;

@@ -117,23 +117,46 @@ export const JuntoNowColors = {
   },
 
   new_here: {
-    tint: "#059669",
-    tintDark: "#34D399",
+    tint: "#0891B2",
+    tintDark: "#22D3EE",
     light: {
-      bg: "#ECFDF5",
-      border: "#D1FAE5",
-      iconBg: "#D1FAE5",
-      btnBg: "#D1FAE5",
-      btnText: "#059669",
+      bg: "#ECFEFF",
+      border: "#CFFAFE",
+      iconBg: "#CFFAFE",
+      btnBg: "#CFFAFE",
+      btnText: "#0891B2",
       title: "#0F172A",
       sub: "#64748B",
     },
     dark: {
-      bg: "rgba(5, 150, 105, 0.12)",
-      border: "rgba(5, 150, 105, 0.28)",
-      iconBg: "rgba(5, 150, 105, 0.22)",
-      btnBg: "rgba(5, 150, 105, 0.22)",
-      btnText: "#34D399",
+      bg: "rgba(8, 145, 178, 0.12)",
+      border: "rgba(8, 145, 178, 0.28)",
+      iconBg: "rgba(8, 145, 178, 0.22)",
+      btnBg: "rgba(8, 145, 178, 0.22)",
+      btnText: "#22D3EE",
+      title: "#F8FAFC",
+      sub: "rgba(255, 255, 255, 0.7)",
+    },
+  },
+
+  ticket: {
+    tint: "#E11D48",
+    tintDark: "#FB7185",
+    light: {
+      bg: "#FFF1F2",
+      border: "#FFE4E6",
+      iconBg: "#FFE4E6",
+      btnBg: "#FFE4E6",
+      btnText: "#E11D48",
+      title: "#0F172A",
+      sub: "#64748B",
+    },
+    dark: {
+      bg: "rgba(225, 29, 72, 0.12)",
+      border: "rgba(225, 29, 72, 0.28)",
+      iconBg: "rgba(225, 29, 72, 0.22)",
+      btnBg: "rgba(225, 29, 72, 0.22)",
+      btnText: "#FB7185",
       title: "#F8FAFC",
       sub: "rgba(255, 255, 255, 0.7)",
     },
@@ -228,22 +251,13 @@ export const DefaultJuntoNowFeatures: JuntoNowItemConfig[] = [
     colorKey: "company",
     route: "/(screens)/add-daymate",
   },
-  // {
-  //   id: "new_here",
-  //   icon: "location",
-  //   title: "New Here",
-  //   subtitle: "Visiting {city}?",
-  //   btn: "Explore Now",
-  //   colorKey: "new_here",
-  //   route: "/(screens)/new-here",
-  // },
   {
     id: "ticket_swap",
     icon: "ticket",
-    title: "Ticket Swap",
+    title: "Sell Tickets",
     subtitle: "Find / Sell movie tickets",
-    btn: "Find/Sell Tickets",
-    colorKey: "new_here",
+    btn: "Sell Tickets",
+    colorKey: "ticket",
     route: "/(screens)/add-ticket",
   },
 ];
@@ -252,10 +266,18 @@ export function getJuntoNowFeatureColors(
   feature: JuntoNowItemConfig | string,
   isDark: boolean,
 ) {
-  const colorKey =
+  let colorKey =
     typeof feature === "string"
       ? feature
       : feature.colorKey || feature.id || "default";
+
+  if (
+    colorKey === "ticket_swap" ||
+    colorKey === "sell_ticket" ||
+    colorKey === "sell_tickets"
+  ) {
+    colorKey = "ticket";
+  }
 
   const config =
     (JuntoNowColors as Record<string, any>)[colorKey] || JuntoNowColors.default;

@@ -374,10 +374,12 @@ export async function addTicketForSale(
           return new Date();
         }
       })(),
-      cost: body.sellingPrice,
+      cost: body.sellingPrice || 0,
+      originalPrice: body.originalPrice ?? 0,
+      sellingPrice: body.sellingPrice ?? 0,
 
-      maxParticipants: body.quantity,
-      remainingSeats: body.quantity,
+      maxParticipants: body.quantity || 1,
+      remainingSeats: body.quantity || 1,
 
       participantIds: [],
       tags: ["MOVIES", body.movieName, "TICKET_SALE"],
@@ -391,7 +393,10 @@ export async function addTicketForSale(
 
     // 1. Confirm to organizer
     const orgTitle = `Ticket Listed for Sale! 🎟️`;
-    const orgMsg = `Your ${body.quantity} ticket(s) for "${body.movieName}" are listed in ${body.locationName}.`;
+    const orgMsg =
+      body.quantity && body.quantity > 1
+        ? `Your ${body.quantity} tickets for "${body.movieName}" are listed in ${body.locationName}.`
+        : `Your ticket for "${body.movieName}" is listed in ${body.locationName}.`;
     notificationRepository
       .createNotification({
         userId: organizer.id,
@@ -402,7 +407,7 @@ export async function addTicketForSale(
         data: {
           activityId: activity.id,
           title: body.movieName,
-          cost: body.sellingPrice,
+          cost: body.sellingPrice || 0,
           locationName: body.locationName,
           category: "MOVIES",
         },

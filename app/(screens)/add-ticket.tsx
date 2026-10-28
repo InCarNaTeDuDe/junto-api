@@ -20,7 +20,6 @@ import {
 } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "@/context/LocationContext";
-import { useAuthContext } from "@/context/AuthContext";
 import { useAppConfig } from "@/context/AppConfigContext";
 import { FeatureDisabledView } from "@/components/FeatureDisabledBanner";
 import { JuntoScreenHeader } from "@/components/JuntoScreenHeader";
@@ -34,33 +33,12 @@ export interface SellTicketFormProps {
   onSubmitSuccess?: (data: any) => void;
 }
 
-const TICKET_CATEGORIES = [
-  { id: "movie", label: "Movie", emoji: "🎬", icon: "film-outline" },
-  {
-    id: "concert",
-    label: "Concert",
-    emoji: "🎸",
-    icon: "musical-notes-outline",
-  },
-  { id: "sports", label: "Sports", emoji: "🏏", icon: "football-outline" },
-  { id: "event", label: "Live Event", emoji: "🎭", icon: "sparkles-outline" },
-];
-
 const POPULAR_MOVIES = [
+  "Pushpa 2",
   "Kalki 2898 AD",
   "Devara: Part 1",
-  "Avatar: Fire and Ash",
-  "Coldplay Live 2026",
-  "IPL Cricket Match",
-  "Arijit Singh Arena Tour",
-];
-
-const POPULAR_VENUES = [
-  "PVR Inorbit Mall (Screen 4)",
-  "AMB Cinemas Gachibowli",
-  "Inox GVK One Mall",
-  "Prasads Multiplex Screen 6",
-  "Gachibowli Stadium",
+  "Avatar 3",
+  "Coolie",
 ];
 
 export default function SellTicketScreen({
@@ -73,10 +51,8 @@ export default function SellTicketScreen({
   const insets = useSafeAreaInsets();
   const { theme: t, isDark } = useTheme();
   const { selectedLocation } = useLocation();
-  const { user } = useAuthContext();
   const { isFeatureEnabled, refreshConfig } = useAppConfig();
 
-  // If Ticket Selling is disabled, show dedicated Ticket Swap maintenance screen (NOT RideMate!)
   if (!isFeatureEnabled("enableTicketSelling")) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -90,19 +66,12 @@ export default function SellTicketScreen({
     );
   }
 
-  const [selectedCategory, setSelectedCategory] = useState("movie");
-  const [eventName, setEventName] = useState("");
-  const [venue, setVenue] = useState("");
-  const [ticketQuantity, setTicketQuantity] = useState(2);
-  const [seatsDetail, setSeatsDetail] = useState("");
+  // Form state: Movie Name, Date, Time, Original Price, Selling Price, Additional Notes
+  const [movieName, setMovieName] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
-  const [deliveryMethod, setDeliveryMethod] = useState<"digital" | "venue">(
-    "digital",
-  );
   const [notes, setNotes] = useState("");
 
-  // Date and Time Pickers
   const [showDate, setShowDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -115,29 +84,22 @@ export default function SellTicketScreen({
   });
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else if (onClose) {
-      onClose();
-    } else if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
-    }
-  };
+  const origPriceNum = parseFloat(originalPrice.replace(/[^0-9.]/g, "")) || 0;
+  const sellPriceNum = parseFloat(sellingPrice.replace(/[^0-9.]/g, "")) || 0;
+  const discountAmount =
+    origPriceNum > sellPriceNum ? origPriceNum - sellPriceNum : 0;
+  const discountPercent =
+    origPriceNum > 0 && discountAmount > 0
+      ? Math.round((discountAmount / origPriceNum) * 100)
+      : 0;
 
   const handleClose = () => {
-    if (onClose) {
-      onClose();
-    } else if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
-    }
+    if (onBack) onBack();
+    else if (onClose) onClose();
+    else if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
   };
 
   const onDateChange = (_: any, selected?: Date) => {
@@ -150,30 +112,14 @@ export default function SellTicketScreen({
     if (selected) setShowTime(selected);
   };
 
-  const origPriceNum = parseFloat(originalPrice.replace(/[^0-9.]/g, "")) || 0;
-  const sellPriceNum = parseFloat(sellingPrice.replace(/[^0-9.]/g, "")) || 0;
-  const discountAmount =
-    origPriceNum > sellPriceNum ? origPriceNum - sellPriceNum : 0;
-  const discountPercent =
-    origPriceNum > 0 && discountAmount > 0
-      ? Math.round((discountAmount / origPriceNum) * 100)
-      : 0;
-
   const handleSubmit = async () => {
-    const trimmedTitle = eventName.trim();
+    const trimmedTitle = movieName.trim();
     if (!trimmedTitle) {
-      Alert.alert("Title Required", "Please enter the movie or event name.");
-      return;
-    }
-    if (!venue.trim()) {
-      Alert.alert("Venue Required", "Please enter the theater or event venue.");
+      Alert.alert("Movie Name Required", "Please enter the movie name.");
       return;
     }
     if (sellPriceNum <= 0) {
-      Alert.alert(
-        "Price Required",
-        "Please enter your selling price per ticket.",
-      );
+      Alert.alert("Selling Price Required", "Please enter your selling price.");
       return;
     }
 
@@ -181,9 +127,7 @@ export default function SellTicketScreen({
     try {
       const dateIso = showDate.toISOString().split("T")[0];
       const timeIso = showTime.toTimeString().split(" ")[0];
-
-      const locName =
-        venue.trim() + ", " + (selectedLocation?.name || "Hyderabad");
+      const locName = selectedLocation?.name || "Hyderabad";
 
       const payload = {
         movieName: trimmedTitle,
@@ -192,15 +136,8 @@ export default function SellTicketScreen({
         showTime: timeIso,
         originalPrice: origPriceNum || sellPriceNum,
         sellingPrice: sellPriceNum,
-        quantity: ticketQuantity,
-        note: [
-          seatsDetail.trim() ? `Seats: ${seatsDetail.trim()}` : "",
-          `Venue: ${venue.trim()}`,
-          `Delivery: ${deliveryMethod === "digital" ? "Instant M-Ticket WhatsApp/App Transfer" : "Physical handover at venue gate"}`,
-          notes.trim(),
-        ]
-          .filter(Boolean)
-          .join(" • "),
+        quantity: 1,
+        note: notes.trim(),
         locationName: locName,
         locationState: selectedLocation?.state || "Telangana",
         latitude: selectedLocation?.latitude || 17.4375,
@@ -210,14 +147,16 @@ export default function SellTicketScreen({
 
       try {
         await ApiService.post("/api/activity/sell-ticket", payload);
-      } catch (postErr) {
-        // Fallback to /api/activity if /sell-ticket endpoint is offline
+      } catch {
+        // Fallback to /api/activity
         await ApiService.post("/api/activity", {
           activity: trimmedTitle,
           activityEmoji: "🎟️",
           category: "MOVIES",
           cost: sellPriceNum,
-          matesNeeded: ticketQuantity,
+          originalPrice: origPriceNum || sellPriceNum,
+          sellingPrice: sellPriceNum,
+          matesNeeded: 1,
           date: dateIso,
           time: timeIso,
           showDate: showDate.toLocaleDateString("en-IN", {
@@ -233,27 +172,26 @@ export default function SellTicketScreen({
           locationState: selectedLocation?.state || "Telangana",
           latitude: selectedLocation?.latitude || 17.4375,
           longitude: selectedLocation?.longitude || 78.3853,
-          description: payload.note,
+          description: notes.trim(),
           type: "MOVIE TICKET",
         });
       }
 
       PushNotificationService.triggerLocalPushNotification(
-        "Ticket Listed for Swap! 🎟️",
-        `Your ${ticketQuantity} ticket(s) for "${trimmedTitle}" are now live with 0% platform fee.`,
+        "Ticket Listed! 🎟️",
+        `Your ticket for "${trimmedTitle}" is now listed at ₹${sellPriceNum} with 0% platform fee.`,
         { type: "ticket" },
       );
 
       Alert.alert(
         "Ticket Listed! 🎟️",
-        `Your tickets for "${trimmedTitle}" are now live in the Ticket Marketplace. Neighbors nearby will be notified!`,
+        `Your movie ticket for "${trimmedTitle}" is listed at ₹${sellPriceNum}. People nearby can see it!`,
         [
           {
-            text: "View My Tickets",
+            text: "Done",
             onPress: () => {
               if (onSubmitSuccess) onSubmitSuccess(payload);
-              if (onClose) onClose();
-              else router.replace("/(tabs)/profile");
+              handleClose();
             },
           },
         ],
@@ -284,9 +222,9 @@ export default function SellTicketScreen({
         {!isEmbedded && (
           <JuntoScreenHeader
             title="Sell / Swap Ticket"
-            subtitle="0% platform fee movie & event ticket marketplace"
+            subtitle="0% platform fee movie ticket exchange"
             showBack={true}
-            onBack={handleBack}
+            onBack={handleClose}
             onClose={handleClose}
           />
         )}
@@ -300,22 +238,27 @@ export default function SellTicketScreen({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Hero Value Proposition Banner */}
+          {/* Hero Value Banner */}
           <View
             style={[
               styles.heroBanner,
               {
-                backgroundColor: isDark
-                  ? "rgba(249, 115, 22, 0.12)"
-                  : "rgba(249, 115, 22, 0.08)",
-                borderColor: isDark
-                  ? "rgba(249, 115, 22, 0.3)"
-                  : "rgba(249, 115, 22, 0.25)",
+                backgroundColor: isDark ? "rgba(225, 29, 72, 0.12)" : "#FFF1F2",
+                borderColor: isDark ? "rgba(225, 29, 72, 0.28)" : "#FFE4E6",
               },
             ]}
           >
-            <View style={styles.heroIconBox}>
-              <Ionicons name="ticket" size={26} color="#F97316" />
+            <View
+              style={[
+                styles.heroIconBox,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(225, 29, 72, 0.22)"
+                    : "#FFE4E6",
+                },
+              ]}
+            >
+              <Ionicons name="ticket" size={24} color="#E11D48" />
             </View>
             <View style={{ flex: 1 }}>
               <View
@@ -325,65 +268,20 @@ export default function SellTicketScreen({
                   Ticket Swap & Resale
                 </Text>
                 <View style={styles.feeZeroBadge}>
-                  <Text style={styles.feeZeroText}>0% Platform Fee</Text>
+                  <Text style={styles.feeZeroText}>0% Fee</Text>
                 </View>
               </View>
               <Text style={[styles.heroSubtitle, { color: t.sub }]}>
-                Plans changed? Avoid complete loss! Sell spare tickets directly
-                to verified locals at face value or discount.
+                Plans changed? Sell or swap spare movie tickets directly to
+                verified locals nearby.
               </Text>
             </View>
           </View>
 
-          {/* 1. Category Selector */}
+          {/* 1. Movie Name */}
           <View>
             <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Event Category
-            </Text>
-            <View style={styles.categoryRow}>
-              {TICKET_CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setSelectedCategory(cat.id)}
-                    style={[
-                      styles.categoryPill,
-                      {
-                        backgroundColor: isSelected
-                          ? isDark
-                            ? "rgba(249, 115, 22, 0.25)"
-                            : "#FFEDD5"
-                          : isDark
-                            ? "rgba(255, 255, 255, 0.05)"
-                            : t.card,
-                        borderColor: isSelected ? "#F97316" : t.border,
-                      },
-                    ]}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={{ fontSize: 16 }}>{cat.emoji}</Text>
-                    <Text
-                      style={[
-                        styles.categoryPillText,
-                        {
-                          color: isSelected ? "#F97316" : t.text,
-                          fontWeight: isSelected ? "800" : "600",
-                        },
-                      ]}
-                    >
-                      {cat.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* 2. Event or Movie Title */}
-          <View>
-            <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Movie or Event Name <Text style={{ color: "#EF4444" }}>*</Text>
+              Movie Name <Text style={{ color: "#EF4444" }}>*</Text>
             </Text>
             <TextInput
               style={[
@@ -394,13 +292,13 @@ export default function SellTicketScreen({
                   color: t.text,
                 },
               ]}
-              placeholder="e.g., Kalki 2898 AD, Coldplay Live, IPL match..."
+              placeholder="e.g., Pushpa 2, Kalki 2898 AD, Devara..."
               placeholderTextColor={t.placeholder}
-              value={eventName}
-              onChangeText={setEventName}
+              value={movieName}
+              onChangeText={setMovieName}
             />
 
-            {/* Quick Suggestions Chips */}
+            {/* Quick Movie Chips */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -409,26 +307,26 @@ export default function SellTicketScreen({
               {POPULAR_MOVIES.map((item) => (
                 <TouchableOpacity
                   key={item}
-                  onPress={() => setEventName(item)}
+                  onPress={() => setMovieName(item)}
                   style={[
                     styles.chip,
                     {
                       backgroundColor:
-                        eventName === item
+                        movieName === item
                           ? isDark
-                            ? "rgba(249, 115, 22, 0.25)"
-                            : "#FFEDD5"
+                            ? "rgba(225, 29, 72, 0.22)"
+                            : "#FFE4E6"
                           : isDark
                             ? "rgba(255, 255, 255, 0.04)"
                             : t.card,
-                      borderColor: eventName === item ? "#F97316" : t.border,
+                      borderColor: movieName === item ? "#E11D48" : t.border,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      { color: eventName === item ? "#F97316" : t.sub },
+                      { color: movieName === item ? "#E11D48" : t.sub },
                     ]}
                   >
                     {item}
@@ -438,68 +336,10 @@ export default function SellTicketScreen({
             </ScrollView>
           </View>
 
-          {/* 3. Theater / Venue & Location */}
+          {/* 2. Date & Time */}
           <View>
             <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Theater / Venue <Text style={{ color: "#EF4444" }}>*</Text>
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                  borderColor: t.border,
-                  color: t.text,
-                },
-              ]}
-              placeholder="e.g., PVR Inorbit Mall Screen 3, AMB Cinemas..."
-              placeholderTextColor={t.placeholder}
-              value={venue}
-              onChangeText={setVenue}
-            />
-
-            {/* Quick Venue Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, marginTop: 8 }}
-            >
-              {POPULAR_VENUES.map((v) => (
-                <TouchableOpacity
-                  key={v}
-                  onPress={() => setVenue(v)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        venue === v
-                          ? isDark
-                            ? "rgba(249, 115, 22, 0.25)"
-                            : "#FFEDD5"
-                          : isDark
-                            ? "rgba(255, 255, 255, 0.04)"
-                            : t.card,
-                      borderColor: venue === v ? "#F97316" : t.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: venue === v ? "#F97316" : t.sub },
-                    ]}
-                  >
-                    {v}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* 4. Show Date & Time Controls */}
-          <View>
-            <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Show Date & Time
+              Date & Time
             </Text>
             <View style={styles.dateTimeRow}>
               {/* Pick Date */}
@@ -509,7 +349,7 @@ export default function SellTicketScreen({
                   styles.dateTimeCard,
                   {
                     backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: isDatePickerOpen ? "#F97316" : t.border,
+                    borderColor: isDatePickerOpen ? "#E11D48" : t.border,
                   },
                 ]}
                 activeOpacity={0.8}
@@ -517,10 +357,14 @@ export default function SellTicketScreen({
                 <View
                   style={[
                     styles.dateTimeIconBox,
-                    { backgroundColor: "rgba(249, 115, 22, 0.15)" },
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(225, 29, 72, 0.2)"
+                        : "#FFE4E6",
+                    },
                   ]}
                 >
-                  <Ionicons name="calendar-outline" size={18} color="#F97316" />
+                  <Ionicons name="calendar-outline" size={18} color="#E11D48" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.dateTimeLabel, { color: t.sub }]}>
@@ -544,7 +388,7 @@ export default function SellTicketScreen({
                   styles.dateTimeCard,
                   {
                     backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: isTimePickerOpen ? "#F97316" : t.border,
+                    borderColor: isTimePickerOpen ? "#E11D48" : t.border,
                   },
                 ]}
                 activeOpacity={0.8}
@@ -552,10 +396,14 @@ export default function SellTicketScreen({
                 <View
                   style={[
                     styles.dateTimeIconBox,
-                    { backgroundColor: "rgba(249, 115, 22, 0.15)" },
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(225, 29, 72, 0.2)"
+                        : "#FFE4E6",
+                    },
                   ]}
                 >
-                  <Ionicons name="time-outline" size={18} color="#F97316" />
+                  <Ionicons name="time-outline" size={18} color="#E11D48" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.dateTimeLabel, { color: t.sub }]}>
@@ -572,13 +420,23 @@ export default function SellTicketScreen({
               </TouchableOpacity>
             </View>
 
-            {/* Inline Date/Time Pickers for Web/Mobile */}
+            {/* Inline Pickers for Web / Expanded */}
             {(isDatePickerOpen ||
               isTimePickerOpen ||
               Platform.OS === "web") && (
               <View style={styles.pickersContainer}>
                 {(isDatePickerOpen || Platform.OS === "web") && (
-                  <View style={styles.pickerBox}>
+                  <View
+                    style={[
+                      styles.pickerBox,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.04)"
+                          : t.card,
+                        borderColor: t.border,
+                      },
+                    ]}
+                  >
                     <Text style={[styles.pickerBoxLabel, { color: t.sub }]}>
                       Select Date
                     </Text>
@@ -592,7 +450,17 @@ export default function SellTicketScreen({
                   </View>
                 )}
                 {(isTimePickerOpen || Platform.OS === "web") && (
-                  <View style={styles.pickerBox}>
+                  <View
+                    style={[
+                      styles.pickerBox,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.04)"
+                          : t.card,
+                        borderColor: t.border,
+                      },
+                    ]}
+                  >
                     <Text style={[styles.pickerBoxLabel, { color: t.sub }]}>
                       Select Time
                     </Text>
@@ -609,85 +477,10 @@ export default function SellTicketScreen({
             )}
           </View>
 
-          {/* 5. Quantity Stepper & Seats */}
-          <View style={styles.quantityAndSeatRow}>
-            {/* Quantity */}
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.sectionHeading, { color: t.text }]}>
-                Number of Tickets
-              </Text>
-              <View
-                style={[
-                  styles.stepperContainer,
-                  {
-                    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: t.border,
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => setTicketQuantity((q) => Math.max(1, q - 1))}
-                  disabled={ticketQuantity <= 1}
-                  style={[
-                    styles.stepperBtn,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(255,255,255,0.08)"
-                        : "#F1F5F9",
-                      opacity: ticketQuantity <= 1 ? 0.4 : 1,
-                    },
-                  ]}
-                >
-                  <Ionicons name="remove" size={18} color={t.text} />
-                </TouchableOpacity>
-
-                <Text style={[styles.stepperCount, { color: t.text }]}>
-                  {ticketQuantity}
-                </Text>
-
-                <TouchableOpacity
-                  onPress={() => setTicketQuantity((q) => Math.min(10, q + 1))}
-                  style={[
-                    styles.stepperBtn,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(255,255,255,0.08)"
-                        : "#F1F5F9",
-                    },
-                  ]}
-                >
-                  <Ionicons name="add" size={18} color={t.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Seat Category */}
-            <View style={{ flex: 1.2 }}>
-              <Text style={[styles.sectionHeading, { color: t.text }]}>
-                Seat / Row Info
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: t.border,
-                    color: t.text,
-                    height: 52,
-                  },
-                ]}
-                placeholder="e.g. Row F, Seats 12 & 13"
-                placeholderTextColor={t.placeholder}
-                value={seatsDetail}
-                onChangeText={setSeatsDetail}
-              />
-            </View>
-          </View>
-
-          {/* 6. Pricing & Deal Calculation */}
+          {/* 3. Original Price & Selling Price */}
           <View>
             <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Pricing Details (Per Ticket)
+              Pricing Details
             </Text>
             <View style={{ flexDirection: "row", gap: 12 }}>
               {/* Original Price */}
@@ -720,24 +513,23 @@ export default function SellTicketScreen({
                 </View>
               </View>
 
-              {/* Selling / Swap Price */}
+              {/* Selling Price */}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.inputSubLabel, { color: t.sub }]}>
-                  Your Selling Price (₹){" "}
-                  <Text style={{ color: "#EF4444" }}>*</Text>
+                  Selling Price (₹) <Text style={{ color: "#EF4444" }}>*</Text>
                 </Text>
                 <View
                   style={[
                     styles.priceInputWrapper,
                     {
                       backgroundColor: isDark
-                        ? "rgba(249, 115, 22, 0.1)"
-                        : "#FFF7ED",
-                      borderColor: "#F97316",
+                        ? "rgba(225, 29, 72, 0.1)"
+                        : "#FFF1F2",
+                      borderColor: "#E11D48",
                     },
                   ]}
                 >
-                  <Text style={[styles.currencyPrefix, { color: "#F97316" }]}>
+                  <Text style={[styles.currencyPrefix, { color: "#E11D48" }]}>
                     ₹
                   </Text>
                   <TextInput
@@ -752,7 +544,7 @@ export default function SellTicketScreen({
               </View>
             </View>
 
-            {/* Deal Value Banner */}
+            {/* Savings calculation banner */}
             {sellPriceNum > 0 && (
               <View
                 style={[
@@ -768,106 +560,20 @@ export default function SellTicketScreen({
                 <Ionicons name="pricetag" size={16} color="#10B981" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.dealSummaryText}>
-                    Total Value: ₹{sellPriceNum * ticketQuantity} for{" "}
-                    {ticketQuantity} ticket{ticketQuantity > 1 ? "s" : ""}
-                    {discountPercent > 0 ? ` (${discountPercent}% OFF)` : ""}
+                    Price: ₹{sellPriceNum}
+                    {discountPercent > 0
+                      ? ` (${discountPercent}% OFF • Saves ₹${discountAmount})`
+                      : ""}
                   </Text>
                   <Text style={styles.dealSubText}>
-                    0% platform cut • Buyer saves directly • You recover full
-                    amount
+                    0% platform cut • 100% goes directly to you
                   </Text>
                 </View>
               </View>
             )}
           </View>
 
-          {/* 7. Delivery / Handover Method */}
-          <View>
-            <Text style={[styles.sectionHeading, { color: t.text }]}>
-              Delivery / Transfer Method
-            </Text>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => setDeliveryMethod("digital")}
-                style={[
-                  styles.methodCard,
-                  {
-                    backgroundColor:
-                      deliveryMethod === "digital"
-                        ? isDark
-                          ? "rgba(249, 115, 22, 0.2)"
-                          : "#FFEDD5"
-                        : isDark
-                          ? "rgba(255,255,255,0.04)"
-                          : t.card,
-                    borderColor:
-                      deliveryMethod === "digital" ? "#F97316" : t.border,
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="phone-portrait-outline"
-                  size={20}
-                  color={deliveryMethod === "digital" ? "#F97316" : t.sub}
-                />
-                <Text
-                  style={[
-                    styles.methodCardTitle,
-                    {
-                      color: deliveryMethod === "digital" ? "#F97316" : t.text,
-                    },
-                  ]}
-                >
-                  Digital M-Ticket
-                </Text>
-                <Text style={[styles.methodCardSub, { color: t.sub }]}>
-                  Instant WhatsApp or app transfer
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setDeliveryMethod("venue")}
-                style={[
-                  styles.methodCard,
-                  {
-                    backgroundColor:
-                      deliveryMethod === "venue"
-                        ? isDark
-                          ? "rgba(249, 115, 22, 0.2)"
-                          : "#FFEDD5"
-                        : isDark
-                          ? "rgba(255,255,255,0.04)"
-                          : t.card,
-                    borderColor:
-                      deliveryMethod === "venue" ? "#F97316" : t.border,
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="people-outline"
-                  size={20}
-                  color={deliveryMethod === "venue" ? "#F97316" : t.sub}
-                />
-                <Text
-                  style={[
-                    styles.methodCardTitle,
-                    {
-                      color: deliveryMethod === "venue" ? "#F97316" : t.text,
-                    },
-                  ]}
-                >
-                  Venue Meetup
-                </Text>
-                <Text style={[styles.methodCardSub, { color: t.sub }]}>
-                  Meet at gate before showtime
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* 8. Additional Notes */}
+          {/* 4. Additional Notes */}
           <View>
             <Text style={[styles.sectionHeading, { color: t.text }]}>
               Additional Notes (Optional)
@@ -882,7 +588,7 @@ export default function SellTicketScreen({
                   color: t.text,
                 },
               ]}
-              placeholder="e.g. Can share BookMyShow booking screenshot or meet 15 mins before show..."
+              placeholder="e.g. Theater, screen, seat info, booking screenshot or meetup details..."
               placeholderTextColor={t.placeholder}
               value={notes}
               onChangeText={setNotes}
@@ -911,8 +617,7 @@ export default function SellTicketScreen({
           </TouchableOpacity>
 
           <Text style={[styles.footerDisclaimer, { color: t.sub }]}>
-            🛡️ Peer-to-peer community exchange with 0% platform fee. Connect
-            directly with verified buyers.
+            🛡️ Peer-to-peer community exchange with 0% platform fee.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -941,10 +646,9 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   heroIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(249, 115, 22, 0.2)",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -974,22 +678,48 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 0.2,
   },
-  categoryRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+  inputSubLabel: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginBottom: 6,
   },
-  categoryPill: {
+  priceInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
     borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 50,
   },
-  categoryPillText: {
+  currencyPrefix: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginRight: 6,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  dealSummaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  dealSummaryText: {
     fontSize: 13,
+    fontWeight: "800",
+    color: "#10B981",
+  },
+  dealSubText: {
+    fontSize: 10.5,
+    color: "#059669",
+    marginTop: 2,
+    fontWeight: "500",
   },
   textInput: {
     borderWidth: 1,
@@ -1000,7 +730,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   textArea: {
-    height: 76,
+    height: 80,
     textAlignVertical: "top",
   },
   chip: {
@@ -1054,105 +784,21 @@ const styles = StyleSheet.create({
     minWidth: 140,
     padding: 10,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
   pickerBoxLabel: {
     fontSize: 11,
     fontWeight: "700",
     marginBottom: 6,
   },
-  quantityAndSeatRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  stepperContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    height: 52,
-  },
-  stepperBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperCount: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  inputSubLabel: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  priceInputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 50,
-  },
-  currencyPrefix: {
-    fontSize: 16,
-    fontWeight: "800",
-    marginRight: 6,
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  dealSummaryCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 10,
-  },
-  dealSummaryText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#10B981",
-  },
-  dealSubText: {
-    fontSize: 10.5,
-    color: "#059669",
-    marginTop: 2,
-    fontWeight: "500",
-  },
-  methodCard: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: 6,
-  },
-  methodCardTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  methodCardSub: {
-    fontSize: 10.5,
-    lineHeight: 14,
-  },
   submitButton: {
-    backgroundColor: "#F97316",
+    backgroundColor: "#E11D48",
     borderRadius: 18,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
-    shadowColor: "#F97316",
+    shadowColor: "#E11D48",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
