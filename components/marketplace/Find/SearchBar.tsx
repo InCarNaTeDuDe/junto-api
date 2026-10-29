@@ -145,7 +145,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 />
               </Animated.View>
             ) : (
-              <Ionicons name="mic" size={18} color={textMute} />
+              <Ionicons name="mic-off" size={18} color={textMute} />
             )}
           </TouchableOpacity>
         )}

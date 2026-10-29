@@ -161,6 +161,29 @@ export const JuntoNowColors = {
     },
   },
 
+  glamup: {
+    tint: "#DB2777",
+    tintDark: "#F472B6",
+    light: {
+      bg: "#FDF2F8",
+      border: "#FCE7F3",
+      iconBg: "#FCE7F3",
+      btnBg: "#FCE7F3",
+      btnText: "#DB2777",
+      title: "#0F172A",
+      sub: "#64748B",
+    },
+    dark: {
+      bg: "rgba(219, 39, 119, 0.12)",
+      border: "rgba(219, 39, 119, 0.28)",
+      iconBg: "rgba(219, 39, 119, 0.22)",
+      btnBg: "rgba(219, 39, 119, 0.22)",
+      btnText: "#F472B6",
+      title: "#F8FAFC",
+      sub: "rgba(255, 255, 255, 0.7)",
+    },
+  },
+
   // Fallback default for any newly added Junto Now features
   default: {
     tint: "#A855F7",
@@ -273,16 +296,40 @@ export function getJuntoNowFeatureColors(
   if (
     colorKey === "ticket_swap" ||
     colorKey === "sell_ticket" ||
-    colorKey === "sell_tickets"
+    colorKey === "sell_tickets" ||
+    colorKey === "ticketswap"
   ) {
     colorKey = "ticket";
   }
   if (
     colorKey === "find_mate" ||
     colorKey === "day_mates" ||
-    colorKey === "dayMate"
+    colorKey === "dayMate" ||
+    colorKey === "daymate" ||
+    colorKey === "daymates" ||
+    colorKey === "hostevent" ||
+    colorKey === "activitychats" ||
+    colorKey === "all"
   ) {
     colorKey = "company";
+  }
+  if (
+    colorKey === "services" ||
+    colorKey === "fix" ||
+    colorKey === "repair" ||
+    colorKey === "homehelp" ||
+    colorKey === "autohelp"
+  ) {
+    colorKey = "service";
+  }
+  if (colorKey === "ridemate" || colorKey === "rides") {
+    colorKey = "ride";
+  }
+  if (colorKey === "newhere" || colorKey === "roam") {
+    colorKey = "new_here";
+  }
+  if (colorKey === "asknearby" || colorKey === "ineedthis") {
+    colorKey = "help";
   }
 
   const config =
@@ -313,6 +360,8 @@ export function getJuntoNowFeatureColors(
     tint,
   };
 }
+
+export const getQuickFeatureColors = getJuntoNowFeatureColors;
 
 export const LightTheme = {
   /* ---------- Backgrounds ---------- */

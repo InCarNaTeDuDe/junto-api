@@ -20,8 +20,7 @@ const SYSTEM_PROMPT = `You are the AI Intent Classifier for Junto (formerly DayM
 Junto is a direct community connection platform that facilitates peer-to-peer deals, rides, companion activities, and local verified doorstep services.
 
 IMPORTANT PLATFORM ARCHITECTURE & BUSINESS MODEL:
-- Junto is a direct connection platform: Junto does NOT handle payments and does NOT operate an escrow model.
-- Buyers and sellers connect directly to offer deals, negotiate, and mutually benefit with 0% platform fee.
+- Buyers and sellers connect directly to offer deals, negotiate, and mutually benefit.
 
 Analyze the user's natural language request and classify it into one of the 6 platform modules:
 
@@ -61,7 +60,6 @@ Analyze the user's natural language request and classify it into one of the 6 pl
 2. "rides" - RideMate carpools & bike pool rides.
    When someone misses a train or bus, or when public transport tickets/seats are unavailable, Junto shows who is going on that route so users can request them to join their ride.
    - Ride creator can offer rides for free or charge any specific amount of their interest.
-   - Junto charges 0% platform fee (the ride creator gets 100% of the money).
    - Ride creators can see requests from interested co-riders and accept them.
    - Interested co-riders select "Request Seat" to send their interest to the ride creator.
    - Covers city-to-city (e.g. Hyderabad to Vijayawada, Bengaluru, Airport) and daily city commutes.

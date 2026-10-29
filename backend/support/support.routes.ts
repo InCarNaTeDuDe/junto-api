@@ -22,13 +22,13 @@ const PROJECT_KNOWLEDGE_BASE = `
 DayMates (formerly Junto) App Knowledge Base & Customer Support Guidelines:
 
 1. ABOUT DAYMATES (JUNTO):
-Junto is a direct community connection platform for finding activity companions ("DayMates"), discovering local events, asking nearby locals real-time questions, arranging peer carpool rides ("RideMate"), finding verified local technicians & doorstep services, and buying/selling/swapping event or movie tickets directly between buyers and sellers with 0% platform fees (Junto does NOT handle payments or use an escrow model).
+Junto is a direct community connection platform for finding activity companions ("DayMates"), discovering local events, asking nearby locals real-time questions, arranging peer carpool rides ("RideMate"), finding verified local technicians & doorstep services, and buying/selling/swapping event or movie tickets directly between buyers and sellers (Junto does NOT handle payments or use an escrow model).
 
 2. KEY FEATURES & HOW THEY WORK:
 - **DayMates (Social Activities)**: Users can post or join activities like grabbing coffee, gym sessions, walking, sports, games, lunch, or dining out. Users can delete their activities anytime from Profile -> Activities.
-- **Ticket Swap & Marketplace**: Users can buy, sell, or swap tickets for movies, concerts, and events. If someone drops plans to watch a movie or attend an event, they can avoid complete loss and offer the ticket to someone else, so buyer and seller mutually benefit with 0% platform fees.
+- **Ticket Swap & Marketplace**: Users can buy, sell, or swap tickets for movies, concerts, and events. If someone drops plans to watch a movie or attend an event, they can avoid complete loss and offer the ticket to someone else, so buyer and seller mutually benefit through direct peer connection.
 - **RideMate (Carpool & Bike Pool)**:
-  - Connect with drivers or riders heading your way with 0% platform fee.
+  - Connect directly with drivers or riders heading your way.
   - Active Vehicle Protection: If a vehicle is in transit or in ride progress state, the user cannot create another ride with the same vehicle number.
   - Pickup Travel Sequence: Only after the ride owner clicks "I'm traveling to pickup location" will the button be enabled for the co-rider to start travelling to pickup.
   - OTP Verification & Status: Co-riders receive a unique 4-digit OTP displayed directly on their screen. When meeting at the pickup point, the driver verifies the OTP. The status tracker shows "OTP" which gets a completed tick mark (✓) upon successful exchange, activating live safety and GPS trip controls.
@@ -39,7 +39,7 @@ Junto is a direct community connection platform for finding activity companions 
 - **Account & Location**: Seamless Google Sign-In with account selector prompt on every sign-in. Active user city/location automatically synchronizes from the database and persists locally.
 
 3. FREQUENTLY ASKED QUESTIONS (FAQ):
-- **How does Ticket Swap work?**: If you can no longer attend an event or movie, post your ticket on Junto to avoid complete loss. Buyers discover great ticket deals, and both parties connect directly with 0% platform fee.
+- **How does Ticket Swap work?**: If you can no longer attend an event or movie, post your ticket on Junto to avoid complete loss. Buyers discover great ticket deals, and both parties connect directly.
 - **How do I list a ticket for sale?**: Tap the '+' button in the navigation bar, select "Sell / Swap Ticket", fill in movie/event details, price, venue, and post.
 - **Is DayMates safe for meeting people?**: Yes! We emphasize profile verification, community ratings, and safety rules (always meet in well-lit public spots).
 - **How do I change my location?**: Tap on your location badge at the top of Home/Explore/Profile screens or go to Profile -> Location -> Change.
@@ -78,7 +78,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     query.includes("drive") ||
     query.includes("ride")
   ) {
-    return "🚗 **RideMate (Carpool & Bike Pool)**:\n\nTo post or offer a ride to coworkers and neighbors heading your way:\n\n1. Tap the direct button below to open the ride creation screen:\n👉 **[🚗 Tap here to Post / Offer a Ride](app://rides?tab=offer)**\n\n2. Enter your **Pickup & Drop** locations.\n3. Choose your **Date & Time**, available seats, and vehicle type (Car or Bike).\n4. Set your price per seat (0% platform fee) and tap Publish!\n\nLooking to find a ride instead? Tap **[🔍 Find a Ride](app://rides?tab=find)**.";
+    return "🚗 **RideMate (Carpool & Bike Pool)**:\n\nTo post or offer a ride to coworkers and neighbors heading your way:\n\n1. Tap the direct button below to open the ride creation screen:\n👉 **[🚗 Tap here to Post / Offer a Ride](app://rides?tab=offer)**\n\n2. Enter your **Pickup & Drop** locations.\n3. Choose your **Date & Time**, available seats, and vehicle type (Car or Bike).\n4. Set your price per seat and tap Publish!\n\nLooking to find a ride instead? Tap **[🔍 Find a Ride](app://rides?tab=find)**.";
   }
 
   if (
@@ -87,7 +87,7 @@ function generateFallbackSupportAnswer(userMessage: string): string {
     query.includes("buy") ||
     query.includes("sell")
   ) {
-    return "🎟️ **Junto Ticket Swap & Marketplace**:\n\n- **Direct Peer Deals**: If your plans change, avoid complete loss by offering your ticket to another user at 0% platform fee.\n\n👉 **[🎟️ Tap here to Sell / Swap a Ticket](app://add-ticket)**\n\nFill in the movie/event details, original & selling price, venue, and post!";
+    return "🎟️ **Junto Ticket Swap & Marketplace**:\n\n- **Direct Peer Deals**: If your plans change, avoid complete loss by offering your ticket to another user directly.\n\n👉 **[🎟️ Tap here to Sell / Swap a Ticket](app://add-ticket)**\n\nFill in the movie/event details, original & selling price, venue, and post!";
   }
 
   if (

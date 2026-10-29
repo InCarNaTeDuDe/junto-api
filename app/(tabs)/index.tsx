@@ -1061,9 +1061,13 @@ export default function Home() {
                 }}
               >
                 <Ionicons
-                  name="mic"
+                  name={isSearchListening ? "mic" : "mic-off"}
                   size={moderateScale(18)}
-                  color={isSearchListening ? "#EF4444" : C.primary || "#8B5CF6"}
+                  color={
+                    isSearchListening
+                      ? C.primary || "#A855F7"
+                      : C.mute || "#94A3B8"
+                  }
                 />
               </Pressable>
             )}

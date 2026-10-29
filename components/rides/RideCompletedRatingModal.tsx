@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -74,10 +74,20 @@ export const RideCompletedRatingModal: React.FC<
   onSubmitReport,
   isDark = true,
 }) => {
-  const [rating, setRating] = useState<number>(5);
+  const [rating, setRating] = useState<number>(0);
   const [feedback, setFeedback] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (visible) {
+      setRating(0);
+      setFeedback("");
+      setSelectedImage(null);
+      setIsReportingProblem(false);
+      setProblemDescription("");
+    }
+  }, [visible]);
 
   // Report Problem Mode
   const [isReportingProblem, setIsReportingProblem] = useState<boolean>(false);
@@ -149,7 +159,7 @@ export const RideCompletedRatingModal: React.FC<
         toRole: targetRole,
       });
       // Reset state and close
-      setRating(5);
+      setRating(0);
       setFeedback("");
       setSelectedImage(null);
       onClose();
@@ -262,7 +272,7 @@ export const RideCompletedRatingModal: React.FC<
                   {/* 1 - 5 Stars */}
                   <View style={styles.starsRow}>
                     {[1, 2, 3, 4, 5].map((star) => {
-                      const isSelected = star <= rating;
+                      const isSelected = rating > 0 && star <= rating;
                       return (
                         <TouchableOpacity
                           key={star}

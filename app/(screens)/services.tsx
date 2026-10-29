@@ -1187,15 +1187,17 @@ export default function ServicesScreen() {
                     styles.micBtn,
                     {
                       backgroundColor: isSearchListening
-                        ? "#EF4444"
-                        : "#9333EA20",
+                        ? "#1E90FF"
+                        : isDark
+                          ? "rgba(255, 255, 255, 0.08)"
+                          : "#F1F5F9",
                     },
                   ]}
                 >
                   <Ionicons
-                    name="mic"
+                    name={isSearchListening ? "mic" : "mic-off"}
                     size={15}
-                    color={isSearchListening ? "#FFF" : "#9333EA"}
+                    color={isSearchListening ? "#FFF" : textMute}
                   />
                 </TouchableOpacity>
               )}
@@ -1851,22 +1853,24 @@ export default function ServicesScreen() {
                       styles.voiceSpeakBtn,
                       {
                         backgroundColor: isIssueListening
-                          ? "#EF4444"
-                          : "#9333EA20",
+                          ? "#1E90FF"
+                          : isDark
+                            ? "rgba(255, 255, 255, 0.08)"
+                            : "#F1F5F9",
                         marginTop: 8,
                       },
                     ]}
                     onPress={handleVoiceBookingIssue}
                   >
                     <Ionicons
-                      name="mic"
+                      name={isIssueListening ? "mic" : "mic-off"}
                       size={12}
-                      color={isIssueListening ? "#FFF" : "#9333EA"}
+                      color={isIssueListening ? "#FFF" : textMute}
                     />
                     <Text
                       style={[
                         styles.voiceSpeakBtnText,
-                        { color: isIssueListening ? "#FFF" : "#9333EA" },
+                        { color: isIssueListening ? "#FFF" : textMute },
                       ]}
                     >
                       {isIssueListening ? "Listening..." : "Speak issue"}

@@ -37,7 +37,7 @@ export const EnrollHero: React.FC<EnrollHeroProps> = ({
         <View style={styles.perkItem}>
           <Ionicons name="checkmark-circle" size={14} color="#10B981" />
           <Text style={[styles.perkText, { color: textPrimary }]}>
-            0% Commission
+            Direct Bookings
           </Text>
         </View>
         <View style={styles.perkItem}>

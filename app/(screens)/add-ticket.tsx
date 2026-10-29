@@ -54,8 +54,12 @@ export default function SellTicketScreen({
   const { selectedLocation } = useLocation();
   const { isFeatureEnabled, refreshConfig } = useAppConfig();
   const ticketColor = JuntoNowColors.ticket.tint;
-  const ticketSoftBg = isDark ? "rgba(249, 115, 22, 0.18)" : "#FFF7ED";
-  const ticketBorder = isDark ? "rgba(249, 115, 22, 0.3)" : "#FFEDD5";
+  const ticketSoftBg = isDark
+    ? JuntoNowColors.ticket.dark.bg
+    : JuntoNowColors.ticket.light.bg;
+  const ticketBorder = isDark
+    ? JuntoNowColors.ticket.dark.border
+    : JuntoNowColors.ticket.light.border;
 
   if (!isFeatureEnabled("enableTicketSelling")) {
     return (
@@ -198,7 +202,7 @@ export default function SellTicketScreen({
 
       PushNotificationService.triggerLocalPushNotification(
         "Ticket Listed! 🎟️",
-        `Your ticket for "${trimmedTitle}" is now listed at ₹${sellPriceNum} with 0% platform fee.`,
+        `Your ticket for "${trimmedTitle}" is now listed at ₹${sellPriceNum}.`,
         { type: "ticket" },
       );
 
@@ -254,7 +258,7 @@ export default function SellTicketScreen({
         {!isEmbedded && (
           <JuntoScreenHeader
             title="Sell / Swap Ticket"
-            subtitle="0% platform fee movie ticket exchange"
+            subtitle="Direct peer-to-peer movie ticket exchange"
             showBack={true}
             onBack={handleClose}
             onClose={handleClose}
@@ -298,7 +302,7 @@ export default function SellTicketScreen({
                   Ticket Swap & Resale
                 </Text>
                 <View style={styles.feeZeroBadge}>
-                  <Text style={styles.feeZeroText}>0% Fee</Text>
+                  <Text style={styles.feeZeroText}>Direct Swap</Text>
                 </View>
               </View>
               <Text style={[styles.heroSubtitle, { color: t.sub }]}>
@@ -468,7 +472,7 @@ export default function SellTicketScreen({
                       : ""}
                   </Text>
                   <Text style={styles.dealSubText}>
-                    0% platform cut • 100% goes directly to you
+                    Direct transfer • 100% goes directly to you
                   </Text>
                 </View>
               </View>
@@ -503,7 +507,11 @@ export default function SellTicketScreen({
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={isSubmitting}
-            style={[styles.submitButton, isSubmitting && { opacity: 0.6 }]}
+            style={[
+              styles.submitButton,
+              { backgroundColor: ticketColor, shadowColor: ticketColor },
+              isSubmitting && { opacity: 0.6 },
+            ]}
             activeOpacity={0.85}
           >
             {isSubmitting ? (
@@ -519,7 +527,7 @@ export default function SellTicketScreen({
           </TouchableOpacity>
 
           <Text style={[styles.footerDisclaimer, { color: t.sub }]}>
-            🛡️ Peer-to-peer community exchange with 0% platform fee.
+            🛡️ Peer-to-peer community exchange with direct member transfer.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -694,13 +702,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   submitButton: {
-    backgroundColor: "#E11D48",
+    backgroundColor: "#DC143C",
     borderRadius: 18,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
-    shadowColor: "#E11D48",
+    shadowColor: "#DC143C",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,

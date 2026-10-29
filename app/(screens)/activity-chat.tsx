@@ -454,16 +454,234 @@ export default function ActivityChatScreen() {
   };
 
   const handleQuickReply = (text: string) => {
-    if (isOwnActivity) return;
     setInputMessage(text);
+  };
+
+  const getContextualQuickChips = (): { label: string; message: string }[] => {
+    const combinedType =
+      `${activityType} ${contextTitle} ${entityType} ${activityDetail?.type || ""}`.toUpperCase();
+
+    // 1. Movie Tickets & Ticket Swap
+    if (
+      combinedType.includes("TICKET") ||
+      combinedType.includes("MOVIE") ||
+      combinedType.includes("SWAP") ||
+      combinedType.includes("CINEMA") ||
+      combinedType.includes("THEATRE")
+    ) {
+      if (isOwnActivity) {
+        return [
+          {
+            label: "Ticket available 🎟️",
+            message:
+              "Yes, the ticket is available! Let me know if you want it.",
+          },
+          {
+            label: "Can share QR code 📲",
+            message: "I can share the booking screenshot / QR code.",
+          },
+          {
+            label: "Seats are together 💺",
+            message:
+              "The seats are next to each other with great viewing angle.",
+          },
+          {
+            label: "Price is fixed 👍",
+            message: "The price is already discounted and fixed.",
+          },
+          {
+            label: "Meet outside screen 📍",
+            message: "We can meet outside the cinema screen entry.",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "Still available? 🎟️",
+            message: "Hi, is this movie ticket still available?",
+          },
+          {
+            label: "What seats / row? 💺",
+            message: "Which row and seat numbers are these tickets?",
+          },
+          {
+            label: "Price negotiable? 🏷️",
+            message: "Is the price slightly negotiable if I take all?",
+          },
+          {
+            label: "Can transfer online? 📲",
+            message: "Can you send the booking QR or do we meet in person?",
+          },
+          {
+            label: "Ready to buy! ⚡",
+            message: "I'm ready to buy now. Please let me know how to pay.",
+          },
+        ];
+      }
+    }
+
+    // 2. Ask Nearby & Lost & Found
+    if (
+      combinedType.includes("ASK") ||
+      combinedType.includes("LOST") ||
+      combinedType.includes("FOUND") ||
+      combinedType.includes("NEARBY")
+    ) {
+      if (isOwnActivity) {
+        return [
+          {
+            label: "Thanks for helping! 🙏",
+            message: "Thank you so much for the helpful update! 🙏",
+          },
+          {
+            label: "Still looking 🔍",
+            message: "Yes, I am still looking for information on this.",
+          },
+          {
+            label: "Can you share details? 📍",
+            message: "Could you share the exact location where you spotted it?",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "I have an update! 💡",
+            message: "Hey, I have some info on this!",
+          },
+          {
+            label: "Where was it last? 📍",
+            message: "Where was it last seen or where should I look?",
+          },
+          {
+            label: "Happy to help 🙌",
+            message:
+              "Let me know if there is anything specific you need checked.",
+          },
+        ];
+      }
+    }
+
+    // 3. Rides & Carpool
+    if (
+      combinedType.includes("RIDE") ||
+      combinedType.includes("CARPOOL") ||
+      combinedType.includes("TRAVEL")
+    ) {
+      if (isOwnActivity) {
+        return [
+          {
+            label: "Leaving in 10 mins 🚗",
+            message: "I'll be starting the ride in about 10 minutes.",
+          },
+          {
+            label: "Waiting at pickup 📍",
+            message: "I have reached the pickup point. See you here!",
+          },
+          {
+            label: "Running on time ⏰",
+            message: "Ride is on schedule! Let me know when you reach.",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "Pickup location? 📍",
+            message: "Where is the exact pickup spot?",
+          },
+          {
+            label: "I'm at the spot 📍",
+            message: "I've reached the pickup location!",
+          },
+          {
+            label: "Luggage space? 🧳",
+            message: "Do you have space for a bag/backpack in the boot?",
+          },
+        ];
+      }
+    }
+
+    // 4. Local Services & Repairs
+    if (
+      combinedType.includes("SERVICE") ||
+      combinedType.includes("REPAIR") ||
+      combinedType.includes("FIX") ||
+      combinedType.includes("HELP_DOMESTIC")
+    ) {
+      if (isOwnActivity) {
+        return [
+          {
+            label: "Available today 🔧",
+            message:
+              "Yes, I am available today. When would you like me to visit?",
+          },
+          {
+            label: "What's the address? 📍",
+            message: "Please share your complete address and landmark.",
+          },
+          {
+            label: "Can visit in 30m ⏱️",
+            message: "I can be at your place in about 30-40 minutes.",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "When can you visit? 🔧",
+            message: "Hi, when are you available for a home visit?",
+          },
+          {
+            label: "What is the quote? 💼",
+            message: "Could you please give an estimated quote for this?",
+          },
+          {
+            label: "Are parts included? ⚙️",
+            message:
+              "Does your quote include spare parts or just service charges?",
+          },
+        ];
+      }
+    }
+
+    // 5. Default: Day Mates / Activities / Social
+    if (isOwnActivity) {
+      return [
+        {
+          label: "Welcome everyone! 👋",
+          message: "Welcome everyone! Excited to meet up 👋",
+        },
+        {
+          label: "I'm at location 📍",
+          message: "I'm at the location, see you all soon! 📍",
+        },
+        {
+          label: "Need directions? 🗺️",
+          message: "Let me know if anyone needs directions! 🗺️",
+        },
+      ];
+    } else {
+      return [
+        {
+          label: "Count me in! 🏃‍♂️",
+          message: "Count me in! What time works best? 🏃‍♂️",
+        },
+        {
+          label: "See you there! 👋",
+          message: "See you at the location! 👋",
+        },
+        {
+          label: "Still open to join? ☕",
+          message: "Is this activity still open to join? ☕",
+        },
+      ];
+    }
   };
 
   const categoryColor =
     activityType.includes("TICKET") || activityType.includes("MOVIE")
-      ? "#A855F7"
-      : activityType.includes("LOST")
-        ? "#14B8A6"
-        : "#EA580C";
+      ? "#EF4444"
+      : activityType.includes("LOST") || activityType.includes("ASK")
+        ? "#0D9488"
+        : "#8B5CF6";
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
@@ -724,69 +942,16 @@ export default function ActivityChatScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 12 }}
           >
-            {isOwnActivity ? (
-              <>
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply("Welcome everyone! Excited to meet up 👋")
-                  }
-                >
-                  <Text style={s.chipText}>Welcome everyone! 👋</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply(
-                      "I'm at the location, see you all soon! 📍",
-                    )
-                  }
-                >
-                  <Text style={s.chipText}>I'm at location 📍</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply(
-                      "Let me know if anyone needs directions! 🗺️",
-                    )
-                  }
-                >
-                  <Text style={s.chipText}>Need directions? 🗺️</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply("Count me in! What time works best? 🏃‍♂️")
-                  }
-                >
-                  <Text style={s.chipText}>Count me in! 🏃‍♂️</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply("See you at the location! 👋")
-                  }
-                >
-                  <Text style={s.chipText}>See you there! 👋</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    handleQuickReply("Is this still open to join? ☕")
-                  }
-                >
-                  <Text style={s.chipText}>Still open to join? ☕</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {getContextualQuickChips().map((chip, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={s.chip}
+                onPress={() => handleQuickReply(chip.message)}
+                activeOpacity={0.7}
+              >
+                <Text style={s.chipText}>{chip.label}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
 

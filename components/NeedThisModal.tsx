@@ -392,10 +392,10 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
                 styles.micBtn,
                 {
                   backgroundColor: isListening
-                    ? "#EF4444"
+                    ? C.primary || "#A855F7"
                     : isDark
-                      ? "rgba(99, 102, 241, 0.25)"
-                      : "#EEF2FF",
+                      ? "rgba(255, 255, 255, 0.08)"
+                      : "#F1F5F9",
                 },
               ]}
               accessibilityLabel={
@@ -404,14 +404,10 @@ export const INeedThisModal: React.FC<INeedThisModalProps> = ({
             >
               <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                 <Ionicons
-                  name={isListening ? "mic" : "mic-outline"}
+                  name={isListening ? "mic" : "mic-off"}
                   size={18}
                   color={
-                    isListening
-                      ? "#FFFFFF"
-                      : isDark
-                        ? "#A5B4FC"
-                        : C.primary || "#6366F1"
+                    isListening ? "#FFFFFF" : isDark ? "#94A3B8" : "#64748B"
                   }
                 />
               </Animated.View>

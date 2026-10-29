@@ -1559,7 +1559,7 @@ export default function ProfileScreen() {
               onPress={() =>
                 Alert.alert(
                   "Ticket Swap Guarantee",
-                  "Junto helps buyers and sellers offer direct deals. Sellers avoid complete loss when plans change, and buyers get great ticket offers with 0% platform fee.",
+                  "Junto helps buyers and sellers offer direct deals. Sellers avoid complete loss when plans change, and buyers get great ticket offers through direct peer transfer.",
                 )
               }
             >
@@ -1837,7 +1837,7 @@ export default function ProfileScreen() {
                   color={t.success}
                 />
                 <Text style={s.featureText}>
-                  0% platform fee on concert & movie ticket swaps
+                  Direct peer-to-peer concert & movie ticket swaps
                 </Text>
               </View>
               <View style={s.featureRow}>

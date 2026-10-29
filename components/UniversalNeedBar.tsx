@@ -24,12 +24,28 @@ interface RotatingExample {
 }
 
 const ROTATING_EXAMPLES: RotatingExample[] = [
-  { id: "1", label: "🔧 Bike mechanic", query: "I need a bike mechanic near me" },
-  { id: "2", label: "🚗 Carpool to Vijayawada", query: "I need someone to go to Vijayawada with" },
-  { id: "3", label: "🎟️ Movie ticket", query: "I need a movie ticket for tonight" },
+  {
+    id: "1",
+    label: "🔧 Bike mechanic",
+    query: "I need a bike mechanic near me",
+  },
+  {
+    id: "2",
+    label: "🚗 Carpool to Vijayawada",
+    query: "I need someone to go to Vijayawada with",
+  },
+  {
+    id: "3",
+    label: "🎟️ Movie ticket",
+    query: "I need a movie ticket for tonight",
+  },
   { id: "4", label: "👜 Lost wallet", query: "I lost my wallet in Hitec City" },
   { id: "5", label: "🚲 Used cycle", query: "I want to buy a used cycle" },
-  { id: "6", label: "🏸 Badminton partner", query: "Need a badminton partner for 7 PM" },
+  {
+    id: "6",
+    label: "🏸 Badminton partner",
+    query: "Need a badminton partner for 7 PM",
+  },
   { id: "7", label: "🍱 Home tiffin", query: "Looking for home tiffin food" },
 ];
 
@@ -43,12 +59,8 @@ export const UniversalNeedBar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const {
-    isListening,
-    transcript,
-    startListening,
-    stopListening,
-  } = useVoiceSpeech("universal-need-bar");
+  const { isListening, transcript, startListening, stopListening } =
+    useVoiceSpeech("universal-need-bar");
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -146,7 +158,8 @@ export const UniversalNeedBar: React.FC = () => {
     }
   };
 
-  const currentPlaceholder = ROTATING_EXAMPLES[placeholderIdx]?.query || "What do you need?";
+  const currentPlaceholder =
+    ROTATING_EXAMPLES[placeholderIdx]?.query || "What do you need?";
 
   return (
     <View style={styles.container}>
@@ -185,13 +198,8 @@ export const UniversalNeedBar: React.FC = () => {
             }
           }}
           placeholder={currentPlaceholder}
-          placeholderTextColor={
-            isDark ? "rgba(255,255,255,0.4)" : "#94A3B8"
-          }
-          style={[
-            styles.input,
-            { color: isDark ? "#FFFFFF" : "#0F172A" },
-          ]}
+          placeholderTextColor={isDark ? "rgba(255,255,255,0.4)" : "#94A3B8"}
+          style={[styles.input, { color: isDark ? "#FFFFFF" : "#0F172A" }]}
           returnKeyType="search"
           onSubmitEditing={() => handleSearch(query || currentPlaceholder)}
           autoCapitalize="none"
@@ -216,7 +224,11 @@ export const UniversalNeedBar: React.FC = () => {
         )}
 
         {isLoading ? (
-          <ActivityIndicator size="small" color="#6366F1" style={{ marginHorizontal: 4 }} />
+          <ActivityIndicator
+            size="small"
+            color="#6366F1"
+            style={{ marginHorizontal: 4 }}
+          />
         ) : (
           <TouchableOpacity
             onPress={handleMicPress}
@@ -224,19 +236,19 @@ export const UniversalNeedBar: React.FC = () => {
               styles.micBtn,
               {
                 backgroundColor: isListening
-                  ? "#EF4444"
+                  ? "#A855F7"
                   : isDark
-                    ? "rgba(99, 102, 241, 0.2)"
-                    : "#EEF2FF",
+                    ? "rgba(255, 255, 255, 0.08)"
+                    : "#F1F5F9",
               },
             ]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <Ionicons
-                name={isListening ? "mic" : "mic-outline"}
+                name={isListening ? "mic" : "mic-off"}
                 size={16}
-                color={isListening ? "#FFFFFF" : isDark ? "#A5B4FC" : "#6366F1"}
+                color={isListening ? "#FFFFFF" : isDark ? "#94A3B8" : "#64748B"}
               />
             </Animated.View>
           </TouchableOpacity>
@@ -296,172 +308,171 @@ export const UniversalNeedBar: React.FC = () => {
       </ScrollView>
 
       {/* Database Results Card (shown only if records returned) */}
-      {matchedIntent && matchedIntent.instantResults && matchedIntent.instantResults.length > 0 && (
-        <View
-          style={[
-            styles.resultsCard,
-            {
-              backgroundColor: isDark
-                ? "rgba(255,255,255,0.05)"
-                : C.card || "#FFFFFF",
-              borderColor: isDark
-                ? "rgba(255,255,255,0.12)"
-                : C.border || "#E2E8F0",
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.resultsHeader}>
-            <View style={styles.resultsHeaderLeft}>
-              <View
-                style={[
-                  styles.iconCircle,
-                  { backgroundColor: matchedIntent.color },
-                ]}
-              >
-                <Ionicons
-                  name={matchedIntent.icon as any}
-                  size={15}
-                  color="#FFFFFF"
-                />
-              </View>
-              <Text
-                style={[
-                  styles.moduleName,
-                  { color: isDark ? "#FFFFFF" : "#0F172A" },
-                ]}
-              >
-                {matchedIntent.moduleName}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.badgePill,
-                { backgroundColor: matchedIntent.bg },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: matchedIntent.color },
-                ]}
-              >
-                {matchedIntent.instantResults.length} Found in DB
-              </Text>
-            </View>
-          </View>
-
-          {/* Result Items */}
-          <View style={styles.itemsList}>
-            {matchedIntent.instantResults.map((item) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.itemRow,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(255,255,255,0.03)"
-                      : "#F8FAFC",
-                    borderColor: isDark
-                      ? "rgba(255,255,255,0.07)"
-                      : "#F1F5F9",
-                  },
-                ]}
-              >
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text
-                    style={[
-                      styles.itemTitle,
-                      { color: isDark ? "#FFFFFF" : "#0F172A" },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.itemSubtitle,
-                      { color: isDark ? "rgba(255,255,255,0.6)" : "#64748B" },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.subtitle}
-                  </Text>
-                  {item.price ? (
-                    <Text
-                      style={[
-                        styles.itemPrice,
-                        { color: matchedIntent.color },
-                      ]}
-                    >
-                      {item.price}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <TouchableOpacity
+      {matchedIntent &&
+        matchedIntent.instantResults &&
+        matchedIntent.instantResults.length > 0 && (
+          <View
+            style={[
+              styles.resultsCard,
+              {
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.05)"
+                  : C.card || "#FFFFFF",
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.12)"
+                  : C.border || "#E2E8F0",
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.resultsHeader}>
+              <View style={styles.resultsHeaderLeft}>
+                <View
                   style={[
-                    styles.actionBtn,
+                    styles.iconCircle,
                     { backgroundColor: matchedIntent.color },
                   ]}
-                  onPress={() => handleItemAction(item)}
-                  activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>
-                    {item.actionText || "View"}
-                  </Text>
-                </TouchableOpacity>
+                  <Ionicons
+                    name={matchedIntent.icon as any}
+                    size={15}
+                    color="#FFFFFF"
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.moduleName,
+                    { color: isDark ? "#FFFFFF" : "#0F172A" },
+                  ]}
+                >
+                  {matchedIntent.moduleName}
+                </Text>
               </View>
-            ))}
-          </View>
+              <View
+                style={[
+                  styles.badgePill,
+                  { backgroundColor: matchedIntent.bg },
+                ]}
+              >
+                <Text
+                  style={[styles.badgeText, { color: matchedIntent.color }]}
+                >
+                  {matchedIntent.instantResults.length} Found in DB
+                </Text>
+              </View>
+            </View>
 
-          {/* Primary Route Button */}
-          <TouchableOpacity
-            style={[
-              styles.primaryBtn,
-              { backgroundColor: matchedIntent.color },
-            ]}
-            onPress={() => router.push(matchedIntent.route as any)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryBtnText}>
-              {matchedIntent.actionLabel}
-            </Text>
-            <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      )}
+            {/* Result Items */}
+            <View style={styles.itemsList}>
+              {matchedIntent.instantResults.map((item) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.itemRow,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.03)"
+                        : "#F8FAFC",
+                      borderColor: isDark
+                        ? "rgba(255,255,255,0.07)"
+                        : "#F1F5F9",
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text
+                      style={[
+                        styles.itemTitle,
+                        { color: isDark ? "#FFFFFF" : "#0F172A" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.itemSubtitle,
+                        { color: isDark ? "rgba(255,255,255,0.6)" : "#64748B" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.subtitle}
+                    </Text>
+                    {item.price ? (
+                      <Text
+                        style={[
+                          styles.itemPrice,
+                          { color: matchedIntent.color },
+                        ]}
+                      >
+                        {item.price}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.actionBtn,
+                      { backgroundColor: matchedIntent.color },
+                    ]}
+                    onPress={() => handleItemAction(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.actionBtnText}>
+                      {item.actionText || "View"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            {/* Primary Route Button */}
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: matchedIntent.color },
+              ]}
+              onPress={() => router.push(matchedIntent.route as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryBtnText}>
+                {matchedIntent.actionLabel}
+              </Text>
+              <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
 
       {/* No Results from DB State */}
-      {hasSearched && !isLoading && (!matchedIntent || !matchedIntent.instantResults || matchedIntent.instantResults.length === 0) && (
-        <View
-          style={[
-            styles.emptyCard,
-            {
-              backgroundColor: isDark
-                ? "rgba(255,255,255,0.04)"
-                : "#F8FAFC",
-              borderColor: isDark
-                ? "rgba(255,255,255,0.08)"
-                : "#E2E8F0",
-            },
-          ]}
-        >
-          <Ionicons
-            name="cube-outline"
-            size={20}
-            color={isDark ? "rgba(255,255,255,0.4)" : "#94A3B8"}
-          />
-          <Text
+      {hasSearched &&
+        !isLoading &&
+        (!matchedIntent ||
+          !matchedIntent.instantResults ||
+          matchedIntent.instantResults.length === 0) && (
+          <View
             style={[
-              styles.emptyText,
-              { color: isDark ? "rgba(255,255,255,0.6)" : "#64748B" },
+              styles.emptyCard,
+              {
+                backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F8FAFC",
+                borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+              },
             ]}
           >
-            No matching records found in database for "{query}".
-          </Text>
-        </View>
-      )}
+            <Ionicons
+              name="cube-outline"
+              size={20}
+              color={isDark ? "rgba(255,255,255,0.4)" : "#94A3B8"}
+            />
+            <Text
+              style={[
+                styles.emptyText,
+                { color: isDark ? "rgba(255,255,255,0.6)" : "#64748B" },
+              ]}
+            >
+              No matching records found in database for "{query}".
+            </Text>
+          </View>
+        )}
     </View>
   );
 };

@@ -36,11 +36,11 @@ export const APP_FEATURES: AppFeatureShowcase[] = [
     category: "Carpool & Bike Pool",
     headline: "Share Daily Rides & Split Petrol",
     description:
-      "Commute with verified coworkers & neighbors with 0% platform commission and live GPS tracking.",
+      "Commute with verified coworkers & neighbors with verified routing and live GPS tracking.",
     color: "#10B981", // Emerald
     lightBg: "#ECFDF5",
     darkBg: "#061A14",
-    tags: ["0% Commission", "OTP Verified", "Live GPS"],
+    tags: ["Direct Carpool", "OTP Verified", "Live GPS"],
   },
   {
     id: "daymates",
@@ -605,7 +605,7 @@ export function SpinnerLoader({
       </View>
 
       <Text style={s.trustNotice}>
-        ⚡ 100% Free Peer Community • 0% Platform Commission
+        ⚡ 100% Free Peer Community • Direct Neighbor Connections
       </Text>
     </View>
   );

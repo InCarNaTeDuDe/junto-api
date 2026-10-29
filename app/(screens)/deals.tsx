@@ -964,11 +964,27 @@ export default function LocalDealsScreen() {
 
         {/* 1-Tap Voice Sell Action Header Button */}
         <TouchableOpacity
-          style={styles.headerVoiceSellBtn}
+          style={[
+            styles.headerVoiceSellBtn,
+            !(showVoiceModal && isListening) && {
+              backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+            },
+          ]}
           onPress={handleOpenVoiceSell}
         >
-          <Ionicons name="mic" size={15} color="#FFF" />
-          <Text style={styles.headerVoiceSellText}>Voice Sell</Text>
+          <Ionicons
+            name={showVoiceModal && isListening ? "mic" : "mic-off"}
+            size={15}
+            color={showVoiceModal && isListening ? "#FFF" : textMute}
+          />
+          <Text
+            style={[
+              styles.headerVoiceSellText,
+              !(showVoiceModal && isListening) && { color: textMute },
+            ]}
+          >
+            Voice Sell
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -992,8 +1008,21 @@ export default function LocalDealsScreen() {
           onPress={handleOpenVoiceSell}
           activeOpacity={0.88}
         >
-          <View style={styles.voiceIconRing}>
-            <Ionicons name="mic" size={24} color="#D97706" />
+          <View
+            style={[
+              styles.voiceIconRing,
+              !(showVoiceModal && isListening) && {
+                backgroundColor: isDark
+                  ? "rgba(148, 163, 184, 0.15)"
+                  : "#E2E8F0",
+              },
+            ]}
+          >
+            <Ionicons
+              name={showVoiceModal && isListening ? "mic" : "mic-off"}
+              size={24}
+              color={showVoiceModal && isListening ? "#D97706" : textMute}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.badgeRow}>
@@ -1058,17 +1087,17 @@ export default function LocalDealsScreen() {
                 styles.searchMicBtn,
                 {
                   backgroundColor: isListening
-                    ? "#7C3AED"
+                    ? "#CA8A04"
                     : isDark
                       ? "#1E293B"
-                      : "#FEF3C7",
+                      : "#F1F5F9",
                 },
               ]}
             >
               <Ionicons
-                name="mic"
+                name={isListening ? "mic" : "mic-off"}
                 size={16}
-                color={isListening ? "#FFF" : "#D97706"}
+                color={isListening ? "#FFFFFF" : textMute}
               />
             </TouchableOpacity>
           )}
@@ -1175,11 +1204,27 @@ export default function LocalDealsScreen() {
               Be the first to list an item in your neighbourhood!
             </Text>
             <TouchableOpacity
-              style={styles.emptyActionBtn}
+              style={[
+                styles.emptyActionBtn,
+                !(showVoiceModal && isListening) && {
+                  backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+                },
+              ]}
               onPress={handleOpenVoiceSell}
             >
-              <Ionicons name="mic" size={16} color="#FFF" />
-              <Text style={styles.emptyActionBtnText}>Speak to Sell Now</Text>
+              <Ionicons
+                name={showVoiceModal && isListening ? "mic" : "mic-off"}
+                size={16}
+                color={showVoiceModal && isListening ? "#FFF" : textMute}
+              />
+              <Text
+                style={[
+                  styles.emptyActionBtnText,
+                  !(showVoiceModal && isListening) && { color: textMute },
+                ]}
+              >
+                Speak to Sell Now
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1538,7 +1583,11 @@ export default function LocalDealsScreen() {
                 style={[styles.voiceModalHeader, { borderBottomColor: border }]}
               >
                 <View style={styles.voiceModalTitleRow}>
-                  <Ionicons name="mic" size={22} color="#D97706" />
+                  <Ionicons
+                    name={isListening ? "mic" : "mic-off"}
+                    size={22}
+                    color={isListening ? "#D97706" : textMute}
+                  />
                   <Text
                     style={[styles.voiceModalTitle, { color: textPrimary }]}
                   >
@@ -1587,13 +1636,15 @@ export default function LocalDealsScreen() {
                           styles.micOrb,
                           {
                             backgroundColor: isListening
-                              ? "#7C3AED"
-                              : "#F59E0B",
+                              ? "#CA8A04"
+                              : isDark
+                                ? "#334155"
+                                : "#E2E8F0",
                             ...Platform.select({
                               web: {
                                 boxShadow: isListening
-                                  ? "0 8px 26px rgba(124, 58, 237, 0.55)"
-                                  : "0 6px 20px rgba(245, 158, 11, 0.4)",
+                                  ? "0 8px 26px rgba(202, 138, 4, 0.55)"
+                                  : "0 4px 14px rgba(0, 0, 0, 0.1)",
                               },
                             }),
                           },
@@ -1612,9 +1663,9 @@ export default function LocalDealsScreen() {
                         activeOpacity={0.85}
                       >
                         <Ionicons
-                          name={isListening ? "mic" : "mic-outline"}
+                          name={isListening ? "mic" : "mic-off"}
                           size={36}
-                          color="#FFFFFF"
+                          color={isListening ? "#FFFFFF" : textMute}
                         />
                       </TouchableOpacity>
                     </Animated.View>
