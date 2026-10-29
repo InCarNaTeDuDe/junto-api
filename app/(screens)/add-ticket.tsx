@@ -34,14 +34,6 @@ export interface SellTicketFormProps {
   onSubmitSuccess?: (data: any) => void;
 }
 
-const POPULAR_MOVIES = [
-  "Pushpa 2",
-  "Kalki 2898 AD",
-  "Devara: Part 1",
-  "Avatar 3",
-  "Coolie",
-];
-
 export default function SellTicketScreen({
   from,
   onBack,
@@ -331,41 +323,6 @@ export default function SellTicketScreen({
               value={movieName}
               onChangeText={setMovieName}
             />
-
-            {/* Quick Movie Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, marginTop: 8 }}
-            >
-              {POPULAR_MOVIES.map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  onPress={() => setMovieName(item)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        movieName === item
-                          ? ticketSoftBg
-                          : isDark
-                            ? "rgba(255, 255, 255, 0.04)"
-                            : t.card,
-                      borderColor: movieName === item ? ticketColor : t.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: movieName === item ? ticketColor : t.sub },
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
 
           {/* 2. Date & Time */}

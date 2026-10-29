@@ -1755,7 +1755,7 @@ export default function ServicesScreen() {
                     onTimeChange={setServiceTime}
                     minimumDate={new Date()}
                     accentColor="#6366F1"
-                    dateLabel="Appointment Date"
+                    dateLabel="Date"
                     timeLabel="Preferred Time"
                   />
                 </View>
