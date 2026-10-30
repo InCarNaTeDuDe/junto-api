@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,20 +9,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Alert,
   Modal,
   Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/hooks/useTheme";
-import { scale } from "react-native-size-matters";
-import { router } from "expo-router";
-import { ApiService } from "@/services/api";
-import FormattedMarkdownText from "@/components/FormattedMarkdownText";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { scale, verticalScale } from "react-native-size-matters";
+
+import { useTheme } from "@/hooks/useTheme";
 import { useAuthContext } from "@/context/AuthContext";
 import { useAppConfig } from "@/context/AppConfigContext";
+import { ApiService } from "@/services/api";
+import FormattedMarkdownText from "@/components/FormattedMarkdownText";
 import {
   saveSupportChatMessages,
   getSupportChatMessages,
@@ -34,6 +34,15 @@ export interface SupportChatMessage {
   sender: "user" | "bot";
   text: string;
   timestamp: string;
+  context?: {
+    category?: string;
+    issueType?: string;
+    actionUrl?: string;
+    actionLabel?: string;
+    caseNumber?: string;
+    canCreateTicket?: boolean;
+    recordId?: string;
+  };
 }
 
 interface InAppActionCard {
@@ -44,11 +53,457 @@ interface InAppActionCard {
   color: string;
 }
 
+interface SupportCategory {
+  id: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  emoji: string;
+  color: string;
+  prompt: string;
+  issues: SupportIssue[];
+}
+
+interface SupportIssue {
+  id: string;
+  label: string;
+  actionType:
+    | "navigate"
+    | "select_record"
+    | "chat_input"
+    | "escalate"
+    | "escalate_safety";
+  route?: string;
+  actionLabel?: string;
+  entityType?:
+    | "ride"
+    | "activity"
+    | "ticket"
+    | "deal"
+    | "service"
+    | "asknearby";
+  filter?: string;
+  botPrompt?: string;
+  botResponse?: string;
+}
+
+interface UserRecordItem {
+  id: string;
+  type: string;
+  title: string;
+  subtitle: string;
+  date: string;
+  status: string;
+  role?: string;
+  details?: Record<string, any>;
+}
+
+interface SupportCaseRecord {
+  caseNumber: string;
+  userId: string;
+  category: string;
+  issueType: string;
+  summary: string;
+  details?: string;
+  status: string;
+  createdAt: string;
+  estimatedResponseTime: string;
+  relatedEntitySummary?: string;
+  urgentSafety?: boolean;
+}
+
+const DEFAULT_CATEGORIES: SupportCategory[] = [
+  {
+    id: "rides",
+    label: "Rides",
+    icon: "car-sport",
+    emoji: "🚗",
+    color: "#10B981",
+    prompt: "Sure! What do you need help with regarding rides?",
+    issues: [
+      {
+        id: "offer_ride",
+        label: "I want to offer a ride.",
+        actionType: "navigate",
+        route: "app://rides?tab=offer",
+        actionLabel: "Open Offer Ride",
+        botResponse:
+          "You can offer a ride directly from Junto!\n\nTap below to share your route, spare seats, vehicle type (car/bike), and price per seat.",
+      },
+      {
+        id: "requested_seat",
+        label: "I requested a seat.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "requested",
+        botPrompt: "Got it! Which ride did you request a seat for?",
+      },
+      {
+        id: "ride_confirmed",
+        label: "My ride is confirmed.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "confirmed",
+        botPrompt: "Okay! Which ride are you referring to?",
+      },
+      {
+        id: "driver_no_show",
+        label: "Driver didn't arrive.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "all",
+        botPrompt: "Sorry about that! Which ride did this happen with?",
+      },
+      {
+        id: "cancel_ride",
+        label: "I want to cancel my ride.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "active",
+        botPrompt: "I can help with that. Which ride would you like to cancel?",
+      },
+      {
+        id: "payment_issue",
+        label: "Payment-related issue.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "all",
+        botPrompt: "Which ride had a payment-related issue?",
+      },
+      {
+        id: "rides_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt:
+          "Please tell me a little more about what's going on with your ride.",
+      },
+    ],
+  },
+  {
+    id: "daymates",
+    label: "DayMates",
+    icon: "people",
+    emoji: "🤝",
+    color: "#8B5CF6",
+    prompt: "Sure! What do you need help with regarding DayMates?",
+    issues: [
+      {
+        id: "finding_people",
+        label: "Finding people nearby.",
+        actionType: "navigate",
+        route: "app://explore",
+        actionLabel: "Explore DayMates",
+        botResponse:
+          "You can discover companions for walking, coffee, gym, and movies on the Explore tab!",
+      },
+      {
+        id: "creating_activity",
+        label: "Creating an activity.",
+        actionType: "navigate",
+        route: "app://add-daymate",
+        actionLabel: "Create DayMate Activity",
+        botResponse:
+          "Creating an activity takes less than a minute! Set your activity type, location, and date to find companion buddies.",
+      },
+      {
+        id: "someone_no_show",
+        label: "Someone didn't attend.",
+        actionType: "select_record",
+        entityType: "activity",
+        botPrompt:
+          "We're sorry that happened! Which activity did someone not attend?",
+      },
+      {
+        id: "inappropriate_behaviour",
+        label: "Inappropriate behaviour.",
+        actionType: "escalate_safety",
+        entityType: "activity",
+        botPrompt:
+          "Community safety is our highest priority. Which activity or member is this regarding?",
+      },
+      {
+        id: "activity_issue",
+        label: "Activity-related issue.",
+        actionType: "select_record",
+        entityType: "activity",
+        botPrompt: "Which activity are you experiencing an issue with?",
+      },
+      {
+        id: "daymates_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt:
+          "Please tell me what you need assistance with regarding DayMates.",
+      },
+    ],
+  },
+  {
+    id: "services",
+    label: "Services",
+    icon: "construct",
+    emoji: "💇",
+    color: "#3B82F6",
+    prompt: "Sure! What do you need help with regarding services?",
+    issues: [
+      {
+        id: "finding_provider",
+        label: "Finding a service provider.",
+        actionType: "navigate",
+        route: "app://services",
+        actionLabel: "Browse Local Services",
+        botResponse:
+          "You can browse verified local electricians, plumbers, repair technicians, and beauty professionals directly on Junto Services!",
+      },
+      {
+        id: "existing_booking",
+        label: "Existing booking.",
+        actionType: "chat_input",
+        botPrompt:
+          "Which service booking or technician do you have questions about?",
+      },
+      {
+        id: "provider_no_show",
+        label: "Provider didn't arrive.",
+        actionType: "escalate",
+        entityType: "service",
+        botPrompt:
+          "We apologize for the inconvenience. Which scheduled service appointment had a no-show?",
+      },
+      {
+        id: "cancellation",
+        label: "Cancellation.",
+        actionType: "chat_input",
+        botPrompt:
+          "Which service booking would you like to cancel or reschedule?",
+      },
+      {
+        id: "service_quality",
+        label: "Service quality issue.",
+        actionType: "escalate",
+        entityType: "service",
+        botPrompt:
+          "We hold service partners to strict standards. Which service was unsatisfactory?",
+      },
+      {
+        id: "services_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt:
+          "Please let us know how we can help with your service request.",
+      },
+    ],
+  },
+  {
+    id: "tickets",
+    label: "Movie Tickets",
+    icon: "ticket",
+    emoji: "🎟️",
+    color: "#F97316",
+    prompt: "Sure! What do you need help with regarding movie tickets?",
+    issues: [
+      {
+        id: "buying_ticket",
+        label: "Buying a ticket.",
+        actionType: "navigate",
+        route: "app://explore",
+        actionLabel: "Browse Ticket Deals",
+        botResponse:
+          "Looking to grab movie or event tickets? Check out direct listings from fellow users on the Explore tab!",
+      },
+      {
+        id: "selling_ticket",
+        label: "Selling a ticket.",
+        actionType: "navigate",
+        route: "app://add-ticket",
+        actionLabel: "Sell / Swap Ticket",
+        botResponse:
+          "Plans changed? Avoid complete loss by posting your spare movie or event tickets directly on Junto!",
+      },
+      {
+        id: "ticket_transfer",
+        label: "Ticket transfer problem.",
+        actionType: "select_record",
+        entityType: "ticket",
+        botPrompt:
+          "Which ticket listing or transfer are you experiencing an issue with?",
+      },
+      {
+        id: "payment_issue",
+        label: "Payment issue.",
+        actionType: "select_record",
+        entityType: "ticket",
+        botPrompt: "Which ticket transaction has a payment issue?",
+      },
+      {
+        id: "ticket_not_received",
+        label: "Ticket not received.",
+        actionType: "escalate",
+        entityType: "ticket",
+        botPrompt: "Which ticket did you purchase that was not received?",
+      },
+      {
+        id: "tickets_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt: "Please describe your ticket-related question or problem.",
+      },
+    ],
+  },
+  {
+    id: "deals",
+    label: "LocalDeals",
+    icon: "pricetag",
+    emoji: "🏷️",
+    color: "#F59E0B",
+    prompt: "Sure! What do you need help with regarding LocalDeals?",
+    issues: [
+      {
+        id: "finding_deals",
+        label: "Finding deals.",
+        actionType: "navigate",
+        route: "app://deals",
+        actionLabel: "Open Local Deals",
+        botResponse:
+          "Discover pre-owned electronics, furniture, books, and gear in your immediate neighborhood with verified neighbors!",
+      },
+      {
+        id: "purchasing_deal",
+        label: "Purchasing a deal.",
+        actionType: "chat_input",
+        botPrompt:
+          "To buy a deal, open the item on the Deals marketplace and tap 'Make Deal' or message the seller directly. How can I help?",
+      },
+      {
+        id: "redemption_problem",
+        label: "Redemption problem.",
+        actionType: "select_record",
+        entityType: "deal",
+        botPrompt:
+          "Which deal listing or seller is this redemption issue related to?",
+      },
+      {
+        id: "deal_unavailable",
+        label: "Deal unavailable.",
+        actionType: "select_record",
+        entityType: "deal",
+        botPrompt: "Which deal listing was reported unavailable?",
+      },
+      {
+        id: "deals_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt: "Please describe your question or issue with Local Deals.",
+      },
+    ],
+  },
+  {
+    id: "helpme",
+    label: "HelpMe",
+    icon: "megaphone",
+    emoji: "🆘",
+    color: "#EC4899",
+    prompt: "Sure! What do you need help with regarding HelpMe (Ask Nearby)?",
+    issues: [
+      {
+        id: "immediate_help",
+        label: "I need immediate nearby help.",
+        actionType: "navigate",
+        route: "app://ask-nearby",
+        actionLabel: "Ask Nearby Broadcast",
+        botResponse:
+          "If you need immediate neighborhood assistance (such as blood donation, lost keys, or urgent medicine), broadcast a request on Ask Nearby!",
+      },
+      {
+        id: "requested_help",
+        label: "I requested help.",
+        actionType: "select_record",
+        entityType: "asknearby",
+        botPrompt: "Which help request did you broadcast?",
+      },
+      {
+        id: "nobody_responded",
+        label: "Nobody responded.",
+        actionType: "select_record",
+        entityType: "asknearby",
+        botPrompt:
+          "We're sorry nobody has responded yet. Which request was it? I can help boost or resolve it.",
+      },
+      {
+        id: "safety_concern",
+        label: "I have a safety concern.",
+        actionType: "escalate_safety",
+        botPrompt:
+          "Your safety is our urgent concern. Please describe what happened so our trust & safety team can take action immediately.",
+      },
+      {
+        id: "helpme_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt: "Please share what you need help with on Ask Nearby.",
+      },
+    ],
+  },
+  {
+    id: "account",
+    label: "Account & General",
+    icon: "person",
+    emoji: "👤",
+    color: "#6366F1",
+    prompt: "Sure! What account or general question do you have?",
+    issues: [
+      {
+        id: "login_problem",
+        label: "Login problem.",
+        actionType: "chat_input",
+        botPrompt:
+          "Are you having trouble with Google Sign-In, session expiration, or switching accounts?",
+      },
+      {
+        id: "profile_problem",
+        label: "Profile problem.",
+        actionType: "navigate",
+        route: "app://profile",
+        actionLabel: "Manage Profile",
+        botResponse:
+          "You can update your name, avatar, bio, and settings directly in Profile -> Edit Profile.",
+      },
+      {
+        id: "notifications",
+        label: "Notifications.",
+        actionType: "chat_input",
+        botPrompt:
+          "Are you missing push notifications or having trouble with message alerts?",
+      },
+      {
+        id: "app_not_working",
+        label: "App not working.",
+        actionType: "escalate",
+        botPrompt:
+          "What issues are you seeing (e.g. app freezing, blank screen, or error popup)? Let us know and we'll escalate a technical ticket.",
+      },
+      {
+        id: "general_question",
+        label: "General question.",
+        actionType: "chat_input",
+        botPrompt: "Ask me anything about Junto, and I'll be glad to help!",
+      },
+      {
+        id: "account_other",
+        label: "Something else.",
+        actionType: "chat_input",
+        botPrompt: "Please describe your question or issue.",
+      },
+    ],
+  },
+];
+
+const INITIAL_GREETING_TEXT =
+  "Hi! 👋 Welcome to Junto Support.\n\nWhat can I help you with today?";
+
 function detectActionCards(text: string): InAppActionCard[] {
   const cards: InAppActionCard[] = [];
   const lower = text.toLowerCase();
 
-  // 1. Explicit markdown link detection [label](app://...)
+  // Explicit markdown link detection [label](app://...)
   const linkMatches = [...text.matchAll(/\[(.*?)\]\((app:\/\/[^\s)]+)\)/g)];
   if (linkMatches.length > 0) {
     for (const match of linkMatches) {
@@ -84,10 +539,14 @@ function detectActionCards(text: string): InAppActionCard[] {
         icon = "megaphone";
         color = "#EC4899";
         sub = "Broadcast urgent requests to neighbors";
-      } else if (url.includes("location")) {
-        icon = "location";
-        color = "#06B6D4";
-        sub = "Change active neighborhood or city";
+      } else if (url.includes("explore")) {
+        icon = "compass";
+        color = "#8B5CF6";
+        sub = "Explore community hangouts & deals";
+      } else if (url.includes("profile")) {
+        icon = "person";
+        color = "#6366F1";
+        sub = "View and edit profile details";
       }
 
       cards.push({ label: rawLabel || "Open Screen", sub, url, icon, color });
@@ -95,12 +554,9 @@ function detectActionCards(text: string): InAppActionCard[] {
     return cards;
   }
 
-  // 2. Intelligent fallback intent detection
+  // Fallback heuristic detection if not in markdown link
   if (
-    (lower.includes("post") ||
-      lower.includes("offer") ||
-      lower.includes("create") ||
-      lower.includes("publish")) &&
+    (lower.includes("post") || lower.includes("offer")) &&
     (lower.includes("ride") || lower.includes("carpool"))
   ) {
     cards.push({
@@ -121,15 +577,7 @@ function detectActionCards(text: string): InAppActionCard[] {
       icon: "car-outline",
       color: "#10B981",
     });
-  } else if (
-    (lower.includes("sell") ||
-      lower.includes("swap") ||
-      lower.includes("list") ||
-      lower.includes("post")) &&
-    (lower.includes("ticket") ||
-      lower.includes("movie") ||
-      lower.includes("event"))
-  ) {
+  } else if (lower.includes("sell") && lower.includes("ticket")) {
     cards.push({
       label: "Sell / Swap Ticket",
       sub: "Post spare movie or event ticket",
@@ -137,13 +585,7 @@ function detectActionCards(text: string): InAppActionCard[] {
       icon: "ticket",
       color: "#F97316",
     });
-  } else if (
-    lower.includes("post activity") ||
-    lower.includes("create daymate") ||
-    lower.includes("find buddy") ||
-    lower.includes("hangout") ||
-    lower.includes("daymate")
-  ) {
+  } else if (lower.includes("create") && lower.includes("daymate")) {
     cards.push({
       label: "Create DayMate Activity",
       sub: "Find companion for gym, coffee or sports",
@@ -151,7 +593,7 @@ function detectActionCards(text: string): InAppActionCard[] {
       icon: "people",
       color: "#8B5CF6",
     });
-  } else if (lower.includes("service") || lower.includes("technician")) {
+  } else if (lower.includes("browse") && lower.includes("service")) {
     cards.push({
       label: "Browse Local Services",
       sub: "Find verified local technicians & pros",
@@ -159,48 +601,10 @@ function detectActionCards(text: string): InAppActionCard[] {
       icon: "construct",
       color: "#3B82F6",
     });
-  } else if (lower.includes("deal") || lower.includes("marketplace")) {
-    cards.push({
-      label: "Local Deals Marketplace",
-      sub: "Discover and offer deals for pre-owned items",
-      url: "app://deals",
-      icon: "pricetag",
-      color: "#F59E0B",
-    });
-  } else if (
-    lower.includes("ask nearby") ||
-    lower.includes("emergency") ||
-    lower.includes("lost")
-  ) {
-    cards.push({
-      label: "Ask Nearby",
-      sub: "Broadcast urgent queries to neighbors",
-      url: "app://ask-nearby",
-      icon: "megaphone",
-      color: "#EC4899",
-    });
-  } else if (lower.includes("location") || lower.includes("change city")) {
-    cards.push({
-      label: "Change Location",
-      sub: "Select active hub or city",
-      url: "app://location-search",
-      icon: "location",
-      color: "#06B6D4",
-    });
   }
 
   return cards;
 }
-
-const DEFAULT_WELCOME_MESSAGE: SupportChatMessage = {
-  id: "welcome-bot-msg",
-  sender: "bot",
-  text: "👋 **Hello! I'm Junto Copilot**.\n\nYour 24/7 AI Assistant for **Junto**. Need to post a ride, sell a ticket, find activity buddies, or explore services? Ask me anything and I'll provide direct links to the right screen!",
-  timestamp: new Date().toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  }),
-};
 
 export default function CustomerCareChatModal({
   onClose,
@@ -211,10 +615,43 @@ export default function CustomerCareChatModal({
   const { user, isLoggedIn } = useAuthContext();
   const { clearFeatureAlert } = useAppConfig();
 
-  const [messages, setMessages] = useState<SupportChatMessage[]>([
-    DEFAULT_WELCOME_MESSAGE,
-  ]);
+  const [categories, setCategories] =
+    useState<SupportCategory[]>(DEFAULT_CATEGORIES);
+  const [activeCategory, setActiveCategory] = useState<SupportCategory | null>(
+    null,
+  );
+  const [activeIssue, setActiveIssue] = useState<SupportIssue | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<UserRecordItem | null>(
+    null,
+  );
 
+  // User records state
+  const [userRecords, setUserRecords] = useState<UserRecordItem[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+
+  // Support ticket / case state
+  const [isRaisingTicket, setIsRaisingTicket] = useState(false);
+  const [showCaseTrackingModal, setShowCaseTrackingModal] = useState(false);
+  const [activeTrackingCase, setActiveTrackingCase] =
+    useState<SupportCaseRecord | null>(null);
+  const [showSupportEscalationPrompt, setShowSupportEscalationPrompt] =
+    useState(false);
+
+  const sessionIdRef = useRef<string>(`session-${Date.now()}`);
+
+  const initialMessage: SupportChatMessage = {
+    id: "welcome-greeting-msg",
+    sender: "bot",
+    text: INITIAL_GREETING_TEXT,
+    timestamp: new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+
+  const [messages, setMessages] = useState<SupportChatMessage[]>([
+    initialMessage,
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [endingChat, setEndingChat] = useState(false);
@@ -222,12 +659,42 @@ export default function CustomerCareChatModal({
   const [isSyncingHistory, setIsSyncingHistory] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Load preserved messages on mount (from local storage and backend supportchat table)
+  // 1. Fetch dynamic support config from backend on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadConfig() {
+      try {
+        const res = await ApiService.get<{
+          success: boolean;
+          categories?: SupportCategory[];
+        }>("/api/support/config");
+
+        if (
+          isMounted &&
+          res?.success &&
+          Array.isArray(res.categories) &&
+          res.categories.length > 0
+        ) {
+          setCategories(res.categories);
+        }
+      } catch (err) {
+        console.warn(
+          "Could not load dynamic support config, using standard configuration:",
+          err,
+        );
+      }
+    }
+    loadConfig();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. Load preserved messages on mount
   useEffect(() => {
     let isMounted = true;
 
     async function loadPreservedChat() {
-      // 1. Immediately hydrate from local storage so UI doesn't flicker
       try {
         const cached = await getSupportChatMessages(user?.id);
         if (isMounted && cached && cached.length > 0) {
@@ -237,7 +704,6 @@ export default function CustomerCareChatModal({
         console.warn("Error loading cached support messages:", err);
       }
 
-      // 2. Fetch from backend supportchat table for logged-in user
       if (isLoggedIn) {
         try {
           setIsSyncingHistory(true);
@@ -271,20 +737,22 @@ export default function CustomerCareChatModal({
     };
   }, [user?.id, isLoggedIn]);
 
-  const quickPrompts = [
-    "🚗 Help me post a ride",
-    "🎟️ Help posting a movie ticket",
-    "🔍 Find available rides",
-    "👥 Find a DayMate companion",
-    "🔧 Browse local services",
-    "🏷️ Search deals & marketplace",
-    "📢 Ask nearby neighbors",
-    "📍 Change my location",
-    "🛡️ Safety guidelines",
-  ];
+  const persistMessages = async (newMessages: SupportChatMessage[]) => {
+    try {
+      await saveSupportChatMessages(user?.id, newMessages);
+    } catch (e) {
+      console.warn("Failed to persist support messages locally:", e);
+    }
+  };
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 120);
+  };
+
+  // Safe navigation handler
   const handleActionNavigation = (rawUrl: string) => {
-    // Clear any previous maintenance/feature popup from app config so it never bleeds into new screens
     clearFeatureAlert?.();
 
     let target = rawUrl;
@@ -304,6 +772,8 @@ export default function CustomerCareChatModal({
         target = "/(screens)/glamup";
       } else if (path === "profile") {
         target = "/(tabs)/profile";
+      } else if (path === "explore") {
+        target = "/(tabs)/explore";
       } else if (path === "asknearby" || path === "ask-nearby") {
         target = "/(screens)/ask-nearby";
       } else if (path === "location-search" || path === "location") {
@@ -326,16 +796,15 @@ export default function CustomerCareChatModal({
     }, 120);
   };
 
-  // Helper to persist messages locally
-  const persistMessages = async (newMessages: SupportChatMessage[]) => {
-    try {
-      await saveSupportChatMessages(user?.id, newMessages);
-    } catch (e) {
-      console.warn("Failed to persist support messages locally:", e);
-    }
-  };
-
-  const handleSend = async (textToSend?: string) => {
+  // Send message helper
+  const handleSend = async (
+    textToSend?: string,
+    overrideContext?: {
+      category?: string;
+      issueType?: string;
+      selectedRecord?: any;
+    },
+  ) => {
     const query = (textToSend || input).trim();
     if (!query || loading) return;
 
@@ -355,10 +824,14 @@ export default function CustomerCareChatModal({
 
     setInput("");
     setLoading(true);
+    scrollToBottom();
 
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    const activeCtx = {
+      category: overrideContext?.category || activeCategory?.id,
+      issueType: overrideContext?.issueType || activeIssue?.label,
+      selectedRecord: overrideContext?.selectedRecord || selectedRecord,
+      sessionId: sessionIdRef.current,
+    };
 
     try {
       const res = await ApiService.post<{ success: boolean; reply: string }>(
@@ -366,13 +839,14 @@ export default function CustomerCareChatModal({
         {
           messages: updatedWithUser,
           userMessage: query,
+          context: activeCtx,
         },
       );
 
       const botReplyText =
         res && res.reply
           ? res.reply
-          : "I'm having trouble connecting to Junto services right now. Please email **support@junto.app** for further assistance.";
+          : "I'm having trouble connecting to Junto services right now. You can email **support@junto.app** for assistance.";
 
       const botMsg: SupportChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -387,12 +861,22 @@ export default function CustomerCareChatModal({
       const updatedWithBot = [...updatedWithUser, botMsg];
       setMessages(updatedWithBot);
       persistMessages(updatedWithBot);
+
+      // Check if bot offered escalation or if issue requires escalation
+      if (
+        botReplyText.toLowerCase().includes("support request") ||
+        botReplyText.toLowerCase().includes("raise a ticket") ||
+        activeIssue?.actionType === "escalate" ||
+        activeIssue?.actionType === "escalate_safety"
+      ) {
+        setShowSupportEscalationPrompt(true);
+      }
     } catch (err) {
       console.error("Support API error:", err);
       const fallbackMsg: SupportChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: "bot",
-        text: "Sorry, I couldn't process that request right now. You can reach human support directly at **support@junto.app**.",
+        text: "I couldn't resolve this automatically. Would you like me to raise a support request for our team?",
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -401,25 +885,267 @@ export default function CustomerCareChatModal({
       const updatedWithFallback = [...updatedWithUser, fallbackMsg];
       setMessages(updatedWithFallback);
       persistMessages(updatedWithFallback);
+      setShowSupportEscalationPrompt(true);
     } finally {
       setLoading(false);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      scrollToBottom();
     }
   };
 
-  // Check whether the user has active interaction in the chat
-  const hasActiveChat =
-    messages.length > 1 ||
-    (messages.length === 1 && messages[0].sender === "user");
+  // Step 1: Select Category
+  const handleSelectCategory = (cat: SupportCategory) => {
+    setActiveCategory(cat);
+    setActiveIssue(null);
+    setSelectedRecord(null);
+    setUserRecords([]);
+    setShowSupportEscalationPrompt(false);
 
-  // Prompt or open End Chat confirmation modal
-  const handleConfirmEndChat = () => {
-    setShowEndChatConfirm(true);
+    const userMsg: SupportChatMessage = {
+      id: Date.now().toString(),
+      sender: "user",
+      text: `${cat.emoji} ${cat.label}`,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    const botMsg: SupportChatMessage = {
+      id: (Date.now() + 1).toString(),
+      sender: "bot",
+      text:
+        cat.prompt ||
+        `Sure! What do you need help with regarding ${cat.label}?`,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    const updated = [...messages, userMsg, botMsg];
+    setMessages(updated);
+    persistMessages(updated);
+    scrollToBottom();
   };
 
-  // Conclude the chat session, update database, and clear session
+  // Step 2: Select Issue
+  const handleSelectIssue = async (issue: SupportIssue) => {
+    setActiveIssue(issue);
+    setSelectedRecord(null);
+    setShowSupportEscalationPrompt(false);
+
+    const userMsg: SupportChatMessage = {
+      id: Date.now().toString(),
+      sender: "user",
+      text: issue.label,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    // Scenario C: If issue is a direct navigation action (e.g. "I want to offer a ride.")
+    if (issue.actionType === "navigate" && issue.route) {
+      const responseText = `${issue.botResponse || "You can complete this directly in Junto!"}\n\n👉 **[${issue.actionLabel || "Open Screen"}](${issue.route})**`;
+
+      const botMsg: SupportChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: "bot",
+        text: responseText,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      const updated = [...messages, userMsg, botMsg];
+      setMessages(updated);
+      persistMessages(updated);
+      scrollToBottom();
+      return;
+    }
+
+    // Scenario A & B: If issue requires selecting a record (e.g. "My ride is confirmed." or "Driver didn't arrive.")
+    if (issue.actionType === "select_record" && issue.entityType) {
+      const botMsg: SupportChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: "bot",
+        text:
+          issue.botPrompt || `Which ${issue.entityType} are you referring to?`,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      const updated = [...messages, userMsg, botMsg];
+      setMessages(updated);
+      persistMessages(updated);
+      scrollToBottom();
+
+      // Fetch user's real records
+      fetchUserRecords(issue.entityType, issue.filter);
+      return;
+    }
+
+    // Escalation or Chat input flow
+    const botText =
+      issue.botPrompt ||
+      issue.botResponse ||
+      "Please provide details about what happened, and I will help resolve this.";
+
+    const botMsg: SupportChatMessage = {
+      id: (Date.now() + 1).toString(),
+      sender: "bot",
+      text: botText,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    const updated = [...messages, userMsg, botMsg];
+    setMessages(updated);
+    persistMessages(updated);
+
+    if (
+      issue.actionType === "escalate" ||
+      issue.actionType === "escalate_safety"
+    ) {
+      setShowSupportEscalationPrompt(true);
+    }
+    scrollToBottom();
+  };
+
+  // Fetch real authenticated records
+  const fetchUserRecords = async (entityType: string, filter?: string) => {
+    setLoadingRecords(true);
+    try {
+      const res = await ApiService.get<{
+        success: boolean;
+        records?: UserRecordItem[];
+      }>(
+        `/api/support/user-records?type=${entityType}&filter=${filter || "all"}`,
+      );
+
+      if (res?.success && Array.isArray(res.records)) {
+        setUserRecords(res.records);
+      } else {
+        setUserRecords([]);
+      }
+    } catch (err) {
+      console.warn("Could not fetch user records for support context:", err);
+      setUserRecords([]);
+    } finally {
+      setLoadingRecords(false);
+      scrollToBottom();
+    }
+  };
+
+  // Step 3: Handle User selecting a specific real record
+  const handleSelectRecord = async (record: UserRecordItem) => {
+    setSelectedRecord(record);
+    setUserRecords([]); // Hide selector after pick
+
+    const userText = `Selected: ${record.title} (${record.subtitle})`;
+    await handleSend(userText, {
+      category: activeCategory?.id,
+      issueType: activeIssue?.label,
+      selectedRecord: record,
+    });
+  };
+
+  // Step 4: Create Support Case
+  const handleCreateSupportCase = async () => {
+    setIsRaisingTicket(true);
+    try {
+      const relatedEntityType = activeIssue?.entityType || activeCategory?.id;
+      const relatedEntityId = selectedRecord?.id;
+      const relatedEntitySummary = selectedRecord
+        ? `${selectedRecord.title} • ${selectedRecord.subtitle}`
+        : undefined;
+
+      const summary = `${activeCategory?.label || "General"} - ${activeIssue?.label || "Support Issue"}`;
+      const conversationDetails = messages
+        .slice(-6)
+        .map((m) => `${m.sender.toUpperCase()}: ${m.text}`)
+        .join("\n");
+
+      const res = await ApiService.post<{
+        success: boolean;
+        case?: SupportCaseRecord;
+      }>("/api/support/ticket", {
+        category: activeCategory?.label || "General",
+        issueType: activeIssue?.label || "General Support",
+        sessionId: sessionIdRef.current,
+        relatedEntityType,
+        relatedEntityId,
+        relatedEntitySummary,
+        summary,
+        details: conversationDetails,
+        urgentSafety: activeIssue?.actionType === "escalate_safety",
+      });
+
+      if (res?.success && res.case) {
+        setShowSupportEscalationPrompt(false);
+        setActiveTrackingCase(res.case);
+
+        const botConfirmation: SupportChatMessage = {
+          id: (Date.now() + 2).toString(),
+          sender: "bot",
+          text: `✅ **Support Request Logged!**\n\n**Case Reference**: \`${res.case.caseNumber}\`\n**Status**: ${res.case.status}\n**Category**: ${res.case.category} • ${res.case.issueType}\n\nOur team has received this and will investigate ${res.case.estimatedResponseTime}.`,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          context: {
+            caseNumber: res.case.caseNumber,
+          },
+        };
+
+        const updated = [...messages, botConfirmation];
+        setMessages(updated);
+        persistMessages(updated);
+      }
+    } catch (err) {
+      console.error("Error creating support case:", err);
+      const errBotMsg: SupportChatMessage = {
+        id: (Date.now() + 2).toString(),
+        sender: "bot",
+        text: "Could not automatically create your support request right now. Please email **support@junto.app** and our team will assist you.",
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      setMessages((prev) => [...prev, errBotMsg]);
+    } finally {
+      setIsRaisingTicket(false);
+      scrollToBottom();
+    }
+  };
+
+  // Open Case Tracking Modal
+  const handleOpenCaseTracking = async (caseNumber: string) => {
+    try {
+      const res = await ApiService.get<{
+        success: boolean;
+        case?: SupportCaseRecord;
+      }>(`/api/support/cases/${caseNumber}`);
+
+      if (res?.success && res.case) {
+        setActiveTrackingCase(res.case);
+        setShowCaseTrackingModal(true);
+      }
+    } catch (err) {
+      console.warn("Could not fetch case status:", err);
+      if (activeTrackingCase) {
+        setShowCaseTrackingModal(true);
+      }
+    }
+  };
+
+  // End Chat Session
   const handleExecuteEndChat = async () => {
     setEndingChat(true);
     try {
@@ -427,10 +1153,17 @@ export default function CustomerCareChatModal({
         await ApiService.post("/api/support/end-chat", {});
       }
       await removeSupportChatMessages(user?.id);
+      setActiveCategory(null);
+      setActiveIssue(null);
+      setSelectedRecord(null);
+      setUserRecords([]);
+      setShowSupportEscalationPrompt(false);
+      sessionIdRef.current = `session-${Date.now()}`;
+
       const freshWelcome: SupportChatMessage = {
-        id: "welcome-bot-msg-" + Date.now(),
+        id: "welcome-greeting-msg-" + Date.now(),
         sender: "bot",
-        text: "👋 **Hello! I'm Junto Copilot**.\n\nYour 24/7 AI Assistant for **Junto**. Previous session ended. How can I help you today?",
+        text: INITIAL_GREETING_TEXT,
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -445,6 +1178,10 @@ export default function CustomerCareChatModal({
       setShowEndChatConfirm(false);
     }
   };
+
+  const hasActiveChat =
+    messages.length > 1 ||
+    (messages.length === 1 && messages[0].sender === "user");
 
   return (
     <SafeAreaView
@@ -499,7 +1236,7 @@ export default function CustomerCareChatModal({
                 <Text
                   style={{ fontSize: 16, fontWeight: "800", color: t.text }}
                 >
-                  Junto Copilot
+                  Junto Support
                 </Text>
                 <View
                   style={{
@@ -516,7 +1253,7 @@ export default function CustomerCareChatModal({
                       color: "#FFFFFF",
                     }}
                   >
-                    AI
+                    AI 24/7
                   </Text>
                 </View>
               </View>
@@ -534,7 +1271,7 @@ export default function CustomerCareChatModal({
                 <Text style={{ fontSize: 11, color: t.sub, fontWeight: "600" }}>
                   {isSyncingHistory
                     ? "Syncing history..."
-                    : "Active 24/7 • Persistent Chat"}
+                    : "Active Support • Real-time"}
                 </Text>
               </View>
             </View>
@@ -544,7 +1281,7 @@ export default function CustomerCareChatModal({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {hasActiveChat && (
               <TouchableOpacity
-                onPress={handleConfirmEndChat}
+                onPress={() => setShowEndChatConfirm(true)}
                 disabled={endingChat}
                 activeOpacity={0.7}
                 style={{
@@ -603,12 +1340,15 @@ export default function CustomerCareChatModal({
         >
           {messages.map((m) => {
             const isUser = m.sender === "user";
+            const actionCards = !isUser ? detectActionCards(m.text) : [];
+            const caseNumber = m.context?.caseNumber;
+
             return (
               <View
                 key={m.id}
                 style={{
                   alignSelf: isUser ? "flex-end" : "flex-start",
-                  maxWidth: "85%",
+                  maxWidth: "88%",
                 }}
               >
                 <View
@@ -634,12 +1374,14 @@ export default function CustomerCareChatModal({
                     style={{
                       color: isUser ? "#FFFFFF" : t.text,
                       fontSize: 14,
+                      lineHeight: 20,
                     }}
                   />
 
-                  {!isUser && (
-                    <View style={{ marginTop: 8, gap: 6 }}>
-                      {detectActionCards(m.text).map((action, actionIdx) => (
+                  {/* Render actionable deep link cards if present */}
+                  {!isUser && actionCards.length > 0 && (
+                    <View style={{ marginTop: 10, gap: 8 }}>
+                      {actionCards.map((action, actionIdx) => (
                         <TouchableOpacity
                           key={actionIdx}
                           onPress={() => handleActionNavigation(action.url)}
@@ -703,7 +1445,47 @@ export default function CustomerCareChatModal({
                       ))}
                     </View>
                   )}
+
+                  {/* Track Support Request button */}
+                  {!isUser && caseNumber && (
+                    <TouchableOpacity
+                      onPress={() => handleOpenCaseTracking(caseNumber)}
+                      activeOpacity={0.8}
+                      style={{
+                        marginTop: 10,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        backgroundColor: isDark
+                          ? "rgba(16, 185, 129, 0.16)"
+                          : "#D1FAE5",
+                        borderColor: "#10B981",
+                        borderWidth: 1.5,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                      }}
+                    >
+                      <Ionicons name="search" size={16} color="#10B981" />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 12,
+                          fontWeight: "800",
+                          color: "#10B981",
+                        }}
+                      >
+                        Track My Request ({caseNumber})
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color="#10B981"
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
+
                 <Text
                   style={{
                     fontSize: 10,
@@ -718,6 +1500,7 @@ export default function CustomerCareChatModal({
             );
           })}
 
+          {/* Loader when Copilot is generating reply */}
           {loading && (
             <View
               style={{
@@ -735,64 +1518,467 @@ export default function CustomerCareChatModal({
             >
               <ActivityIndicator size="small" color={t.primary} />
               <Text style={{ fontSize: 11, color: t.sub, fontWeight: "600" }}>
-                Junto Copilot is thinking...
+                Junto Support is preparing an answer...
               </Text>
             </View>
           )}
-        </ScrollView>
 
-        {/* Quick Prompts */}
-        {messages.length < 5 && (
-          <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
-            <Text
+          {/* ========================================================= */}
+          {/* INTERACTIVE MENU: 1. INITIAL CATEGORY SELECTION           */}
+          {/* ========================================================= */}
+          {!activeCategory && (
+            <View
               style={{
-                fontSize: 10,
-                fontWeight: "800",
-                color: t.sub,
-                marginBottom: 6,
-                letterSpacing: 0.5,
+                marginTop: 8,
+                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
+                borderWidth: 1,
+                borderColor: t.border,
+                borderRadius: 16,
+                padding: 14,
+                gap: 10,
               }}
             >
-              SUGGESTED QUESTIONS
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "800",
+                  color: t.sub,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                }}
+              >
+                SELECT A CATEGORY
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                {categories.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => handleSelectCategory(cat)}
+                    activeOpacity={0.75}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.06)"
+                        : "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: t.border,
+                      borderRadius: 14,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      minWidth: "47%",
+                      flexGrow: 1,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{cat.emoji}</Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: t.text,
+                      }}
+                    >
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================= */}
+          {/* INTERACTIVE MENU: 2. ISSUE TYPES BASED ON CATEGORY        */}
+          {/* ========================================================= */}
+          {activeCategory && userRecords.length === 0 && !loadingRecords && (
+            <View
+              style={{
+                marginTop: 8,
+                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
+                borderWidth: 1,
+                borderColor: t.border,
+                borderRadius: 16,
+                padding: 14,
+                gap: 10,
+              }}
             >
-              {quickPrompts.map((prompt) => (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
+                  <Text style={{ fontSize: 14 }}>{activeCategory.emoji}</Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: t.text,
+                    }}
+                  >
+                    {activeCategory.label} Issues
+                  </Text>
+                </View>
+
+                {/* Back to Categories Button */}
                 <TouchableOpacity
-                  key={prompt}
-                  onPress={() => handleSend(prompt)}
+                  onPress={() => {
+                    setActiveCategory(null);
+                    setActiveIssue(null);
+                    setSelectedRecord(null);
+                    setShowSupportEscalationPrompt(false);
+                  }}
                   style={{
-                    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : t.card,
-                    borderColor: t.border,
-                    borderWidth: 1,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 10,
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : "#E2E8F0",
+                  }}
+                >
+                  <Ionicons name="arrow-back" size={12} color={t.sub} />
+                  <Text
+                    style={{ fontSize: 11, fontWeight: "700", color: t.sub }}
+                  >
+                    All Categories
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ gap: 6 }}>
+                {activeCategory.issues.map((iss) => (
+                  <TouchableOpacity
+                    key={iss.id}
+                    onPress={() => handleSelectIssue(iss)}
+                    activeOpacity={0.75}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.05)"
+                        : "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: t.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "600",
+                        color: t.text,
+                        flex: 1,
+                      }}
+                    >
+                      {iss.label}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={t.sub} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================= */}
+          {/* INTERACTIVE MENU: 3. REAL USER RECORDS SELECTOR           */}
+          {/* ========================================================= */}
+          {loadingRecords && (
+            <View
+              style={{
+                padding: 16,
+                alignItems: "center",
+                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: t.border,
+                gap: 8,
+              }}
+            >
+              <ActivityIndicator size="small" color={t.primary} />
+              <Text style={{ fontSize: 12, color: t.sub, fontWeight: "600" }}>
+                Fetching your relevant records...
+              </Text>
+            </View>
+          )}
+
+          {!loadingRecords && userRecords.length > 0 && (
+            <View
+              style={{
+                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: t.border,
+                padding: 14,
+                gap: 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "800",
+                    color: t.text,
+                  }}
+                >
+                  Select your {activeCategory?.label || "Record"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setUserRecords([])}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       color: t.primary,
-                      fontWeight: "600",
+                      fontWeight: "700",
                     }}
                   >
-                    {prompt}
+                    Cancel
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+              </View>
 
-        {/* Input Row */}
+              <View style={{ gap: 8 }}>
+                {userRecords.map((record) => (
+                  <TouchableOpacity
+                    key={record.id}
+                    onPress={() => handleSelectRecord(record)}
+                    activeOpacity={0.75}
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.05)"
+                        : "#FFFFFF",
+                      borderWidth: 1.5,
+                      borderColor:
+                        selectedRecord?.id === record.id ? t.primary : t.border,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color: t.text,
+                          flex: 1,
+                        }}
+                      >
+                        {record.title}
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor:
+                            record.status === "confirmed" ||
+                            record.status === "active"
+                              ? "rgba(16, 185, 129, 0.15)"
+                              : "rgba(168, 85, 247, 0.15)",
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "700",
+                            color:
+                              record.status === "confirmed" ||
+                              record.status === "active"
+                                ? "#10B981"
+                                : t.primary,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {record.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: t.sub,
+                        marginTop: 4,
+                      }}
+                    >
+                      {record.subtitle}
+                    </Text>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                        marginTop: 6,
+                      }}
+                    >
+                      {record.role && (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "700",
+                            color: t.sub,
+                          }}
+                        >
+                          Role: {record.role}
+                        </Text>
+                      )}
+                      <Text style={{ fontSize: 10, color: t.sub }}>
+                        Date: {record.date}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================= */}
+          {/* SUPPORT ESCALATION PROMPT (Create Support Request)        */}
+          {/* ========================================================= */}
+          {showSupportEscalationPrompt && (
+            <View
+              style={{
+                marginTop: 6,
+                padding: 14,
+                borderRadius: 16,
+                backgroundColor: isDark
+                  ? "rgba(168, 85, 247, 0.12)"
+                  : "rgba(168, 85, 247, 0.08)",
+                borderWidth: 1.5,
+                borderColor: t.primary,
+                gap: 10,
+              }}
+            >
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Ionicons
+                  name="help-buoy-outline"
+                  size={20}
+                  color={t.primary}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "800",
+                    color: t.text,
+                    flex: 1,
+                  }}
+                >
+                  Raise a Support Request?
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 12, color: t.sub, lineHeight: 17 }}>
+                Our human customer care team will review your session,
+                investigate any records, and follow up directly with you.
+              </Text>
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={handleCreateSupportCase}
+                  disabled={isRaisingTicket}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    backgroundColor: t.primary,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "row",
+                    gap: 6,
+                  }}
+                >
+                  {isRaisingTicket ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="clipboard-outline"
+                        size={15}
+                        color="#FFFFFF"
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "800",
+                          color: "#FFFFFF",
+                        }}
+                      >
+                        Create Support Request
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowSupportEscalationPrompt(false)}
+                  disabled={isRaisingTicket}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : "#E2E8F0",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 12, fontWeight: "700", color: t.text }}
+                  >
+                    Continue Chat
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Input Bar */}
         <View
           style={{
             paddingHorizontal: 16,
-            paddingTop: 12,
+            paddingTop: 10,
+            paddingBottom: Platform.OS === "ios" ? 10 : 12,
             borderTopWidth: 1,
             borderColor: t.border,
             backgroundColor: t.card,
@@ -804,7 +1990,11 @@ export default function CustomerCareChatModal({
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Ask Junto Copilot..."
+            placeholder={
+              activeCategory
+                ? `Ask about ${activeCategory.label}...`
+                : "Type message or select category above..."
+            }
             placeholderTextColor={t.placeholder}
             style={{
               flex: 1,
@@ -907,9 +2097,9 @@ export default function CustomerCareChatModal({
                   marginBottom: 20,
                 }}
               >
-                This will close your active conversation with Junto Copilot and
-                conclude the session. Until you click this, your chat is
-                preserved when you navigate across screens.
+                This will conclude your conversation and reset the session.
+                Until ended, your conversation state is preserved when
+                navigating across app screens.
               </Text>
 
               <View
@@ -969,6 +2159,276 @@ export default function CustomerCareChatModal({
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Case Tracking Modal */}
+        <Modal
+          visible={showCaseTrackingModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowCaseTrackingModal(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              justifyContent: "flex-end",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: t.bg,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: t.border,
+                maxHeight: "80%",
+                gap: 14,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <Ionicons name="shield-checkmark" size={22} color="#10B981" />
+                  <Text
+                    style={{ fontSize: 17, fontWeight: "800", color: t.text }}
+                  >
+                    Support Case Details
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowCaseTrackingModal(false)}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close" size={22} color={t.sub} />
+                </TouchableOpacity>
+              </View>
+
+              {activeTrackingCase && (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View
+                    style={{
+                      padding: 16,
+                      borderRadius: 16,
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.04)"
+                        : "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: t.border,
+                      gap: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: t.sub,
+                        }}
+                      >
+                        CASE REFERENCE
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "900",
+                          color: t.primary,
+                        }}
+                      >
+                        {activeTrackingCase.caseNumber}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: t.sub,
+                        }}
+                      >
+                        STATUS
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: "#D1FAE5",
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "800",
+                            color: "#059669",
+                          }}
+                        >
+                          {activeTrackingCase.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: t.sub,
+                        }}
+                      >
+                        ESTIMATED RESOLUTION
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "700",
+                          color: t.text,
+                        }}
+                      >
+                        {activeTrackingCase.estimatedResponseTime}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={{
+                        borderTopWidth: 1,
+                        borderColor: t.border,
+                        paddingTop: 10,
+                        gap: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: t.sub,
+                        }}
+                      >
+                        CATEGORY & ISSUE
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "800",
+                          color: t.text,
+                        }}
+                      >
+                        {activeTrackingCase.category} •{" "}
+                        {activeTrackingCase.issueType}
+                      </Text>
+                    </View>
+
+                    {activeTrackingCase.relatedEntitySummary && (
+                      <View
+                        style={{
+                          borderTopWidth: 1,
+                          borderColor: t.border,
+                          paddingTop: 10,
+                          gap: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: t.sub,
+                          }}
+                        >
+                          ASSOCIATED RECORD
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: t.text,
+                          }}
+                        >
+                          {activeTrackingCase.relatedEntitySummary}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View
+                      style={{
+                        borderTopWidth: 1,
+                        borderColor: t.border,
+                        paddingTop: 10,
+                        gap: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: t.sub,
+                        }}
+                      >
+                        SUBMITTED AT
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: t.sub,
+                        }}
+                      >
+                        {new Date(
+                          activeTrackingCase.createdAt,
+                        ).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setShowCaseTrackingModal(false)}
+                    style={{
+                      marginTop: 16,
+                      backgroundColor: t.primary,
+                      paddingVertical: 12,
+                      borderRadius: 14,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "800",
+                        color: "#FFFFFF",
+                      }}
+                    >
+                      Close Tracker
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
             </View>
           </View>
         </Modal>

@@ -1261,6 +1261,18 @@ export class RideRepository extends BaseRepository<Ride> {
       );
     }
   }
+
+  /**
+   * Find all rides created or joined by user (driving and riding)
+   */
+  async findByUser(userId: string): Promise<{
+    driving: RideRecord[];
+    riding: RideRecord[];
+  }> {
+    const driving = await this.findByDriverId(userId);
+    const riding = await this.findByPassengerId(userId);
+    return { driving, riding };
+  }
 }
 
 export const rideRepository = new RideRepository();
