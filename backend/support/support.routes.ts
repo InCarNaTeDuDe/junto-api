@@ -84,6 +84,14 @@ export const SUPPORT_CONFIG = {
           botPrompt: "Okay! Which ride are you referring to?",
         },
         {
+          id: "select_ride",
+          label: "Select a specific ride.",
+          actionType: "select_record",
+          entityType: "ride",
+          filter: "all",
+          botPrompt: "Which ride would you like help with?",
+        },
+        {
           id: "driver_no_show",
           label: "Driver didn't arrive.",
           actionType: "select_record",
@@ -472,6 +480,30 @@ Junto is a direct community connection platform for finding activity companions 
 - If user provides specific ride or activity context, reference it directly.
 - If unable to resolve automatically or if human investigation is needed, offer:
   "I couldn't resolve this automatically. Would you like me to raise a support request for our team?"
+
+5. HUMAN COMMON SENSE & CRITICAL REASONING (ACT AS A SMART, LOGICAL HUMAN AGENT):
+- You must always think and reason like an intelligent, observant human customer support specialist, NOT a mindless script.
+- Always check the status and details of any selected record before responding.
+- RIDE STATUS LOGIC (CRITICAL):
+  * When a user references or selects a ride whose status is 'completed' (or 'ended'/'finished') and states or selects "Driver didn't arrive", "driver didn't come", "driver didn't show", "no show", etc.:
+    ACT LIKE A REAL HUMAN: A driver cannot fail to arrive for a ride that has already concluded and is marked as 'completed'! That claim is obsolete and contradictory for a completed ride.
+    Do NOT blindly apologize that the driver didn't arrive. Instead, politely and naturally point out the logical contradiction:
+    "Wait a moment—looking at your trip history, this ride from [From] to [To] is already marked as Completed. How could the driver not have arrived for a completed ride? Once a trip is completed, it has already concluded. Did you select this ride by mistake instead of an upcoming one, or did the driver falsely mark the ride as completed without actually picking you up? Please let me know so I can investigate properly!"
+  * If the user clarifies that the driver falsely marked it completed without picking them up (fraud/misconduct), take it seriously as a severe violation and offer an immediate urgent Trust & Safety escalation.
+  * If the user selected the wrong ride by mistake, guide them to specify or select the correct ride.
+  * Driver no-show is only valid for scheduled or active rides (status: 'active', 'confirmed', 'both_travelling').
+- Always apply this common-sense check to any contradictory user inputs across all categories.
+
+6. HANDLING UNUSUAL, SILLY, CURIOUS, OR "DUMB" QUESTIONS:
+- The agent must ALWAYS respond with grace, warmth, patience, and professional courtesy. NEVER insult, scold, mock, or dismiss the user.
+- A user may ask playful, bizarre, or impossible questions (e.g., "can my dog drive?", "can I carpool to the moon?", "are you a human or AI?", "give me free money", "can you marry me?", "is this Uber?"):
+  * Respond with a polite, good-humored, and friendly tone, acknowledging their question with a warm smile, while gently bringing them back to how Junto helps in the real world.
+  * Example: "Haha, as much as our team loves space exploration, trips to the moon are still in development! 😄 Right here on Earth, Junto connects verified neighbors for daily carpools, local activities, and home services. How can I help you with a real ride or booking today?"
+- If the question is very basic, repetitive, or obvious (e.g. "what is a car?", "why do I need an OTP?", "what does this button do?"):
+  * Answer simply, clearly, and encouragingly without condescension.
+  * Example: "Great question! On Junto, the 4-digit OTP ensures that both rider and driver meet safely at the pickup point before the ride begins. It protects both parties. Let me know if you'd like more details on how trips work!"
+- If the question is gibberish, sarcastic, or tests the AI:
+  * Remain completely calm, polite, and helpful: "I want to make sure I understand you correctly! Could you rephrase your query or let me know what you'd like to do on Junto? I'm here 24/7 to help."
 `;
 
 function generateFallbackSupportAnswer(
@@ -480,22 +512,103 @@ function generateFallbackSupportAnswer(
 ): string {
   const query = userMessage.toLowerCase();
 
+  // Helper to extract selected record from context or history
+  const record = context?.selectedRecord;
+  const rawStatus = (
+    record?.status ||
+    record?.details?.status ||
+    ""
+  ).toLowerCase();
+  const isRideCompleted =
+    rawStatus === "completed" ||
+    rawStatus === "ended" ||
+    rawStatus === "finished";
+  const isRideCancelled = rawStatus === "cancelled" || rawStatus === "canceled";
+
   // 1. Contextual Ride Scenarios
   if (
     context?.category === "rides" ||
     query.includes("ride") ||
-    query.includes("carpool")
+    query.includes("carpool") ||
+    record?.type === "ride"
   ) {
+    // A. Driver didn't arrive / no-show queries
     if (
       context?.issueType === "Driver didn't arrive." ||
       query.includes("driver didn't arrive") ||
-      query.includes("driver didn't show")
+      query.includes("driver didn't show") ||
+      query.includes("driver didnt arrive") ||
+      query.includes("driver didnt show") ||
+      query.includes("driver didn't come") ||
+      query.includes("driver didnt come") ||
+      query.includes("driver not arrive") ||
+      query.includes("driver not arrived") ||
+      query.includes("driver no show") ||
+      query.includes("driver never came") ||
+      query.includes("driver never arrived")
     ) {
-      const record = context?.selectedRecord;
       if (record) {
+        if (isRideCompleted) {
+          const fromLoc =
+            record.details?.from ||
+            record.title?.split("➔")[0]?.trim() ||
+            "your pickup location";
+          const toLoc =
+            record.details?.to || record.title?.split("➔")[1]?.trim() || "";
+          const routeStr = toLoc
+            ? `from **${fromLoc}** to **${toLoc}**`
+            : `**${fromLoc}**`;
+
+          return `Wait a moment—looking at your trip history, this ride ${routeStr} is already marked as **Completed**.\n\nHow could the driver have not arrived for a completed ride? Once a trip is marked completed, the ride has already concluded. Claiming the driver didn't arrive for a completed trip doesn't add up.\n\nDid you select this ride by mistake instead of an upcoming or active one? Or did the driver dishonestly mark it as completed without actually picking you up? Please let me know so I can investigate the right issue!`;
+        }
+
+        if (isRideCancelled) {
+          return `Looking at your trip records, this ride is marked as **Cancelled**.\n\nSince this ride was already cancelled, the trip was not active. If the driver cancelled on you last minute or if you need help finding another ride, please let me know!`;
+        }
+
         return `I'm really sorry to hear that your driver (${record.details?.driverName || "the driver"}) didn't arrive for your ride from **${record.details?.from || record.title}** on **${record.details?.time || "scheduled time"}**.\n\nDid the driver answer any phone calls or in-app messages?\n\nIf they didn't show up, I can immediately raise an urgent support request for our team to investigate and follow up with you.`;
       }
       return "Sorry about that! Which ride did this happen with? Please select your ride from the list or tell me the route, and I'll help resolve this or raise a support ticket.";
+    }
+
+    // B. Follow-up: Driver falsely marked completed without picking up
+    if (
+      query.includes("without picking") ||
+      query.includes("falsely") ||
+      query.includes("dishonestly") ||
+      query.includes("lied") ||
+      query.includes("never picked") ||
+      query.includes("cheated") ||
+      query.includes("scam") ||
+      query.includes("marked completed without") ||
+      query.includes("marked it complete without") ||
+      (query.includes("marked") && query.includes("complete"))
+    ) {
+      return `🚨 **Driver Misconduct Alert**: Marking a ride completed without picking up the passenger is a severe violation of Junto's community trust and safety rules.\n\nI can immediately raise an urgent priority support request for our Trust & Safety team to review the driver's GPS logs, verify the pickup timestamp, and initiate a full investigation and refund.\n\nWould you like me to create this urgent support request now?`;
+    }
+
+    // C. Follow-up: User selected the wrong ride by mistake
+    if (
+      query.includes("wrong ride") ||
+      query.includes("wrong one") ||
+      query.includes("mistake") ||
+      query.includes("different ride") ||
+      query.includes("another ride")
+    ) {
+      return `Understood! Which active or upcoming ride did you mean? Please share the route or scheduled departure time, and I will assist you with the correct trip right away.`;
+    }
+
+    // D. User selecting a specific completed ride initially
+    if (
+      context?.issueType === "Select a specific ride." ||
+      (query.startsWith("selected:") &&
+        (context?.category === "rides" ||
+          query.includes("car") ||
+          query.includes("bike")))
+    ) {
+      if (record && isRideCompleted) {
+        return `I found your completed ride from **${record.details?.from || record.title}** on **${record.details?.time || record.date}**.\n\nSince this trip is already marked **Completed**, what would you like assistance with?\n- Driver falsely marked ride completed (they didn't pick you up)\n- Payment or fare dispute\n- Lost an item in vehicle\n- Driver feedback or misconduct\n\nIf you meant an upcoming or active ride instead, please let me know!`;
+      }
     }
 
     if (
@@ -676,7 +789,75 @@ function generateFallbackSupportAnswer(
     return "I can raise a support request directly with our human customer care team right now!\n\nTap **Create Support Request** below, or let me know the details and I'll log it for you.";
   }
 
-  return "I'm here to help you with **Rides**, **DayMates**, **Services**, **Movie Tickets**, **LocalDeals**, and **HelpMe**.\n\nPlease select one of the menu options above or tell me what you'd like to do!";
+  // 8. Polite and courteous handling for silly, curious, or "dumb" questions
+  if (
+    query.includes("moon") ||
+    query.includes("mars") ||
+    query.includes("space") ||
+    query.includes("fly") ||
+    query.includes("alien") ||
+    query.includes("dinosaur") ||
+    query.includes("elephant") ||
+    query.includes("dog drive") ||
+    query.includes("cat drive") ||
+    query.includes("can my pet") ||
+    query.includes("free money") ||
+    query.includes("millionaire") ||
+    query.includes("marry me") ||
+    query.includes("love you") ||
+    query.includes("kill") ||
+    query.includes("joke")
+  ) {
+    if (query.includes("marry") || query.includes("love")) {
+      return "That's very sweet of you! 😄 While I'm dedicated 24/7 to helping you on Junto, I'm purely your digital support companion. If you're looking for great human connections or coffee buddies, definitely explore the **DayMates** tab in the app!";
+    }
+    if (query.includes("joke")) {
+      return "Here's one for your commute: Why did the traffic light turn red? Because it had to change in the middle of the street! 😄 Now, how can I genuinely assist you with your rides, activities, or services today?";
+    }
+    return "Haha, that's quite an adventurous idea! 😄 While our Junto drivers and members are pretty extraordinary, space expeditions, flying vehicles, and pet drivers aren't quite on our route map yet.\n\nRight here on Earth, Junto connects you with verified neighbors for real carpools, hangout activities, trusted local services, and ticket swaps. How can I help you with a real trip or booking today?";
+  }
+
+  // 9. Identity & Assistant questions
+  if (
+    query.includes("who are you") ||
+    query.includes("are you human") ||
+    query.includes("are you ai") ||
+    query.includes("are you a bot") ||
+    query.includes("are you real")
+  ) {
+    return "I'm Junto's AI Support Assistant! 🤖\n\nI'm available 24/7 to answer questions, guide your bookings, and resolve trip issues in real-time. Whenever something requires hands-on investigation, our human customer care team is always standing by to step in. How can I help you today?";
+  }
+
+  // 10. Basic / Explanatory questions (What is Junto, What is OTP, How carpool works)
+  if (
+    query.includes("what is junto") ||
+    query.includes("what does this app do") ||
+    query.includes("how does this work")
+  ) {
+    return "Welcome to **Junto**! 🌟 Junto is a local community platform designed to make daily life simpler and safer:\n\n1. 🚗 **Rides**: Share empty seats on daily carpool or bike trips to split fuel costs.\n2. 🤝 **DayMates**: Discover companion buddies for walking, coffee, movies, or sports.\n3. 🔧 **Local Services**: Find verified local technicians and repair specialists.\n4. 🎟️ **Ticket Deals**: Sell or buy spare movie and event tickets safely.\n5. 📢 **Ask Nearby**: Broadcast urgent community queries to neighbors.\n\nWhat would you like to explore first?";
+  }
+
+  if (
+    query.includes("what is otp") ||
+    query.includes("why otp") ||
+    query.includes("how otp works")
+  ) {
+    return "Great question! 🔐 In Junto rides, the **4-digit OTP** is a safety verification code.\n\nWhen meeting at the pickup location, the co-rider displays their unique OTP on screen. The driver enters this OTP to officially confirm pickup and start the ride. This ensures passengers and drivers only ride with verified, matched peers.";
+  }
+
+  // 11. Polite handling for gibberish, very short nonsense, or unclear messages
+  const cleanQ = query.trim().replace(/[^a-z0-9]/g, "");
+  const isGibberish =
+    cleanQ.length > 5 &&
+    (!/[aeiou]/.test(cleanQ) ||
+      /^(.)\1+$/.test(cleanQ) ||
+      /(asdf|qwer|zxcv)/.test(cleanQ));
+
+  if (isGibberish || query === "???" || query === "..." || query.length === 1) {
+    return "I want to make sure I understand you properly! 😊 Could you please rephrase your question, or let me know what you'd like help with regarding your rides, activities, or bookings?";
+  }
+
+  return "I'm here to help you with **Rides**, **DayMates**, **Services**, **Movie Tickets**, **LocalDeals**, and **HelpMe**.\n\nPlease feel free to describe what's going on or pick an option above, and I'll assist you with a smile!";
 }
 
 async function callOpenRouter(
@@ -697,6 +878,23 @@ async function callOpenRouter(
     contextualSystem += `\n\nCURRENT CONVERSATION CONTEXT:\n- Category: ${context.category || "None"}\n- Issue Type: ${context.issueType || "None"}`;
     if (context.selectedRecord) {
       contextualSystem += `\n- Selected Record: ${JSON.stringify(context.selectedRecord)}`;
+      const rawStatus = (
+        context.selectedRecord.status ||
+        context.selectedRecord.details?.status ||
+        ""
+      ).toLowerCase();
+      if (
+        rawStatus === "completed" ||
+        rawStatus === "ended" ||
+        rawStatus === "finished"
+      ) {
+        contextualSystem += `\n\nCRITICAL LOGICAL RULE FOR THIS TURN:
+The user has selected a ride that is ALREADY marked as '${rawStatus}'.
+If the user claims, selects, or asks about "driver didn't arrive", "driver didn't come", or "driver no-show", REASON LIKE A HUMAN AGENT:
+A driver cannot have failed to arrive for a ride that has already been completed and concluded! That is contradictory and obsolete for a completed ride.
+Politely point out this contradiction with human common sense (e.g., 'Looking at your records, this ride is marked as completed—did you pick this ride by mistake, or did the driver dishonestly mark it completed without picking you up?').
+Do NOT blindly accept or apologize for a driver no-show on a completed trip!`;
+      }
     }
     contextualSystem += `\nKeep your response friendly, polite, empathetic, and under 3 short paragraphs. Ask only one question at a time. Include actionable app:// markdown links when relevant.`;
   }
@@ -1188,6 +1386,37 @@ router.get("/messages", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error?.message || "Failed to fetch support chat messages",
+    });
+  }
+});
+
+// POST /api/support/log-messages - Persist interactive menu selections (categories, issues) to supportchat table
+router.post("/log-messages", async (req, res) => {
+  try {
+    const userId = getUserIdFromAuth(req);
+    const { messages, sessionId } = req.body;
+
+    if (userId && Array.isArray(messages)) {
+      for (const m of messages) {
+        if (m.text && m.sender) {
+          try {
+            await supportChatRepository.addMessage(
+              userId,
+              m.sender,
+              m.text,
+              sessionId,
+            );
+          } catch (e) {
+            console.warn("Could not log support message:", e);
+          }
+        }
+      }
+    }
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error?.message || "Failed to log support messages",
     });
   }
 });

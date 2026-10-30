@@ -146,6 +146,14 @@ const DEFAULT_CATEGORIES: SupportCategory[] = [
         botPrompt: "Okay! Which ride are you referring to?",
       },
       {
+        id: "select_ride",
+        label: "Select a specific ride.",
+        actionType: "select_record",
+        entityType: "ride",
+        filter: "all",
+        botPrompt: "Which ride would you like help with?",
+      },
+      {
         id: "driver_no_show",
         label: "Driver didn't arrive.",
         actionType: "select_record",
@@ -901,7 +909,7 @@ export default function CustomerCareChatModal({
     setShowSupportEscalationPrompt(false);
 
     const userMsg: SupportChatMessage = {
-      id: Date.now().toString(),
+      id: `cat-user-${Date.now()}`,
       sender: "user",
       text: `${cat.emoji} ${cat.label}`,
       timestamp: new Date().toLocaleTimeString([], {
@@ -911,7 +919,7 @@ export default function CustomerCareChatModal({
     };
 
     const botMsg: SupportChatMessage = {
-      id: (Date.now() + 1).toString(),
+      id: `cat-bot-${Date.now() + 1}`,
       sender: "bot",
       text:
         cat.prompt ||
@@ -925,14 +933,38 @@ export default function CustomerCareChatModal({
     const updated = [...messages, userMsg, botMsg];
     setMessages(updated);
     persistMessages(updated);
+
+    if (isLoggedIn) {
+      ApiService.post("/api/support/log-messages", {
+        messages: [
+          { sender: "user", text: userMsg.text },
+          { sender: "bot", text: botMsg.text },
+        ],
+        sessionId: sessionIdRef.current,
+      }).catch((err) =>
+        console.warn("Could not log category support messages:", err),
+      );
+    }
+
     scrollToBottom();
   };
 
   // Step 2: Select Issue
   const handleSelectIssue = async (issue: SupportIssue) => {
     setActiveIssue(issue);
-    setSelectedRecord(null);
     setShowSupportEscalationPrompt(false);
+
+    // If a record has ALREADY been selected (e.g. user selected ride -> then selected issue)
+    if (selectedRecord) {
+      await handleSend(issue.label, {
+        category: activeCategory?.id,
+        issueType: issue.label,
+        selectedRecord: selectedRecord,
+      });
+      return;
+    }
+
+    setSelectedRecord(null);
 
     const userMsg: SupportChatMessage = {
       id: Date.now().toString(),
@@ -942,6 +974,21 @@ export default function CustomerCareChatModal({
         hour: "2-digit",
         minute: "2-digit",
       }),
+    };
+
+    // Helper to log interaction to backend
+    const logIssueInteraction = (botText: string) => {
+      if (isLoggedIn) {
+        ApiService.post("/api/support/log-messages", {
+          messages: [
+            { sender: "user", text: userMsg.text },
+            { sender: "bot", text: botText },
+          ],
+          sessionId: sessionIdRef.current,
+        }).catch((err) =>
+          console.warn("Could not log issue support messages:", err),
+        );
+      }
     };
 
     // Scenario C: If issue is a direct navigation action (e.g. "I want to offer a ride.")
@@ -961,17 +1008,20 @@ export default function CustomerCareChatModal({
       const updated = [...messages, userMsg, botMsg];
       setMessages(updated);
       persistMessages(updated);
+      logIssueInteraction(responseText);
       scrollToBottom();
       return;
     }
 
     // Scenario A & B: If issue requires selecting a record (e.g. "My ride is confirmed." or "Driver didn't arrive.")
     if (issue.actionType === "select_record" && issue.entityType) {
+      const botMsgText =
+        issue.botPrompt || `Which ${issue.entityType} are you referring to?`;
+
       const botMsg: SupportChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: "bot",
-        text:
-          issue.botPrompt || `Which ${issue.entityType} are you referring to?`,
+        text: botMsgText,
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -981,6 +1031,7 @@ export default function CustomerCareChatModal({
       const updated = [...messages, userMsg, botMsg];
       setMessages(updated);
       persistMessages(updated);
+      logIssueInteraction(botMsgText);
       scrollToBottom();
 
       // Fetch user's real records
@@ -1007,6 +1058,7 @@ export default function CustomerCareChatModal({
     const updated = [...messages, userMsg, botMsg];
     setMessages(updated);
     persistMessages(updated);
+    logIssueInteraction(botText);
 
     if (
       issue.actionType === "escalate" ||
@@ -1179,9 +1231,15 @@ export default function CustomerCareChatModal({
     }
   };
 
-  const hasActiveChat =
-    messages.length > 1 ||
-    (messages.length === 1 && messages[0].sender === "user");
+  const isCategoryBrowsingOnly =
+    messages.length <= 1 ||
+    (messages.length === 3 &&
+      activeCategory &&
+      !activeIssue &&
+      !selectedRecord &&
+      messages[1]?.id?.startsWith("cat-user-"));
+
+  const hasActiveChat = !isCategoryBrowsingOnly && messages.length > 1;
 
   return (
     <SafeAreaView
@@ -1484,6 +1542,87 @@ export default function CustomerCareChatModal({
                       />
                     </TouchableOpacity>
                   )}
+
+                  {/* Quick Action Chips for Completed Ride Contradiction */}
+                  {!isUser &&
+                    (m.text.includes("marked as **Completed**") ||
+                      m.text.includes("marked completed")) && (
+                      <View style={{ marginTop: 10, gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleSend(
+                              "The driver marked the ride completed without picking me up.",
+                            )
+                          }
+                          activeOpacity={0.75}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                            backgroundColor: isDark
+                              ? "rgba(239, 68, 68, 0.15)"
+                              : "#FEE2E2",
+                            borderWidth: 1,
+                            borderColor: "#EF4444",
+                          }}
+                        >
+                          <Ionicons
+                            name="alert-circle"
+                            size={14}
+                            color="#EF4444"
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "700",
+                              color: "#EF4444",
+                              flex: 1,
+                            }}
+                          >
+                            Driver marked completed without picking me up
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleSend("I selected the wrong ride by mistake.")
+                          }
+                          activeOpacity={0.75}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                            backgroundColor: isDark
+                              ? "rgba(168, 85, 247, 0.15)"
+                              : "#F3E8FF",
+                            borderWidth: 1,
+                            borderColor: t.primary,
+                          }}
+                        >
+                          <Ionicons
+                            name="refresh"
+                            size={14}
+                            color={t.primary}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "700",
+                              color: t.primary,
+                              flex: 1,
+                            }}
+                          >
+                            I selected the wrong ride by mistake
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                 </View>
 
                 <Text
@@ -1526,7 +1665,7 @@ export default function CustomerCareChatModal({
           {/* ========================================================= */}
           {/* INTERACTIVE MENU: 1. INITIAL CATEGORY SELECTION           */}
           {/* ========================================================= */}
-          {!activeCategory && (
+          {!activeCategory && !hasActiveChat && (
             <View
               style={{
                 marginTop: 8,
@@ -1597,105 +1736,125 @@ export default function CustomerCareChatModal({
           {/* ========================================================= */}
           {/* INTERACTIVE MENU: 2. ISSUE TYPES BASED ON CATEGORY        */}
           {/* ========================================================= */}
-          {activeCategory && userRecords.length === 0 && !loadingRecords && (
-            <View
-              style={{
-                marginTop: 8,
-                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
-                borderWidth: 1,
-                borderColor: t.border,
-                borderRadius: 16,
-                padding: 14,
-                gap: 10,
-              }}
-            >
+          {activeCategory &&
+            !activeIssue &&
+            !selectedRecord &&
+            !hasActiveChat &&
+            userRecords.length === 0 &&
+            !loadingRecords && (
               <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  marginTop: 8,
+                  backgroundColor: isDark ? "rgba(255,255,255,0.03)" : t.card,
+                  borderWidth: 1,
+                  borderColor: t.border,
+                  borderRadius: 16,
+                  padding: 14,
+                  gap: 10,
                 }}
               >
                 <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-                >
-                  <Text style={{ fontSize: 14 }}>{activeCategory.emoji}</Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "800",
-                      color: t.text,
-                    }}
-                  >
-                    {activeCategory.label} Issues
-                  </Text>
-                </View>
-
-                {/* Back to Categories Button */}
-                <TouchableOpacity
-                  onPress={() => {
-                    setActiveCategory(null);
-                    setActiveIssue(null);
-                    setSelectedRecord(null);
-                    setShowSupportEscalationPrompt(false);
-                  }}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 10,
-                    backgroundColor: isDark
-                      ? "rgba(255,255,255,0.08)"
-                      : "#E2E8F0",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <Ionicons name="arrow-back" size={12} color={t.sub} />
-                  <Text
-                    style={{ fontSize: 11, fontWeight: "700", color: t.sub }}
-                  >
-                    All Categories
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ gap: 6 }}>
-                {activeCategory.issues.map((iss) => (
-                  <TouchableOpacity
-                    key={iss.id}
-                    onPress={() => handleSelectIssue(iss)}
-                    activeOpacity={0.75}
+                  <View
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      backgroundColor: isDark
-                        ? "rgba(255,255,255,0.05)"
-                        : "#F8FAFC",
-                      borderWidth: 1,
-                      borderColor: t.border,
+                      gap: 6,
                     }}
                   >
+                    <Text style={{ fontSize: 14 }}>{activeCategory.emoji}</Text>
                     <Text
                       style={{
-                        fontSize: 13,
-                        fontWeight: "600",
+                        fontSize: 12,
+                        fontWeight: "800",
                         color: t.text,
-                        flex: 1,
                       }}
                     >
-                      {iss.label}
+                      {activeCategory.label} Issues
                     </Text>
-                    <Ionicons name="chevron-forward" size={14} color={t.sub} />
+                  </View>
+
+                  {/* Back to Categories Button */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setActiveCategory(null);
+                      setActiveIssue(null);
+                      setSelectedRecord(null);
+                      setShowSupportEscalationPrompt(false);
+                      setMessages((prev) =>
+                        prev.filter(
+                          (m) =>
+                            m.id === "welcome-greeting-msg" ||
+                            !m.id.startsWith("cat-"),
+                        ),
+                      );
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 10,
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : "#E2E8F0",
+                    }}
+                  >
+                    <Ionicons name="arrow-back" size={12} color={t.sub} />
+                    <Text
+                      style={{ fontSize: 11, fontWeight: "700", color: t.sub }}
+                    >
+                      All Categories
+                    </Text>
                   </TouchableOpacity>
-                ))}
+                </View>
+
+                <View style={{ gap: 6 }}>
+                  {activeCategory.issues.map((iss) => (
+                    <TouchableOpacity
+                      key={iss.id}
+                      onPress={() => handleSelectIssue(iss)}
+                      activeOpacity={0.75}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.05)"
+                          : "#F8FAFC",
+                        borderWidth: 1,
+                        borderColor: t.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "600",
+                          color: t.text,
+                          flex: 1,
+                        }}
+                      >
+                        {iss.label}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={14}
+                        color={t.sub}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-          )}
+            )}
 
           {/* ========================================================= */}
           {/* INTERACTIVE MENU: 3. REAL USER RECORDS SELECTOR           */}
@@ -1991,9 +2150,11 @@ export default function CustomerCareChatModal({
             value={input}
             onChangeText={setInput}
             placeholder={
-              activeCategory
-                ? `Ask about ${activeCategory.label}...`
-                : "Type message or select category above..."
+              hasActiveChat
+                ? "Type your message..."
+                : activeCategory
+                  ? `Ask about ${activeCategory.label}...`
+                  : "Type message or select category above..."
             }
             placeholderTextColor={t.placeholder}
             style={{
