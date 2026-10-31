@@ -11,3 +11,6 @@ export * from "./Rides.repository";
 export * from "./Ticket.repository";
 export * from "./User.repository";
 export * from "./SupportChat.repository";
+export * from "./SupportCase.repository";
+export * from "./SupportCaseMessage.repository";
+export * from "./SupportAgent.repository";

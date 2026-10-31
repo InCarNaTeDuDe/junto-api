@@ -14,6 +14,9 @@ import { LocalDeal } from "../entities/LocalDeals.entity";
 import { LocalService } from "../entities/LocalServices.entity";
 import { SupportChat } from "../entities/SupportChat.entity";
 import { AppConfig } from "../entities/AppConfig.entity";
+import { SupportCase } from "../entities/SupportCase.entity";
+import { SupportCaseMessage } from "../entities/SupportCaseMessage.entity";
+import { SupportAgent } from "../entities/SupportAgent.entity";
 
 // import { inMemoryStore } from "../db"; // <-- adjust path if needed
 
@@ -48,6 +51,9 @@ export const AppDataSource = new DataSource({
     LocalService,
     SupportChat,
     AppConfig,
+    SupportCase,
+    SupportCaseMessage,
+    SupportAgent,
   ],
 
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,

@@ -8,6 +8,7 @@ import { dealsRepository } from "../repositories/Deals.repository";
 import { localServicesRepository } from "../repositories/LocalServices.repository";
 import { auditRepository } from "../repositories/Audit.repository";
 import { ActivityCategory } from "../entities/Activity.entity";
+import { supportCaseService } from "./support-case.service";
 
 const router = express.Router();
 
@@ -1203,9 +1204,29 @@ router.post("/ticket", async (req, res) => {
       });
     }
 
-    // Generate real case reference number
-    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
-    const caseNumber = `JNT-SR-${randomSuffix}`;
+    // Persist real SupportCase in database via SupportCaseService
+    let dbCase: any = null;
+    let caseNumber = "";
+    try {
+      dbCase = await supportCaseService.createCase({
+        userId,
+        category,
+        issueType,
+        subject: summary || `${category} - ${issueType}`,
+        description: details || "",
+        chatSessionId: sessionId || null,
+        relatedEntityType: relatedEntityType || null,
+        relatedEntityId: relatedEntityId || null,
+      });
+      caseNumber = dbCase.caseNumber;
+    } catch (dbErr) {
+      console.warn(
+        "SupportCaseService createCase notice:",
+        (dbErr as any)?.message,
+      );
+      const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+      caseNumber = `JNT-SR-${randomSuffix}`;
+    }
 
     const newCase: SupportCase = {
       caseNumber,
@@ -1219,7 +1240,9 @@ router.post("/ticket", async (req, res) => {
       summary: summary || `${category} - ${issueType}`,
       details: details || "",
       status: "Under Review",
-      createdAt: new Date().toISOString(),
+      createdAt: dbCase?.createdAt
+        ? new Date(dbCase.createdAt).toISOString()
+        : new Date().toISOString(),
       estimatedResponseTime: urgentSafety
         ? "Immediate (Under 15 mins)"
         : "Within 2 hours",
@@ -1275,6 +1298,35 @@ router.get("/cases", async (req, res) => {
       return res.json({ success: true, cases: [] });
     }
 
+    // First try fetching from persistent SupportCaseService
+    try {
+      const dbCases = await supportCaseService.listCasesForCustomer(userId);
+      if (dbCases && dbCases.length > 0) {
+        const formatted = dbCases.map((c) => ({
+          caseNumber: c.caseNumber,
+          userId: c.userId,
+          category: c.category,
+          issueType: c.issueType || "",
+          summary: c.subject,
+          details: c.description || "",
+          status: c.status,
+          createdAt: new Date(c.createdAt).toISOString(),
+          estimatedResponseTime: "Within 2 hours",
+          relatedEntityType: c.relatedEntityType,
+          relatedEntityId: c.relatedEntityId,
+        }));
+        return res.json({
+          success: true,
+          cases: formatted,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        "Notice: Fetching from memory cases fallback:",
+        (err as any)?.message,
+      );
+    }
+
     const userCases: SupportCase[] = [];
     for (const c of supportCasesStore.values()) {
       if (c.userId === userId) {
@@ -1320,6 +1372,31 @@ router.get("/cases/:caseNumber", async (req, res) => {
   try {
     const userId = getUserIdFromAuth(req);
     const { caseNumber } = req.params;
+
+    // Check persistent database first
+    try {
+      const dbCase = await supportCaseService.getCaseByCaseNumber(caseNumber);
+      if (dbCase) {
+        return res.json({
+          success: true,
+          case: {
+            caseNumber: dbCase.caseNumber,
+            userId: dbCase.userId,
+            category: dbCase.category,
+            issueType: dbCase.issueType || "",
+            summary: dbCase.subject,
+            details: dbCase.description || "",
+            status: dbCase.status,
+            createdAt: new Date(dbCase.createdAt).toISOString(),
+            estimatedResponseTime: "Within 2 hours",
+            relatedEntityType: dbCase.relatedEntityType,
+            relatedEntityId: dbCase.relatedEntityId,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("Notice checking case in memory:", (err as any)?.message);
+    }
 
     let targetCase = supportCasesStore.get(caseNumber);
 
@@ -1371,6 +1448,7 @@ router.get("/messages", async (req, res) => {
       id: m.id,
       sender: m.sender,
       text: m.message,
+      createdAt: m.createdAt,
       timestamp: new Date(m.createdAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",

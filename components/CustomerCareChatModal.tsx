@@ -34,6 +34,7 @@ export interface SupportChatMessage {
   sender: "user" | "bot";
   text: string;
   timestamp: string;
+  createdAt?: string | Date;
   context?: {
     category?: string;
     issueType?: string;
@@ -727,8 +728,25 @@ export default function CustomerCareChatModal({
             Array.isArray(res.messages) &&
             res.messages.length > 0
           ) {
-            setMessages(res.messages);
-            await saveSupportChatMessages(user?.id, res.messages);
+            const localizedMessages: SupportChatMessage[] = res.messages.map(
+              (m: any) => {
+                if (m.createdAt) {
+                  const dateObj = new Date(m.createdAt);
+                  if (!isNaN(dateObj.getTime())) {
+                    return {
+                      ...m,
+                      timestamp: dateObj.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                    };
+                  }
+                }
+                return m;
+              },
+            );
+            setMessages(localizedMessages);
+            await saveSupportChatMessages(user?.id, localizedMessages);
           }
         } catch (apiErr) {
           console.warn("Could not sync supportchat from database:", apiErr);
@@ -1633,7 +1651,12 @@ export default function CustomerCareChatModal({
                     alignSelf: isUser ? "flex-end" : "flex-start",
                   }}
                 >
-                  {m.timestamp}
+                  {m.createdAt && !isNaN(new Date(m.createdAt).getTime())
+                    ? new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : m.timestamp}
                 </Text>
               </View>
             );
