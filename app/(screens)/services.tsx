@@ -1195,7 +1195,7 @@ export default function ServicesScreen() {
                   ]}
                 >
                   <Ionicons
-                    name={isSearchListening ? "mic" : "mic-off"}
+                    name={isSearchListening ? "mic" : "mic-outline"}
                     size={15}
                     color={isSearchListening ? "#FFF" : textMute}
                   />

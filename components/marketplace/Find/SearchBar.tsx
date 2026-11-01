@@ -35,33 +35,126 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const textMute = isDark ? "#94A3B8" : "#64748B";
 
   const pulse = useRef(new Animated.Value(1)).current;
+  const ripple = useRef(new Animated.Value(0.9)).current;
+  const rippleOpacity = useRef(new Animated.Value(0)).current;
+  const wave1 = useRef(new Animated.Value(4)).current;
+  const wave2 = useRef(new Animated.Value(9)).current;
+  const wave3 = useRef(new Animated.Value(5)).current;
 
   useEffect(() => {
     if (!isListening) {
       pulse.stopAnimation();
+      ripple.stopAnimation();
+      rippleOpacity.stopAnimation();
+      wave1.stopAnimation();
+      wave2.stopAnimation();
+      wave3.stopAnimation();
+
       pulse.setValue(1);
+      ripple.setValue(0.9);
+      rippleOpacity.setValue(0);
+      wave1.setValue(4);
+      wave2.setValue(9);
+      wave3.setValue(5);
       return;
     }
 
-    const animation = Animated.loop(
+    const pulseAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
-          toValue: 1.18,
-          duration: 500,
-          useNativeDriver: true,
+          toValue: 1.15,
+          duration: 450,
+          useNativeDriver: false,
         }),
         Animated.timing(pulse, {
           toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
+          duration: 450,
+          useNativeDriver: false,
         }),
       ]),
     );
 
-    animation.start();
+    const rippleAnim = Animated.loop(
+      Animated.parallel([
+        Animated.timing(ripple, {
+          toValue: 1.65,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.sequence([
+          Animated.timing(rippleOpacity, {
+            toValue: 0.65,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+          Animated.timing(rippleOpacity, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]),
+    );
 
-    return () => animation.stop();
-  }, [isListening, pulse]);
+    const w1 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wave1, {
+          toValue: 14,
+          duration: 260,
+          useNativeDriver: false,
+        }),
+        Animated.timing(wave1, {
+          toValue: 4,
+          duration: 260,
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+
+    const w2 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wave2, {
+          toValue: 5,
+          duration: 320,
+          useNativeDriver: false,
+        }),
+        Animated.timing(wave2, {
+          toValue: 18,
+          duration: 320,
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+
+    const w3 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wave3, {
+          toValue: 15,
+          duration: 290,
+          useNativeDriver: false,
+        }),
+        Animated.timing(wave3, {
+          toValue: 4,
+          duration: 290,
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+
+    pulseAnim.start();
+    rippleAnim.start();
+    w1.start();
+    w2.start();
+    w3.start();
+
+    return () => {
+      pulseAnim.stop();
+      rippleAnim.stop();
+      w1.stop();
+      w2.stop();
+      w3.stop();
+    };
+  }, [isListening, pulse, ripple, rippleOpacity, wave1, wave2, wave3]);
 
   return (
     <View style={styles.container}>
@@ -109,41 +202,48 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             style={styles.micBtn}
             onPress={onVoicePress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={
+              isListening ? "Listening... Tap to stop" : "Voice search"
+            }
           >
             {isListening ? (
-              <Animated.View
-                style={[
-                  styles.listeningCircle,
-                  {
-                    backgroundColor: `${accentColor}18`,
-                    transform: [{ scale: pulse }],
-                  },
-                ]}
-              >
-                <View
-                  style={[styles.soundWave, { backgroundColor: accentColor }]}
-                />
-                <View
+              <View style={styles.listeningContainer}>
+                {/* Expanding outer pulse ripple */}
+                <Animated.View
                   style={[
-                    styles.soundWave,
-                    styles.waveTall,
-                    { backgroundColor: accentColor },
+                    styles.rippleRing,
+                    {
+                      borderColor: accentColor,
+                      opacity: rippleOpacity,
+                      transform: [{ scale: ripple }],
+                    },
                   ]}
                 />
-                <View
+                {/* Active pulsating mic button with bouncing sound waves */}
+                <Animated.View
                   style={[
-                    styles.soundWave,
-                    styles.waveSmall,
-                    { backgroundColor: accentColor },
+                    styles.listeningBadge,
+                    {
+                      backgroundColor: accentColor,
+                      transform: [{ scale: pulse }],
+                    },
                   ]}
-                />
-                <Ionicons
-                  name="mic"
-                  size={15}
-                  color={accentColor}
-                  style={styles.micIcon}
-                />
-              </Animated.View>
+                >
+                  <Animated.View
+                    style={[
+                      styles.soundWave,
+                      { height: wave1, backgroundColor: "#FFFFFF" },
+                    ]}
+                  />
+                  <Ionicons name="mic" size={13} color="#FFFFFF" />
+                  <Animated.View
+                    style={[
+                      styles.soundWave,
+                      { height: wave3, backgroundColor: "#FFFFFF" },
+                    ]}
+                  />
+                </Animated.View>
+              </View>
             ) : (
               <Ionicons name="mic-outline" size={18} color={accentColor} />
             )}
@@ -184,38 +284,40 @@ const styles = StyleSheet.create({
   },
 
   micBtn: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  listeningCircle: {
+  listeningContainer: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+
+  rippleRing: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+  },
+
+  listeningBadge: {
     width: 30,
     height: 30,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 2,
+    gap: 2.5,
   },
 
   soundWave: {
     width: 2,
-    height: 7,
-    borderRadius: 2,
-    opacity: 0.7,
-  },
-
-  waveTall: {
-    height: 13,
-  },
-
-  waveSmall: {
-    height: 5,
-  },
-
-  micIcon: {
-    marginLeft: 1,
+    borderRadius: 1,
   },
 });

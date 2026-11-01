@@ -1087,22 +1087,45 @@ export default function LocalDealsScreen() {
           ) : (
             <TouchableOpacity
               onPress={handleVoiceSearch}
-              style={[
-                styles.searchMicBtn,
-                {
-                  backgroundColor: isListening
-                    ? "#CA8A04"
-                    : isDark
-                      ? "#1E293B"
-                      : "#F1F5F9",
-                },
-              ]}
+              activeOpacity={0.8}
+              style={{ alignItems: "center", justifyContent: "center" }}
+              accessibilityLabel={
+                isListening ? "Listening... Tap to stop" : "Voice search"
+              }
             >
-              <Ionicons
-                name={isListening ? "mic" : "mic-outline"}
-                size={16}
-                color={isListening ? "#FFFFFF" : textMute}
-              />
+              {isListening && (
+                <Animated.View
+                  style={{
+                    position: "absolute",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: "#CA8A04",
+                    opacity: micRingOpacityAnim,
+                    transform: [{ scale: micRingScaleAnim }],
+                  }}
+                />
+              )}
+              <Animated.View
+                style={[
+                  styles.searchMicBtn,
+                  {
+                    backgroundColor: isListening
+                      ? "#CA8A04"
+                      : isDark
+                        ? "#1E293B"
+                        : "#F1F5F9",
+                    transform: [{ scale: isListening ? micScaleAnim : 1 }],
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={isListening ? "mic" : "mic-outline"}
+                  size={16}
+                  color={isListening ? "#FFFFFF" : textMute}
+                />
+              </Animated.View>
             </TouchableOpacity>
           )}
         </View>

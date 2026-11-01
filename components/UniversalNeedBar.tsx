@@ -246,7 +246,7 @@ export const UniversalNeedBar: React.FC = () => {
           >
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <Ionicons
-                name={isListening ? "mic" : "mic-off"}
+                name={isListening ? "mic" : "mic-outline"}
                 size={16}
                 color={isListening ? "#FFFFFF" : isDark ? "#94A3B8" : "#64748B"}
               />
