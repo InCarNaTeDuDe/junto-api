@@ -19,6 +19,7 @@ import {
   Message,
   AppNotification,
   fetchNotificationsFromApi,
+  markNotificationsReadInStore,
 } from "../hooks/useStore";
 import { useTheme } from "../hooks/useTheme";
 
@@ -705,9 +706,14 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
     fetchNotificationsFromApi();
   }, []);
 
+  const handleClose = () => {
+    markNotificationsReadInStore();
+    onClose();
+  };
+
   const handleNotificationPress = (notif: AppNotification) => {
     notif.read = true;
-    onClose();
+    handleClose();
 
     // 1. If explicit activityId exists in notif or notif.data
     const activityId =
@@ -874,7 +880,8 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const notifications = state.notifications || [];
+  // Only display active notifications that have been added and not yet dismissed
+  const notifications = (state.notifications || []).filter((n) => !n.read);
 
   return (
     <View
@@ -894,7 +901,7 @@ function NotificationsOverlay({ onClose }: { onClose: () => void }) {
         ]}
       >
         <View style={styles.notifHeaderLeft}>
-          <Pressable onPress={onClose} style={styles.p1}>
+          <Pressable onPress={handleClose} style={styles.p1}>
             <Ionicons
               name="arrow-back"
               size={20}

@@ -462,17 +462,21 @@ export async function fetchNotificationsFromApi() {
 
 export async function markNotificationsReadInStore() {
   const unreadList = state.notifications.filter((n) => !n.read);
+  if (unreadList.length === 0) return;
+
   state.notifications = state.notifications.map((n) => ({
     ...n,
     read: true,
   }));
   updateListeners();
 
-  for (const n of unreadList) {
-    try {
-      await ApiService.patch(`/api/notifications/${n.id}/read`, {});
-    } catch (e) {
-      // Ignore individually failed read patches
+  try {
+    await ApiService.patch("/api/notifications/read-all", {});
+  } catch (e) {
+    for (const n of unreadList) {
+      try {
+        await ApiService.patch(`/api/notifications/${n.id}/read`, {});
+      } catch {}
     }
   }
 }
@@ -640,6 +644,8 @@ export function useStore() {
   const setShowNotifications = (show: boolean) => {
     state.showNotifications = show;
     if (show) {
+      fetchNotificationsFromApi();
+    } else {
       markNotificationsReadInStore();
     }
     updateListeners();

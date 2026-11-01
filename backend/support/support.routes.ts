@@ -8,7 +8,6 @@ import { dealsRepository } from "../repositories/Deals.repository";
 import { localServicesRepository } from "../repositories/LocalServices.repository";
 import { auditRepository } from "../repositories/Audit.repository";
 import { ActivityCategory } from "../entities/Activity.entity";
-import { supportCaseService } from "./support-case.service";
 
 const router = express.Router();
 
@@ -83,14 +82,6 @@ export const SUPPORT_CONFIG = {
           entityType: "ride",
           filter: "confirmed",
           botPrompt: "Okay! Which ride are you referring to?",
-        },
-        {
-          id: "select_ride",
-          label: "Select a specific ride.",
-          actionType: "select_record",
-          entityType: "ride",
-          filter: "all",
-          botPrompt: "Which ride would you like help with?",
         },
         {
           id: "driver_no_show",
@@ -513,103 +504,29 @@ function generateFallbackSupportAnswer(
 ): string {
   const query = userMessage.toLowerCase();
 
-  // Helper to extract selected record from context or history
-  const record = context?.selectedRecord;
-  const rawStatus = (
-    record?.status ||
-    record?.details?.status ||
-    ""
-  ).toLowerCase();
-  const isRideCompleted =
-    rawStatus === "completed" ||
-    rawStatus === "ended" ||
-    rawStatus === "finished";
-  const isRideCancelled = rawStatus === "cancelled" || rawStatus === "canceled";
-
   // 1. Contextual Ride Scenarios
   if (
     context?.category === "rides" ||
     query.includes("ride") ||
-    query.includes("carpool") ||
-    record?.type === "ride"
+    query.includes("carpool")
   ) {
-    // A. Driver didn't arrive / no-show queries
     if (
       context?.issueType === "Driver didn't arrive." ||
       query.includes("driver didn't arrive") ||
       query.includes("driver didn't show") ||
-      query.includes("driver didnt arrive") ||
-      query.includes("driver didnt show") ||
-      query.includes("driver didn't come") ||
-      query.includes("driver didnt come") ||
-      query.includes("driver not arrive") ||
-      query.includes("driver not arrived") ||
-      query.includes("driver no show") ||
-      query.includes("driver never came") ||
-      query.includes("driver never arrived")
+      query.includes("driver didn't come")
     ) {
+      const record = context?.selectedRecord;
       if (record) {
-        if (isRideCompleted) {
-          const fromLoc =
-            record.details?.from ||
-            record.title?.split("➔")[0]?.trim() ||
-            "your pickup location";
-          const toLoc =
-            record.details?.to || record.title?.split("➔")[1]?.trim() || "";
-          const routeStr = toLoc
-            ? `from **${fromLoc}** to **${toLoc}**`
-            : `**${fromLoc}**`;
-
-          return `Wait a moment—looking at your trip history, this ride ${routeStr} is already marked as **Completed**.\n\nHow could the driver have not arrived for a completed ride? Once a trip is marked completed, the ride has already concluded. Claiming the driver didn't arrive for a completed trip doesn't add up.\n\nDid you select this ride by mistake instead of an upcoming or active one? Or did the driver dishonestly mark it as completed without actually picking you up? Please let me know so I can investigate the right issue!`;
+        const isCompleted =
+          record.status === "completed" ||
+          record.details?.status === "completed";
+        if (isCompleted) {
+          return `Wait a second—looking at our system records, your ride from **${record.details?.from || record.title}** on **${record.details?.time || "scheduled time"}** is marked as **Completed**.\n\nA driver cannot fail to arrive for a trip that is already finished and completed, unless:\n1. **Did the driver falsely mark the ride as completed without actually picking you up?** (If so, this is a serious violation and I will immediately escalate this to our safety team!)\n2. Or **did you accidentally select a past completed ride** instead of an upcoming one?\n\nPlease let me know which happened so I can help you correctly!`;
         }
-
-        if (isRideCancelled) {
-          return `Looking at your trip records, this ride is marked as **Cancelled**.\n\nSince this ride was already cancelled, the trip was not active. If the driver cancelled on you last minute or if you need help finding another ride, please let me know!`;
-        }
-
         return `I'm really sorry to hear that your driver (${record.details?.driverName || "the driver"}) didn't arrive for your ride from **${record.details?.from || record.title}** on **${record.details?.time || "scheduled time"}**.\n\nDid the driver answer any phone calls or in-app messages?\n\nIf they didn't show up, I can immediately raise an urgent support request for our team to investigate and follow up with you.`;
       }
       return "Sorry about that! Which ride did this happen with? Please select your ride from the list or tell me the route, and I'll help resolve this or raise a support ticket.";
-    }
-
-    // B. Follow-up: Driver falsely marked completed without picking up
-    if (
-      query.includes("without picking") ||
-      query.includes("falsely") ||
-      query.includes("dishonestly") ||
-      query.includes("lied") ||
-      query.includes("never picked") ||
-      query.includes("cheated") ||
-      query.includes("scam") ||
-      query.includes("marked completed without") ||
-      query.includes("marked it complete without") ||
-      (query.includes("marked") && query.includes("complete"))
-    ) {
-      return `🚨 **Driver Misconduct Alert**: Marking a ride completed without picking up the passenger is a severe violation of Junto's community trust and safety rules.\n\nI can immediately raise an urgent priority support request for our Trust & Safety team to review the driver's GPS logs, verify the pickup timestamp, and initiate a full investigation and refund.\n\nWould you like me to create this urgent support request now?`;
-    }
-
-    // C. Follow-up: User selected the wrong ride by mistake
-    if (
-      query.includes("wrong ride") ||
-      query.includes("wrong one") ||
-      query.includes("mistake") ||
-      query.includes("different ride") ||
-      query.includes("another ride")
-    ) {
-      return `Understood! Which active or upcoming ride did you mean? Please share the route or scheduled departure time, and I will assist you with the correct trip right away.`;
-    }
-
-    // D. User selecting a specific completed ride initially
-    if (
-      context?.issueType === "Select a specific ride." ||
-      (query.startsWith("selected:") &&
-        (context?.category === "rides" ||
-          query.includes("car") ||
-          query.includes("bike")))
-    ) {
-      if (record && isRideCompleted) {
-        return `I found your completed ride from **${record.details?.from || record.title}** on **${record.details?.time || record.date}**.\n\nSince this trip is already marked **Completed**, what would you like assistance with?\n- Driver falsely marked ride completed (they didn't pick you up)\n- Payment or fare dispute\n- Lost an item in vehicle\n- Driver feedback or misconduct\n\nIf you meant an upcoming or active ride instead, please let me know!`;
-      }
     }
 
     if (
@@ -790,75 +707,7 @@ function generateFallbackSupportAnswer(
     return "I can raise a support request directly with our human customer care team right now!\n\nTap **Create Support Request** below, or let me know the details and I'll log it for you.";
   }
 
-  // 8. Polite and courteous handling for silly, curious, or "dumb" questions
-  if (
-    query.includes("moon") ||
-    query.includes("mars") ||
-    query.includes("space") ||
-    query.includes("fly") ||
-    query.includes("alien") ||
-    query.includes("dinosaur") ||
-    query.includes("elephant") ||
-    query.includes("dog drive") ||
-    query.includes("cat drive") ||
-    query.includes("can my pet") ||
-    query.includes("free money") ||
-    query.includes("millionaire") ||
-    query.includes("marry me") ||
-    query.includes("love you") ||
-    query.includes("kill") ||
-    query.includes("joke")
-  ) {
-    if (query.includes("marry") || query.includes("love")) {
-      return "That's very sweet of you! 😄 While I'm dedicated 24/7 to helping you on Junto, I'm purely your digital support companion. If you're looking for great human connections or coffee buddies, definitely explore the **DayMates** tab in the app!";
-    }
-    if (query.includes("joke")) {
-      return "Here's one for your commute: Why did the traffic light turn red? Because it had to change in the middle of the street! 😄 Now, how can I genuinely assist you with your rides, activities, or services today?";
-    }
-    return "Haha, that's quite an adventurous idea! 😄 While our Junto drivers and members are pretty extraordinary, space expeditions, flying vehicles, and pet drivers aren't quite on our route map yet.\n\nRight here on Earth, Junto connects you with verified neighbors for real carpools, hangout activities, trusted local services, and ticket swaps. How can I help you with a real trip or booking today?";
-  }
-
-  // 9. Identity & Assistant questions
-  if (
-    query.includes("who are you") ||
-    query.includes("are you human") ||
-    query.includes("are you ai") ||
-    query.includes("are you a bot") ||
-    query.includes("are you real")
-  ) {
-    return "I'm Junto's AI Support Assistant! 🤖\n\nI'm available 24/7 to answer questions, guide your bookings, and resolve trip issues in real-time. Whenever something requires hands-on investigation, our human customer care team is always standing by to step in. How can I help you today?";
-  }
-
-  // 10. Basic / Explanatory questions (What is Junto, What is OTP, How carpool works)
-  if (
-    query.includes("what is junto") ||
-    query.includes("what does this app do") ||
-    query.includes("how does this work")
-  ) {
-    return "Welcome to **Junto**! 🌟 Junto is a local community platform designed to make daily life simpler and safer:\n\n1. 🚗 **Rides**: Share empty seats on daily carpool or bike trips to split fuel costs.\n2. 🤝 **DayMates**: Discover companion buddies for walking, coffee, movies, or sports.\n3. 🔧 **Local Services**: Find verified local technicians and repair specialists.\n4. 🎟️ **Ticket Deals**: Sell or buy spare movie and event tickets safely.\n5. 📢 **Ask Nearby**: Broadcast urgent community queries to neighbors.\n\nWhat would you like to explore first?";
-  }
-
-  if (
-    query.includes("what is otp") ||
-    query.includes("why otp") ||
-    query.includes("how otp works")
-  ) {
-    return "Great question! 🔐 In Junto rides, the **4-digit OTP** is a safety verification code.\n\nWhen meeting at the pickup location, the co-rider displays their unique OTP on screen. The driver enters this OTP to officially confirm pickup and start the ride. This ensures passengers and drivers only ride with verified, matched peers.";
-  }
-
-  // 11. Polite handling for gibberish, very short nonsense, or unclear messages
-  const cleanQ = query.trim().replace(/[^a-z0-9]/g, "");
-  const isGibberish =
-    cleanQ.length > 5 &&
-    (!/[aeiou]/.test(cleanQ) ||
-      /^(.)\1+$/.test(cleanQ) ||
-      /(asdf|qwer|zxcv)/.test(cleanQ));
-
-  if (isGibberish || query === "???" || query === "..." || query.length === 1) {
-    return "I want to make sure I understand you properly! 😊 Could you please rephrase your question, or let me know what you'd like help with regarding your rides, activities, or bookings?";
-  }
-
-  return "I'm here to help you with **Rides**, **DayMates**, **Services**, **Movie Tickets**, **LocalDeals**, and **HelpMe**.\n\nPlease feel free to describe what's going on or pick an option above, and I'll assist you with a smile!";
+  return "I'm here to help you with **Rides**, **DayMates**, **Services**, **Movie Tickets**, **LocalDeals**, and **HelpMe**.\n\nPlease select one of the menu options above or tell me what you'd like to do!";
 }
 
 async function callOpenRouter(
@@ -879,22 +728,11 @@ async function callOpenRouter(
     contextualSystem += `\n\nCURRENT CONVERSATION CONTEXT:\n- Category: ${context.category || "None"}\n- Issue Type: ${context.issueType || "None"}`;
     if (context.selectedRecord) {
       contextualSystem += `\n- Selected Record: ${JSON.stringify(context.selectedRecord)}`;
-      const rawStatus = (
-        context.selectedRecord.status ||
-        context.selectedRecord.details?.status ||
-        ""
-      ).toLowerCase();
       if (
-        rawStatus === "completed" ||
-        rawStatus === "ended" ||
-        rawStatus === "finished"
+        context.selectedRecord.status === "completed" ||
+        context.selectedRecord.details?.status === "completed"
       ) {
-        contextualSystem += `\n\nCRITICAL LOGICAL RULE FOR THIS TURN:
-The user has selected a ride that is ALREADY marked as '${rawStatus}'.
-If the user claims, selects, or asks about "driver didn't arrive", "driver didn't come", or "driver no-show", REASON LIKE A HUMAN AGENT:
-A driver cannot have failed to arrive for a ride that has already been completed and concluded! That is contradictory and obsolete for a completed ride.
-Politely point out this contradiction with human common sense (e.g., 'Looking at your records, this ride is marked as completed—did you pick this ride by mistake, or did the driver dishonestly mark it completed without picking you up?').
-Do NOT blindly accept or apologize for a driver no-show on a completed trip!`;
+        contextualSystem += `\n- IMPORTANT COMMON SENSE RULE: The user has selected a ride that is marked as 'completed'. If the user says their driver didn't arrive / didn't show up / cancelled, do not accept it blindly—point out that our records show this ride was marked Completed. Ask if the driver falsely marked it completed without picking them up (in which case offer immediate safety escalation), or if they accidentally selected a past ride.`;
       }
     }
     contextualSystem += `\nKeep your response friendly, polite, empathetic, and under 3 short paragraphs. Ask only one question at a time. Include actionable app:// markdown links when relevant.`;
@@ -1009,13 +847,29 @@ router.get("/user-records", async (req, res) => {
         );
       }
 
+      // Prioritize active and ongoing rides ahead of completed/cancelled rides
+      filtered.sort((a, b) => {
+        const priority: Record<string, number> = {
+          both_travelling: 1,
+          active: 2,
+          confirmed: 3,
+          pending: 4,
+          completed: 10,
+          cancelled: 11,
+        };
+        const pA = priority[a.status] || 5;
+        const pB = priority[b.status] || 5;
+        return pA - pB;
+      });
+
       const records = filtered.map((r) => {
         const isDriver = r.userId === userId;
+        const statusLabel = r.status ? ` • [${r.status.toUpperCase()}]` : "";
         return {
           id: r.id,
           type: "ride",
           title: `${r.from} ➔ ${r.to}`,
-          subtitle: `${r.vehicleType === "bike" ? "🏍️ Bike" : "🚗 Car"} • ${r.time} • ₹${r.price}/seat`,
+          subtitle: `${r.vehicleType === "bike" ? "🏍️ Bike" : "🚗 Car"} • ${r.time} • ₹${r.price}/seat${statusLabel}`,
           date: r.time,
           status: r.status,
           role: isDriver ? "Driver" : "Passenger",
@@ -1204,29 +1058,9 @@ router.post("/ticket", async (req, res) => {
       });
     }
 
-    // Persist real SupportCase in database via SupportCaseService
-    let dbCase: any = null;
-    let caseNumber = "";
-    try {
-      dbCase = await supportCaseService.createCase({
-        userId,
-        category,
-        issueType,
-        subject: summary || `${category} - ${issueType}`,
-        description: details || "",
-        chatSessionId: sessionId || null,
-        relatedEntityType: relatedEntityType || null,
-        relatedEntityId: relatedEntityId || null,
-      });
-      caseNumber = dbCase.caseNumber;
-    } catch (dbErr) {
-      console.warn(
-        "SupportCaseService createCase notice:",
-        (dbErr as any)?.message,
-      );
-      const randomSuffix = Math.floor(100000 + Math.random() * 900000);
-      caseNumber = `JNT-SR-${randomSuffix}`;
-    }
+    // Generate real case reference number
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const caseNumber = `JNT-SR-${randomSuffix}`;
 
     const newCase: SupportCase = {
       caseNumber,
@@ -1240,9 +1074,7 @@ router.post("/ticket", async (req, res) => {
       summary: summary || `${category} - ${issueType}`,
       details: details || "",
       status: "Under Review",
-      createdAt: dbCase?.createdAt
-        ? new Date(dbCase.createdAt).toISOString()
-        : new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       estimatedResponseTime: urgentSafety
         ? "Immediate (Under 15 mins)"
         : "Within 2 hours",
@@ -1298,35 +1130,6 @@ router.get("/cases", async (req, res) => {
       return res.json({ success: true, cases: [] });
     }
 
-    // First try fetching from persistent SupportCaseService
-    try {
-      const dbCases = await supportCaseService.listCasesForCustomer(userId);
-      if (dbCases && dbCases.length > 0) {
-        const formatted = dbCases.map((c) => ({
-          caseNumber: c.caseNumber,
-          userId: c.userId,
-          category: c.category,
-          issueType: c.issueType || "",
-          summary: c.subject,
-          details: c.description || "",
-          status: c.status,
-          createdAt: new Date(c.createdAt).toISOString(),
-          estimatedResponseTime: "Within 2 hours",
-          relatedEntityType: c.relatedEntityType,
-          relatedEntityId: c.relatedEntityId,
-        }));
-        return res.json({
-          success: true,
-          cases: formatted,
-        });
-      }
-    } catch (err) {
-      console.warn(
-        "Notice: Fetching from memory cases fallback:",
-        (err as any)?.message,
-      );
-    }
-
     const userCases: SupportCase[] = [];
     for (const c of supportCasesStore.values()) {
       if (c.userId === userId) {
@@ -1372,31 +1175,6 @@ router.get("/cases/:caseNumber", async (req, res) => {
   try {
     const userId = getUserIdFromAuth(req);
     const { caseNumber } = req.params;
-
-    // Check persistent database first
-    try {
-      const dbCase = await supportCaseService.getCaseByCaseNumber(caseNumber);
-      if (dbCase) {
-        return res.json({
-          success: true,
-          case: {
-            caseNumber: dbCase.caseNumber,
-            userId: dbCase.userId,
-            category: dbCase.category,
-            issueType: dbCase.issueType || "",
-            summary: dbCase.subject,
-            details: dbCase.description || "",
-            status: dbCase.status,
-            createdAt: new Date(dbCase.createdAt).toISOString(),
-            estimatedResponseTime: "Within 2 hours",
-            relatedEntityType: dbCase.relatedEntityType,
-            relatedEntityId: dbCase.relatedEntityId,
-          },
-        });
-      }
-    } catch (err) {
-      console.warn("Notice checking case in memory:", (err as any)?.message);
-    }
 
     let targetCase = supportCasesStore.get(caseNumber);
 
@@ -1448,7 +1226,6 @@ router.get("/messages", async (req, res) => {
       id: m.id,
       sender: m.sender,
       text: m.message,
-      createdAt: m.createdAt,
       timestamp: new Date(m.createdAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -1464,37 +1241,6 @@ router.get("/messages", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error?.message || "Failed to fetch support chat messages",
-    });
-  }
-});
-
-// POST /api/support/log-messages - Persist interactive menu selections (categories, issues) to supportchat table
-router.post("/log-messages", async (req, res) => {
-  try {
-    const userId = getUserIdFromAuth(req);
-    const { messages, sessionId } = req.body;
-
-    if (userId && Array.isArray(messages)) {
-      for (const m of messages) {
-        if (m.text && m.sender) {
-          try {
-            await supportChatRepository.addMessage(
-              userId,
-              m.sender,
-              m.text,
-              sessionId,
-            );
-          } catch (e) {
-            console.warn("Could not log support message:", e);
-          }
-        }
-      }
-    }
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: error?.message || "Failed to log support messages",
     });
   }
 });

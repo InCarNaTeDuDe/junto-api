@@ -199,23 +199,7 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
   const [description, setDescription] = useState(
     initialData?.description || "",
   );
-  const [availableDate, setAvailableDate] = useState<Date>(() => {
-    if (initialData?.availableDate) {
-      const parsed = new Date(initialData.availableDate);
-      if (!isNaN(parsed.getTime())) return parsed;
-    }
-    return new Date();
-  });
-  const [showCalendar, setShowCalendar] = useState(false);
-
-  const isSameDayAsToday = (date: Date) => {
-    const today = new Date();
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
-  };
+  // Available date state removed per user request - defaults to available today
 
   // Dynamic placeholder for Skills & Specialization based on the selected category
   const computedSkillsPlaceholder = getSkillsPlaceholderForCategory(category);
@@ -313,8 +297,8 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
       experience: experience.trim() || "5 yrs exp",
       distance: distance.trim() || "Near you",
       description: description.trim(),
-      availableToday: isSameDayAsToday(availableDate),
-      availableDate: availableDate.toISOString().split("T")[0],
+      availableToday: true,
+      availableDate: new Date().toISOString().split("T")[0],
       avatar: avatar.trim(),
     };
 
@@ -573,128 +557,6 @@ export const EnrollForm: React.FC<EnrollFormProps> = ({
           multiline
           numberOfLines={3}
         />
-      </View>
-
-      {/* 7. Service Availability Date (Replaces Available Today with Calendar, minDate as today) */}
-      <View style={styles.formGroup}>
-        <View style={styles.labelRow}>
-          <Text style={[styles.label, { color: textPrimary }]}>
-            Availability Date <Text style={styles.requiredStar}>*</Text>
-          </Text>
-        </View>
-        <Text style={[styles.helperSubText, { color: textMute }]}>
-          Select date when you are available to accept service bookings (min
-          date is today)
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.calendarSelectorCard,
-            {
-              backgroundColor: inputBg,
-              borderColor: showCalendar ? accentColor : border,
-            },
-          ]}
-          onPress={() => setShowCalendar((prev) => !prev)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.calendarSelectorLeft}>
-            <View
-              style={[
-                styles.calendarIconCircle,
-                { backgroundColor: `${accentColor}18` },
-              ]}
-            >
-              <Ionicons name="calendar" size={18} color={accentColor} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[
-                  styles.calendarSelectedDateText,
-                  { color: textPrimary },
-                ]}
-              >
-                {availableDate.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </Text>
-              <Text
-                style={[
-                  styles.calendarStatusHint,
-                  {
-                    color: isSameDayAsToday(availableDate)
-                      ? "#10B981"
-                      : accentColor,
-                  },
-                ]}
-              >
-                {isSameDayAsToday(availableDate)
-                  ? "✓ Available today for immediate bookings"
-                  : `📅 Available starting ${availableDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-              </Text>
-            </View>
-          </View>
-          <View
-            style={[
-              styles.calendarToggleActionBadge,
-              {
-                backgroundColor: showCalendar
-                  ? accentColor
-                  : isDark
-                    ? "#334155"
-                    : "#F1F5F9",
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.calendarToggleActionText,
-                { color: showCalendar ? "#FFFFFF" : textPrimary },
-              ]}
-            >
-              {showCalendar ? "Done" : "Change Date"}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {(showCalendar || Platform.OS === "web") && (
-          <View
-            style={[
-              styles.calendarPickerContainer,
-              {
-                backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
-                borderColor: border,
-              },
-            ]}
-          >
-            <DateTimePicker
-              value={availableDate}
-              mode="date"
-              display="default"
-              minimumDate={new Date()}
-              onChange={(event: DateTimePickerEvent, date?: Date) => {
-                if (Platform.OS !== "web") {
-                  setShowCalendar(false);
-                }
-                if (date) {
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const chosen = new Date(date);
-                  chosen.setHours(0, 0, 0, 0);
-                  if (chosen < today) {
-                    setAvailableDate(new Date());
-                  } else {
-                    setAvailableDate(date);
-                  }
-                }
-              }}
-              themeVariant={isDark ? "dark" : "light"}
-            />
-          </View>
-        )}
       </View>
 
       {/* 8. Provider / Technician Photo (Cloudinary services/ folder) */}

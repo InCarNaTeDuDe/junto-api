@@ -867,6 +867,10 @@ export default function LocalDealsScreen() {
   };
 
   const handleVoiceSearch = () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
     startListening((text) => {
       setSearchQuery(text.replace(/show me|find|search for/gi, "").trim());
     });
@@ -1095,7 +1099,7 @@ export default function LocalDealsScreen() {
               ]}
             >
               <Ionicons
-                name={isListening ? "mic" : "mic-off"}
+                name={isListening ? "mic" : "mic-outline"}
                 size={16}
                 color={isListening ? "#FFFFFF" : textMute}
               />

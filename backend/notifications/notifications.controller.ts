@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import {
   getUserNotifications,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
   sendPushNotification,
   registerUserPushToken,
 } from "./notifications.service";
@@ -50,6 +51,19 @@ export async function markRead(
 ) {
   try {
     await markNotificationAsRead(req.params.id as string, req.user!);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function markAllRead(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    await markAllNotificationsAsRead(req.user!);
     return res.status(200).json({ success: true });
   } catch (err) {
     next(err);

@@ -34,7 +34,6 @@ export interface SupportChatMessage {
   sender: "user" | "bot";
   text: string;
   timestamp: string;
-  createdAt?: string | Date;
   context?: {
     category?: string;
     issueType?: string;
@@ -145,14 +144,6 @@ const DEFAULT_CATEGORIES: SupportCategory[] = [
         entityType: "ride",
         filter: "confirmed",
         botPrompt: "Okay! Which ride are you referring to?",
-      },
-      {
-        id: "select_ride",
-        label: "Select a specific ride.",
-        actionType: "select_record",
-        entityType: "ride",
-        filter: "all",
-        botPrompt: "Which ride would you like help with?",
       },
       {
         id: "driver_no_show",
@@ -666,6 +657,8 @@ export default function CustomerCareChatModal({
   const [endingChat, setEndingChat] = useState(false);
   const [showEndChatConfirm, setShowEndChatConfirm] = useState(false);
   const [isSyncingHistory, setIsSyncingHistory] = useState(false);
+  const [showCategoryMenuExplicit, setShowCategoryMenuExplicit] =
+    useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // 1. Fetch dynamic support config from backend on mount
@@ -728,25 +721,8 @@ export default function CustomerCareChatModal({
             Array.isArray(res.messages) &&
             res.messages.length > 0
           ) {
-            const localizedMessages: SupportChatMessage[] = res.messages.map(
-              (m: any) => {
-                if (m.createdAt) {
-                  const dateObj = new Date(m.createdAt);
-                  if (!isNaN(dateObj.getTime())) {
-                    return {
-                      ...m,
-                      timestamp: dateObj.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }),
-                    };
-                  }
-                }
-                return m;
-              },
-            );
-            setMessages(localizedMessages);
-            await saveSupportChatMessages(user?.id, localizedMessages);
+            setMessages(res.messages);
+            await saveSupportChatMessages(user?.id, res.messages);
           }
         } catch (apiErr) {
           console.warn("Could not sync supportchat from database:", apiErr);
@@ -920,6 +896,7 @@ export default function CustomerCareChatModal({
 
   // Step 1: Select Category
   const handleSelectCategory = (cat: SupportCategory) => {
+    setShowCategoryMenuExplicit(false);
     setActiveCategory(cat);
     setActiveIssue(null);
     setSelectedRecord(null);
@@ -927,7 +904,7 @@ export default function CustomerCareChatModal({
     setShowSupportEscalationPrompt(false);
 
     const userMsg: SupportChatMessage = {
-      id: `cat-user-${Date.now()}`,
+      id: Date.now().toString(),
       sender: "user",
       text: `${cat.emoji} ${cat.label}`,
       timestamp: new Date().toLocaleTimeString([], {
@@ -937,7 +914,7 @@ export default function CustomerCareChatModal({
     };
 
     const botMsg: SupportChatMessage = {
-      id: `cat-bot-${Date.now() + 1}`,
+      id: (Date.now() + 1).toString(),
       sender: "bot",
       text:
         cat.prompt ||
@@ -951,19 +928,6 @@ export default function CustomerCareChatModal({
     const updated = [...messages, userMsg, botMsg];
     setMessages(updated);
     persistMessages(updated);
-
-    if (isLoggedIn) {
-      ApiService.post("/api/support/log-messages", {
-        messages: [
-          { sender: "user", text: userMsg.text },
-          { sender: "bot", text: botMsg.text },
-        ],
-        sessionId: sessionIdRef.current,
-      }).catch((err) =>
-        console.warn("Could not log category support messages:", err),
-      );
-    }
-
     scrollToBottom();
   };
 
@@ -972,17 +936,19 @@ export default function CustomerCareChatModal({
     setActiveIssue(issue);
     setShowSupportEscalationPrompt(false);
 
-    // If a record has ALREADY been selected (e.g. user selected ride -> then selected issue)
-    if (selectedRecord) {
+    // If record is already selected, continue conversation with this issue & record
+    if (
+      issue.actionType === "select_record" &&
+      issue.entityType &&
+      selectedRecord
+    ) {
       await handleSend(issue.label, {
-        category: activeCategory?.id,
+        category: activeCategory?.id || "rides",
         issueType: issue.label,
         selectedRecord: selectedRecord,
       });
       return;
     }
-
-    setSelectedRecord(null);
 
     const userMsg: SupportChatMessage = {
       id: Date.now().toString(),
@@ -992,21 +958,6 @@ export default function CustomerCareChatModal({
         hour: "2-digit",
         minute: "2-digit",
       }),
-    };
-
-    // Helper to log interaction to backend
-    const logIssueInteraction = (botText: string) => {
-      if (isLoggedIn) {
-        ApiService.post("/api/support/log-messages", {
-          messages: [
-            { sender: "user", text: userMsg.text },
-            { sender: "bot", text: botText },
-          ],
-          sessionId: sessionIdRef.current,
-        }).catch((err) =>
-          console.warn("Could not log issue support messages:", err),
-        );
-      }
     };
 
     // Scenario C: If issue is a direct navigation action (e.g. "I want to offer a ride.")
@@ -1026,20 +977,17 @@ export default function CustomerCareChatModal({
       const updated = [...messages, userMsg, botMsg];
       setMessages(updated);
       persistMessages(updated);
-      logIssueInteraction(responseText);
       scrollToBottom();
       return;
     }
 
     // Scenario A & B: If issue requires selecting a record (e.g. "My ride is confirmed." or "Driver didn't arrive.")
     if (issue.actionType === "select_record" && issue.entityType) {
-      const botMsgText =
-        issue.botPrompt || `Which ${issue.entityType} are you referring to?`;
-
       const botMsg: SupportChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: "bot",
-        text: botMsgText,
+        text:
+          issue.botPrompt || `Which ${issue.entityType} are you referring to?`,
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -1049,7 +997,6 @@ export default function CustomerCareChatModal({
       const updated = [...messages, userMsg, botMsg];
       setMessages(updated);
       persistMessages(updated);
-      logIssueInteraction(botMsgText);
       scrollToBottom();
 
       // Fetch user's real records
@@ -1076,7 +1023,6 @@ export default function CustomerCareChatModal({
     const updated = [...messages, userMsg, botMsg];
     setMessages(updated);
     persistMessages(updated);
-    logIssueInteraction(botText);
 
     if (
       issue.actionType === "escalate" ||
@@ -1117,12 +1063,24 @@ export default function CustomerCareChatModal({
     setSelectedRecord(record);
     setUserRecords([]); // Hide selector after pick
 
+    const isCompleted =
+      record.status === "completed" || record.details?.status === "completed";
+    const isDriverNoShow =
+      activeIssue?.id === "driver_no_show" ||
+      activeIssue?.label?.toLowerCase().includes("driver didn't arrive") ||
+      activeIssue?.label?.toLowerCase().includes("didn't arrive") ||
+      activeIssue?.label?.toLowerCase().includes("didn't come");
+
     const userText = `Selected: ${record.title} (${record.subtitle})`;
     await handleSend(userText, {
-      category: activeCategory?.id,
+      category: activeCategory?.id || "rides",
       issueType: activeIssue?.label,
       selectedRecord: record,
     });
+
+    if (isCompleted && isDriverNoShow) {
+      setShowSupportEscalationPrompt(true);
+    }
   };
 
   // Step 4: Create Support Case
@@ -1249,15 +1207,9 @@ export default function CustomerCareChatModal({
     }
   };
 
-  const isCategoryBrowsingOnly =
-    messages.length <= 1 ||
-    (messages.length === 3 &&
-      activeCategory &&
-      !activeIssue &&
-      !selectedRecord &&
-      messages[1]?.id?.startsWith("cat-user-"));
-
-  const hasActiveChat = !isCategoryBrowsingOnly && messages.length > 1;
+  const hasActiveChat =
+    messages.length > 1 ||
+    (messages.length === 1 && messages[0].sender === "user");
 
   return (
     <SafeAreaView
@@ -1355,6 +1307,49 @@ export default function CustomerCareChatModal({
 
           {/* Header Action: End Chat & Close */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {hasActiveChat && (
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCategoryMenuExplicit((prev) => !prev);
+                  setActiveCategory(null);
+                  setActiveIssue(null);
+                  setSelectedRecord(null);
+                  setUserRecords([]);
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 9,
+                  paddingVertical: 5,
+                  borderRadius: 12,
+                  backgroundColor: showCategoryMenuExplicit
+                    ? t.primary
+                    : isDark
+                      ? "rgba(168, 85, 247, 0.16)"
+                      : "rgba(168, 85, 247, 0.1)",
+                  borderWidth: 1,
+                  borderColor: isDark ? "rgba(168, 85, 247, 0.35)" : "#E9D5FF",
+                }}
+              >
+                <Ionicons
+                  name="grid-outline"
+                  size={scale(12)}
+                  color={showCategoryMenuExplicit ? "#FFFFFF" : t.primary}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: showCategoryMenuExplicit ? "#FFFFFF" : t.primary,
+                  }}
+                >
+                  Topics
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {hasActiveChat && (
               <TouchableOpacity
                 onPress={() => setShowEndChatConfirm(true)}
@@ -1560,87 +1555,6 @@ export default function CustomerCareChatModal({
                       />
                     </TouchableOpacity>
                   )}
-
-                  {/* Quick Action Chips for Completed Ride Contradiction */}
-                  {!isUser &&
-                    (m.text.includes("marked as **Completed**") ||
-                      m.text.includes("marked completed")) && (
-                      <View style={{ marginTop: 10, gap: 6 }}>
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleSend(
-                              "The driver marked the ride completed without picking me up.",
-                            )
-                          }
-                          activeOpacity={0.75}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                            paddingHorizontal: 10,
-                            paddingVertical: 7,
-                            borderRadius: 10,
-                            backgroundColor: isDark
-                              ? "rgba(239, 68, 68, 0.15)"
-                              : "#FEE2E2",
-                            borderWidth: 1,
-                            borderColor: "#EF4444",
-                          }}
-                        >
-                          <Ionicons
-                            name="alert-circle"
-                            size={14}
-                            color="#EF4444"
-                          />
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "700",
-                              color: "#EF4444",
-                              flex: 1,
-                            }}
-                          >
-                            Driver marked completed without picking me up
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleSend("I selected the wrong ride by mistake.")
-                          }
-                          activeOpacity={0.75}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                            paddingHorizontal: 10,
-                            paddingVertical: 7,
-                            borderRadius: 10,
-                            backgroundColor: isDark
-                              ? "rgba(168, 85, 247, 0.15)"
-                              : "#F3E8FF",
-                            borderWidth: 1,
-                            borderColor: t.primary,
-                          }}
-                        >
-                          <Ionicons
-                            name="refresh"
-                            size={14}
-                            color={t.primary}
-                          />
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "700",
-                              color: t.primary,
-                              flex: 1,
-                            }}
-                          >
-                            I selected the wrong ride by mistake
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
                 </View>
 
                 <Text
@@ -1651,12 +1565,7 @@ export default function CustomerCareChatModal({
                     alignSelf: isUser ? "flex-end" : "flex-start",
                   }}
                 >
-                  {m.createdAt && !isNaN(new Date(m.createdAt).getTime())
-                    ? new Date(m.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : m.timestamp}
+                  {m.timestamp}
                 </Text>
               </View>
             );
@@ -1687,8 +1596,10 @@ export default function CustomerCareChatModal({
 
           {/* ========================================================= */}
           {/* INTERACTIVE MENU: 1. INITIAL CATEGORY SELECTION           */}
+          {/* Hidden when chat is going on, unless user taps Topics      */}
           {/* ========================================================= */}
-          {!activeCategory && !hasActiveChat && (
+          {((!hasActiveChat && !activeCategory) ||
+            showCategoryMenuExplicit) && (
             <View
               style={{
                 marginTop: 8,
@@ -1758,11 +1669,10 @@ export default function CustomerCareChatModal({
 
           {/* ========================================================= */}
           {/* INTERACTIVE MENU: 2. ISSUE TYPES BASED ON CATEGORY        */}
+          {/* Only shown until an issue is selected                     */}
           {/* ========================================================= */}
           {activeCategory &&
             !activeIssue &&
-            !selectedRecord &&
-            !hasActiveChat &&
             userRecords.length === 0 &&
             !loadingRecords && (
               <View
@@ -1809,13 +1719,6 @@ export default function CustomerCareChatModal({
                       setActiveIssue(null);
                       setSelectedRecord(null);
                       setShowSupportEscalationPrompt(false);
-                      setMessages((prev) =>
-                        prev.filter(
-                          (m) =>
-                            m.id === "welcome-greeting-msg" ||
-                            !m.id.startsWith("cat-"),
-                        ),
-                      );
                     }}
                     style={{
                       flexDirection: "row",
@@ -2173,11 +2076,9 @@ export default function CustomerCareChatModal({
             value={input}
             onChangeText={setInput}
             placeholder={
-              hasActiveChat
-                ? "Type your message..."
-                : activeCategory
-                  ? `Ask about ${activeCategory.label}...`
-                  : "Type message or select category above..."
+              activeCategory
+                ? `Ask about ${activeCategory.label}...`
+                : "Type message or select category above..."
             }
             placeholderTextColor={t.placeholder}
             style={{

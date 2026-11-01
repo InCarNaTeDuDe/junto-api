@@ -501,6 +501,15 @@ export async function markNotificationAsRead(id: string, user: User) {
   return { success: true };
 }
 
+export async function markAllNotificationsAsRead(user: User) {
+  const notificationRepo = getNotificationRepo();
+  await notificationRepo.update(
+    { userId: user.id, read: false },
+    { read: true },
+  );
+  return { success: true };
+}
+
 export async function sendPushNotification(
   targetUserId: string,
   title: string,

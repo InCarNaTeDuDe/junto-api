@@ -223,7 +223,21 @@ export default function GlamUpScreen() {
   const {
     isListening: isSearchListening,
     startListening: startSearchListening,
+    stopListening: stopSearchListening,
   } = useVoiceSpeech("glamup-search");
+
+  // Voice Search Handler (Toggle on/off with clean regex formatting)
+  const handleVoiceSearch = () => {
+    if (isSearchListening) {
+      stopSearchListening();
+      return;
+    }
+    startSearchListening((transcript) => {
+      setSearchQuery(
+        transcript.replace(/i need|need|find|search for/gi, "").trim(),
+      );
+    });
+  };
 
   // Fetch Glam Artists from real server repository/service
   const fetchArtists = useCallback(async () => {
@@ -622,11 +636,7 @@ export default function GlamUpScreen() {
             actionButtonIcon="calendar"
             isDark={isDark}
             isListening={isSearchListening}
-            onVoicePress={() =>
-              startSearchListening((transcript) => {
-                setSearchQuery(transcript);
-              })
-            }
+            onVoicePress={handleVoiceSearch}
             itemNoun="doorstep beauty specialists"
             emptyEmoji="💄"
             emptyTitle="No beauty specialists found"
