@@ -495,7 +495,9 @@ export default function OfferRideTab({
         </View>
 
         {/* Date & Time */}
-        <View style={{ gap: 12 }}>
+        <View
+          style={{ gap: 12, marginLeft: 16, marginRight: 16, marginBottom: 12 }}
+        >
           <AppDatePicker
             mode="date"
             value={departureDate}
