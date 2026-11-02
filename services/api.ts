@@ -29,7 +29,7 @@ const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000;
 /* ---------------- Base URL ---------------- */
 
 function getBaseUrl(): string {
-  const url = "http://10.251.178.39:3000"; // Env.API_BASE_URL?.trim();
+  const url = Env.API_BASE_URL?.trim();
 
   if (!url) {
     throw new Error("[API] Env.API_BASE_URL is not configured.");
