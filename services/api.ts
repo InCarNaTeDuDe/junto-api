@@ -155,6 +155,8 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "x-timezone":
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
     ...((options.headers as Record<string, string>) ?? {}),
   };
 

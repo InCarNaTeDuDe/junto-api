@@ -381,6 +381,13 @@ export default function RidesScreen() {
       );
       return;
     }
+    if (pickup.toLowerCase() === drop.toLowerCase()) {
+      Alert.alert(
+        "Invalid Route ⚠️",
+        "Pickup and drop locations cannot be the same. Please choose different locations.",
+      );
+      return;
+    }
     if (!vehicleNum) {
       Alert.alert(
         "Vehicle Number Required 🚗",
@@ -637,6 +644,13 @@ export default function RidesScreen() {
       Alert.alert("Drop Location Required", "Please enter your drop location.");
       return;
     }
+    if (pickup.toLowerCase() === drop.toLowerCase()) {
+      Alert.alert(
+        "Invalid Route ⚠️",
+        "Pickup and drop locations cannot be the same. Please choose different locations.",
+      );
+      return;
+    }
     if (!vehicleNum) {
       Alert.alert(
         "Vehicle Number Required",
@@ -868,6 +882,39 @@ export default function RidesScreen() {
         err?.response?.data?.message ||
           err?.message ||
           "Failed to confirm passenger.",
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
+  // Decline / Reject a passenger (for driver)
+  const handleRejectPassenger = async (
+    rideId: string,
+    passengerUserId: string,
+  ) => {
+    try {
+      setActionLoadingRideId(rideId);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${rideId}/passengers/${passengerUserId}/decline`, {});
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === rideId ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+      Alert.alert("Co-Rider Declined ✗", "Co-rider request has been declined.");
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to decline passenger.",
       );
     } finally {
       setActionLoadingRideId(null);
@@ -2683,77 +2730,291 @@ export default function RidesScreen() {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: "rgba(16, 185, 129, 0.15)",
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: 8,
-                              gap: 4,
+                              gap: 8,
                             }}
                           >
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={14}
-                              color="#10B981"
-                            />
-                            <Text
+                            <View
                               style={{
-                                color: "#10B981",
-                                fontSize: 12,
-                                fontWeight: "700",
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                gap: 4,
                               }}
                             >
-                              Confirmed
-                            </Text>
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={15}
+                                color="#10B981"
+                              />
+                              <Text
+                                style={{
+                                  color: "#10B981",
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Confirmed
+                              </Text>
+                            </View>
+
+                            {/* Red Cross button to reject / remove co-rider */}
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "#EF4444",
+                                paddingHorizontal: 9,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                gap: 4,
+                              }}
+                              onPress={async () => {
+                                await handleRejectPassenger(
+                                  coRiderManageRide.id,
+                                  p.userId,
+                                );
+                                setCoRiderManageRide((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        passengers: (
+                                          prev.passengers || []
+                                        ).filter(
+                                          (passenger) =>
+                                            passenger.userId !== p.userId,
+                                        ),
+                                      }
+                                    : null,
+                                );
+                              }}
+                              activeOpacity={0.8}
+                              accessibilityLabel="Reject co-rider"
+                            >
+                              <Ionicons
+                                name="close-circle"
+                                size={15}
+                                color="#FFFFFF"
+                              />
+                              <Text
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 11,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Reject
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                        ) : (
-                          <TouchableOpacity
+                        ) : p.status === "declined" ? (
+                          <View
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: "#10B981",
-                              paddingHorizontal: 12,
-                              paddingVertical: 6,
-                              borderRadius: 8,
-                              gap: 4,
-                            }}
-                            onPress={async () => {
-                              await handleAcceptPassenger(
-                                coRiderManageRide.id,
-                                p.userId,
-                              );
-                              setCoRiderManageRide((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      passengers: (prev.passengers || []).map(
-                                        (passenger) =>
-                                          passenger.userId === p.userId
-                                            ? {
-                                                ...passenger,
-                                                status: "confirmed",
-                                              }
-                                            : passenger,
-                                      ),
-                                    }
-                                  : null,
-                              );
+                              gap: 8,
                             }}
                           >
-                            <Ionicons
-                              name="checkmark"
-                              size={14}
-                              color="#FFFFFF"
-                            />
-                            <Text
+                            <View
                               style={{
-                                color: "#FFFFFF",
-                                fontSize: 12,
-                                fontWeight: "700",
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                gap: 4,
                               }}
                             >
-                              Accept Seat
-                            </Text>
-                          </TouchableOpacity>
+                              <Ionicons
+                                name="close-circle"
+                                size={15}
+                                color="#EF4444"
+                              />
+                              <Text
+                                style={{
+                                  color: "#EF4444",
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Declined
+                              </Text>
+                            </View>
+
+                            {/* Green Tick to accept if reconsidering */}
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "#10B981",
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                gap: 4,
+                              }}
+                              onPress={async () => {
+                                await handleAcceptPassenger(
+                                  coRiderManageRide.id,
+                                  p.userId,
+                                );
+                                setCoRiderManageRide((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        passengers: (prev.passengers || []).map(
+                                          (passenger) =>
+                                            passenger.userId === p.userId
+                                              ? {
+                                                  ...passenger,
+                                                  status: "confirmed",
+                                                }
+                                              : passenger,
+                                        ),
+                                      }
+                                    : null,
+                                );
+                              }}
+                              activeOpacity={0.8}
+                              accessibilityLabel="Accept co-rider"
+                            >
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={15}
+                                color="#FFFFFF"
+                              />
+                              <Text
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 11,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Accept
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            {/* Green Tick Button - Accept Co-Rider */}
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "#10B981",
+                                paddingHorizontal: 11,
+                                paddingVertical: 7,
+                                borderRadius: 8,
+                                gap: 4,
+                                shadowColor: "#10B981",
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 3,
+                                elevation: 3,
+                              }}
+                              onPress={async () => {
+                                await handleAcceptPassenger(
+                                  coRiderManageRide.id,
+                                  p.userId,
+                                );
+                                setCoRiderManageRide((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        passengers: (prev.passengers || []).map(
+                                          (passenger) =>
+                                            passenger.userId === p.userId
+                                              ? {
+                                                  ...passenger,
+                                                  status: "confirmed",
+                                                }
+                                              : passenger,
+                                        ),
+                                      }
+                                    : null,
+                                );
+                              }}
+                              activeOpacity={0.8}
+                              accessibilityLabel="Accept co-rider with green tick"
+                            >
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={16}
+                                color="#FFFFFF"
+                              />
+                              <Text
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Accept
+                              </Text>
+                            </TouchableOpacity>
+
+                            {/* Red Cross Button - Reject Co-Rider */}
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "#EF4444",
+                                paddingHorizontal: 11,
+                                paddingVertical: 7,
+                                borderRadius: 8,
+                                gap: 4,
+                                shadowColor: "#EF4444",
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 3,
+                                elevation: 3,
+                              }}
+                              onPress={async () => {
+                                await handleRejectPassenger(
+                                  coRiderManageRide.id,
+                                  p.userId,
+                                );
+                                setCoRiderManageRide((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        passengers: (
+                                          prev.passengers || []
+                                        ).filter(
+                                          (passenger) =>
+                                            passenger.userId !== p.userId,
+                                        ),
+                                      }
+                                    : null,
+                                );
+                              }}
+                              activeOpacity={0.8}
+                              accessibilityLabel="Reject co-rider with red cross"
+                            >
+                              <Ionicons
+                                name="close-circle"
+                                size={16}
+                                color="#FFFFFF"
+                              />
+                              <Text
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Reject
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         )}
                       </View>
                     );

@@ -1,38 +1,46 @@
 import { z } from "zod";
 
-export const CreateRideSchema = z.object({
-  from: z.string().trim().min(2, "Starting point is required").max(120),
-  to: z.string().trim().min(2, "Destination is required").max(120),
-  time: z.string().trim().min(2, "Departure time is required").max(80),
-  vehicleType: z.enum(["car", "bike"]),
-  seatsLeft: z.number().int().min(0).max(8).default(1),
-  totalSeats: z.number().int().min(1).max(8).optional(),
-  price: z
-    .union([z.number(), z.string()])
-    .transform((val) => {
-      if (typeof val === "number") return val;
-      const parsed = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-      return isNaN(parsed) ? 0 : parsed;
-    })
-    .pipe(z.number().min(0, "Price must be a valid non-negative number")),
-  notes: z.string().trim().max(300).optional(),
-  // Ride location & details
-  locationName: z.string().trim().max(120).optional(),
-  locationState: z.string().trim().max(120).optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  verified: z.boolean().optional().default(true),
-  // Safety & Vehicle details
-  vehicleModel: z.string().trim().max(120).optional(),
-  registrationNumber: z
-    .string()
-    .trim()
-    .min(2, "Vehicle registration number is required")
-    .max(50),
-  pickupLocation: z.string().trim().max(200).optional(),
-  dropLocation: z.string().trim().max(200).optional(),
-  driverPhone: z.string().trim().max(10).optional(),
-});
+export const CreateRideSchema = z
+  .object({
+    from: z.string().trim().min(2, "Starting point is required").max(120),
+    to: z.string().trim().min(2, "Destination is required").max(120),
+    time: z.string().trim().min(2, "Departure time is required").max(80),
+    vehicleType: z.enum(["car", "bike"]),
+    seatsLeft: z.number().int().min(0).max(8).default(1),
+    totalSeats: z.number().int().min(1).max(8).optional(),
+    price: z
+      .union([z.number(), z.string()])
+      .transform((val) => {
+        if (typeof val === "number") return val;
+        const parsed = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+        return isNaN(parsed) ? 0 : parsed;
+      })
+      .pipe(z.number().min(0, "Price must be a valid non-negative number")),
+    notes: z.string().trim().max(300).optional(),
+    // Ride location & details
+    locationName: z.string().trim().max(120).optional(),
+    locationState: z.string().trim().max(120).optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    verified: z.boolean().optional().default(true),
+    // Safety & Vehicle details
+    vehicleModel: z.string().trim().max(120).optional(),
+    registrationNumber: z
+      .string()
+      .trim()
+      .min(2, "Vehicle registration number is required")
+      .max(50),
+    pickupLocation: z.string().trim().max(200).optional(),
+    dropLocation: z.string().trim().max(200).optional(),
+    driverPhone: z.string().trim().max(10).optional(),
+  })
+  .refine(
+    (data) => data.from.trim().toLowerCase() !== data.to.trim().toLowerCase(),
+    {
+      message: "Pickup and drop locations cannot be the same",
+      path: ["to"],
+    },
+  );
 
 export const QueryRideSchema = z.object({
   from: z.string().optional(),

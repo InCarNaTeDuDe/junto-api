@@ -158,6 +158,12 @@ export default function OfferRideTab({
     reason: null,
   });
 
+  const isSameLocation = Boolean(
+    offerPickup.trim() &&
+    offerDrop.trim() &&
+    offerPickup.trim().toLowerCase() === offerDrop.trim().toLowerCase(),
+  );
+
   const VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\s\d{2}\s[A-Z]{1,3}\s\d{4}$/;
 
   const isValidVehicleNumber = (value: string) => {
@@ -468,6 +474,16 @@ export default function OfferRideTab({
                   style={styles.locationInput}
                   autoCapitalize="words"
                 />
+
+                {/* Warning when Pickup and Drop are the same */}
+                {isSameLocation && (
+                  <View style={styles.sameLocationWarningRow}>
+                    <Ionicons name="alert-circle" size={15} color="#EF4444" />
+                    <Text style={styles.sameLocationWarningText}>
+                      Pickup and drop locations cannot be the same.
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -481,9 +497,25 @@ export default function OfferRideTab({
                   key={idx}
                   style={styles.quickLocChip}
                   onPress={() => {
-                    if (!offerPickup) setOfferPickup(loc);
-                    else if (!offerDrop) setOfferDrop(loc);
-                    else setOfferPickup(loc);
+                    if (!offerPickup) {
+                      setOfferPickup(loc);
+                    } else if (!offerDrop) {
+                      if (
+                        offerPickup.trim().toLowerCase() ===
+                        loc.trim().toLowerCase()
+                      ) {
+                        return;
+                      }
+                      setOfferDrop(loc);
+                    } else {
+                      if (
+                        offerDrop.trim().toLowerCase() ===
+                        loc.trim().toLowerCase()
+                      ) {
+                        return;
+                      }
+                      setOfferPickup(loc);
+                    }
                   }}
                   activeOpacity={0.7}
                 >
@@ -840,16 +872,20 @@ export default function OfferRideTab({
           style={[
             styles.postRideBtn,
             (isPublishing ||
+              isSameLocation ||
               vehicleValidation.isValid === false ||
               vehicleValidation.checking) && {
               opacity: 0.6,
               backgroundColor:
-                vehicleValidation.isValid === false ? "#475569" : "#38BDF8",
+                isSameLocation || vehicleValidation.isValid === false
+                  ? "#475569"
+                  : "#38BDF8",
             },
           ]}
           onPress={onPublish}
           disabled={
             isPublishing ||
+            isSameLocation ||
             vehicleValidation.isValid === false ||
             vehicleValidation.checking
           }
@@ -857,6 +893,13 @@ export default function OfferRideTab({
         >
           {isPublishing ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : isSameLocation ? (
+            <>
+              <Ionicons name="alert-circle" size={18} color="#CBD5E1" />
+              <Text style={styles.postRideBtnText}>
+                Pickup & Drop Cannot Be Same
+              </Text>
+            </>
           ) : vehicleValidation.isValid === false ? (
             <>
               <Ionicons name="lock-closed" size={18} color="#CBD5E1" />
@@ -1372,6 +1415,23 @@ const styles = StyleSheet.create({
   },
   vehicleSuccessText: {
     color: "#10B981",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  sameLocationWarningRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.35)",
+  },
+  sameLocationWarningText: {
+    color: "#F87171",
     fontSize: 12,
     fontWeight: "600",
   },

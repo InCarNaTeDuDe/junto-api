@@ -30,6 +30,7 @@ import {
   RideRatingInput,
   ReportProblemInput,
 } from "./rides.schema";
+import { getClientTimezone } from "../utils/timezone";
 
 export async function getRidesHandler(
   req: Request,
@@ -37,11 +38,16 @@ export async function getRidesHandler(
   next: NextFunction,
 ) {
   try {
-    const rides = await listRides(req.query as unknown as QueryRideInput);
+    const timezone = getClientTimezone(req);
+    const rides = await listRides({
+      ...(req.query as unknown as QueryRideInput),
+      timezone,
+    });
     return res.status(200).json({
       success: true,
       data: rides,
       total: rides.length,
+      timezone,
     });
   } catch (err) {
     next(err);

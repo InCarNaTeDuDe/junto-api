@@ -11,6 +11,7 @@ import {
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 import { dealsRepository } from "../repositories";
+import { getClientTimezone, isActivityMatchingToday } from "../utils/timezone";
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
@@ -35,15 +36,19 @@ export async function fetchActivitiesByLoc(
   next: NextFunction,
 ) {
   try {
+    const timezone = getClientTimezone(req);
     const location = {
       latitude: req.body?.latitude ?? req.query?.latitude,
       longitude: req.body?.longitude ?? req.query?.longitude,
       locationName: req.body?.locationName ?? req.query?.locationName,
       locationState: req.body?.locationState ?? req.query?.locationState,
       radiusKm: req.body?.radiusKm ?? req.query?.radiusKm,
+      timezone,
+      all: req.body?.all ?? req.query?.all,
+      todayOnly: req.body?.todayOnly ?? req.query?.todayOnly,
     };
     const feed = await popularActivitiesAround(location);
-    res.status(200).json({ userActivities: feed });
+    res.status(200).json({ userActivities: feed, timezone });
   } catch (error) {
     next(error);
   }
@@ -55,7 +60,11 @@ export async function exploreByArea(
   next: NextFunction,
 ) {
   try {
-    const activePinsInLocation = await exploreByLatLong(req.body);
+    const timezone = getClientTimezone(req);
+    const activePinsInLocation = await exploreByLatLong({
+      ...req.body,
+      timezone,
+    });
 
     res.status(200).json(activePinsInLocation || []);
   } catch (error) {
@@ -91,10 +100,12 @@ export async function getJuntoNowStatsHandler(
 ) {
   try {
     const locationName = (req.query?.locationName as string) || "";
-    const stats = await getJuntoNowStats(locationName);
+    const timezone = getClientTimezone(req);
+    const stats = await getJuntoNowStats(locationName, timezone);
     return res.status(200).json({
       success: true,
       stats,
+      timezone,
     });
   } catch (error) {
     next(error);
@@ -107,8 +118,19 @@ export async function listAllActivities(
   next: NextFunction,
 ) {
   try {
+    const timezone = getClientTimezone(req);
     const activities = await activityRepository.findAll();
-    return res.status(200).json({ success: true, activities });
+    const isAll = req.query.all === "true" || req.query.todayOnly === "false";
+    const filtered = isAll
+      ? activities
+      : activities.filter((a) => isActivityMatchingToday(a, timezone));
+
+    return res.status(200).json({
+      success: true,
+      activities: filtered,
+      total: filtered.length,
+      timezone,
+    });
   } catch (error) {
     next(error);
   }

@@ -14,13 +14,28 @@ import {
   sendExpoPushNotification,
 } from "../notifications/notifications.service";
 import { rideRepository, RideRecord } from "../repositories/Rides.repository";
+import { isRideMatchingToday } from "../utils/timezone";
 
 /**
- * List rides
+ * List rides matching today (with timezone & daylight saving time precision)
  */
-export async function listRides(query: QueryRideInput): Promise<RideRecord[]> {
-  // Delegate all filtering, search and ordering to database ORM in repository
-  return rideRepository.findRides(query);
+export async function listRides(
+  query: QueryRideInput & {
+    timezone?: string;
+    all?: string;
+    todayOnly?: string;
+  },
+): Promise<RideRecord[]> {
+  const rides = await rideRepository.findRides(query);
+  const tz = query?.timezone || "Asia/Kolkata";
+
+  if (query?.all === "true" || query?.todayOnly === "false") {
+    return rides;
+  }
+
+  // Filter rides matching today in the specified client timezone
+  const todayRides = rides.filter((r) => isRideMatchingToday(r, tz));
+  return todayRides;
 }
 
 /**
@@ -114,6 +129,10 @@ export async function createRide(
         `Vehicle "${input.registrationNumber}" is currently in travelling state on an active trip (${check.ride.from} ➔ ${check.ride.to}). Neither you nor another user can create a ride with this vehicle until the ongoing trip finishes.`,
       );
     }
+  }
+
+  if (input.from.trim().toLowerCase() === input.to.trim().toLowerCase()) {
+    throw new Error("Pickup and drop locations cannot be the same.");
   }
 
   try {
