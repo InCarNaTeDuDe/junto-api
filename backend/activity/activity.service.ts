@@ -266,22 +266,24 @@ export async function exploreByLatLong(location: {
   locationName?: string;
   locationState?: string;
   timezone?: string;
+  date?: string;
   all?: boolean | string;
 }) {
   if (!location.latitude || !location.longitude) {
     console.log("No lat long found from req", location);
   }
   try {
-    const tz = location.timezone || "Asia/Kolkata";
-    const activities = await activityRepository.findByLocation(
+    const isAll = location.all === true || location.all === "true";
+    // Pull from DB directly with current date (using ORM / DB function CURRENT_DATE) or query date
+    const targetActivities = await activityRepository.findByLocation(
       location.latitude,
       location.longitude,
+      50,
+      {
+        date: location.date,
+        all: isAll,
+      },
     );
-
-    const isAll = location.all === true || location.all === "true";
-    const targetActivities = isAll
-      ? activities
-      : activities.filter((a) => isActivityMatchingToday(a, tz));
 
     const reqLat = Number(location.latitude);
     const reqLng = Number(location.longitude);
@@ -461,35 +463,21 @@ export async function addTicketForSale(
 export async function getJuntoNowStats(
   locationName?: string,
   timezone = "Asia/Kolkata",
+  date?: string,
 ) {
   try {
-    const [rides, deals, pros, allActs] = await Promise.all([
-      listRides({ vehicleType: "all", timezone }),
+    const [rides, deals, pros, categoryCounts] = await Promise.all([
+      listRides({ vehicleType: "all", timezone, date }),
       listDeals({ category: "All" }),
       listServicePros({ category: "all" }),
-      activityRepository.findAll(),
+      activityRepository.getTodayCategoryCounts({ date }),
     ]);
 
-    const todayActs = allActs.filter((a) =>
-      isActivityMatchingToday(a, timezone),
-    );
-
-    let helpCount = 0;
-    let companyCount = 0;
-    let newHereCount = 0;
-
-    for (const a of todayActs) {
-      if (a.category === ActivityCategory.ASK_NEARBY) helpCount++;
-      else if (a.category === ActivityCategory.DAY_MATES) companyCount++;
-
-      if (
-        a.category === ActivityCategory.SPORTS ||
-        a.category === ActivityCategory.FOOD ||
-        a.category === ActivityCategory.DAY_MATES
-      ) {
-        newHereCount++;
-      }
-    }
+    const helpCount = categoryCounts[ActivityCategory.ASK_NEARBY] || 0;
+    const companyCount = categoryCounts[ActivityCategory.DAY_MATES] || 0;
+    const sportsCount = categoryCounts[ActivityCategory.SPORTS] || 0;
+    const foodCount = categoryCounts[ActivityCategory.FOOD] || 0;
+    const newHereCount = sportsCount + foodCount + companyCount;
 
     return {
       ridesCount: rides.length,

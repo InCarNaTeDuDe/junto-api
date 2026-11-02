@@ -187,7 +187,8 @@ export class ActivityRepository extends BaseRepository<Activity> {
 
   /**
    * Fetches popular activities around a given location, using database ORM haversine distance
-   * calculation and sorting directly in PostgreSQL, with in-memory fallback.
+   * Fetches popular activities around a given location, using database ORM haversine distance
+   * calculation and DB functions (CURRENT_DATE or target date parameter) directly in PostgreSQL.
    */
   async findPopularAround(locationFilter?: {
     latitude?: number | string;
@@ -204,17 +205,18 @@ export class ActivityRepository extends BaseRepository<Activity> {
       locationFilter?.all === "true" ||
       locationFilter?.todayOnly === false ||
       locationFilter?.todayOnly === "false";
-    const targetDate =
-      locationFilter?.date || new Date().toISOString().slice(0, 10);
+    const targetDate = locationFilter?.date;
 
     if (!this.isConnected) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const effectiveDate = targetDate || todayStr;
       return Array.from(inMemoryActivities.values()).filter((a) => {
         if (a.isDeleted && a.isDeleted !== 0) return false;
         if (isAll) return true;
         const d = a.datetime || a.createdAt;
         if (!d) return true;
         const dStr = new Date(d).toISOString().slice(0, 10);
-        return dStr === targetDate;
+        return dStr === effectiveDate;
       });
     }
 
@@ -243,11 +245,18 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .leftJoinAndSelect("activity.organizer", "organizer")
         .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
 
-      if (!isAll && targetDate) {
-        qb.andWhere(
-          "(DATE(activity.datetime) = :targetDate OR (activity.datetime IS NULL AND DATE(activity.createdAt) = :targetDate))",
-          { targetDate },
-        );
+      // DB function date filtering: uses SQL CURRENT_DATE or parameterized target date
+      if (!isAll) {
+        if (targetDate) {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
+            { targetDate },
+          );
+        } else {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
+          );
+        }
       }
 
       if (hasGeo) {
@@ -285,18 +294,124 @@ export class ActivityRepository extends BaseRepository<Activity> {
     }
   }
 
-  async findByLocation(
-    latitude: number,
-    longitude: number,
-    radiusKm: number = 50,
-  ): Promise<Activity[]> {
+  /**
+   * Database ORM query to find activities for today (or specified query date)
+   * using DB functions (CURRENT_DATE) directly in PostgreSQL rather than in-memory filtering.
+   */
+  async findToday(options?: {
+    date?: string;
+    timezone?: string;
+    all?: boolean;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Activity[]> {
+    const isAll = options?.all === true;
+    const targetDate = options?.date;
+
     if (!this.isConnected) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const effectiveDate = targetDate || todayStr;
+      return Array.from(inMemoryActivities.values()).filter((a) => {
+        if (a.isDeleted && a.isDeleted !== 0) return false;
+        if (options?.category && a.category !== options.category) return false;
+        if (isAll) return true;
+        const d = a.datetime || a.createdAt;
+        if (!d) return true;
+        const dStr = new Date(d).toISOString().slice(0, 10);
+        return dStr === effectiveDate;
+      });
+    }
+
+    try {
+      const qb = this.repo
+        .createQueryBuilder("activity")
+        .leftJoinAndSelect("activity.organizer", "organizer")
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (!isAll) {
+        if (targetDate) {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
+            { targetDate },
+          );
+        } else {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
+          );
+        }
+      }
+
+      if (options?.category) {
+        qb.andWhere("activity.category = :category", {
+          category: options.category,
+        });
+      }
+
+      qb.orderBy("activity.createdAt", "DESC");
+
+      if (options?.limit) {
+        qb.take(options.limit);
+      }
+      if (options?.offset) {
+        qb.skip(options.offset);
+      }
+
+      return await qb.getMany();
+    } catch {
       return Array.from(inMemoryActivities.values()).filter(
         (a) => !a.isDeleted || a.isDeleted === 0,
       );
     }
+  }
+
+  async findByLocation(
+    latitude: number,
+    longitude: number,
+    radiusKm: number = 50,
+    options?: {
+      date?: string;
+      all?: boolean;
+    },
+  ): Promise<Activity[]> {
+    const isAll = options?.all === true;
+    const targetDate = options?.date;
+
+    if (!this.isConnected) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const effectiveDate = targetDate || todayStr;
+      return Array.from(inMemoryActivities.values()).filter((a) => {
+        if (a.isDeleted && a.isDeleted !== 0) return false;
+        if (!isAll) {
+          const d = a.datetime || a.createdAt;
+          if (d) {
+            const dStr = new Date(d).toISOString().slice(0, 10);
+            if (dStr !== effectiveDate) return false;
+          }
+        }
+        return true;
+      });
+    }
 
     try {
+      const qb = this.repo
+        .createQueryBuilder("activity")
+        .leftJoinAndSelect("activity.organizer", "organizer")
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (!isAll) {
+        if (targetDate) {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
+            { targetDate },
+          );
+        } else {
+          qb.andWhere(
+            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
+          );
+        }
+      }
+
       if (
         Number.isFinite(Number(latitude)) &&
         Number.isFinite(Number(longitude))
@@ -305,26 +420,71 @@ export class ActivityRepository extends BaseRepository<Activity> {
         const lng = Number(longitude);
         const haversineSql = `(6371 * acos(least(1.0, greatest(-1.0, cos(radians(:lat)) * cos(radians(activity.latitude)) * cos(radians(activity.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(activity.latitude))))))`;
 
-        return await this.repo
-          .createQueryBuilder("activity")
-          .leftJoinAndSelect("activity.organizer", "organizer")
-          .where("activity.isDeleted = :isDeleted", { isDeleted: 0 })
-          .andWhere(`${haversineSql} <= :radiusKm`, { lat, lng, radiusKm })
+        qb.andWhere(`${haversineSql} <= :radiusKm`, { lat, lng, radiusKm })
           .addSelect(haversineSql, "distance_km")
           .orderBy("distance_km", "ASC")
-          .addOrderBy("activity.createdAt", "DESC")
-          .getMany();
+          .addOrderBy("activity.createdAt", "DESC");
+      } else {
+        qb.orderBy("activity.createdAt", "DESC");
       }
 
-      return await this.repo.find({
-        where: { isDeleted: 0 },
-        relations: { organizer: true },
-        order: { createdAt: "DESC" },
-      });
+      return await qb.getMany();
     } catch {
       return Array.from(inMemoryActivities.values()).filter(
         (a) => !a.isDeleted || a.isDeleted === 0,
       );
+    }
+  }
+
+  /**
+   * Uses DB aggregation and functions to count activities for today by category
+   * directly inside PostgreSQL / DB, avoiding loading all rows into Node.js memory.
+   */
+  async getTodayCategoryCounts(options?: {
+    date?: string;
+  }): Promise<Record<string, number>> {
+    const targetDate = options?.date;
+    const counts: Record<string, number> = {};
+
+    if (!this.isConnected) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const effectiveDate = targetDate || todayStr;
+      for (const a of inMemoryActivities.values()) {
+        if (a.isDeleted && a.isDeleted !== 0) continue;
+        const d = a.datetime || a.createdAt;
+        if (d && new Date(d).toISOString().slice(0, 10) === effectiveDate) {
+          counts[a.category] = (counts[a.category] || 0) + 1;
+        }
+      }
+      return counts;
+    }
+
+    try {
+      const qb = this.repo
+        .createQueryBuilder("activity")
+        .select("activity.category", "category")
+        .addSelect("COUNT(activity.id)", "cnt")
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (targetDate) {
+        qb.andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
+          { targetDate },
+        );
+      } else {
+        qb.andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
+        );
+      }
+
+      qb.groupBy("activity.category");
+      const rows = await qb.getRawMany();
+      for (const row of rows) {
+        counts[row.category] = parseInt(row.cnt, 10) || 0;
+      }
+      return counts;
+    } catch {
+      return counts;
     }
   }
 

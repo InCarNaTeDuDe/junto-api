@@ -37,7 +37,10 @@ export async function fetchActivitiesByLoc(
 ) {
   try {
     const timezone = getClientTimezone(req);
-    const date = getClientDate(req);
+    const date =
+      getClientDate(req) ||
+      (req.body?.date as string) ||
+      (req.query?.date as string);
     const location = {
       latitude: req.body?.latitude ?? req.query?.latitude,
       longitude: req.body?.longitude ?? req.query?.longitude,
@@ -50,7 +53,9 @@ export async function fetchActivitiesByLoc(
       todayOnly: req.body?.todayOnly ?? req.query?.todayOnly,
     };
     const feed = await popularActivitiesAround(location);
-    res.status(200).json({ userActivities: feed, timezone, date });
+    res
+      .status(200)
+      .json({ userActivities: feed, timezone, ...(date ? { date } : {}) });
   } catch (error) {
     next(error);
   }
@@ -63,9 +68,14 @@ export async function exploreByArea(
 ) {
   try {
     const timezone = getClientTimezone(req);
+    const date =
+      getClientDate(req) ||
+      (req.body?.date as string) ||
+      (req.query?.date as string);
     const activePinsInLocation = await exploreByLatLong({
       ...req.body,
       timezone,
+      date,
     });
 
     res.status(200).json(activePinsInLocation || []);
@@ -103,7 +113,8 @@ export async function getJuntoNowStatsHandler(
   try {
     const locationName = (req.query?.locationName as string) || "";
     const timezone = getClientTimezone(req);
-    const stats = await getJuntoNowStats(locationName, timezone);
+    const date = getClientDate(req) || (req.query?.date as string);
+    const stats = await getJuntoNowStats(locationName, timezone, date);
     return res.status(200).json({
       success: true,
       stats,
@@ -121,17 +132,22 @@ export async function listAllActivities(
 ) {
   try {
     const timezone = getClientTimezone(req);
-    const activities = await activityRepository.findAll();
+    const date = getClientDate(req) || (req.query?.date as string);
     const isAll = req.query.all === "true" || req.query.todayOnly === "false";
-    const filtered = isAll
-      ? activities
-      : activities.filter((a) => isActivityMatchingToday(a, timezone));
+
+    // Direct database ORM query using DB functions (CURRENT_DATE) or query date
+    const activities = await activityRepository.findToday({
+      date,
+      timezone,
+      all: isAll,
+    });
 
     return res.status(200).json({
       success: true,
-      activities: filtered,
-      total: filtered.length,
+      activities,
+      total: activities.length,
       timezone,
+      ...(date ? { date } : {}),
     });
   } catch (error) {
     next(error);

@@ -414,16 +414,25 @@ export class RideRepository extends BaseRepository<Ride> {
         });
       }
 
-      // ORM WHERE clause for current date
-      if (!isAll && targetDate) {
-        qb.andWhere(
-          "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = :targetDate OR ride.time LIKE :datePattern)",
-          {
-            liveStatuses: ["both_travelling", "in_progress"],
-            targetDate,
-            datePattern: `%${targetDate}%`,
-          },
-        );
+      // ORM WHERE clause for current date using DB function CURRENT_DATE or targetDate parameter
+      if (!isAll) {
+        if (query?.date) {
+          qb.andWhere(
+            "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = :targetDate OR ride.time LIKE :datePattern)",
+            {
+              liveStatuses: ["both_travelling", "in_progress"],
+              targetDate: query.date,
+              datePattern: `%${query.date}%`,
+            },
+          );
+        } else {
+          qb.andWhere(
+            "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = CURRENT_DATE)",
+            {
+              liveStatuses: ["both_travelling", "in_progress"],
+            },
+          );
+        }
       }
 
       if (query.vehicleType && query.vehicleType !== "all") {

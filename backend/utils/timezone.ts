@@ -60,26 +60,26 @@ export function getClientTimezone(req: any): string {
 }
 
 /**
- * Extracts client date (YYYY-MM-DD) from headers (x-date, x-current-date), query (date),
- * or defaults to the current date.
+ * Extracts client date (YYYY-MM-DD) from query (date), body (date), or headers (x-date, x-current-date).
+ * Returns undefined when not specified so that database ORM functions (e.g. CURRENT_DATE)
+ * are utilized directly in the database rather than forcing client-side timestamps.
  */
-export function getClientDate(req: any): string {
-  const headerDate =
-    req?.headers?.["x-date"] ||
-    req?.headers?.["x-current-date"] ||
+export function getClientDate(req: any): string | undefined {
+  const candidate =
     req?.query?.date ||
-    req?.body?.date;
+    req?.body?.date ||
+    req?.headers?.["x-date"] ||
+    req?.headers?.["x-current-date"];
 
   if (
-    headerDate &&
-    typeof headerDate === "string" &&
-    /^\d{4}-\d{2}-\d{2}/.test(headerDate.trim())
+    candidate &&
+    typeof candidate === "string" &&
+    /^\d{4}-\d{2}-\d{2}/.test(candidate.trim())
   ) {
-    return headerDate.trim().slice(0, 10);
+    return candidate.trim().slice(0, 10);
   }
 
-  const tz = getClientTimezone(req);
-  return getLocalDateString(new Date(), tz);
+  return undefined;
 }
 
 /**

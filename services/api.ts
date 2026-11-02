@@ -29,7 +29,7 @@ const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000;
 /* ---------------- Base URL ---------------- */
 
 function getBaseUrl(): string {
-  const url = Env.API_BASE_URL?.trim();
+  const url = "http://10.251.178.39:3000"; // Env.API_BASE_URL?.trim();
 
   if (!url) {
     throw new Error("[API] Env.API_BASE_URL is not configured.");
@@ -155,9 +155,6 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-timezone":
-      Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
-    "x-date": new Date().toISOString().slice(0, 10),
     ...((options.headers as Record<string, string>) ?? {}),
   };
 
