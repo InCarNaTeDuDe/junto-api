@@ -350,7 +350,6 @@ export class RideRepository extends BaseRepository<Ride> {
   async findRides(query: any): Promise<RideRecord[]> {
     const includeCompleted = query?.includeCompleted === "true";
     const isAll = query?.all === "true" || query?.todayOnly === "false";
-    const targetDate = query?.date || new Date().toISOString().slice(0, 10);
 
     if (!this.isConnected) {
       let all = Array.from(inMemoryRides.values()).filter(
@@ -362,7 +361,9 @@ export class RideRepository extends BaseRepository<Ride> {
               (r as any).status !== "finished")),
       );
 
-      if (!isAll && targetDate) {
+      // In-memory fallback: active rides or rides >= today
+      if (!isAll) {
+        const todayStr = new Date().toISOString().slice(0, 10);
         all = all.filter((r) => {
           if (r.status === "in_progress" || r.status === "both_travelling") {
             return true;
@@ -370,9 +371,7 @@ export class RideRepository extends BaseRepository<Ride> {
           const d =
             (r as any).date ||
             (r.createdAt ? String(r.createdAt).slice(0, 10) : "");
-          return (
-            d === targetDate || (r.time && String(r.time).includes(targetDate))
-          );
+          return d >= todayStr;
         });
       }
 
@@ -414,25 +413,14 @@ export class RideRepository extends BaseRepository<Ride> {
         });
       }
 
-      // ORM WHERE clause for current date using DB function CURRENT_DATE or targetDate parameter
+      // Direct SQL query manipulation: active rides or rides >= CURRENT_DATE
       if (!isAll) {
-        if (query?.date) {
-          qb.andWhere(
-            "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = :targetDate OR ride.time LIKE :datePattern)",
-            {
-              liveStatuses: ["both_travelling", "in_progress"],
-              targetDate: query.date,
-              datePattern: `%${query.date}%`,
-            },
-          );
-        } else {
-          qb.andWhere(
-            "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = CURRENT_DATE)",
-            {
-              liveStatuses: ["both_travelling", "in_progress"],
-            },
-          );
-        }
+        qb.andWhere(
+          "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) >= CURRENT_DATE)",
+          {
+            liveStatuses: ["both_travelling", "in_progress"],
+          },
+        );
       }
 
       if (query.vehicleType && query.vehicleType !== "all") {

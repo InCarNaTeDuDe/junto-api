@@ -14,16 +14,12 @@ import {
   sendExpoPushNotification,
 } from "../notifications/notifications.service";
 import { rideRepository, RideRecord } from "../repositories/Rides.repository";
-import { isRideMatchingToday } from "../utils/timezone";
 
 /**
-/**
- * List rides matching criteria directly via ORM query
+ * List rides matching criteria directly via ORM query (active or >= CURRENT_DATE)
  */
 export async function listRides(
   query: QueryRideInput & {
-    timezone?: string;
-    date?: string;
     all?: string;
     todayOnly?: string;
   },

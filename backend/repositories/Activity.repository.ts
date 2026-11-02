@@ -187,8 +187,8 @@ export class ActivityRepository extends BaseRepository<Activity> {
 
   /**
    * Fetches popular activities around a given location, using database ORM haversine distance
-   * Fetches popular activities around a given location, using database ORM haversine distance
-   * calculation and DB functions (CURRENT_DATE or target date parameter) directly in PostgreSQL.
+   * Fetches popular activities around a given location using PostgreSQL haversine distance
+   * and SQL query filter for activities greater than or equal to current date (>= CURRENT_DATE).
    */
   async findPopularAround(locationFilter?: {
     latitude?: number | string;
@@ -196,7 +196,6 @@ export class ActivityRepository extends BaseRepository<Activity> {
     locationName?: string;
     locationState?: string;
     radiusKm?: number | string;
-    date?: string;
     all?: boolean | string;
     todayOnly?: boolean | string;
   }): Promise<Activity[]> {
@@ -205,18 +204,16 @@ export class ActivityRepository extends BaseRepository<Activity> {
       locationFilter?.all === "true" ||
       locationFilter?.todayOnly === false ||
       locationFilter?.todayOnly === "false";
-    const targetDate = locationFilter?.date;
 
     if (!this.isConnected) {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const effectiveDate = targetDate || todayStr;
       return Array.from(inMemoryActivities.values()).filter((a) => {
         if (a.isDeleted && a.isDeleted !== 0) return false;
         if (isAll) return true;
         const d = a.datetime || a.createdAt;
         if (!d) return true;
         const dStr = new Date(d).toISOString().slice(0, 10);
-        return dStr === effectiveDate;
+        return dStr >= todayStr;
       });
     }
 
@@ -245,18 +242,11 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .leftJoinAndSelect("activity.organizer", "organizer")
         .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
 
-      // DB function date filtering: uses SQL CURRENT_DATE or parameterized target date
+      // Direct SQL query manipulation: activities >= CURRENT_DATE
       if (!isAll) {
-        if (targetDate) {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
-            { targetDate },
-          );
-        } else {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
-          );
-        }
+        qb.andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) >= CURRENT_DATE",
+        );
       }
 
       if (hasGeo) {
@@ -295,23 +285,19 @@ export class ActivityRepository extends BaseRepository<Activity> {
   }
 
   /**
-   * Database ORM query to find activities for today (or specified query date)
-   * using DB functions (CURRENT_DATE) directly in PostgreSQL rather than in-memory filtering.
+   * Database ORM query to find activities greater than or equal to current date (>= CURRENT_DATE)
+   * handled via complete SQL query manipulation.
    */
   async findToday(options?: {
-    date?: string;
-    timezone?: string;
     all?: boolean;
     category?: string;
     limit?: number;
     offset?: number;
   }): Promise<Activity[]> {
     const isAll = options?.all === true;
-    const targetDate = options?.date;
 
     if (!this.isConnected) {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const effectiveDate = targetDate || todayStr;
       return Array.from(inMemoryActivities.values()).filter((a) => {
         if (a.isDeleted && a.isDeleted !== 0) return false;
         if (options?.category && a.category !== options.category) return false;
@@ -319,7 +305,7 @@ export class ActivityRepository extends BaseRepository<Activity> {
         const d = a.datetime || a.createdAt;
         if (!d) return true;
         const dStr = new Date(d).toISOString().slice(0, 10);
-        return dStr === effectiveDate;
+        return dStr >= todayStr;
       });
     }
 
@@ -329,17 +315,11 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .leftJoinAndSelect("activity.organizer", "organizer")
         .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
 
+      // Direct SQL query manipulation: activities >= CURRENT_DATE
       if (!isAll) {
-        if (targetDate) {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
-            { targetDate },
-          );
-        } else {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
-          );
-        }
+        qb.andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) >= CURRENT_DATE",
+        );
       }
 
       if (options?.category) {
@@ -370,23 +350,20 @@ export class ActivityRepository extends BaseRepository<Activity> {
     longitude: number,
     radiusKm: number = 50,
     options?: {
-      date?: string;
       all?: boolean;
     },
   ): Promise<Activity[]> {
     const isAll = options?.all === true;
-    const targetDate = options?.date;
 
     if (!this.isConnected) {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const effectiveDate = targetDate || todayStr;
       return Array.from(inMemoryActivities.values()).filter((a) => {
         if (a.isDeleted && a.isDeleted !== 0) return false;
         if (!isAll) {
           const d = a.datetime || a.createdAt;
           if (d) {
             const dStr = new Date(d).toISOString().slice(0, 10);
-            if (dStr !== effectiveDate) return false;
+            if (dStr < todayStr) return false;
           }
         }
         return true;
@@ -399,17 +376,11 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .leftJoinAndSelect("activity.organizer", "organizer")
         .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
 
+      // Direct SQL query manipulation: activities >= CURRENT_DATE
       if (!isAll) {
-        if (targetDate) {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
-            { targetDate },
-          );
-        } else {
-          qb.andWhere(
-            "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
-          );
-        }
+        qb.andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) >= CURRENT_DATE",
+        );
       }
 
       if (
@@ -437,22 +408,18 @@ export class ActivityRepository extends BaseRepository<Activity> {
   }
 
   /**
-   * Uses DB aggregation and functions to count activities for today by category
-   * directly inside PostgreSQL / DB, avoiding loading all rows into Node.js memory.
+   * Database ORM aggregation counting activities >= CURRENT_DATE grouped by category
+   * handled via complete SQL query manipulation.
    */
-  async getTodayCategoryCounts(options?: {
-    date?: string;
-  }): Promise<Record<string, number>> {
-    const targetDate = options?.date;
+  async getTodayCategoryCounts(): Promise<Record<string, number>> {
     const counts: Record<string, number> = {};
 
     if (!this.isConnected) {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const effectiveDate = targetDate || todayStr;
       for (const a of inMemoryActivities.values()) {
         if (a.isDeleted && a.isDeleted !== 0) continue;
         const d = a.datetime || a.createdAt;
-        if (d && new Date(d).toISOString().slice(0, 10) === effectiveDate) {
+        if (d && new Date(d).toISOString().slice(0, 10) >= todayStr) {
           counts[a.category] = (counts[a.category] || 0) + 1;
         }
       }
@@ -464,20 +431,12 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .createQueryBuilder("activity")
         .select("activity.category", "category")
         .addSelect("COUNT(activity.id)", "cnt")
-        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+        .where("activity.isDeleted = :isDeleted", { isDeleted: 0 })
+        .andWhere(
+          "DATE(COALESCE(activity.datetime, activity.createdAt)) >= CURRENT_DATE",
+        )
+        .groupBy("activity.category");
 
-      if (targetDate) {
-        qb.andWhere(
-          "DATE(COALESCE(activity.datetime, activity.createdAt)) = :targetDate",
-          { targetDate },
-        );
-      } else {
-        qb.andWhere(
-          "DATE(COALESCE(activity.datetime, activity.createdAt)) = CURRENT_DATE",
-        );
-      }
-
-      qb.groupBy("activity.category");
       const rows = await qb.getRawMany();
       for (const row of rows) {
         counts[row.category] = parseInt(row.cnt, 10) || 0;

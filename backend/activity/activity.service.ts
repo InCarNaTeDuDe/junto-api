@@ -15,7 +15,6 @@ import {
   broadcastExpoPushNotification,
 } from "../notifications/notifications.service";
 import { io } from "../socket/socket";
-import { isActivityMatchingToday } from "../utils/timezone";
 
 export async function createActivity(
   body: CreateActivityRequest,
@@ -193,8 +192,6 @@ export async function popularActivitiesAround(locationFilter?: {
   locationName?: string;
   locationState?: string;
   radiusKm?: number | string;
-  timezone?: string;
-  date?: string;
   all?: boolean | string;
   todayOnly?: boolean | string;
 }) {
@@ -265,8 +262,6 @@ export async function exploreByLatLong(location: {
   longitude: number;
   locationName?: string;
   locationState?: string;
-  timezone?: string;
-  date?: string;
   all?: boolean | string;
 }) {
   if (!location.latitude || !location.longitude) {
@@ -274,13 +269,12 @@ export async function exploreByLatLong(location: {
   }
   try {
     const isAll = location.all === true || location.all === "true";
-    // Pull from DB directly with current date (using ORM / DB function CURRENT_DATE) or query date
+    // Direct SQL query manipulation in DB (>= CURRENT_DATE)
     const targetActivities = await activityRepository.findByLocation(
       location.latitude,
       location.longitude,
       50,
       {
-        date: location.date,
         all: isAll,
       },
     );
@@ -460,17 +454,13 @@ export async function addTicketForSale(
   }
 }
 
-export async function getJuntoNowStats(
-  locationName?: string,
-  timezone = "Asia/Kolkata",
-  date?: string,
-) {
+export async function getJuntoNowStats(locationName?: string) {
   try {
     const [rides, deals, pros, categoryCounts] = await Promise.all([
-      listRides({ vehicleType: "all", timezone, date }),
+      listRides({ vehicleType: "all" }),
       listDeals({ category: "All" }),
       listServicePros({ category: "all" }),
-      activityRepository.getTodayCategoryCounts({ date }),
+      activityRepository.getTodayCategoryCounts(),
     ]);
 
     const helpCount = categoryCounts[ActivityCategory.ASK_NEARBY] || 0;

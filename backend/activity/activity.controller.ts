@@ -11,7 +11,6 @@ import {
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 import { dealsRepository } from "../repositories";
-import { getClientTimezone, getClientDate } from "../utils/timezone";
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
@@ -36,26 +35,17 @@ export async function fetchActivitiesByLoc(
   next: NextFunction,
 ) {
   try {
-    const timezone = getClientTimezone(req);
-    const date =
-      getClientDate(req) ||
-      (req.body?.date as string) ||
-      (req.query?.date as string);
     const location = {
       latitude: req.body?.latitude ?? req.query?.latitude,
       longitude: req.body?.longitude ?? req.query?.longitude,
       locationName: req.body?.locationName ?? req.query?.locationName,
       locationState: req.body?.locationState ?? req.query?.locationState,
       radiusKm: req.body?.radiusKm ?? req.query?.radiusKm,
-      timezone,
-      date,
       all: req.body?.all ?? req.query?.all,
       todayOnly: req.body?.todayOnly ?? req.query?.todayOnly,
     };
     const feed = await popularActivitiesAround(location);
-    res
-      .status(200)
-      .json({ userActivities: feed, timezone, ...(date ? { date } : {}) });
+    res.status(200).json({ userActivities: feed });
   } catch (error) {
     next(error);
   }
@@ -67,17 +57,7 @@ export async function exploreByArea(
   next: NextFunction,
 ) {
   try {
-    const timezone = getClientTimezone(req);
-    const date =
-      getClientDate(req) ||
-      (req.body?.date as string) ||
-      (req.query?.date as string);
-    const activePinsInLocation = await exploreByLatLong({
-      ...req.body,
-      timezone,
-      date,
-    });
-
+    const activePinsInLocation = await exploreByLatLong(req.body);
     res.status(200).json(activePinsInLocation || []);
   } catch (error) {
     next(error);
@@ -112,13 +92,10 @@ export async function getJuntoNowStatsHandler(
 ) {
   try {
     const locationName = (req.query?.locationName as string) || "";
-    const timezone = getClientTimezone(req);
-    const date = getClientDate(req) || (req.query?.date as string);
-    const stats = await getJuntoNowStats(locationName, timezone, date);
+    const stats = await getJuntoNowStats(locationName);
     return res.status(200).json({
       success: true,
       stats,
-      timezone,
     });
   } catch (error) {
     next(error);
@@ -131,14 +108,10 @@ export async function listAllActivities(
   next: NextFunction,
 ) {
   try {
-    const timezone = getClientTimezone(req);
-    const date = getClientDate(req) || (req.query?.date as string);
     const isAll = req.query.all === "true" || req.query.todayOnly === "false";
 
-    // Direct database ORM query using DB functions (CURRENT_DATE) or query date
+    // Direct database SQL query: pulls activities >= CURRENT_DATE
     const activities = await activityRepository.findToday({
-      date,
-      timezone,
       all: isAll,
     });
 
@@ -146,8 +119,6 @@ export async function listAllActivities(
       success: true,
       activities,
       total: activities.length,
-      timezone,
-      ...(date ? { date } : {}),
     });
   } catch (error) {
     next(error);
