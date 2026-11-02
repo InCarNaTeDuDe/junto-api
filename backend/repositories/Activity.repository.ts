@@ -195,11 +195,27 @@ export class ActivityRepository extends BaseRepository<Activity> {
     locationName?: string;
     locationState?: string;
     radiusKm?: number | string;
+    date?: string;
+    all?: boolean | string;
+    todayOnly?: boolean | string;
   }): Promise<Activity[]> {
+    const isAll =
+      locationFilter?.all === true ||
+      locationFilter?.all === "true" ||
+      locationFilter?.todayOnly === false ||
+      locationFilter?.todayOnly === "false";
+    const targetDate =
+      locationFilter?.date || new Date().toISOString().slice(0, 10);
+
     if (!this.isConnected) {
-      return Array.from(inMemoryActivities.values()).filter(
-        (a) => !a.isDeleted || a.isDeleted === 0,
-      );
+      return Array.from(inMemoryActivities.values()).filter((a) => {
+        if (a.isDeleted && a.isDeleted !== 0) return false;
+        if (isAll) return true;
+        const d = a.datetime || a.createdAt;
+        if (!d) return true;
+        const dStr = new Date(d).toISOString().slice(0, 10);
+        return dStr === targetDate;
+      });
     }
 
     try {
@@ -226,6 +242,13 @@ export class ActivityRepository extends BaseRepository<Activity> {
         .createQueryBuilder("activity")
         .leftJoinAndSelect("activity.organizer", "organizer")
         .where("activity.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (!isAll && targetDate) {
+        qb.andWhere(
+          "(DATE(activity.datetime) = :targetDate OR (activity.datetime IS NULL AND DATE(activity.createdAt) = :targetDate))",
+          { targetDate },
+        );
+      }
 
       if (hasGeo) {
         const haversineSql = `(6371 * acos(least(1.0, greatest(-1.0, cos(radians(:lat)) * cos(radians(activity.latitude)) * cos(radians(activity.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(activity.latitude))))))`;

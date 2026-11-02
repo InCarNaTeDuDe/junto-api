@@ -60,6 +60,29 @@ export function getClientTimezone(req: any): string {
 }
 
 /**
+ * Extracts client date (YYYY-MM-DD) from headers (x-date, x-current-date), query (date),
+ * or defaults to the current date.
+ */
+export function getClientDate(req: any): string {
+  const headerDate =
+    req?.headers?.["x-date"] ||
+    req?.headers?.["x-current-date"] ||
+    req?.query?.date ||
+    req?.body?.date;
+
+  if (
+    headerDate &&
+    typeof headerDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}/.test(headerDate.trim())
+  ) {
+    return headerDate.trim().slice(0, 10);
+  }
+
+  const tz = getClientTimezone(req);
+  return getLocalDateString(new Date(), tz);
+}
+
+/**
  * Checks whether an activity or ticket matches today in the client's timezone.
  */
 export function isActivityMatchingToday(

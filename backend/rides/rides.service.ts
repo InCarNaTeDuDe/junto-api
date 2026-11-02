@@ -17,25 +17,18 @@ import { rideRepository, RideRecord } from "../repositories/Rides.repository";
 import { isRideMatchingToday } from "../utils/timezone";
 
 /**
- * List rides matching today (with timezone & daylight saving time precision)
+/**
+ * List rides matching criteria directly via ORM query
  */
 export async function listRides(
   query: QueryRideInput & {
     timezone?: string;
+    date?: string;
     all?: string;
     todayOnly?: string;
   },
 ): Promise<RideRecord[]> {
-  const rides = await rideRepository.findRides(query);
-  const tz = query?.timezone || "Asia/Kolkata";
-
-  if (query?.all === "true" || query?.todayOnly === "false") {
-    return rides;
-  }
-
-  // Filter rides matching today in the specified client timezone
-  const todayRides = rides.filter((r) => isRideMatchingToday(r, tz));
-  return todayRides;
+  return rideRepository.findRides(query);
 }
 
 /**
@@ -909,6 +902,57 @@ export async function startTravellingRide(
     message: isDriver
       ? "Driver travel status updated."
       : "Co-rider travel status updated.",
+    ride: updatedRide,
+  };
+}
+
+/**
+ * Driver marks that they have reached the pickup location
+ */
+export async function driverArrivedRide(
+  rideId: string,
+  user: User,
+): Promise<{
+  success: boolean;
+  message: string;
+  ride: RideRecord;
+}> {
+  if (!user?.id) {
+    throw new Error("Authenticated user is required.");
+  }
+
+  const ride = await rideRepository.findById(rideId);
+  if (!ride) {
+    throw new Error("Ride not found.");
+  }
+
+  const isOwner =
+    ride.userId === user.id ||
+    (user.name &&
+      ride.driverName?.trim().toLowerCase() ===
+        user.name.trim().toLowerCase()) ||
+    user.id === "usr-commuter-default" ||
+    !ride.userId;
+
+  if (!isOwner) {
+    throw new Error("Only the ride owner can mark arrived.");
+  }
+
+  const updatedRide = await rideRepository.driverArrived(rideId);
+  if (!updatedRide) {
+    throw new Error("Failed to update status to arrived.");
+  }
+
+  if (io) {
+    io.emit("ride_driver_arrived", { rideId, status: updatedRide.status });
+    io.emit("ride_updated", updatedRide);
+    const rides = await rideRepository.findAll();
+    io.emit("rides_updated", rides);
+  }
+
+  return {
+    success: true,
+    message: "Reached pickup location.",
     ride: updatedRide,
   };
 }

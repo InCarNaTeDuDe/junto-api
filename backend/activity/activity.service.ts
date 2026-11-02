@@ -194,24 +194,13 @@ export async function popularActivitiesAround(locationFilter?: {
   locationState?: string;
   radiusKm?: number | string;
   timezone?: string;
+  date?: string;
   all?: boolean | string;
   todayOnly?: boolean | string;
 }) {
-  const tz = locationFilter?.timezone || "Asia/Kolkata";
   const activities = await activityRepository.findPopularAround(locationFilter);
 
-  const isAll =
-    locationFilter?.all === true ||
-    locationFilter?.all === "true" ||
-    locationFilter?.todayOnly === false ||
-    locationFilter?.todayOnly === "false";
-
-  const todayActivities = activities.filter((a) =>
-    isActivityMatchingToday(a, tz),
-  );
-  const targetActivities = isAll ? activities : todayActivities;
-
-  return targetActivities.map((a) => {
+  return activities.map((a) => {
     const base = {
       id: a.id,
       title: a.title,

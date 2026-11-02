@@ -183,6 +183,12 @@ export class Ride {
   })
   isDriverTravelling?: boolean;
 
+  @Column({
+    type: "boolean",
+    default: false,
+  })
+  isDriverArrived?: boolean;
+
   /**
    * For now passengers are stored directly
    * in the rides table as JSONB.

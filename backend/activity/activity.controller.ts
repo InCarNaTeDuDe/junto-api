@@ -11,7 +11,7 @@ import {
 } from "./activity.service";
 import type { CreateActivityRequest } from "./activity.schema";
 import { dealsRepository } from "../repositories";
-import { getClientTimezone, isActivityMatchingToday } from "../utils/timezone";
+import { getClientTimezone, getClientDate } from "../utils/timezone";
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
@@ -37,6 +37,7 @@ export async function fetchActivitiesByLoc(
 ) {
   try {
     const timezone = getClientTimezone(req);
+    const date = getClientDate(req);
     const location = {
       latitude: req.body?.latitude ?? req.query?.latitude,
       longitude: req.body?.longitude ?? req.query?.longitude,
@@ -44,11 +45,12 @@ export async function fetchActivitiesByLoc(
       locationState: req.body?.locationState ?? req.query?.locationState,
       radiusKm: req.body?.radiusKm ?? req.query?.radiusKm,
       timezone,
+      date,
       all: req.body?.all ?? req.query?.all,
       todayOnly: req.body?.todayOnly ?? req.query?.todayOnly,
     };
     const feed = await popularActivitiesAround(location);
-    res.status(200).json({ userActivities: feed, timezone });
+    res.status(200).json({ userActivities: feed, timezone, date });
   } catch (error) {
     next(error);
   }

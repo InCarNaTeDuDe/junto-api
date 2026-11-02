@@ -998,6 +998,41 @@ export default function RidesScreen() {
     }
   };
 
+  // Mark driver arrived at pickup location
+  const handleDriverArrived = async (ride: RideItem) => {
+    try {
+      setActionLoadingRideId(ride.id);
+      const res = await ApiService.post<{
+        success: boolean;
+        message: string;
+        ride: RideItem;
+      }>(`/api/rides/${ride.id}/arrived`, {});
+
+      if (res?.ride) {
+        setRidesList((prev) =>
+          prev.map((r) => (r.id === ride.id ? { ...r, ...res.ride } : r)),
+        );
+      } else {
+        await fetchRides();
+      }
+    } catch (err: any) {
+      console.warn("Arrived API error:", err);
+      setRidesList((prev) =>
+        prev.map((r) =>
+          r.id === ride.id
+            ? {
+                ...r,
+                isDriverTravelling: true,
+                isDriverArrived: true,
+              }
+            : r,
+        ),
+      );
+    } finally {
+      setActionLoadingRideId(null);
+    }
+  };
+
   // Verify Co-Rider Ride OTP (marks OTP Exchanged)
   const handleVerifyRideOtp = async (
     ride: RideItem,
@@ -1725,6 +1760,7 @@ export default function RidesScreen() {
           getUserSeatRequest={getUserSeatRequest}
           onVerifyOtp={handleVerifyRideOtp}
           onStartTravelling={handleStartTravelling}
+          onDriverArrived={handleDriverArrived}
           onStartRide={handleStartRide}
           onCompleteRide={handleEndRide}
           onRateRideSubmit={handleRateRideSubmit}

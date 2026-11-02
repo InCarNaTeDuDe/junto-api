@@ -16,6 +16,7 @@ import {
   rateRide,
   reportRideProblem,
   startTravellingRide,
+  driverArrivedRide,
   verifyVehicleService,
   verifyDriverService,
   verifyRideOtp,
@@ -30,7 +31,7 @@ import {
   RideRatingInput,
   ReportProblemInput,
 } from "./rides.schema";
-import { getClientTimezone } from "../utils/timezone";
+import { getClientTimezone, getClientDate } from "../utils/timezone";
 
 export async function getRidesHandler(
   req: Request,
@@ -39,15 +40,18 @@ export async function getRidesHandler(
 ) {
   try {
     const timezone = getClientTimezone(req);
+    const date = getClientDate(req);
     const rides = await listRides({
       ...(req.query as unknown as QueryRideInput),
       timezone,
+      date,
     });
     return res.status(200).json({
       success: true,
       data: rides,
       total: rides.length,
       timezone,
+      date,
     });
   } catch (err) {
     next(err);
@@ -271,6 +275,28 @@ export async function startTravellingHandler(
     return res.status(200).json(result);
   } catch (err) {
     next(err);
+  }
+}
+
+export async function driverArrivedHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    const result = await driverArrivedRide(req.params.id, req.user!);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      message: err?.message || "Failed to mark arrived",
+    });
   }
 }
 

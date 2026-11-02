@@ -13,6 +13,7 @@ import {
   deleteRideHandler,
   startRideHandler,
   startTravellingHandler,
+  driverArrivedHandler,
   completeRideHandler,
   updateLocationHandler,
   rateRideHandler,
@@ -74,6 +75,8 @@ router.put("/:id", authenticate, validate(UpdateRideSchema), updateRideHandler);
 // Safety, Live GPS Tracking, Ratings & Reports endpoints
 router.post("/:id/verify-otp", authenticate, verifyRideOtpHandler);
 router.post("/:id/start-travelling", authenticate, startTravellingHandler);
+router.post("/:id/arrived", authenticate, driverArrivedHandler);
+router.post("/:id/reached", authenticate, driverArrivedHandler);
 router.post("/:id/start", authenticate, startRideHandler);
 router.post("/:id/complete", authenticate, completeRideHandler);
 router.post(

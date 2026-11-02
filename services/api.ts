@@ -157,6 +157,7 @@ async function request<T>(
     "Content-Type": "application/json",
     "x-timezone":
       Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
+    "x-date": new Date().toISOString().slice(0, 10),
     ...((options.headers as Record<string, string>) ?? {}),
   };
 

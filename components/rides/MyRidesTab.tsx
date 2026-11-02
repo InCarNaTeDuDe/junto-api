@@ -67,6 +67,7 @@ interface MyRidesTabProps {
     otpCode?: string,
   ) => Promise<void> | void;
   onStartTravelling?: (ride: RideItem) => Promise<void> | void;
+  onDriverArrived?: (ride: RideItem) => Promise<void> | void;
   onStartRide?: (ride: RideItem) => Promise<void> | void;
   onCompleteRide?: (ride: RideItem) => Promise<void> | void;
   onRateRideSubmit?: (
@@ -104,6 +105,7 @@ export default function MyRidesTab({
   getUserSeatRequest,
   onVerifyOtp,
   onStartTravelling,
+  onDriverArrived,
   onStartRide,
   onCompleteRide,
   onRateRideSubmit,
@@ -337,6 +339,14 @@ export default function MyRidesTab({
                 (p) => p.status === "confirmed",
               );
               const driverIsTravelling = !!ride.isDriverTravelling;
+              const driverHasArrived = !!ride.isDriverArrived;
+              const isOtpVerified =
+                rideState === "both_travelling" ||
+                rideState === "in_progress" ||
+                isCompleted ||
+                (ride.passengers || []).some(
+                  (p) => p.status === "confirmed" && p.otpVerified,
+                );
               const isStarted =
                 rideState === "both_travelling" ||
                 rideState === "in_progress" ||
@@ -346,6 +356,7 @@ export default function MyRidesTab({
                 ride.status === "completed" ||
                 ride.status === "cancelled" ||
                 driverIsTravelling ||
+                driverHasArrived ||
                 (ride.passengers || []).some((p) => p.isTravelling);
 
               return (
@@ -430,17 +441,11 @@ export default function MyRidesTab({
                     currentStatus={rideState}
                     isDark={isDark}
                     driverTravelling={driverIsTravelling}
+                    driverArrived={driverHasArrived}
                     passengerTravelling={
                       ride.passengers?.some((p) => p.isTravelling) || false
                     }
-                    otpExchanged={
-                      rideState === "both_travelling" ||
-                      rideState === "in_progress" ||
-                      ride.status === "completed" ||
-                      (ride.passengers || []).some(
-                        (p) => p.status === "confirmed" && p.otpVerified,
-                      )
-                    }
+                    otpExchanged={isOtpVerified}
                   />
 
                   {/* If Both Travelling or In Progress: Activate Ride Safety Section */}
@@ -464,78 +469,157 @@ export default function MyRidesTab({
                     />
                   ) : null}
 
-                  {/* Co-Rider Meeting & OTP Exchange for Driver */}
-                  {rideState === "confirmed" && (
-                    <View style={styles.driverMeetingBox}>
-                      <View style={styles.driverMeetingHeader}>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          <Ionicons name="key" size={16} color="#38BDF8" />
-                          <Text style={styles.driverMeetingTitle}>
-                            Co-Rider Meeting & OTP
+                  {/* Driver Step Progression & Action Panel */}
+                  {hasConfirmedCoRider && !isCompleted && (
+                    <View style={styles.driverActionCard}>
+                      {/* Step 1: Head to Pickup (when not travelling and not arrived) */}
+                      {!driverIsTravelling &&
+                        !driverHasArrived &&
+                        !isOtpVerified && (
+                          <View style={styles.driverStepBlock}>
+                            <View style={styles.stepHeaderRow}>
+                              <View style={styles.stepBadgePending}>
+                                <Text style={styles.stepBadgePendingText}>
+                                  Step 1
+                                </Text>
+                              </View>
+                              <Text style={styles.stepTitleText}>
+                                Head to Pickup
+                              </Text>
+                            </View>
+                            <Text style={styles.stepDescText}>
+                              Start heading to pickup location. Arrival unlocks
+                              co-rider OTP verification.
+                            </Text>
+                            {onStartTravelling && (
+                              <TouchableOpacity
+                                style={styles.actionBtnPrimaryAccent}
+                                onPress={() => onStartTravelling(ride)}
+                                activeOpacity={0.8}
+                              >
+                                <Ionicons
+                                  name="navigate"
+                                  size={15}
+                                  color="#FFFFFF"
+                                />
+                                <Text style={styles.actionBtnBoldText}>
+                                  Head to Pickup
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+
+                      {/* Step 2: Reached Location (when travelling but not arrived) */}
+                      {driverIsTravelling &&
+                        !driverHasArrived &&
+                        !isOtpVerified && (
+                          <View style={styles.driverStepBlock}>
+                            <View style={styles.stepHeaderRow}>
+                              <View style={styles.stepBadgeActive}>
+                                <Text style={styles.stepBadgeActiveText}>
+                                  Step 2
+                                </Text>
+                              </View>
+                              <Text style={styles.stepTitleText}>
+                                Confirm Arrival
+                              </Text>
+                            </View>
+                            <Text style={styles.stepDescText}>
+                              You are en route. Confirm once you reach the
+                              pickup location to verify OTP.
+                            </Text>
+                            {onDriverArrived && (
+                              <TouchableOpacity
+                                style={styles.actionBtnArrived}
+                                onPress={() => onDriverArrived(ride)}
+                                activeOpacity={0.8}
+                              >
+                                <Ionicons
+                                  name="location"
+                                  size={15}
+                                  color="#FFFFFF"
+                                />
+                                <Text style={styles.actionBtnBoldText}>
+                                  Reached Location
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+
+                      {/* Step 3: Verify OTP (ONLY when arrived at pickup and OTP not yet verified) */}
+                      {driverHasArrived && !isOtpVerified && (
+                        <View style={styles.driverStepBlock}>
+                          <View style={styles.stepHeaderRow}>
+                            <View style={styles.stepBadgeSuccess}>
+                              <Text style={styles.stepBadgeSuccessText}>
+                                Step 3
+                              </Text>
+                            </View>
+                            <Text style={styles.stepTitleText}>
+                              Verify Co-Rider
+                            </Text>
+                          </View>
+                          <Text style={styles.stepDescText}>
+                            You have arrived. Verify the 4-digit code shown on
+                            co-rider's screen to board.
                           </Text>
+                          <TouchableOpacity
+                            style={styles.actionBtnVerify}
+                            onPress={() => handleOpenOtpModal(ride)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name="shield-checkmark"
+                              size={15}
+                              color="#FFFFFF"
+                            />
+                            <Text style={styles.actionBtnBoldText}>
+                              Verify OTP
+                            </Text>
+                          </TouchableOpacity>
                         </View>
-                        <View style={styles.driverMeetingBadge}>
-                          <Text style={styles.driverMeetingBadgeText}>
-                            Pickup Meeting
+                      )}
+
+                      {/* Step 4: Start Trip (after OTP is verified and trip not yet started) */}
+                      {isOtpVerified && rideState !== "in_progress" && (
+                        <View style={styles.driverStepBlock}>
+                          <View style={styles.stepHeaderRow}>
+                            <View style={styles.stepBadgeVerified}>
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={13}
+                                color="#10B981"
+                              />
+                              <Text style={styles.stepBadgeVerifiedText}>
+                                OTP Verified
+                              </Text>
+                            </View>
+                            <Text style={styles.stepTitleText}>
+                              Boarding Complete
+                            </Text>
+                          </View>
+                          <Text style={styles.stepDescText}>
+                            Co-rider verified. Tap below to start trip
+                            navigation.
                           </Text>
+                          {onStartRide && (
+                            <TouchableOpacity
+                              style={styles.actionBtnStartTrip}
+                              onPress={() => onStartRide(ride)}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons name="play" size={15} color="#FFFFFF" />
+                              <Text style={styles.actionBtnBoldText}>
+                                Start Trip
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
-                      </View>
-                      <Text style={styles.driverMeetingSub}>
-                        When you meet your co-rider at the pickup spot, verify
-                        the 4-digit code shown on their screen to exchange OTP.
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.verifyOtpBtn}
-                        onPress={() => handleOpenOtpModal(ride)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name="shield-checkmark"
-                          size={15}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.verifyOtpBtnText}>
-                          Verify Co-Rider OTP
-                        </Text>
-                      </TouchableOpacity>
+                      )}
                     </View>
                   )}
-
-                  {/* OTP Exchanged Status Confirmation */}
-                  {rideState === "both_travelling" && (
-                    <View style={styles.metConfirmedBadge}>
-                      <Ionicons
-                        name="checkmark-done-circle"
-                        size={16}
-                        color="#10B981"
-                      />
-                      <Text style={styles.metConfirmedBadgeText}>
-                        OTP Exchanged & Verified
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Travelling Action for Driver if Confirmed and not yet travelling */}
-                  {rideState === "confirmed" &&
-                    !driverIsTravelling &&
-                    onStartTravelling && (
-                      <TouchableOpacity
-                        style={styles.startTravellingActionBtn}
-                        onPress={() => onStartTravelling(ride)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="navigate" size={15} color="#FFFFFF" />
-                        <Text style={styles.startTravellingActionText}>
-                          🚗 I'm Travelling to Pickup Point
-                        </Text>
-                      </TouchableOpacity>
-                    )}
 
                   {/* Completed Ride Actions */}
                   {isCompleted && (
@@ -775,6 +859,7 @@ export default function MyRidesTab({
                   currentStatus={rideState}
                   isDark={isDark}
                   driverTravelling={!!ride.isDriverTravelling}
+                  driverArrived={!!ride.isDriverArrived}
                   passengerTravelling={passengerIsTravelling}
                   otpExchanged={
                     rideState === "both_travelling" ||
@@ -937,16 +1022,26 @@ export default function MyRidesTab({
                   !passengerIsTravelling &&
                   onStartTravelling &&
                   (ride.isDriverTravelling ? (
-                    <TouchableOpacity
-                      style={styles.startTravellingActionBtn}
-                      onPress={() => onStartTravelling(ride)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="walk" size={15} color="#FFFFFF" />
-                      <Text style={styles.startTravellingActionText}>
-                        🚶‍♂️ I'm Travelling to Pickup Point
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={{ marginVertical: 8 }}>
+                      {ride.isDriverArrived && (
+                        <View style={styles.driverArrivedNotice}>
+                          <Ionicons name="location" size={14} color="#10B981" />
+                          <Text style={styles.driverArrivedNoticeText}>
+                            Driver arrived at pickup location
+                          </Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.startTravellingActionBtn}
+                        onPress={() => onStartTravelling(ride)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="navigate" size={15} color="#FFFFFF" />
+                        <Text style={styles.startTravellingActionText}>
+                          Head to Pickup
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   ) : (
                     <View style={{ marginTop: 10 }}>
                       <View
@@ -980,8 +1075,7 @@ export default function MyRidesTab({
                             flex: 1,
                           }}
                         >
-                          Waiting for ride owner to head to pickup location.
-                          Button will enable once the driver is travelling.
+                          Waiting for driver to head to pickup location.
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -1006,7 +1100,7 @@ export default function MyRidesTab({
                             { color: isDark ? "#94A3B8" : "#64748B" },
                           ]}
                         >
-                          🚶‍♂️ I'm Travelling to Pickup Point (Wait for Host)
+                          Head to Pickup (Wait for Host)
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1566,6 +1660,145 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   // Driver Meeting Box
+  // Driver Step Progression Card
+  driverActionCard: {
+    backgroundColor: "rgba(30, 41, 59, 0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 14,
+    padding: 12,
+    marginVertical: 10,
+  },
+  driverStepBlock: {
+    gap: 8,
+  },
+  stepHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  stepTitleText: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  stepBadgePending: {
+    backgroundColor: "rgba(168, 85, 247, 0.18)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  stepBadgePendingText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#C084FC",
+  },
+  stepBadgeActive: {
+    backgroundColor: "rgba(245, 158, 11, 0.18)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  stepBadgeActiveText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#F59E0B",
+  },
+  stepBadgeSuccess: {
+    backgroundColor: "rgba(56, 189, 248, 0.18)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  stepBadgeSuccessText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#38BDF8",
+  },
+  stepBadgeVerified: {
+    backgroundColor: "rgba(16, 185, 129, 0.18)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  stepBadgeVerifiedText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  stepDescText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    lineHeight: 16,
+  },
+  actionBtnPrimaryAccent: {
+    backgroundColor: "#8B5CF6",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 4,
+  },
+  actionBtnArrived: {
+    backgroundColor: "#D97706",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 4,
+  },
+  actionBtnVerify: {
+    backgroundColor: "#0284C7",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 4,
+  },
+  actionBtnStartTrip: {
+    backgroundColor: "#059669",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 4,
+  },
+  actionBtnBoldText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  driverArrivedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  driverArrivedNoticeText: {
+    color: "#10B981",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  // Driver Meeting Box (Legacy fallback)
   driverMeetingBox: {
     backgroundColor: "rgba(56, 189, 248, 0.08)",
     borderWidth: 1,

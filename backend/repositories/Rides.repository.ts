@@ -37,6 +37,7 @@ export interface RideRecord {
     | "completed"
     | "cancelled";
   isDriverTravelling?: boolean;
+  isDriverArrived?: boolean;
 
   passengers: Array<{
     id?: string;
@@ -203,6 +204,7 @@ export class RideRepository extends BaseRepository<Ride> {
 
       status: ride.status as any,
       isDriverTravelling: ride.isDriverTravelling ?? false,
+      isDriverArrived: (ride as any).isDriverArrived ?? false,
       isDeleted: Number(ride.isDeleted || 0),
 
       passengers: (ride.passengers || []).map((passenger: any) => ({
@@ -347,8 +349,11 @@ export class RideRepository extends BaseRepository<Ride> {
    */
   async findRides(query: any): Promise<RideRecord[]> {
     const includeCompleted = query?.includeCompleted === "true";
+    const isAll = query?.all === "true" || query?.todayOnly === "false";
+    const targetDate = query?.date || new Date().toISOString().slice(0, 10);
+
     if (!this.isConnected) {
-      const all = Array.from(inMemoryRides.values()).filter(
+      let all = Array.from(inMemoryRides.values()).filter(
         (r) =>
           (!r.isDeleted || r.isDeleted === 0) &&
           (includeCompleted ||
@@ -356,6 +361,21 @@ export class RideRepository extends BaseRepository<Ride> {
               r.status !== "cancelled" &&
               (r as any).status !== "finished")),
       );
+
+      if (!isAll && targetDate) {
+        all = all.filter((r) => {
+          if (r.status === "in_progress" || r.status === "both_travelling") {
+            return true;
+          }
+          const d =
+            (r as any).date ||
+            (r.createdAt ? String(r.createdAt).slice(0, 10) : "");
+          return (
+            d === targetDate || (r.time && String(r.time).includes(targetDate))
+          );
+        });
+      }
+
       const search = query?.search?.toLowerCase();
       const from = query?.from?.toLowerCase();
       const to = query?.to?.toLowerCase();
@@ -392,6 +412,18 @@ export class RideRepository extends BaseRepository<Ride> {
         qb.andWhere("ride.status NOT IN (:...excludeStatuses)", {
           excludeStatuses: ["completed", "cancelled", "finished"],
         });
+      }
+
+      // ORM WHERE clause for current date
+      if (!isAll && targetDate) {
+        qb.andWhere(
+          "(ride.status IN (:...liveStatuses) OR DATE(ride.createdAt) = :targetDate OR ride.time LIKE :datePattern)",
+          {
+            liveStatuses: ["both_travelling", "in_progress"],
+            targetDate,
+            datePattern: `%${targetDate}%`,
+          },
+        );
       }
 
       if (query.vehicleType && query.vehicleType !== "all") {
@@ -1222,6 +1254,39 @@ export class RideRepository extends BaseRepository<Ride> {
     const updated = await this.updateRide(rideId, updatePayload);
     if (!updated) throw new Error("Could not update ride travelling status");
     return updated;
+  }
+
+  /**
+   * Driver confirms having reached the pickup location
+   */
+  async driverArrived(rideId: string): Promise<RideRecord | null> {
+    const existing = await this.findById(rideId);
+    if (!existing) return null;
+
+    const inMem = inMemoryRides.get(rideId);
+    if (inMem) {
+      inMem.isDriverTravelling = true;
+      inMem.isDriverArrived = true;
+      inMem.updatedAt = new Date().toISOString();
+    }
+
+    if (!this.isConnected) {
+      return inMem || existing;
+    }
+
+    try {
+      await this.repo.update(
+        { id: rideId } as any,
+        {
+          isDriverTravelling: true,
+          isDriverArrived: true,
+          updatedAt: new Date(),
+        } as any,
+      );
+      return this.findById(rideId);
+    } catch {
+      return inMem || existing;
+    }
   }
 
   /**

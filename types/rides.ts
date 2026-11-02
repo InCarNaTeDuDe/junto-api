@@ -54,6 +54,7 @@ export interface RideItem {
   departureTimeFormatted?: string;
   arrivalTimeFormatted?: string;
   isDriverTravelling?: boolean;
+  isDriverArrived?: boolean;
   ratings?: Array<{
     id?: string;
     fromUserId?: string;

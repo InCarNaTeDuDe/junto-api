@@ -67,6 +67,7 @@ interface RideStatusStepperProps {
   compact?: boolean;
   hasCoRider?: boolean;
   driverTravelling?: boolean;
+  driverArrived?: boolean;
   passengerTravelling?: boolean;
   otpExchanged?: boolean;
 }
@@ -76,6 +77,7 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
   isDark = true,
   compact = false,
   driverTravelling = false,
+  driverArrived = false,
   passengerTravelling = false,
   otpExchanged = false,
 }) => {
@@ -105,7 +107,19 @@ export const RideStatusStepper: React.FC<RideStatusStepperProps> = ({
   }
 
   let currentStep = STEPS[activeIndex] || STEPS[0];
-  if (normalized === "both_travelling" || (isOtpDone && activeIndex === 2)) {
+  if (driverArrived && !isOtpDone) {
+    currentStep = {
+      key: "confirmed",
+      title: "At Pickup",
+      shortLabel: "2. Arrived",
+      subLabel: "Driver at pickup point • Ready to verify OTP",
+      icon: "location",
+      color: "#38BDF8",
+    };
+  } else if (
+    normalized === "both_travelling" ||
+    (isOtpDone && activeIndex === 2)
+  ) {
     currentStep = {
       key: "both_travelling",
       title: "OTP Exchanged",
