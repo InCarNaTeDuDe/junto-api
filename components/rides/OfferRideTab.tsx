@@ -192,6 +192,7 @@ export default function OfferRideTab({
 
     // Remove spaces for API comparison
     const cleanReg = formatted.replace(/[^A-Z0-9]/g, "");
+    debugger;
 
     // Local active ride check
     if (existingRides && existingRides.length > 0) {

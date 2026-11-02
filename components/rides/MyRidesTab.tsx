@@ -337,6 +337,16 @@ export default function MyRidesTab({
                 (p) => p.status === "confirmed",
               );
               const driverIsTravelling = !!ride.isDriverTravelling;
+              const isStarted =
+                rideState === "both_travelling" ||
+                rideState === "in_progress" ||
+                rideState === "completed" ||
+                ride.status === "in_progress" ||
+                ride.status === "both_travelling" ||
+                ride.status === "completed" ||
+                ride.status === "cancelled" ||
+                driverIsTravelling ||
+                (ride.passengers || []).some((p) => p.isTravelling);
 
               return (
                 <View key={ride.id} style={styles.rideCard}>
@@ -567,19 +577,39 @@ export default function MyRidesTab({
                       </TouchableOpacity>
                     )}
 
-                    {/* Edit button: only appears on rides created by current user */}
+                    {/* Edit button: disabled once ride has started */}
                     {isOwner(ride) && (
                       <TouchableOpacity
-                        style={styles.actionBtnSecondary}
-                        onPress={() => onEditRide(ride)}
-                        activeOpacity={0.8}
+                        style={[
+                          styles.actionBtnSecondary,
+                          isStarted && styles.actionBtnDisabled,
+                        ]}
+                        disabled={isStarted}
+                        onPress={() => {
+                          if (isStarted) {
+                            Alert.alert(
+                              "Edit Disabled",
+                              "Once a ride has started, editing its details is disabled.",
+                            );
+                            return;
+                          }
+                          onEditRide(ride);
+                        }}
+                        activeOpacity={isStarted ? 1 : 0.8}
                       >
                         <Ionicons
                           name="pencil-outline"
                           size={14}
-                          color="#F8FAFC"
+                          color={isStarted ? "#64748B" : "#F8FAFC"}
                         />
-                        <Text style={styles.actionBtnText}>Edit</Text>
+                        <Text
+                          style={[
+                            styles.actionBtnText,
+                            isStarted && styles.actionBtnDisabledText,
+                          ]}
+                        >
+                          Edit
+                        </Text>
                       </TouchableOpacity>
                     )}
 
@@ -1446,6 +1476,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: "#F8FAFC",
+  },
+  actionBtnDisabled: {
+    opacity: 0.45,
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(255, 255, 255, 0.04)",
+  },
+  actionBtnDisabledText: {
+    color: "#64748B",
   },
   actionBtnDanger: {
     flex: 1,

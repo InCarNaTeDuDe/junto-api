@@ -406,14 +406,19 @@ export async function updateRide(
     throw new Error("Unauthorized to modify this ride");
   }
 
-  // Number plate cannot be overridden once the ride has started
-  if (
-    (ride.status === "in_progress" || ride.status === "both_travelling") &&
-    input.registrationNumber &&
-    input.registrationNumber !== ride.registrationNumber
-  ) {
+  // Once ride started EDIT functionality should be disabled
+  const isStarted =
+    ride.status === "in_progress" ||
+    ride.status === "both_travelling" ||
+    ride.status === "completed" ||
+    ride.status === "cancelled" ||
+    (ride as any).status === "finished" ||
+    !!ride.isDriverTravelling ||
+    (ride.passengers || []).some((p) => p.isTravelling);
+
+  if (isStarted) {
     throw new Error(
-      "Vehicle registration number cannot be changed once the ride has started.",
+      "This ride has already started. Editing ride details is disabled.",
     );
   }
 

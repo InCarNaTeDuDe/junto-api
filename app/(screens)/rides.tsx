@@ -547,6 +547,23 @@ export default function RidesScreen() {
 
   // Open Edit Ride Modal with prefilled values
   const openEditRideModal = (ride: RideItem) => {
+    const isRideStarted =
+      ride.status === "in_progress" ||
+      ride.status === "both_travelling" ||
+      ride.status === "completed" ||
+      ride.status === "cancelled" ||
+      (ride as any).status === "finished" ||
+      !!ride.isDriverTravelling ||
+      (ride.passengers || []).some((p) => p.isTravelling);
+
+    if (isRideStarted) {
+      Alert.alert(
+        "Edit Disabled",
+        "Once a ride has started, editing its details is disabled.",
+      );
+      return;
+    }
+
     setEditModalRide(ride);
     setEditPickup(ride.pickupLocation || ride.from || "");
     setEditDrop(ride.dropLocation || ride.to || "");
@@ -583,14 +600,27 @@ export default function RidesScreen() {
   // Save changes to edited ride
   const handleSaveEditRide = async () => {
     if (!editModalRide) return;
-    const pickup = editPickup.trim();
-    const drop = editDrop.trim();
     const isRideStarted =
       editModalRide.status === "in_progress" ||
-      editModalRide.status === "both_travelling";
-    const vehicleNum = isRideStarted
-      ? (editModalRide.registrationNumber || "").trim().toUpperCase()
-      : editVehicleNumber.trim().toUpperCase();
+      editModalRide.status === "both_travelling" ||
+      editModalRide.status === "completed" ||
+      editModalRide.status === "cancelled" ||
+      (editModalRide as any).status === "finished" ||
+      !!editModalRide.isDriverTravelling ||
+      (editModalRide.passengers || []).some((p) => p.isTravelling);
+
+    if (isRideStarted) {
+      Alert.alert(
+        "Edit Disabled",
+        "Once a ride has started, editing its details is disabled.",
+      );
+      setEditModalRide(null);
+      return;
+    }
+
+    const pickup = editPickup.trim();
+    const drop = editDrop.trim();
+    const vehicleNum = editVehicleNumber.trim().toUpperCase();
 
     if (!pickup) {
       Alert.alert("Pickup Required", "Please enter your pickup location.");
@@ -1239,20 +1269,38 @@ export default function RidesScreen() {
     }
   };
 
-  // Vehicle Counts
-  const totalRidesCount = ridesList.length;
-  const carsCount = useMemo(
-    () => ridesList.filter((r) => r.vehicleType === "car").length,
-    [ridesList],
-  );
-  const bikesCount = useMemo(
-    () => ridesList.filter((r) => r.vehicleType === "bike").length,
+  // Active rides for listing (exclude finished, completed, and cancelled rides)
+  const activeListingRides = useMemo(
+    () =>
+      ridesList.filter((ride) => {
+        const s = (ride.status || "").toLowerCase();
+        return s !== "completed" && s !== "finished" && s !== "cancelled";
+      }),
     [ridesList],
   );
 
-  // Filter rides for "Find" tab
+  // Vehicle Counts - active/available rides
+  const totalRidesCount = activeListingRides.length;
+  const carsCount = useMemo(
+    () => activeListingRides.filter((r) => r.vehicleType === "car").length,
+    [activeListingRides],
+  );
+  const bikesCount = useMemo(
+    () => activeListingRides.filter((r) => r.vehicleType === "bike").length,
+    [activeListingRides],
+  );
+
+  // Filter rides for "Find" tab - exclude finished or completed rides
   const filteredRides = useMemo(() => {
     let list = ridesList.filter((ride) => {
+      const status = (ride.status || "").toLowerCase();
+      if (
+        status === "completed" ||
+        status === "finished" ||
+        status === "cancelled"
+      ) {
+        return false;
+      }
       const matchVehicle =
         vehicleFilter === "all" || ride.vehicleType === vehicleFilter;
       const q = searchQuery.toLowerCase().trim();
@@ -1513,7 +1561,7 @@ export default function RidesScreen() {
                 },
               ]}
             >
-              Find rides ({ridesList.length})
+              Find rides ({totalRidesCount})
             </Text>
           </TouchableOpacity>
 

@@ -300,7 +300,11 @@ export class RideRepository extends BaseRepository<Ride> {
   override async findAll<R = RideRecord>(options?: any): Promise<R[]> {
     if (!this.isConnected) {
       return Array.from(inMemoryRides.values()).filter(
-        (r) => !r.isDeleted || r.isDeleted === 0,
+        (r) =>
+          (!r.isDeleted || r.isDeleted === 0) &&
+          r.status !== "completed" &&
+          r.status !== "cancelled" &&
+          (r as any).status !== "finished",
       ) as unknown as R[];
     }
     try {
@@ -328,27 +332,38 @@ export class RideRepository extends BaseRepository<Ride> {
       return rides.map((ride) => this.toRideRecord(ride)) as unknown as R[];
     } catch {
       return Array.from(inMemoryRides.values()).filter(
-        (r) => !r.isDeleted || r.isDeleted === 0,
+        (r) =>
+          (!r.isDeleted || r.isDeleted === 0) &&
+          r.status !== "completed" &&
+          r.status !== "cancelled" &&
+          (r as any).status !== "finished",
       ) as unknown as R[];
     }
   }
 
   /**
    * Database ORM query for listing and filtering rides with criteria and ordering by createdAt DESC.
+   * By default, completed, cancelled, and finished rides are excluded from the public listing.
    */
   async findRides(query: any): Promise<RideRecord[]> {
+    const includeCompleted = query?.includeCompleted === "true";
     if (!this.isConnected) {
       const all = Array.from(inMemoryRides.values()).filter(
-        (r) => !r.isDeleted || r.isDeleted === 0,
+        (r) =>
+          (!r.isDeleted || r.isDeleted === 0) &&
+          (includeCompleted ||
+            (r.status !== "completed" &&
+              r.status !== "cancelled" &&
+              (r as any).status !== "finished")),
       );
-      const search = query.search?.toLowerCase();
-      const from = query.from?.toLowerCase();
-      const to = query.to?.toLowerCase();
+      const search = query?.search?.toLowerCase();
+      const from = query?.from?.toLowerCase();
+      const to = query?.to?.toLowerCase();
       const vehicleType =
-        query.vehicleType && query.vehicleType !== "all"
-          ? query.vehicleType
+        query?.vehicleType && query?.vehicleType !== "all"
+          ? query?.vehicleType
           : null;
-      const availableOnly = query.availableOnly === "true";
+      const availableOnly = query?.availableOnly === "true";
 
       return all.filter((ride) => {
         if (vehicleType && ride.vehicleType !== vehicleType) return false;
@@ -372,6 +387,12 @@ export class RideRepository extends BaseRepository<Ride> {
       const qb = this.repo
         .createQueryBuilder("ride")
         .where("ride.isDeleted = :isDeleted", { isDeleted: 0 });
+
+      if (!includeCompleted) {
+        qb.andWhere("ride.status NOT IN (:...excludeStatuses)", {
+          excludeStatuses: ["completed", "cancelled", "finished"],
+        });
+      }
 
       if (query.vehicleType && query.vehicleType !== "all") {
         qb.andWhere("ride.vehicleType = :vehicleType", {
