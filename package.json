@@ -20,7 +20,9 @@
     "prebuildAndroid": "APP_VARIANT=prod npx expo prebuild --platform android #--clean",
     "prebuildIos": "APP_VARIANT=prod npx expo prebuild --platform ios",
     "android": "npm run prebuildAndroid && npx expo run:android",
-    "ios": "npm run prebuildIos && npx expo run:ios"
+    "ios": "npm run prebuildIos && npx expo run:ios",
+    "eas:build:apk": "npx eas-cli build --platform android --profile preview",
+    "update:ota": "npx eas-cli update --channel preview --message"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

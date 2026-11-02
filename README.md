@@ -167,4 +167,8 @@ npm start
 
 Then Install the APK in your mobile
 
+## Push OTA updates
+
+- npm run update:ota -- "Fixed login and UI bugs"
+
 Enjoy building the future of physical social gatherings with **DayMates**! 🌸🤝🎫

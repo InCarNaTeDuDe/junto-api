@@ -31,7 +31,8 @@ const config: ExpoConfig = {
     },
     package: IS_DEV ? "com.junto.dev" : "com.junto",
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
-    googleServicesFile: "./google-services.json",
+    googleServicesFile:
+      process.env.GOOGLE_SERVICES_JSON || "./google-services.json",
   },
 
   web: {

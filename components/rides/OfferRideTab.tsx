@@ -192,7 +192,6 @@ export default function OfferRideTab({
 
     // Remove spaces for API comparison
     const cleanReg = formatted.replace(/[^A-Z0-9]/g, "");
-    debugger;
 
     // Local active ride check
     if (existingRides && existingRides.length > 0) {
@@ -202,6 +201,15 @@ export default function OfferRideTab({
           .replace(/[^A-Z0-9]/g, "");
 
         if (!rReg || rReg !== cleanReg) return false;
+
+        // If the ride is already completed or cancelled, the vehicle is free and NOT in transit
+        if (
+          r.status === "completed" ||
+          r.status === "cancelled" ||
+          (r as any).status === "finished"
+        ) {
+          return false;
+        }
 
         const isTravelling =
           r.status === "in_progress" ||

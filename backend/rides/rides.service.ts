@@ -679,6 +679,12 @@ export async function completeRide(
 
   const updatedRide = await rideRepository.updateRide(rideId, {
     status: "completed",
+    isDriverTravelling: false,
+    isGpsActive: false,
+    passengers: (ride.passengers || []).map((p) => ({
+      ...p,
+      isTravelling: false,
+    })),
   });
 
   if (!updatedRide) {

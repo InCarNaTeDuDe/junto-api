@@ -322,7 +322,7 @@ export const RideSafetySection: React.FC<RideSafetySectionProps> = ({
             >
               <Ionicons name="flag" size={16} color="#FFFFFF" />
               <Text style={styles.completeRideActionText}>
-                Destination Reached • Complete Ride & Rate
+                Finish your Ride • Complete Ride & Rate
               </Text>
             </TouchableOpacity>
           )}

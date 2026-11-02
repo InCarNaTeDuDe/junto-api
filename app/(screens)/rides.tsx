@@ -404,6 +404,13 @@ export default function RidesScreen() {
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "");
       if (!rReg || rReg !== cleanVehicle) return false;
+      if (
+        r.status === "completed" ||
+        r.status === "cancelled" ||
+        (r as any).status === "finished"
+      ) {
+        return false;
+      }
       return (
         r.status === "in_progress" ||
         r.status === "both_travelling" ||

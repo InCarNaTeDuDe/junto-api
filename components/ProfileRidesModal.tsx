@@ -197,8 +197,54 @@ export default function ProfileRidesModal({
             showsVerticalScrollIndicator={false}
           >
             {filtered.map((ride) => {
-              const isCompleted = ride.status === "completed";
+              const isCompleted =
+                ride.status === "completed" ||
+                (ride as any).status === "finished";
+              const isCancelled = ride.status === "cancelled";
+              const isInProgressOrUpcoming =
+                (ride.status === "in_progress" ||
+                  ride.status === "both_travelling" ||
+                  ride.status === "active") &&
+                !isCompleted &&
+                !isCancelled;
               const isDriver = ride.userRole === "driver";
+
+              // Extract rating for rider or owner
+              let ratingValue: number | null = null;
+              if (isDriver) {
+                const driverRatings = (ride.ratings || []).filter(
+                  (r: any) => r.toRole === "driver" || !r.toRole,
+                );
+                if (driverRatings.length > 0) {
+                  const sum = driverRatings.reduce(
+                    (acc: number, r: any) => acc + Number(r.rating || 0),
+                    0,
+                  );
+                  ratingValue = sum / driverRatings.length;
+                } else if (ride.driverRating && Number(ride.driverRating) > 0) {
+                  ratingValue = Number(ride.driverRating);
+                } else if (ride.rating && Number(ride.rating) > 0) {
+                  ratingValue = Number(ride.rating);
+                }
+              } else {
+                const passengerRatings = (ride.ratings || []).filter(
+                  (r: any) => r.toRole === "passenger",
+                );
+                if (passengerRatings.length > 0) {
+                  const sum = passengerRatings.reduce(
+                    (acc: number, r: any) => acc + Number(r.rating || 0),
+                    0,
+                  );
+                  ratingValue = sum / passengerRatings.length;
+                } else if (ride.ratings && ride.ratings.length > 0) {
+                  ratingValue = Number(ride.ratings[0].rating || 0);
+                } else if (ride.driverRating && Number(ride.driverRating) > 0) {
+                  ratingValue = Number(ride.driverRating);
+                } else if (ride.rating && Number(ride.rating) > 0) {
+                  ratingValue = Number(ride.rating);
+                }
+              }
+
               return (
                 <View
                   key={ride.id}
@@ -207,31 +253,76 @@ export default function ProfileRidesModal({
                     { backgroundColor: t.card, borderColor: t.border },
                   ]}
                 >
-                  {/* Card Header: Role & Status */}
+                  {/* Card Header: Role, Rating & Status */}
                   <View style={s.cardTop}>
-                    <View
-                      style={[
-                        s.roleTag,
-                        {
-                          backgroundColor: isDriver
-                            ? `${t.primary}15`
-                            : "#3B82F615",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={isDriver ? "navigate-circle" : "person"}
-                        size={scale(12)}
-                        color={isDriver ? t.primary : "#3B82F6"}
-                      />
-                      <Text
+                    <View style={s.roleTagRow}>
+                      <View
                         style={[
-                          s.roleText,
-                          { color: isDriver ? t.primary : "#3B82F6" },
+                          s.roleTag,
+                          {
+                            backgroundColor: isDriver
+                              ? `${t.primary}15`
+                              : "#3B82F615",
+                          },
                         ]}
                       >
-                        {isDriver ? "You Drove" : "You Rode"}
-                      </Text>
+                        <Ionicons
+                          name={isDriver ? "navigate-circle" : "person"}
+                          size={scale(12)}
+                          color={isDriver ? t.primary : "#3B82F6"}
+                        />
+                        <Text
+                          style={[
+                            s.roleText,
+                            { color: isDriver ? t.primary : "#3B82F6" },
+                          ]}
+                        >
+                          {isDriver ? "You Drove" : "You Rode"}
+                        </Text>
+                      </View>
+
+                      {/* Star rating for driver or rider */}
+                      {ratingValue !== null && ratingValue > 0 && (
+                        <View style={s.ratingBadge}>
+                          {/* <View style={s.starsRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Ionicons
+                                key={star}
+                                name={
+                                  star <= Math.floor(ratingValue!)
+                                    ? "star"
+                                    : star - 0.5 <= ratingValue!
+                                      ? "star-half"
+                                      : "star-outline"
+                                }
+                                size={scale(11)}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </View> */}
+                          <Text
+                            style={[s.ratingBadgeText, { color: "#F59E0B" }]}
+                          >
+                            {Number(ratingValue) % 1 === 0
+                              ? Number(ratingValue).toFixed(0)
+                              : Number(ratingValue).toFixed(1)}{" "}
+                            {[1 /*, 2, 3, 4, 5*/].map((star) => (
+                              <Ionicons
+                                key={star}
+                                name={
+                                  star <= Math.floor(ratingValue!)
+                                    ? "star"
+                                    : star - 0.5 <= ratingValue!
+                                      ? "star-half"
+                                      : "star-outline"
+                                }
+                                size={scale(11)}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     <View
@@ -242,7 +333,7 @@ export default function ProfileRidesModal({
                             ? "#10B981"
                             : ride.status === "active"
                               ? "#3B82F6"
-                              : ride.status === "cancelled"
+                              : isCancelled
                                 ? "#6B7280"
                                 : "#F59E0B",
                         },
@@ -251,7 +342,12 @@ export default function ProfileRidesModal({
                       <Text style={s.statusText}>
                         {isCompleted
                           ? "Completed ✓"
-                          : ride.status?.toUpperCase() || "ACTIVE"}
+                          : isCancelled
+                            ? "Cancelled"
+                            : ride.status === "in_progress" ||
+                                ride.status === "both_travelling"
+                              ? "In Transit"
+                              : "Active"}
                       </Text>
                     </View>
                   </View>
@@ -320,7 +416,7 @@ export default function ProfileRidesModal({
                     </Text>
                   </View>
 
-                  {/* Footer with action */}
+                  {/* Footer with action - Only show View in Rides if NOT completed */}
                   <View style={s.cardFooter}>
                     <Text style={[s.driverLabel, { color: t.sub }]}>
                       {isDriver
@@ -328,28 +424,30 @@ export default function ProfileRidesModal({
                         : `Driver: ${ride.driverName || "Community Member"}`}
                     </Text>
 
-                    <TouchableOpacity
-                      style={[
-                        s.viewBtn,
-                        {
-                          backgroundColor: t.cardSecondary,
-                          borderColor: t.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        onClose();
-                        router.push("/(screens)/rides");
-                      }}
-                    >
-                      <Text style={[s.viewBtnText, { color: t.text }]}>
-                        View in Rides
-                      </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={scale(12)}
-                        color={t.sub}
-                      />
-                    </TouchableOpacity>
+                    {isInProgressOrUpcoming && (
+                      <TouchableOpacity
+                        style={[
+                          s.viewBtn,
+                          {
+                            backgroundColor: t.cardSecondary,
+                            borderColor: t.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          onClose();
+                          router.push("/(screens)/rides");
+                        }}
+                      >
+                        <Text style={[s.viewBtnText, { color: t.text }]}>
+                          View in Rides
+                        </Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={scale(12)}
+                          color={t.sub}
+                        />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -426,6 +524,33 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  roleTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(6),
+    flexWrap: "wrap",
+    flex: 1,
+  },
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.3)",
+    paddingHorizontal: scale(7),
+    paddingVertical: verticalScale(3),
+    borderRadius: scale(8),
+    gap: scale(4),
+  },
+  starsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(1),
+  },
+  ratingBadgeText: {
+    fontSize: moderateScale(11),
+    fontWeight: "700",
   },
   roleTag: {
     flexDirection: "row",
